@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import os
 import re
 import shutil
 import subprocess
@@ -43,11 +44,14 @@ DIST = ROOT / "dist"
 ISS = ROOT / "installer.iss"
 BINARIES = ("CS2 Launcher.exe", "cs2cfg.exe")
 
-# Where Inno Setup's compiler normally lands. Looked for rather than assumed to
-# be on PATH, because its installer does not put it there.
-ISCC_CANDIDATES = (
-    r"C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
-    r"C:\Program Files\Inno Setup 6\ISCC.exe",
+# Where Inno Setup's compiler lands. Looked for rather than assumed to be on
+# PATH, because its installer does not put it there. The per-user location is
+# first: that is where winget puts it, and winget is how the README says to
+# install it -- looking only under Program Files missed a working install.
+ISCC_HOMES = (
+    os.environ.get("LOCALAPPDATA", ""),
+    os.environ.get("ProgramFiles(x86)", ""),
+    os.environ.get("ProgramFiles", ""),
 )
 
 
@@ -55,9 +59,14 @@ def find_iscc() -> str:
     found = shutil.which("ISCC") or shutil.which("iscc")
     if found:
         return found
-    for candidate in ISCC_CANDIDATES:
-        if Path(candidate).is_file():
-            return candidate
+    for home in ISCC_HOMES:
+        if not home:
+            continue
+        for folder in ("Programs", ""):
+            for version in ("Inno Setup 6", "Inno Setup 5"):
+                candidate = Path(home) / folder / version / "ISCC.exe"
+                if candidate.is_file():
+                    return str(candidate)
     return ""
 
 
@@ -304,11 +313,20 @@ def main() -> int:
         print()
         return 0
 
+    # Both tools are checked before anything is run, built or written. The
+    # first release discovered a missing Inno Setup only after the tests, the
+    # build and the packaging had already happened.
     if not has_gh:
         raise Stop(
             "the GitHub CLI (`gh`) is not installed, so this cannot publish.\n"
             "    winget install --id GitHub.cli\n"
             "  then sign in once with:  gh auth login")
+    if not find_iscc():
+        raise Stop(
+            "Inno Setup is not installed, so the installer edition cannot be "
+            "built.\n    winget install -e --id JRSoftware.InnoSetup\n"
+            "  Releases carry both editions, so this is not optional -- an "
+            "installed copy\n  looks for the Setup.exe and would find nothing.")
 
     dirty = run(["git", "status", "--porcelain"], capture=True)
     if dirty:
@@ -316,6 +334,30 @@ def main() -> int:
                    "first, so the release matches what is in the repository:\n"
                    + "\n".join("    " + line for line in dirty.splitlines()))
 
+    # Everything written before the push is remembered, so a failure can put
+    # it all back. Nothing here is committed until step 6.
+    written = {path: path.read_bytes()
+               for path in (INIT, UPDATES, ISS) if path.is_file()}
+
+    def undo(why: str) -> None:
+        for path, before in written.items():
+            if path.read_bytes() != before:
+                path.write_bytes(before)
+                print(f"    put back {path.name}")
+        print(f"\n  nothing was published. {why}\n")
+
+    try:
+        return _publish(args, repo, previous, version, notes)
+    except Stop:
+        undo("The working tree is back as it was.")
+        raise
+    except KeyboardInterrupt:
+        undo("Interrupted.")
+        raise
+
+
+def _publish(args, repo: str, previous: str, version: str, notes: str) -> int:
+    """The steps that change things. Wrapped by main so they can be undone."""
     print("\n  [1/6] pointing the updater at the release repository")
     if point_updater_at(repo):
         print(f"    DEFAULT_REPO = {repo!r}")
@@ -348,7 +390,8 @@ def main() -> int:
          "--title", f"{version}", "--notes", notes])
 
     print(f"\n  published: https://github.com/{repo}/releases/tag/v{version}")
-    print("  Installed copies will be offered it within five minutes.\n")
+    print("  Both editions are attached. Installed copies will be offered it")
+    print("  within five minutes.\n")
     return 0
 
 
