@@ -70,6 +70,27 @@ def find_iscc() -> str:
     return ""
 
 
+# Same problem as the compiler above, and the same answer. A shell started
+# before the CLI was installed has a PATH that predates it, so `which` reports
+# nothing while a perfectly good, signed-in gh sits where the installer put it.
+GH_CANDIDATES = (
+    os.path.join(os.environ.get("ProgramFiles", ""), "GitHub CLI", "gh.exe"),
+    os.path.join(os.environ.get("ProgramFiles(x86)", ""), "GitHub CLI", "gh.exe"),
+    os.path.join(os.environ.get("LOCALAPPDATA", ""),
+                 "Programs", "GitHub CLI", "gh.exe"),
+)
+
+
+def find_gh() -> str:
+    found = shutil.which("gh")
+    if found:
+        return found
+    for candidate in GH_CANDIDATES:
+        if candidate and Path(candidate).is_file():
+            return candidate
+    return ""
+
+
 class Stop(SystemExit):
     """A refusal with a reason, printed without a traceback."""
 
@@ -288,7 +309,8 @@ def main() -> int:
         notes = f"Version {version}."
 
     repo = origin_repo()
-    has_gh = bool(shutil.which("gh"))
+    gh = find_gh()
+    has_gh = bool(gh)
 
     print(f"\n  releasing {previous} -> {version}   to {repo}")
     if args.dry_run:
@@ -386,7 +408,7 @@ def _publish(args, repo: str, previous: str, version: str, notes: str) -> int:
     run(["git", "tag", "-a", f"v{version}", "-m", f"Release {version}"])
     run(["git", "push", "origin", "HEAD"])
     run(["git", "push", "origin", f"v{version}"])
-    run(["gh", "release", "create", f"v{version}", str(archive), str(setup),
+    run([find_gh(), "release", "create", f"v{version}", str(archive), str(setup),
          "--title", f"{version}", "--notes", notes])
 
     print(f"\n  published: https://github.com/{repo}/releases/tag/v{version}")
