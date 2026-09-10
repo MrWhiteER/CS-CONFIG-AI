@@ -16,6 +16,8 @@ import io
 import json
 import sys
 import tempfile
+import threading
+import time
 import unittest
 import zipfile
 from pathlib import Path
@@ -261,22 +263,112 @@ class TheTimer(unittest.TestCase):
     def test_an_unchanged_feed_keeps_what_it_already_knew(self):
         """GitHub answers 304 with no body; the known release must survive."""
         checker = self._checker(updates.Release(version="1.4.0"))
+        checker._state = updates.AVAILABLE
         with mock.patch.object(updates, "configured", lambda: True), \
              mock.patch.object(updates, "fetch_latest",
-                               return_value=(None, "etag-2")):
+                               return_value=(None, "etag-2", updates.Rate(60, 55, 0))):
             checker.check_once()
-        self.assertEqual(checker.summary()["latest"]["version"], "1.4.0")
+        summary = checker.summary()
+        self.assertEqual(summary["latest"]["version"], "1.4.0")
+        self.assertEqual(summary["error"], "", "a 304 is not a failure")
+        self.assertNotEqual(summary["state"], updates.ERROR)
 
     def test_auto_download_is_off_unless_asked_for(self):
         self.assertFalse(updates.Checker().summary()["auto_download"])
         self.assertTrue(
             updates.Checker(auto_download=True).summary()["auto_download"])
 
+    def test_a_full_check_records_what_is_left_of_the_budget(self):
+        checker = self._checker()
+        with mock.patch.object(updates, "configured", lambda: True), \
+             mock.patch.object(updates, "fetch_latest",
+                               return_value=(updates.Release(version="1.4.0"),
+                                             "e", updates.Rate(60, 41, 0))):
+            checker.check_once()
+        self.assertEqual(checker.summary()["rate"]["remaining"], 41)
+
     def test_it_never_installs_on_its_own(self):
         """The whole point: downloading may be automatic, installing is not."""
         source = Path(updates.__file__).read_text(encoding="utf-8")
         loop = source[source.index("def _run(self)"):source.index("def start(self)")]
         self.assertNotIn("install", loop)
+
+
+class TheRateLimit(unittest.TestCase):
+    """GitHub allows 60 an hour per address, and a 304 costs one of them.
+
+    That was measured against the live rate_limit endpoint rather than assumed:
+    a full request took it 59 -> 58, and a conditional request answered 304 took
+    it 58 -> 57. Several copies behind one router therefore share one budget,
+    which is what the backing-off below exists for.
+    """
+
+    def test_headers_are_read_into_a_budget(self):
+        rate = updates._rate_from({
+            "X-RateLimit-Limit": "60", "X-RateLimit-Remaining": "37",
+            "X-RateLimit-Reset": "1789050000"})
+        self.assertEqual((rate.limit, rate.remaining), (60, 37))
+        self.assertTrue(rate.known)
+
+    def test_missing_headers_mean_nothing_is_known(self):
+        self.assertFalse(updates._rate_from({}).known)
+
+    def test_a_healthy_budget_keeps_the_asked_for_interval(self):
+        checker = updates.Checker(interval=300.0)
+        checker._rate = updates.Rate(60, 55, time.time() + 3000)
+        self.assertEqual(checker._delay(), 300.0)
+
+    def test_a_thin_budget_stretches_the_interval(self):
+        """Five left and half an hour to go: slow to fit, not to fail."""
+        checker = updates.Checker(interval=300.0)
+        checker._rate = updates.Rate(60, 5, time.time() + 1800)
+        delay = checker._delay()
+        self.assertGreater(delay, 300.0)
+        self.assertLessEqual(delay, 1800.0)
+
+    def test_an_exhausted_budget_waits_for_the_window(self):
+        checker = updates.Checker(interval=300.0)
+        checker._rate = updates.Rate(60, 0, time.time() + 900)
+        self.assertGreaterEqual(checker._delay(), 900.0)
+
+    def test_the_interval_is_a_floor_never_a_ceiling(self):
+        """A generous budget must not make it poll faster than asked."""
+        checker = updates.Checker(interval=300.0)
+        checker._rate = updates.Rate(60, 59, time.time() + 10)
+        self.assertEqual(checker._delay(), 300.0)
+
+    def test_being_rate_limited_is_not_an_error_state(self):
+        """The network is fine and so is the app; there is just nothing to ask."""
+        checker = updates.Checker()
+        limited = updates.RateLimited(updates.Rate(60, 0, time.time() + 600))
+        with mock.patch.object(updates, "configured", lambda: True), \
+             mock.patch.object(updates, "fetch_latest", side_effect=limited):
+            checker.check_once()
+        summary = checker.summary()
+        self.assertNotEqual(summary["state"], updates.ERROR)
+        self.assertIn("limit", summary["error"])
+
+    def test_a_known_release_survives_being_rate_limited(self):
+        checker = updates.Checker(current="1.0.0")
+        checker._latest = updates.Release(version="1.4.0")
+        checker._state = updates.AVAILABLE
+        limited = updates.RateLimited(updates.Rate(60, 0, time.time() + 600))
+        with mock.patch.object(updates, "configured", lambda: True), \
+             mock.patch.object(updates, "fetch_latest", side_effect=limited):
+            checker.check_once()
+        self.assertEqual(checker.summary()["latest"]["version"], "1.4.0")
+        self.assertTrue(checker.summary()["available"])
+
+    def test_summary_does_not_deadlock(self):
+        """summary() holds the lock and calls _delay(); the lock is not reentrant."""
+        checker = updates.Checker()
+        checker._rate = updates.Rate(60, 3, time.time() + 600)
+        done = []
+        worker = threading.Thread(target=lambda: done.append(checker.summary()))
+        worker.start()
+        worker.join(timeout=5)
+        self.assertFalse(worker.is_alive(), "summary() deadlocked")
+        self.assertEqual(len(done), 1)
 
 
 if __name__ == "__main__":

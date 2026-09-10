@@ -54,6 +54,40 @@ TIMEOUT = 15.0
 # else attached to it is ignored by the updater.
 ASSET_SUFFIX = ".zip"
 
+# Unauthenticated GitHub allows 60 requests an hour, counted per address rather
+# than per machine -- so several copies behind one router share one budget.
+# Below this much of it left, checking slows down to fit what remains.
+EASE_OFF_BELOW = 20
+
+
+@dataclass
+class Rate:
+    """What GitHub said was left of the budget, from the response headers."""
+
+    limit: int = -1
+    remaining: int = -1
+    reset: float = 0.0
+
+    @property
+    def known(self) -> bool:
+        return self.remaining >= 0
+
+    def as_dict(self) -> Dict[str, object]:
+        return {"limit": self.limit, "remaining": self.remaining,
+                "reset": self.reset}
+
+
+def _rate_from(headers) -> Rate:
+    def number(name, fallback=-1):
+        try:
+            return int(headers.get(name, ""))
+        except (TypeError, ValueError):
+            return fallback
+
+    return Rate(limit=number("X-RateLimit-Limit"),
+                remaining=number("X-RateLimit-Remaining"),
+                reset=float(number("X-RateLimit-Reset", 0)))
+
 
 def repo() -> str:
     return os.environ.get(REPO_ENV) or DEFAULT_REPO
@@ -129,11 +163,11 @@ class Release:
 
 
 def _get(url: str, etag: str = "") -> tuple:
-    """Fetch a URL, returning (status, body, etag).
+    """Fetch a URL, returning (status, body, etag, rate).
 
     A 304 comes back with no body and the caller keeps what it already had.
-    Asking with the previous ETag does not count against the unauthenticated
-    rate limit, which matters when polling every five minutes.
+    It still costs a request against the rate limit -- measured, not assumed --
+    so the ETag saves bandwidth here, not budget.
     """
     request = urllib.request.Request(url, headers={
         "User-Agent": _user_agent(),
@@ -144,10 +178,16 @@ def _get(url: str, etag: str = "") -> tuple:
         request.add_header("If-None-Match", etag)
     try:
         with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
-            return response.status, response.read(), response.headers.get("ETag", "")
+            return (response.status, response.read(),
+                    response.headers.get("ETag", ""), _rate_from(response.headers))
     except urllib.error.HTTPError as exc:
+        # The headers on a refusal are the useful part: they say when the
+        # budget comes back.
+        rate = _rate_from(getattr(exc, "headers", None) or {})
         if exc.code == 304:
-            return 304, b"", etag
+            return 304, b"", etag, rate
+        if exc.code in (403, 429) and rate.known and rate.remaining == 0:
+            raise RateLimited(rate) from exc
         raise
 
 
@@ -177,17 +217,28 @@ def parse_release(data: Dict[str, object]) -> Release:
     return release
 
 
-def fetch_latest(etag: str = "") -> tuple:
-    """The newest published release as (Release, etag).
+class RateLimited(RuntimeError):
+    """GitHub has nothing left for this address until the window resets."""
 
-    Returns (None, etag) when GitHub says nothing has changed. Uses the
+    def __init__(self, rate: Rate) -> None:
+        self.rate = rate
+        minutes = max(0, int((rate.reset - time.time()) / 60))
+        super().__init__(
+            "GitHub's hourly limit for this network is used up"
+            + (f"; it resets in about {minutes} min" if minutes else ""))
+
+
+def fetch_latest(etag: str = "") -> tuple:
+    """The newest published release as (Release, etag, rate).
+
+    Returns (None, etag, rate) when GitHub says nothing has changed. Uses the
     "latest" endpoint, which by definition skips drafts and pre-releases, so
     work in progress can be pushed without every user being offered it.
     """
-    status, body, new_etag = _get(f"{API}/repos/{repo()}/releases/latest", etag)
+    status, body, new_etag, rate = _get(f"{API}/repos/{repo()}/releases/latest", etag)
     if status == 304:
-        return None, new_etag
-    return parse_release(json.loads(body.decode("utf-8"))), new_etag
+        return None, new_etag, rate
+    return parse_release(json.loads(body.decode("utf-8"))), new_etag, rate
 
 
 # --------------------------------------------------------------------------
@@ -421,6 +472,7 @@ class Checker:
         self._auto = bool(auto_download)
         self._skip = skip or ""
         self._want = False
+        self._rate = Rate()
 
     # -- what the server reads --------------------------------------------
     def summary(self) -> Dict[str, object]:
@@ -442,6 +494,8 @@ class Checker:
                 "available": newer,
                 "done": self._done,
                 "total": self._total,
+                "rate": self._rate.as_dict(),
+                "next_in": round(self._delay(), 1),
             }
             out["latest"] = latest.as_dict() if latest else None
             # The popup should appear for a new version the user has not
@@ -483,13 +537,23 @@ class Checker:
             return
         self._set(state=CHECKING, error="")
         try:
-            found, etag = fetch_latest(self._etag)
-        except Exception as exc:                      # network, DNS, rate limit
+            found, etag, rate = fetch_latest(self._etag)
+        except RateLimited as exc:
+            # Not a failure worth alarming anyone about: the timer below will
+            # simply wait for the window to come back.
+            with self._lock:
+                self._rate = exc.rate
+                self._checked = time.time()
+            self._set(state=IDLE if self._latest is None else self._state,
+                      error=str(exc))
+            return
+        except Exception as exc:                      # network, DNS, refusal
             self._set(state=ERROR, error=str(exc), checked=time.time())
             return
 
         with self._lock:
             self._etag = etag
+            self._rate = rate
             self._checked = time.time()
             if found is not None:
                 self._latest = found
@@ -524,6 +588,26 @@ class Checker:
         clean_old(keep=latest.version)
         self._set(state=READY)
 
+    def _delay(self) -> float:
+        """How long to wait before asking again.
+
+        The configured interval is a floor, never a ceiling. When the budget
+        for this address is running low, whatever is left is spread over the
+        time until it resets -- so several copies behind one router slow each
+        other down rather than locking each other out.
+
+        Deliberately does not take the lock: summary() calls this while already
+        holding it, and the lock is not reentrant. One attribute read is atomic
+        here, and choosing a delay from a slightly stale budget is harmless.
+        """
+        rate = self._rate
+        if not rate.known or rate.remaining > EASE_OFF_BELOW:
+            return self.interval
+        left = max(1.0, rate.reset - time.time())
+        if rate.remaining <= 0:
+            return max(self.interval, left + 5)
+        return max(self.interval, left / rate.remaining)
+
     def _run(self) -> None:
         # A first check shortly after start, so a user who opens the window and
         # closes it a minute later still finds out. Then on the interval.
@@ -533,7 +617,7 @@ class Checker:
             if self._stop.is_set():
                 return
             self._wake.clear()
-            delay = self.interval
+            delay = self._delay()
 
             self.check_once()
             with self._lock:
