@@ -23,7 +23,46 @@ this one touches all three, and backs up all three together.
 
 ---
 
-## Install
+## Download
+
+Grab the latest build from the [releases page][releases] -- one zip with two
+executables in it. Unpack it anywhere you like and run **CS2 Launcher.exe**.
+
+There is nothing to install. No Python, no account, no sign-in. Everything the
+application writes goes in a `cs2cfg-data` folder next to the executable, so it
+runs from a USB stick and leaves nothing behind on a machine it visited.
+
+[releases]: ../../releases/latest
+
+### Staying up to date
+
+While it is open it asks GitHub for the latest release every five minutes, and
+tells you when there is one -- a notice in the corner, wherever you happen to
+be in the application, and an **Updates** tab with the details.
+
+What happens next is yours to choose:
+
+| | |
+|---|---|
+| **Download now** | fetch it when you press the button |
+| **Download in the background** | a setting in the Updates tab; it fetches as soon as a release appears |
+| **Install now** | put it in place and restart, right away |
+| **Later** | leave it downloaded and sitting there; install whenever |
+| **Skip this version** | stop being told about this one, but still hear about the next |
+
+Downloading and installing are separate on purpose. A new version can be sitting
+on your disk for a week and nothing changes until you say so -- which matters
+when the thing you would be restarting is the thing that just set up your game.
+
+The download is checked against the checksum GitHub publishes for it before it
+is unpacked, and a failed install leaves the working version exactly where it
+was.
+
+---
+
+## Install from source
+
+### Requirements
 
 ```
 winget install -e --id Python.Python.3.13
@@ -527,6 +566,39 @@ cs2cfg.bat update --reset      go back to the bundled tables
 The bundle is one JSON object keyed by filename. Nothing is written until every
 member parses and passes a schema check, so a truncated download cannot leave a
 half-updated knowledge base behind.
+
+---
+
+## Releasing
+
+Publishing is one command, run by hand, and it is the only thing in this
+project that reaches outside the machine:
+
+```
+py tools/release.py 1.1.0 --notes "What changed"
+py tools/release.py 1.1.0 --dry-run       # print the plan, do none of it
+```
+
+It runs the tests, sets the version, builds, zips both executables, tags,
+pushes, and publishes the release with the archive attached. It refuses to go
+if the working tree is dirty, if the version is not newer than the current one,
+or if `gh` is missing -- so a half-finished release is not a state it can
+leave behind.
+
+The repository the built application checks against is not typed in anywhere.
+It is read from the `origin` remote and written into the source before the
+build, so a build cannot point somewhere its own repository does not.
+
+Nothing publishes on its own. There is no scheduled job, no hook, and no step
+in the build that pushes. Until this command is run, a change exists only on
+the machine it was made on.
+
+Requires the [GitHub CLI](https://cli.github.com/), signed in once:
+
+```
+winget install --id GitHub.cli
+gh auth login
+```
 
 ---
 
