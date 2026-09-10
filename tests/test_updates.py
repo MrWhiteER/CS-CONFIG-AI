@@ -382,6 +382,19 @@ class TheRateLimit(unittest.TestCase):
         self.assertEqual(checker.summary()["latest"]["version"], "1.4.0")
         self.assertTrue(checker.summary()["available"])
 
+    def test_nothing_published_yet_is_not_an_error(self):
+        """Before the first release, and every user's first launch after it."""
+        checker = updates.Checker()
+        with mock.patch.object(updates, "configured", lambda: True), \
+             mock.patch.object(updates, "fetch_latest",
+                               side_effect=updates.NoReleasesYet()):
+            checker.check_once()
+        summary = checker.summary()
+        self.assertEqual(summary["state"], updates.IDLE)
+        self.assertNotIn("404", summary["error"],
+                         "a bare status code tells the reader nothing")
+        self.assertIn("no releases", summary["error"])
+
     def test_summary_does_not_deadlock(self):
         """summary() holds the lock and calls _delay(); the lock is not reentrant."""
         checker = updates.Checker()

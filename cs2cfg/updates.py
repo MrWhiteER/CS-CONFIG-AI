@@ -195,6 +195,8 @@ def _get(url: str, etag: str = "") -> tuple:
             return 304, b"", etag, rate
         if exc.code in (403, 429) and rate.known and rate.remaining == 0:
             raise RateLimited(rate) from exc
+        if exc.code == 404:
+            raise NoReleasesYet() from exc
         raise
 
 
@@ -228,6 +230,18 @@ def parse_release(data: Dict[str, object], kind: str = "") -> Release:
             release.asset_sha256 = digest.split(":", 1)[1]
         break
     return release
+
+
+class NoReleasesYet(RuntimeError):
+    """The repository has published nothing, or is not there at all.
+
+    GitHub answers 404 for both, and does not distinguish them without another
+    request. Neither is worth alarming anyone about: there is simply nothing
+    newer than what is already running.
+    """
+
+    def __init__(self) -> None:
+        super().__init__("no releases have been published yet")
 
 
 class RateLimited(RuntimeError):
@@ -674,6 +688,11 @@ class Checker:
         self._set(state=CHECKING, error="")
         try:
             found, etag, rate = fetch_latest(self._etag)
+        except NoReleasesYet as exc:
+            # Nothing published: up to date by definition, and the panel says
+            # so rather than showing a bare status code.
+            self._set(state=IDLE, error=str(exc), checked=time.time())
+            return
         except RateLimited as exc:
             # Not a failure worth alarming anyone about: the timer below will
             # simply wait for the window to come back.
