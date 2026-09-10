@@ -361,40 +361,71 @@ def clean_old(keep: str = "") -> None:
 # installing
 
 SWAP_SCRIPT = """@echo off
-setlocal
+setlocal EnableDelayedExpansion
 rem Written by cs2-autoconfig to finish an update. Windows will not let a
 rem running executable be replaced, so this waits for the application to close
 rem before copying the new files over it.
 set "LOG=%~dp0swap.log"
-echo [%date% %time%] waiting for pid {pid} > "%LOG%"
+echo [%date% %time%] waiting for pid @@PID@@ > "%LOG%"
 
 set /a TRIES=0
-:wait
-tasklist /fi "PID eq {pid}" 2>nul | find "{pid}" >nul
-if errorlevel 1 goto copyfiles
+:waitpid
+tasklist /fi "PID eq @@PID@@" 2>nul | find "@@PID@@" >nul
+if errorlevel 1 goto waitlocks
 set /a TRIES+=1
-if %TRIES% GTR 120 (
-  echo [%date% %time%] gave up waiting >> "%LOG%"
-  goto done
+if !TRIES! GTR 120 (
+  echo [%date% %time%] gave up waiting for the window >> "%LOG%"
+  goto copyfiles
 )
 ping -n 2 127.0.0.1 >nul
-goto wait
+goto waitpid
+
+:waitlocks
+rem A second window or a console copy running out of the same folder holds a
+rem lock on a file about to be overwritten. Wait for those too -- they belong
+rem to the user, so they are not killed.
+set /a TRIES=0
+:lockloop
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$t='@@TARGET@@'; $p=Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($t,'OrdinalIgnoreCase') }; if ($p) { exit 1 } exit 0"
+if not errorlevel 1 goto copyfiles
+set /a TRIES+=1
+if !TRIES! GTR 30 (
+  echo [%date% %time%] something is still running from the folder; trying anyway >> "%LOG%"
+  goto copyfiles
+)
+echo [%date% %time%] still in use, waiting >> "%LOG%"
+ping -n 3 127.0.0.1 >nul
+goto lockloop
 
 :copyfiles
 echo [%date% %time%] copying >> "%LOG%"
-robocopy "{ready}" "{target}" /E /IS /IT /R:3 /W:1 /XF .complete >> "%LOG%" 2>&1
+robocopy "@@READY@@" "@@TARGET@@" /E /IS /IT /R:5 /W:2 /XF .complete >> "%LOG%" 2>&1
 rem robocopy reports 0-7 for success; 8 and above mean nothing was copied.
 if %ERRORLEVEL% GEQ 8 (
   echo [%date% %time%] copy failed, leaving the old version in place >> "%LOG%"
   goto done
 )
 echo [%date% %time%] restarting >> "%LOG%"
-if not "{relaunch}"=="" start "" "{relaunch}"
+if not "@@RELAUNCH@@"=="" start "" "@@RELAUNCH@@"
 
 :done
 rem Remove this script now that it has finished with itself.
 (goto) 2>nul & del "%~f0"
 """
+
+
+def _fill(pid: int, ready: str, target: str, relaunch: str) -> str:
+    """Fill the template by token, not by format.
+
+    The script contains PowerShell, and PowerShell is mostly braces. str.format
+    would need every one of them doubled, and one missed pair produces a script
+    that runs and does the wrong thing.
+    """
+    out = SWAP_SCRIPT
+    for token, value in (("@@PID@@", str(pid)), ("@@READY@@", ready),
+                         ("@@TARGET@@", target), ("@@RELAUNCH@@", relaunch)):
+        out = out.replace(token, value)
+    return out
 
 
 def install(release: Release, relaunch: bool = True) -> Path:
@@ -415,7 +446,7 @@ def install(release: Release, relaunch: bool = True) -> Path:
 
     script = staging_dir() / "swap.cmd"
     script.parent.mkdir(parents=True, exist_ok=True)
-    script.write_text(SWAP_SCRIPT.format(
+    script.write_text(_fill(
         pid=os.getpid(),
         ready=str(ready),
         target=str(app_dir()),

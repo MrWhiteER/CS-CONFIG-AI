@@ -206,11 +206,34 @@ class Installing(unittest.TestCase):
 
     def test_the_swap_script_waits_before_it_copies(self):
         """Copying over a running exe fails on Windows, so order matters."""
-        script = updates.SWAP_SCRIPT
-        self.assertLess(script.index(":wait"), script.index(":copyfiles"))
+        script = updates._fill(pid=4321, ready=r"C:\ready", target=r"C:\app",
+                               relaunch=r"C:\app\CS2 Launcher.exe")
+        order = [script.index(":waitpid"), script.index(":waitlocks"),
+                 script.index("\n:copyfiles")]
+        self.assertEqual(order, sorted(order),
+                         "it must wait for the window, then for any other "
+                         "lock holder, and only then copy")
         self.assertIn("tasklist", script)
         # A failed copy must leave the working version alone.
         self.assertIn("leaving the old version in place", script)
+
+    def test_the_swap_script_waits_for_other_copies_too(self):
+        """A console cs2cfg.exe left open locks a file the copy needs."""
+        script = updates._fill(pid=1, ready=r"C:\ready", target=r"C:\app",
+                               relaunch="")
+        self.assertIn("StartsWith", script, "it should look for processes by path")
+        self.assertNotIn("taskkill", script.lower(),
+                         "a window the user opened is theirs; wait, do not kill")
+
+    def test_every_token_in_the_swap_script_is_filled(self):
+        """A leftover token would run as a literal and do the wrong thing."""
+        script = updates._fill(pid=7, ready=r"C:\r", target=r"C:\t", relaunch="")
+        self.assertNotIn("@@", script)
+
+    def test_both_waits_are_bounded(self):
+        """Something that never lets go must not hang the update forever."""
+        script = updates._fill(pid=7, ready=r"C:\r", target=r"C:\t", relaunch="")
+        self.assertEqual(script.count("GTR"), 2)
 
 
 class TheTimer(unittest.TestCase):
