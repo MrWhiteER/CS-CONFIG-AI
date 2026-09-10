@@ -585,9 +585,14 @@ Publishing is one command, run by hand, and it is the only thing in this
 project that reaches outside the machine:
 
 ```
-py tools/release.py 1.1.0 --notes "What changed"
-py tools/release.py 1.1.0 --dry-run       # print the plan, do none of it
+py tools/release.py                       # next patch, notes from the commits
+py tools/release.py minor                 # or major, or an explicit 1.4.0
+py tools/release.py --dry-run             # print the plan, do none of it
 ```
+
+With no arguments it steps the last number up by one and writes the notes from
+the commit subjects since the previous tag -- so a release needs nothing typed
+but the command, and the changelog is whatever the commits already said.
 
 It runs the tests, sets the version, builds, zips both executables, tags,
 pushes, and publishes the release with the archive attached. It refuses to go

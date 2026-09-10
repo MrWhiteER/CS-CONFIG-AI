@@ -5,8 +5,14 @@ GitHub and publishes a release that every installed copy will be offered
 within five minutes. Nothing else in the project does that, and nothing calls
 this automatically -- it exists to be run deliberately, by hand.
 
-    py tools/release.py 1.1.0 --notes "What changed"
-    py tools/release.py 1.1.0 --dry-run        # say what would happen, do none of it
+    py tools/release.py                        # next patch, notes from the commits
+    py tools/release.py minor                  # or major, or an explicit 1.4.0
+    py tools/release.py --dry-run              # say what would happen, do none of it
+    py tools/release.py --notes "..."          # override the generated notes
+
+With no arguments it steps the last number up by one and writes the notes from
+the commit subjects since the previous tag, so publishing needs nothing typed
+but the command itself.
 
 The order matters. Tests run before the version is touched, the build runs
 before anything is pushed, and the tag is only pushed once there is an
@@ -110,6 +116,46 @@ def as_numbers(version: str) -> tuple:
     return tuple(parts)
 
 
+def resolve_version(asked: str, current: str) -> str:
+    """Work out the version to publish.
+
+    "patch", "minor", "major" step up from what is there now; anything else is
+    taken as an explicit version and checked below. Defaulting to a patch bump
+    is what makes a release a single word -- the common case is a handful of
+    fixes, and that is exactly what the last number is for.
+    """
+    major, minor, patch = as_numbers(current)
+    step = (asked or "patch").strip().lower()
+    if step == "patch":
+        return f"{major}.{minor}.{patch + 1}"
+    if step == "minor":
+        return f"{major}.{minor + 1}.0"
+    if step == "major":
+        return f"{major + 1}.0.0"
+    return step.lstrip("vV")
+
+
+def last_tag() -> str:
+    """The most recent release tag, or "" before the first one."""
+    return run(["git", "describe", "--tags", "--abbrev=0"],
+               capture=True, check=False)
+
+
+def notes_from_git(since: str) -> str:
+    """The commit subjects since the last release, as the notes.
+
+    Written once, in the commit, and read back here -- rather than written
+    again by hand at release time and slowly drifting away from the truth.
+    """
+    span = f"{since}..HEAD" if since else "HEAD"
+    subjects = run(["git", "log", span, "--no-merges", "--pretty=format:%s"],
+                   capture=True, check=False)
+    lines = [s.strip() for s in subjects.splitlines() if s.strip()]
+    if not lines:
+        return ""
+    return "\n".join("- " + line for line in lines)
+
+
 # --------------------------------------------------------------------------
 # the archive
 
@@ -138,7 +184,9 @@ def build_archive(version: str) -> Path:
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Publish a release to GitHub.")
-    parser.add_argument("version", help='the new version, e.g. "1.1.0"')
+    parser.add_argument("version", nargs="?", default="patch",
+                        help='"patch" (the default), "minor", "major", '
+                             'or an explicit version like "1.4.0"')
     parser.add_argument("--notes", default="",
                         help="release notes; shown in the update centre")
     parser.add_argument("--notes-file", default="",
@@ -149,11 +197,11 @@ def main() -> int:
                         help="do not run the suite first (not recommended)")
     args = parser.parse_args()
 
-    version = args.version.lstrip("vV")
+    previous = read_version()
+    version = resolve_version(args.version, previous)
     if not re.fullmatch(r"\d+\.\d+\.\d+", version):
         raise Stop(f"{version!r} is not a three-part version like 1.2.0")
 
-    previous = read_version()
     if as_numbers(version) <= as_numbers(previous):
         raise Stop(
             f"{version} is not newer than the current {previous}. "
@@ -163,6 +211,8 @@ def main() -> int:
     notes = args.notes
     if args.notes_file:
         notes = Path(args.notes_file).read_text(encoding="utf-8")
+    if not notes.strip():
+        notes = notes_from_git(last_tag())
     if not notes.strip():
         notes = f"Version {version}."
 
@@ -183,6 +233,9 @@ def main() -> int:
                      "publish the release with the zip attached"):
             print(f"    - {step}")
         print(f"\n  gh: {'found' if has_gh else 'NOT INSTALLED -- publishing would stop here'}")
+        print("\n  notes it would publish:")
+        for line in notes.splitlines()[:12]:
+            print(f"    {line}")
         print()
         return 0
 
