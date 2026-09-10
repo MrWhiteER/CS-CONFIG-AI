@@ -1,0 +1,42 @@
+# Build output. Both executables are produced by `dev.bat build` and shipped as
+# release assets, never committed -- a 30 MB binary per version would dominate
+# the repository and tell nobody anything useful.
+/build/
+/dist/
+*.spec.bak
+
+# Personal data. `dist/cs2cfg-data/` is the portable data directory of a real
+# installation: preferences, session history, and backups of the CS2 configs
+# that were read. None of it belongs to anyone but the person who ran it.
+cs2cfg-data/
+config.json
+window_state.json
+
+# Anything that looks like a captured game config, wherever it ends up. These
+# are somebody's real settings, and the whole premise of this tool is that it
+# treats them as read-only references.
+*.vcfg
+backups/
+sessions/
+
+# Local development tooling: absolute paths from one machine.
+/.claude/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Editor and OS noise
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+desktop.ini
+
+# Working files kept beside the source during development.
+*.pre-skin
+*.orig
+*.rej

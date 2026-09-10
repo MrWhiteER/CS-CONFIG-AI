@@ -1,0 +1,576 @@
+{
+ "schema": 1,
+ "updated": "2026-09-07",
+ "target_file": "userdata/<accountid>/730/local/cfg/cs2_video.txt",
+ "note": "CS2 keeps picture quality here, not in any .cfg. Console convars for these settings are ignored or reset at load, which is why an autoexec cannot change them. Values carry a confidence level: 'high' means the mapping is settled, 'medium' means the ceiling was inferred from files in the wild and the tool clamps to it. Run `cs2cfg calibrate` to record the real values your own client writes and override anything here.",
+ "keys": {
+  "setting.cpu_level": {
+   "min": 0,
+   "max": 3,
+   "confidence": "high",
+   "labels": {
+    "0": "Low",
+    "1": "Medium",
+    "2": "High",
+    "3": "Very High"
+   }
+  },
+  "setting.gpu_level": {
+   "min": 0,
+   "max": 3,
+   "confidence": "high",
+   "labels": {
+    "0": "Low",
+    "1": "Medium",
+    "2": "High",
+    "3": "Very High"
+   }
+  },
+  "setting.gpu_mem_level": {
+   "min": 0,
+   "max": 3,
+   "confidence": "high",
+   "labels": {
+    "0": "Low",
+    "1": "Medium",
+    "2": "High",
+    "3": "Very High"
+   }
+  },
+  "setting.shaderquality": {
+   "min": 0,
+   "max": 1,
+   "confidence": "high",
+   "ui": "Shader Detail",
+   "labels": {
+    "0": "Low",
+    "1": "High"
+   }
+  },
+  "setting.msaa_samples": {
+   "min": 0,
+   "max": 8,
+   "allowed": [
+    0,
+    2,
+    4,
+    8
+   ],
+   "confidence": "high",
+   "ui": "Multisampling AA",
+   "labels": {
+    "0": "None",
+    "2": "2x MSAA",
+    "4": "4x MSAA",
+    "8": "8x MSAA"
+   }
+  },
+  "setting.r_texturefilteringquality": {
+   "min": 0,
+   "max": 5,
+   "confidence": "high",
+   "ui": "Texture Filtering",
+   "labels": {
+    "0": "Bilinear",
+    "1": "Trilinear",
+    "2": "Anisotropic 2x",
+    "3": "Anisotropic 4x",
+    "4": "Anisotropic 8x",
+    "5": "Anisotropic 16x"
+   }
+  },
+  "setting.videocfg_shadow_quality": {
+   "min": 0,
+   "max": 3,
+   "confidence": "high",
+   "ui": "Shadow Quality",
+   "labels": {
+    "0": "Very Low",
+    "1": "Low",
+    "2": "Medium",
+    "3": "High"
+   }
+  },
+  "setting.videocfg_dynamic_shadows": {
+   "min": 0,
+   "max": 2,
+   "confidence": "high",
+   "ui": "Dynamic Shadows",
+   "labels": {
+    "0": "Disabled",
+    "1": "Sun only",
+    "2": "All"
+   }
+  },
+  "setting.videocfg_texture_detail": {
+   "min": 0,
+   "max": 2,
+   "confidence": "high",
+   "ui": "Model / Texture Detail",
+   "labels": {
+    "0": "Low",
+    "1": "Medium",
+    "2": "High"
+   }
+  },
+  "setting.videocfg_particle_detail": {
+   "min": 0,
+   "max": 3,
+   "confidence": "medium",
+   "ui": "Particle Detail",
+   "labels": {
+    "0": "Low",
+    "1": "Medium",
+    "2": "High",
+    "3": "Very High"
+   }
+  },
+  "setting.videocfg_ao_detail": {
+   "min": 0,
+   "max": 3,
+   "confidence": "medium",
+   "ui": "Ambient Occlusion",
+   "labels": {
+    "0": "Disabled",
+    "1": "Low",
+    "2": "Medium",
+    "3": "High"
+   }
+  },
+  "setting.videocfg_hdr_detail": {
+   "min": 0,
+   "max": 3,
+   "confidence": "medium",
+   "ui": "High Dynamic Range",
+   "labels": {
+    "0": "Disabled",
+    "1": "Performance",
+    "2": "Quality",
+    "3": "Quality"
+   }
+  },
+  "setting.videocfg_fsr_detail": {
+   "min": 0,
+   "max": 5,
+   "confidence": "medium",
+   "ui": "FidelityFX Super Resolution",
+   "labels": {
+    "0": "Disabled",
+    "1": "Ultra Quality",
+    "2": "Quality",
+    "3": "Balanced",
+    "4": "Performance",
+    "5": "Ultra Performance"
+   }
+  },
+  "setting.r_csgo_cmaa_enable": {
+   "min": 0,
+   "max": 1,
+   "confidence": "high",
+   "ui": "Conservative Morphological AA",
+   "labels": {
+    "0": "Off",
+    "1": "On"
+   }
+  },
+  "setting.r_low_latency": {
+   "min": 0,
+   "max": 2,
+   "confidence": "high",
+   "ui": "NVIDIA Reflex Low Latency",
+   "labels": {
+    "0": "Disabled",
+    "1": "Enabled",
+    "2": "Enabled + Boost"
+   }
+  },
+  "setting.mat_vsync": {
+   "min": 0,
+   "max": 1,
+   "confidence": "high",
+   "ui": "Vertical Sync",
+   "labels": {
+    "0": "Off",
+    "1": "On"
+   }
+  },
+  "setting.fullscreen_min_on_focus_loss": {
+   "min": 0,
+   "max": 1,
+   "confidence": "high",
+   "ui": "Minimise On Focus Loss",
+   "labels": {
+    "0": "No",
+    "1": "Yes"
+   }
+  },
+  "setting.fullscreen": {
+   "min": 0,
+   "max": 1,
+   "confidence": "high",
+   "ui": "Fullscreen Mode",
+   "labels": {
+    "0": "Windowed",
+    "1": "Exclusive fullscreen"
+   }
+  },
+  "setting.nowindowborder": {
+   "min": 0,
+   "max": 1,
+   "confidence": "high",
+   "ui": "Window Border",
+   "labels": {
+    "0": "Bordered",
+    "1": "Borderless"
+   }
+  },
+  "setting.high_dpi": {
+   "min": 0,
+   "max": 1,
+   "confidence": "high",
+   "ui": "High DPI",
+   "labels": {
+    "0": "Off",
+    "1": "On"
+   }
+  }
+ },
+ "preserve": [
+  "setting.defaultres",
+  "setting.defaultresheight",
+  "setting.refreshrate_numerator",
+  "setting.refreshrate_denominator",
+  "setting.fullscreen",
+  "setting.nowindowborder",
+  "setting.aspectratiomode",
+  "setting.monitor_index",
+  "setting.coop_fullscreen",
+  "Version",
+  "VendorID",
+  "DeviceID",
+  "setting.knowndevice",
+  "Autoconfig"
+ ],
+ "preserve_note": "Resolution, aspect ratio, monitor choice and the device identity block are the player's own decision or Steam's bookkeeping. A stretched 1550x1440 on a 1440p panel is a deliberate competitive choice, not a misconfiguration, and this tool never touches it.",
+ "intents": {
+  "competitive": {
+   "description": "Frame rate and target clarity first. Shadow quality stays high on purpose: in CS2 a shadow cast around a corner is information, and cutting it costs you more than the frames are worth. Model and particle detail go down to reduce visual clutter.",
+   "tiers": {
+    "S": {
+     "setting.cpu_level": 3,
+     "setting.gpu_level": 3,
+     "setting.gpu_mem_level": 3,
+     "setting.shaderquality": 1,
+     "setting.msaa_samples": 4,
+     "setting.r_texturefilteringquality": 4,
+     "setting.videocfg_shadow_quality": 3,
+     "setting.videocfg_dynamic_shadows": 2,
+     "setting.videocfg_texture_detail": 0,
+     "setting.videocfg_particle_detail": 0,
+     "setting.videocfg_ao_detail": 0,
+     "setting.videocfg_hdr_detail": 2,
+     "setting.videocfg_fsr_detail": 0,
+     "setting.r_csgo_cmaa_enable": 0
+    },
+    "A": {
+     "setting.cpu_level": 3,
+     "setting.gpu_level": 2,
+     "setting.gpu_mem_level": 3,
+     "setting.shaderquality": 1,
+     "setting.msaa_samples": 2,
+     "setting.r_texturefilteringquality": 3,
+     "setting.videocfg_shadow_quality": 3,
+     "setting.videocfg_dynamic_shadows": 2,
+     "setting.videocfg_texture_detail": 0,
+     "setting.videocfg_particle_detail": 0,
+     "setting.videocfg_ao_detail": 0,
+     "setting.videocfg_hdr_detail": 1,
+     "setting.videocfg_fsr_detail": 0,
+     "setting.r_csgo_cmaa_enable": 0
+    },
+    "B": {
+     "setting.cpu_level": 2,
+     "setting.gpu_level": 1,
+     "setting.gpu_mem_level": 2,
+     "setting.shaderquality": 0,
+     "setting.msaa_samples": 2,
+     "setting.r_texturefilteringquality": 2,
+     "setting.videocfg_shadow_quality": 3,
+     "setting.videocfg_dynamic_shadows": 2,
+     "setting.videocfg_texture_detail": 0,
+     "setting.videocfg_particle_detail": 0,
+     "setting.videocfg_ao_detail": 0,
+     "setting.videocfg_hdr_detail": 1,
+     "setting.videocfg_fsr_detail": 0,
+     "setting.r_csgo_cmaa_enable": 0
+    },
+    "C": {
+     "setting.cpu_level": 1,
+     "setting.gpu_level": 0,
+     "setting.gpu_mem_level": 1,
+     "setting.shaderquality": 0,
+     "setting.msaa_samples": 0,
+     "setting.r_texturefilteringquality": 1,
+     "setting.videocfg_shadow_quality": 2,
+     "setting.videocfg_dynamic_shadows": 1,
+     "setting.videocfg_texture_detail": 0,
+     "setting.videocfg_particle_detail": 0,
+     "setting.videocfg_ao_detail": 0,
+     "setting.videocfg_hdr_detail": 1,
+     "setting.videocfg_fsr_detail": 2,
+     "setting.r_csgo_cmaa_enable": 0
+    },
+    "D": {
+     "setting.cpu_level": 0,
+     "setting.gpu_level": 0,
+     "setting.gpu_mem_level": 0,
+     "setting.shaderquality": 0,
+     "setting.msaa_samples": 0,
+     "setting.r_texturefilteringquality": 0,
+     "setting.videocfg_shadow_quality": 1,
+     "setting.videocfg_dynamic_shadows": 1,
+     "setting.videocfg_texture_detail": 0,
+     "setting.videocfg_particle_detail": 0,
+     "setting.videocfg_ao_detail": 0,
+     "setting.videocfg_hdr_detail": 1,
+     "setting.videocfg_fsr_detail": 4,
+     "setting.r_csgo_cmaa_enable": 0
+    }
+   }
+  },
+  "balanced": {
+   "description": "Keeps a comfortable margin over your refresh rate while letting the game look like itself. The default.",
+   "tiers": {
+    "S": {
+     "setting.cpu_level": 3,
+     "setting.gpu_level": 3,
+     "setting.gpu_mem_level": 3,
+     "setting.shaderquality": 1,
+     "setting.msaa_samples": 4,
+     "setting.r_texturefilteringquality": 5,
+     "setting.videocfg_shadow_quality": 3,
+     "setting.videocfg_dynamic_shadows": 2,
+     "setting.videocfg_texture_detail": 2,
+     "setting.videocfg_particle_detail": 2,
+     "setting.videocfg_ao_detail": 2,
+     "setting.videocfg_hdr_detail": 2,
+     "setting.videocfg_fsr_detail": 0,
+     "setting.r_csgo_cmaa_enable": 0
+    },
+    "A": {
+     "setting.cpu_level": 3,
+     "setting.gpu_level": 2,
+     "setting.gpu_mem_level": 3,
+     "setting.shaderquality": 1,
+     "setting.msaa_samples": 4,
+     "setting.r_texturefilteringquality": 4,
+     "setting.videocfg_shadow_quality": 3,
+     "setting.videocfg_dynamic_shadows": 2,
+     "setting.videocfg_texture_detail": 1,
+     "setting.videocfg_particle_detail": 1,
+     "setting.videocfg_ao_detail": 1,
+     "setting.videocfg_hdr_detail": 2,
+     "setting.videocfg_fsr_detail": 0,
+     "setting.r_csgo_cmaa_enable": 0
+    },
+    "B": {
+     "setting.cpu_level": 2,
+     "setting.gpu_level": 1,
+     "setting.gpu_mem_level": 2,
+     "setting.shaderquality": 1,
+     "setting.msaa_samples": 2,
+     "setting.r_texturefilteringquality": 3,
+     "setting.videocfg_shadow_quality": 2,
+     "setting.videocfg_dynamic_shadows": 2,
+     "setting.videocfg_texture_detail": 1,
+     "setting.videocfg_particle_detail": 1,
+     "setting.videocfg_ao_detail": 0,
+     "setting.videocfg_hdr_detail": 1,
+     "setting.videocfg_fsr_detail": 0,
+     "setting.r_csgo_cmaa_enable": 0
+    },
+    "C": {
+     "setting.cpu_level": 1,
+     "setting.gpu_level": 1,
+     "setting.gpu_mem_level": 1,
+     "setting.shaderquality": 0,
+     "setting.msaa_samples": 0,
+     "setting.r_texturefilteringquality": 2,
+     "setting.videocfg_shadow_quality": 2,
+     "setting.videocfg_dynamic_shadows": 1,
+     "setting.videocfg_texture_detail": 0,
+     "setting.videocfg_particle_detail": 0,
+     "setting.videocfg_ao_detail": 0,
+     "setting.videocfg_hdr_detail": 1,
+     "setting.videocfg_fsr_detail": 1,
+     "setting.r_csgo_cmaa_enable": 1
+    },
+    "D": {
+     "setting.cpu_level": 0,
+     "setting.gpu_level": 0,
+     "setting.gpu_mem_level": 0,
+     "setting.shaderquality": 0,
+     "setting.msaa_samples": 0,
+     "setting.r_texturefilteringquality": 0,
+     "setting.videocfg_shadow_quality": 1,
+     "setting.videocfg_dynamic_shadows": 1,
+     "setting.videocfg_texture_detail": 0,
+     "setting.videocfg_particle_detail": 0,
+     "setting.videocfg_ao_detail": 0,
+     "setting.videocfg_hdr_detail": 1,
+     "setting.videocfg_fsr_detail": 3,
+     "setting.r_csgo_cmaa_enable": 1
+    }
+   }
+  },
+  "quality": {
+   "description": "Best picture the hardware can carry while still clearing your refresh rate. Only sensible when the tier has headroom to spare.",
+   "tiers": {
+    "S": {
+     "setting.cpu_level": 3,
+     "setting.gpu_level": 3,
+     "setting.gpu_mem_level": 3,
+     "setting.shaderquality": 1,
+     "setting.msaa_samples": 8,
+     "setting.r_texturefilteringquality": 5,
+     "setting.videocfg_shadow_quality": 3,
+     "setting.videocfg_dynamic_shadows": 2,
+     "setting.videocfg_texture_detail": 2,
+     "setting.videocfg_particle_detail": 3,
+     "setting.videocfg_ao_detail": 3,
+     "setting.videocfg_hdr_detail": 3,
+     "setting.videocfg_fsr_detail": 0,
+     "setting.r_csgo_cmaa_enable": 0
+    },
+    "A": {
+     "setting.cpu_level": 3,
+     "setting.gpu_level": 3,
+     "setting.gpu_mem_level": 3,
+     "setting.shaderquality": 1,
+     "setting.msaa_samples": 4,
+     "setting.r_texturefilteringquality": 5,
+     "setting.videocfg_shadow_quality": 3,
+     "setting.videocfg_dynamic_shadows": 2,
+     "setting.videocfg_texture_detail": 2,
+     "setting.videocfg_particle_detail": 2,
+     "setting.videocfg_ao_detail": 2,
+     "setting.videocfg_hdr_detail": 2,
+     "setting.videocfg_fsr_detail": 0,
+     "setting.r_csgo_cmaa_enable": 0
+    },
+    "B": {
+     "setting.cpu_level": 2,
+     "setting.gpu_level": 2,
+     "setting.gpu_mem_level": 2,
+     "setting.shaderquality": 1,
+     "setting.msaa_samples": 4,
+     "setting.r_texturefilteringquality": 4,
+     "setting.videocfg_shadow_quality": 3,
+     "setting.videocfg_dynamic_shadows": 2,
+     "setting.videocfg_texture_detail": 2,
+     "setting.videocfg_particle_detail": 1,
+     "setting.videocfg_ao_detail": 1,
+     "setting.videocfg_hdr_detail": 2,
+     "setting.videocfg_fsr_detail": 0,
+     "setting.r_csgo_cmaa_enable": 0
+    },
+    "C": {
+     "setting.cpu_level": 2,
+     "setting.gpu_level": 1,
+     "setting.gpu_mem_level": 2,
+     "setting.shaderquality": 1,
+     "setting.msaa_samples": 2,
+     "setting.r_texturefilteringquality": 3,
+     "setting.videocfg_shadow_quality": 2,
+     "setting.videocfg_dynamic_shadows": 2,
+     "setting.videocfg_texture_detail": 1,
+     "setting.videocfg_particle_detail": 1,
+     "setting.videocfg_ao_detail": 0,
+     "setting.videocfg_hdr_detail": 1,
+     "setting.videocfg_fsr_detail": 1,
+     "setting.r_csgo_cmaa_enable": 0
+    },
+    "D": {
+     "setting.cpu_level": 1,
+     "setting.gpu_level": 0,
+     "setting.gpu_mem_level": 1,
+     "setting.shaderquality": 0,
+     "setting.msaa_samples": 0,
+     "setting.r_texturefilteringquality": 2,
+     "setting.videocfg_shadow_quality": 1,
+     "setting.videocfg_dynamic_shadows": 1,
+     "setting.videocfg_texture_detail": 0,
+     "setting.videocfg_particle_detail": 0,
+     "setting.videocfg_ao_detail": 0,
+     "setting.videocfg_hdr_detail": 1,
+     "setting.videocfg_fsr_detail": 3,
+     "setting.r_csgo_cmaa_enable": 1
+    }
+   }
+  }
+ },
+ "adjustments": [
+  {
+   "id": "vsync_off",
+   "when": "always",
+   "set": {
+    "setting.mat_vsync": 0
+   },
+   "reason": "V-Sync adds a frame of latency and caps you at the refresh rate. On a high refresh panel that trade is not worth it in a competitive shooter."
+  },
+  {
+   "id": "reflex_nvidia",
+   "when": "gpu_reflex",
+   "set": {
+    "setting.r_low_latency": 2
+   },
+   "reason": "NVIDIA Reflex + Boost keeps the render queue short. Reflex is the single largest latency win available in CS2 on GeForce hardware."
+  },
+  {
+   "id": "reflex_unsupported",
+   "when": "not_gpu_reflex",
+   "set": {
+    "setting.r_low_latency": 0
+   },
+   "reason": "Reflex is a GeForce feature; leaving it on elsewhere does nothing useful."
+  },
+  {
+   "id": "vram_texture_cap",
+   "when": "vram_below_6",
+   "set": {
+    "setting.videocfg_texture_detail": 0,
+    "setting.gpu_mem_level": 0
+   },
+   "reason": "Under 6 GB of VRAM, high texture detail causes stutter as the pool spills to system memory. Frame pacing matters more than texel density."
+  },
+  {
+   "id": "msaa_cut_4k",
+   "when": "pixels_above_4mp_and_tier_below_s",
+   "set": {
+    "setting.msaa_samples": 0
+   },
+   "reason": "MSAA cost scales with resolution. Above roughly 4 megapixels it is the first thing to drop on anything short of a top-tier GPU."
+  },
+  {
+   "id": "no_upscaling_when_ample",
+   "when": "headroom_above_1_3",
+   "set": {
+    "setting.videocfg_fsr_detail": 0
+   },
+   "reason": "You already clear the refresh rate without upscaling, so rendering below native only costs image quality."
+  },
+  {
+   "id": "keep_gpu_quality_when_cpu_bound",
+   "when": "gpu_ahead_of_cpu",
+   "set": {
+    "setting.r_texturefilteringquality": 3,
+    "setting.videocfg_hdr_detail": 2
+   },
+   "reason": "The graphics card can already draw more frames than the processor can feed it, so the processor is the limit. Texture filtering and HDR cost GPU time and no CPU time, which means turning them down here buys no frames at all and only costs picture quality. Anisotropic 4x and HDR Quality are what the pro-settings surveys recommend, and this machine gets them for free.",
+   "sources": [
+    "https://prosettings.net/guides/cs2-options/",
+    "https://www.steamdb.com/en/articles/cs2-best-settings-for-competitive"
+   ]
+  }
+ ]
+}

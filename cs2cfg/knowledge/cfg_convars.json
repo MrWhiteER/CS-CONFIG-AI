@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "updated": "2026-09-06",
+  "note": "Only convars confirmed to exist in CS2 are emitted. A convar that does not exist prints an error to the console at exec time, which turns a config into noise and hides real problems. When in doubt a setting is left out of this list rather than guessed at.",
+
+  "performance": {
+    "fps_max": {
+      "confidence": "high",
+      "comment": "Frame rate cap; 0 is uncapped",
+      "rule": "uncapped_when_headroom",
+      "reason": "Uncapped is right whenever the machine clears the refresh rate comfortably. Capping only helps when the cap is reachable every single frame, which is what keeps frametimes flat."
+    },
+    "fps_max_ui": {
+      "confidence": "high",
+      "comment": "Frame rate cap for menus",
+      "rule": "refresh_rate",
+      "reason": "Menus have no reason to render faster than the panel. Costs nothing in game and keeps the card from spinning up in the lobby."
+    },
+    "engine_no_focus_sleep": {
+      "confidence": "high",
+      "comment": "Keep rendering when the window loses focus",
+      "rule": "constant",
+      "value": "0",
+      "reason": "Prevents the frame rate collapsing on alt-tab, so returning to the game does not cost a second of stutter."
+    },
+    "rate": {
+      "confidence": "high",
+      "comment": "Maximum bytes per second the client will accept",
+      "rule": "constant",
+      "value": "786432",
+      "reason": "CS2's default and maximum. The 128000 figure that circulates in old configs is a CS:GO-era number and is a straight downgrade here."
+    }
+  },
+
+  "visibility": {
+    "r_player_visibility_mode": {
+      "confidence": "high",
+      "comment": "Player model contrast against the map",
+      "rule": "constant",
+      "value": "1",
+      "reason": "Boosts player readability against backgrounds. Purely a legibility setting, no frame cost."
+    },
+    "cl_teamid_overhead_always": {
+      "confidence": "medium",
+      "comment": "Always draw teammate markers through walls",
+      "rule": "skip",
+      "reason": "Preference, not performance. Listed so the tool knows the name is real, but never written automatically."
+    }
+  }
+}

@@ -1,0 +1,1987 @@
+{
+  "schema": 2,
+  "updated": "2026-09-06",
+  "note": "Laid out to follow the in-game settings menu: the same sections, in the same order, with settings grouped the way CS2 groups them. It is a close mapping rather than a pixel copy -- the authority on the menu is the game, and this is assembled from what can actually be read and written on disk.",
+  "sources": {
+    "cfg": "a convar in a .cfg / .vcfg file; editable by this tool",
+    "video": "a key in cs2_video.txt under Steam userdata; CS2 ignores these as console convars, so they can only be set in that file"
+  },
+  "control_note": "A slider appears only where the engine clamps the value to a known range. Anything unbounded gets a number box, because a slider implies limits and inventing them would misrepresent what the game accepts. 'range_source' says which is which.",
+  "sections": [
+    {
+      "id": "video",
+      "label": "Video",
+      "groups": [
+        {
+          "id": "video_basic",
+          "label": "Video",
+          "subgroups": [
+            {
+              "id": "display",
+              "label": "Display"
+            },
+            {
+              "id": "resolution",
+              "label": "Resolution"
+            },
+            {
+              "id": "image",
+              "label": "Image"
+            }
+          ]
+        },
+        {
+          "id": "video_advanced",
+          "label": "Advanced Video",
+          "subgroups": [
+            {
+              "id": "aa",
+              "label": "Anti-aliasing"
+            },
+            {
+              "id": "detail",
+              "label": "Detail"
+            },
+            {
+              "id": "lighting",
+              "label": "Lighting & shadows"
+            },
+            {
+              "id": "scaling",
+              "label": "Scaling"
+            },
+            {
+              "id": "latency",
+              "label": "Latency"
+            },
+            {
+              "id": "levels",
+              "label": "Engine detail levels"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "audio",
+      "label": "Audio",
+      "groups": [
+        {
+          "id": "audio_main",
+          "label": "Audio",
+          "subgroups": [
+            {
+              "id": "output",
+              "label": "Output"
+            },
+            {
+              "id": "processing",
+              "label": "Processing"
+            }
+          ]
+        },
+        {
+          "id": "audio_music",
+          "label": "Music",
+          "subgroups": [
+            {
+              "id": "rounds",
+              "label": "Rounds"
+            },
+            {
+              "id": "highlights",
+              "label": "Highlights"
+            },
+            {
+              "id": "overall",
+              "label": "Overall"
+            }
+          ]
+        },
+        {
+          "id": "audio_voice",
+          "label": "Voice",
+          "subgroups": [
+            {
+              "id": "input",
+              "label": "Input"
+            },
+            {
+              "id": "playback",
+              "label": "Playback"
+            },
+            {
+              "id": "muting",
+              "label": "Muting"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "game",
+      "label": "Game",
+      "groups": [
+        {
+          "id": "game_main",
+          "label": "Game",
+          "subgroups": [
+            {
+              "id": "matchmaking",
+              "label": "Matchmaking"
+            },
+            {
+              "id": "gameplay",
+              "label": "Gameplay"
+            },
+            {
+              "id": "interface",
+              "label": "Interface"
+            },
+            {
+              "id": "privacy",
+              "label": "Privacy"
+            }
+          ]
+        },
+        {
+          "id": "game_prediction",
+          "label": "Damage Prediction",
+          "subgroups": [
+            {
+              "id": "prediction",
+              "label": "Prediction"
+            }
+          ]
+        },
+        {
+          "id": "game_hud",
+          "label": "HUD",
+          "subgroups": [
+            {
+              "id": "layout",
+              "label": "Layout"
+            },
+            {
+              "id": "readouts",
+              "label": "Readouts"
+            },
+            {
+              "id": "telemetry",
+              "label": "Telemetry"
+            }
+          ]
+        },
+        {
+          "id": "game_radar",
+          "label": "Radar",
+          "subgroups": [
+            {
+              "id": "size",
+              "label": "Size & scale"
+            },
+            {
+              "id": "behaviour",
+              "label": "Behaviour"
+            }
+          ]
+        },
+        {
+          "id": "game_team",
+          "label": "Team",
+          "subgroups": [
+            {
+              "id": "markers",
+              "label": "Markers"
+            },
+            {
+              "id": "spectating",
+              "label": "Spectating"
+            },
+            {
+              "id": "pings",
+              "label": "Pings"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "input",
+      "label": "Keyboard / Mouse",
+      "groups": [
+        {
+          "id": "input_mouse",
+          "label": "Mouse",
+          "subgroups": [
+            {
+              "id": "sensitivity",
+              "label": "Sensitivity"
+            },
+            {
+              "id": "acceleration",
+              "label": "Acceleration"
+            },
+            {
+              "id": "input",
+              "label": "Input"
+            }
+          ]
+        },
+        {
+          "id": "input_viewmodel",
+          "label": "Viewmodel",
+          "subgroups": [
+            {
+              "id": "position",
+              "label": "Position"
+            },
+            {
+              "id": "presets",
+              "label": "Presets"
+            },
+            {
+              "id": "bob",
+              "label": "Weapon movement"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "crosshair",
+      "label": "Crosshair",
+      "groups": [
+        {
+          "id": "crosshair_main",
+          "label": "Crosshair",
+          "subgroups": [
+            {
+              "id": "shape",
+              "label": "Style & shape"
+            },
+            {
+              "id": "colour",
+              "label": "Colour"
+            },
+            {
+              "id": "outline",
+              "label": "Outline & alpha"
+            },
+            {
+              "id": "dynamic",
+              "label": "Dynamic behaviour"
+            },
+            {
+              "id": "special",
+              "label": "Special cases"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "performance",
+      "label": "Performance",
+      "groups": [
+        {
+          "id": "perf_frames",
+          "label": "Frame rate",
+          "subgroups": [
+            {
+              "id": "limits",
+              "label": "Limits"
+            },
+            {
+              "id": "latency",
+              "label": "Latency"
+            }
+          ]
+        },
+        {
+          "id": "perf_network",
+          "label": "Network",
+          "subgroups": [
+            {
+              "id": "bandwidth",
+              "label": "Bandwidth"
+            }
+          ]
+        },
+        {
+          "id": "perf_effects",
+          "label": "Effects",
+          "subgroups": [
+            {
+              "id": "ragdolls",
+              "label": "Ragdolls"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "settings": {
+    "setting.defaultres": {
+      "source": "video",
+      "group": "video_basic",
+      "label": "Resolution width",
+      "control": "number",
+      "step": 1,
+      "range_source": "convention",
+      "readonly": true,
+      "help": "Set this in the game's own video menu; changing it here can leave you unable to see the game.",
+      "subgroup": "resolution"
+    },
+    "setting.defaultresheight": {
+      "source": "video",
+      "group": "video_basic",
+      "label": "Resolution height",
+      "control": "number",
+      "step": 1,
+      "range_source": "convention",
+      "readonly": true,
+      "subgroup": "resolution"
+    },
+    "setting.refreshrate_numerator": {
+      "source": "video",
+      "group": "video_basic",
+      "label": "Refresh rate",
+      "control": "number",
+      "step": 1,
+      "range_source": "convention",
+      "readonly": true,
+      "subgroup": "resolution"
+    },
+    "setting.fullscreen": {
+      "source": "video",
+      "group": "video_basic",
+      "label": "Display mode",
+      "control": "select",
+      "options": {
+        "0": "Windowed",
+        "1": "Fullscreen"
+      },
+      "range_source": "clamp",
+      "subgroup": "display"
+    },
+    "setting.nowindowborder": {
+      "source": "video",
+      "group": "video_basic",
+      "label": "Window border",
+      "control": "select",
+      "options": {
+        "0": "Bordered",
+        "1": "Borderless"
+      },
+      "range_source": "clamp",
+      "subgroup": "display"
+    },
+    "setting.aspectratiomode": {
+      "source": "video",
+      "group": "video_basic",
+      "label": "Aspect ratio mode",
+      "control": "number",
+      "step": 1,
+      "range_source": "convention",
+      "readonly": true,
+      "help": "Meaning of each value is not documented outside the game; left read-only rather than guessed at.",
+      "subgroup": "resolution"
+    },
+    "setting.monitor_index": {
+      "source": "video",
+      "group": "video_basic",
+      "label": "Monitor",
+      "control": "number",
+      "step": 1,
+      "range_source": "convention",
+      "subgroup": "display"
+    },
+    "setting.fullscreen_min_on_focus_loss": {
+      "source": "video",
+      "group": "video_basic",
+      "label": "Minimise on focus loss",
+      "control": "toggle",
+      "range_source": "clamp",
+      "help": "Off keeps the game up when you alt-tab, which is most of the alt-tab pause.",
+      "subgroup": "display"
+    },
+    "setting.high_dpi": {
+      "source": "video",
+      "group": "video_basic",
+      "label": "High DPI scaling",
+      "control": "toggle",
+      "range_source": "clamp",
+      "subgroup": "resolution"
+    },
+    "setting.mat_vsync": {
+      "source": "video",
+      "group": "video_advanced",
+      "label": "Wait for vertical sync",
+      "control": "toggle",
+      "range_source": "clamp",
+      "help": "Adds about a frame of latency and caps you at the refresh rate.",
+      "subgroup": "latency"
+    },
+    "setting.r_low_latency": {
+      "source": "video",
+      "group": "video_advanced",
+      "label": "NVIDIA Reflex low latency",
+      "control": "select",
+      "options": {
+        "0": "Disabled",
+        "1": "Enabled",
+        "2": "Enabled + Boost"
+      },
+      "range_source": "clamp",
+      "subgroup": "latency"
+    },
+    "setting.msaa_samples": {
+      "source": "video",
+      "group": "video_advanced",
+      "label": "Multisampling AA mode",
+      "control": "select",
+      "options": {
+        "0": "None",
+        "2": "2x MSAA",
+        "4": "4x MSAA",
+        "8": "8x MSAA"
+      },
+      "range_source": "clamp",
+      "subgroup": "aa"
+    },
+    "setting.r_csgo_cmaa_enable": {
+      "source": "video",
+      "group": "video_advanced",
+      "label": "Conservative morphological AA",
+      "control": "toggle",
+      "range_source": "clamp",
+      "subgroup": "aa"
+    },
+    "setting.videocfg_shadow_quality": {
+      "source": "video",
+      "group": "video_advanced",
+      "label": "Global shadow quality",
+      "control": "select",
+      "options": {
+        "0": "Very low",
+        "1": "Low",
+        "2": "Medium",
+        "3": "High"
+      },
+      "range_source": "clamp",
+      "subgroup": "lighting"
+    },
+    "setting.videocfg_dynamic_shadows": {
+      "source": "video",
+      "group": "video_advanced",
+      "label": "Dynamic shadows",
+      "control": "select",
+      "options": {
+        "0": "Disabled",
+        "1": "Sun only",
+        "2": "All"
+      },
+      "range_source": "clamp",
+      "subgroup": "lighting"
+    },
+    "setting.videocfg_texture_detail": {
+      "source": "video",
+      "group": "video_advanced",
+      "label": "Model / texture detail",
+      "control": "select",
+      "options": {
+        "0": "Low",
+        "1": "Medium",
+        "2": "High"
+      },
+      "range_source": "clamp",
+      "subgroup": "detail"
+    },
+    "setting.r_texturefilteringquality": {
+      "source": "video",
+      "group": "video_advanced",
+      "label": "Texture filtering mode",
+      "control": "select",
+      "options": {
+        "0": "Bilinear",
+        "1": "Trilinear",
+        "2": "Anisotropic 2x",
+        "3": "Anisotropic 4x",
+        "4": "Anisotropic 8x",
+        "5": "Anisotropic 16x"
+      },
+      "range_source": "clamp",
+      "subgroup": "detail"
+    },
+    "setting.shaderquality": {
+      "source": "video",
+      "group": "video_advanced",
+      "label": "Shader detail",
+      "control": "select",
+      "options": {
+        "0": "Low",
+        "1": "High"
+      },
+      "range_source": "clamp",
+      "subgroup": "detail"
+    },
+    "setting.videocfg_particle_detail": {
+      "source": "video",
+      "group": "video_advanced",
+      "label": "Particle detail",
+      "control": "select",
+      "options": {
+        "0": "Low",
+        "1": "Medium",
+        "2": "High",
+        "3": "Very high"
+      },
+      "range_source": "clamp",
+      "confidence": "medium",
+      "subgroup": "detail"
+    },
+    "setting.videocfg_ao_detail": {
+      "source": "video",
+      "group": "video_advanced",
+      "label": "Ambient occlusion",
+      "control": "select",
+      "options": {
+        "0": "Disabled",
+        "1": "Low",
+        "2": "Medium",
+        "3": "High"
+      },
+      "range_source": "clamp",
+      "confidence": "medium",
+      "subgroup": "lighting"
+    },
+    "setting.videocfg_hdr_detail": {
+      "source": "video",
+      "group": "video_advanced",
+      "label": "High dynamic range",
+      "control": "select",
+      "options": {
+        "0": "Disabled",
+        "1": "Performance",
+        "2": "Quality",
+        "3": "Quality"
+      },
+      "range_source": "clamp",
+      "confidence": "medium",
+      "subgroup": "lighting"
+    },
+    "setting.videocfg_fsr_detail": {
+      "source": "video",
+      "group": "video_advanced",
+      "label": "FidelityFX Super Resolution",
+      "control": "select",
+      "options": {
+        "0": "Disabled",
+        "1": "Ultra quality",
+        "2": "Quality",
+        "3": "Balanced",
+        "4": "Performance",
+        "5": "Ultra performance"
+      },
+      "range_source": "clamp",
+      "confidence": "medium",
+      "subgroup": "scaling"
+    },
+    "setting.cpu_level": {
+      "source": "video",
+      "group": "video_advanced",
+      "label": "CPU detail level",
+      "control": "select",
+      "options": {
+        "0": "Low",
+        "1": "Medium",
+        "2": "High",
+        "3": "Very high"
+      },
+      "range_source": "clamp",
+      "subgroup": "levels"
+    },
+    "setting.gpu_level": {
+      "source": "video",
+      "group": "video_advanced",
+      "label": "GPU detail level",
+      "control": "select",
+      "options": {
+        "0": "Low",
+        "1": "Medium",
+        "2": "High",
+        "3": "Very high"
+      },
+      "range_source": "clamp",
+      "subgroup": "levels"
+    },
+    "setting.gpu_mem_level": {
+      "source": "video",
+      "group": "video_advanced",
+      "label": "GPU memory level",
+      "control": "select",
+      "options": {
+        "0": "Low",
+        "1": "Medium",
+        "2": "High",
+        "3": "Very high"
+      },
+      "range_source": "clamp",
+      "subgroup": "levels"
+    },
+    "r_player_visibility_mode": {
+      "source": "cfg",
+      "group": "video_advanced",
+      "label": "Boost player contrast",
+      "control": "select",
+      "options": {
+        "0": "Disabled",
+        "1": "Enabled",
+        "2": "High"
+      },
+      "range_source": "clamp",
+      "subgroup": "lighting"
+    },
+    "r_fullscreen_gamma": {
+      "source": "cfg",
+      "group": "video_basic",
+      "label": "Brightness",
+      "control": "slider",
+      "min": 1.6,
+      "max": 2.6,
+      "step": 0.05,
+      "range_source": "clamp",
+      "subgroup": "image"
+    },
+    "battery_saver": {
+      "source": "cfg",
+      "group": "video_basic",
+      "label": "Laptop power savings",
+      "control": "toggle",
+      "range_source": "clamp",
+      "subgroup": "image"
+    },
+    "volume": {
+      "source": "cfg",
+      "group": "audio_main",
+      "label": "Master volume",
+      "control": "slider",
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "range_source": "clamp",
+      "subgroup": "output"
+    },
+    "snd_headphone_eq": {
+      "source": "cfg",
+      "group": "audio_main",
+      "label": "EQ profile",
+      "control": "select",
+      "options": {
+        "0": "Crisp",
+        "1": "Natural",
+        "2": "Smooth"
+      },
+      "range_source": "clamp",
+      "subgroup": "processing"
+    },
+    "snd_spatialize_lerp": {
+      "source": "cfg",
+      "group": "audio_main",
+      "label": "L / R isolation",
+      "control": "slider",
+      "min": 0,
+      "max": 1,
+      "step": 0.05,
+      "range_source": "clamp",
+      "subgroup": "processing"
+    },
+    "snd_steamaudio_enable_perspective_correction": {
+      "source": "cfg",
+      "group": "audio_main",
+      "label": "Perspective correction",
+      "control": "toggle",
+      "range_source": "clamp",
+      "subgroup": "processing"
+    },
+    "snd_mute_losefocus": {
+      "source": "cfg",
+      "group": "audio_main",
+      "label": "Audio when game is in background",
+      "control": "select",
+      "options": {
+        "0": "Enabled",
+        "1": "Muted"
+      },
+      "range_source": "clamp",
+      "subgroup": "output"
+    },
+    "snd_menumusic_volume": {
+      "source": "cfg",
+      "group": "audio_music",
+      "label": "Main menu volume",
+      "control": "slider",
+      "min": 0,
+      "max": 1,
+      "step": 0.005,
+      "range_source": "clamp",
+      "subgroup": "overall"
+    },
+    "snd_roundstart_volume": {
+      "source": "cfg",
+      "group": "audio_music",
+      "label": "Round start volume",
+      "control": "slider",
+      "min": 0,
+      "max": 1,
+      "step": 0.005,
+      "range_source": "clamp",
+      "subgroup": "rounds"
+    },
+    "snd_roundend_volume": {
+      "source": "cfg",
+      "group": "audio_music",
+      "label": "Round end volume",
+      "control": "slider",
+      "min": 0,
+      "max": 1,
+      "step": 0.005,
+      "range_source": "clamp",
+      "subgroup": "rounds"
+    },
+    "snd_mapobjective_volume": {
+      "source": "cfg",
+      "group": "audio_music",
+      "label": "Bomb / objective volume",
+      "control": "slider",
+      "min": 0,
+      "max": 1,
+      "step": 0.005,
+      "range_source": "clamp",
+      "subgroup": "rounds"
+    },
+    "snd_tensecondwarning_volume": {
+      "source": "cfg",
+      "group": "audio_music",
+      "label": "Ten second warning volume",
+      "control": "slider",
+      "min": 0,
+      "max": 1,
+      "step": 0.005,
+      "range_source": "clamp",
+      "subgroup": "rounds"
+    },
+    "snd_mvp_volume": {
+      "source": "cfg",
+      "group": "audio_music",
+      "label": "MVP volume",
+      "control": "slider",
+      "min": 0,
+      "max": 1,
+      "step": 0.005,
+      "range_source": "clamp",
+      "subgroup": "highlights"
+    },
+    "snd_deathcamera_volume": {
+      "source": "cfg",
+      "group": "audio_music",
+      "label": "Death camera volume",
+      "control": "slider",
+      "min": 0,
+      "max": 1,
+      "step": 0.005,
+      "range_source": "clamp",
+      "subgroup": "highlights"
+    },
+    "snd_mute_mvp_music_live_players": {
+      "source": "cfg",
+      "group": "audio_music",
+      "label": "Mute MVP music with live players",
+      "control": "toggle",
+      "range_source": "clamp",
+      "subgroup": "highlights"
+    },
+    "voice_modenable": {
+      "source": "cfg",
+      "group": "audio_voice",
+      "label": "Enable voice",
+      "control": "toggle",
+      "range_source": "clamp",
+      "subgroup": "input"
+    },
+    "snd_voipvolume": {
+      "source": "cfg",
+      "group": "audio_voice",
+      "label": "VOIP volume",
+      "control": "slider",
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "range_source": "clamp",
+      "subgroup": "playback"
+    },
+    "voice_scale": {
+      "source": "cfg",
+      "group": "audio_voice",
+      "label": "Incoming voice scale",
+      "control": "slider",
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "range_source": "clamp",
+      "subgroup": "playback"
+    },
+    "voice_threshold": {
+      "source": "cfg",
+      "group": "audio_voice",
+      "label": "Voice activation threshold",
+      "control": "number",
+      "step": 1,
+      "range_source": "convention",
+      "subgroup": "input"
+    },
+    "cl_player_ping_mute": {
+      "source": "cfg",
+      "group": "audio_voice",
+      "label": "Mute player pings",
+      "control": "toggle",
+      "range_source": "clamp",
+      "subgroup": "muting"
+    },
+    "cl_autohelp": {
+      "source": "cfg",
+      "group": "game_main",
+      "label": "Auto help",
+      "control": "toggle",
+      "range_source": "clamp",
+      "subgroup": "interface"
+    },
+    "gameinstructor_enable": {
+      "source": "cfg",
+      "group": "game_main",
+      "label": "Game instructor",
+      "control": "toggle",
+      "range_source": "clamp",
+      "subgroup": "interface"
+    },
+    "cl_showloadout": {
+      "source": "cfg",
+      "group": "game_main",
+      "label": "Always show inventory",
+      "control": "toggle",
+      "range_source": "clamp",
+      "subgroup": "interface"
+    },
+    "cl_allow_animated_avatars": {
+      "source": "cfg",
+      "group": "game_main",
+      "label": "Animated avatars",
+      "control": "toggle",
+      "range_source": "clamp",
+      "subgroup": "privacy"
+    },
+    "cl_hide_avatar_images": {
+      "source": "cfg",
+      "group": "game_main",
+      "label": "Hide avatar images",
+      "control": "toggle",
+      "range_source": "clamp",
+      "subgroup": "privacy"
+    },
+    "cl_sanitize_player_names": {
+      "source": "cfg",
+      "group": "game_main",
+      "label": "Sanitize player names",
+      "control": "toggle",
+      "range_source": "clamp",
+      "subgroup": "privacy"
+    },
+    "cl_sanitize_muted_players": {
+      "source": "cfg",
+      "group": "game_main",
+      "label": "Sanitize muted players",
+      "control": "toggle",
+      "range_source": "clamp",
+      "subgroup": "privacy"
+    },
+    "cl_show_clan_in_death_notice": {
+      "source": "cfg",
+      "group": "game_main",
+      "label": "Clan tag in death notices",
+      "control": "toggle",
+      "range_source": "clamp",
+      "subgroup": "privacy"
+    },
+    "engine_no_focus_sleep": {
+      "source": "cfg",
+      "group": "game_main",
+      "label": "Sleep when unfocused",
+      "control": "toggle",
+      "range_source": "clamp",
+      "help": "0 keeps the frame rate up when the window loses focus.",
+      "subgroup": "interface"
+    },
+    "safezonex": {
+      "source": "cfg",
+      "group": "game_hud",
+      "label": "HUD width",
+      "control": "slider",
+      "min": 0.5,
+      "max": 1.0,
+      "step": 0.01,
+      "range_source": "clamp",
+      "subgroup": "layout"
+    },
+    "safezoney": {
+      "source": "cfg",
+      "group": "game_hud",
+      "label": "HUD height",
+      "control": "slider",
+      "min": 0.5,
+      "max": 1.0,
+      "step": 0.01,
+      "range_source": "clamp",
+      "subgroup": "layout"
+    },
+    "cl_hud_color": {
+      "source": "cfg",
+      "group": "game_hud",
+      "label": "HUD colour",
+      "control": "select",
+      "options": {
+        "0": "Default",
+        "1": "White",
+        "2": "Light blue",
+        "3": "Blue",
+        "4": "Purple",
+        "5": "Red",
+        "6": "Orange",
+        "7": "Yellow",
+        "8": "Green",
+        "9": "Aqua",
+        "10": "Pink"
+      },
+      "range_source": "clamp",
+      "subgroup": "layout"
+    },
+    "cl_showfps": {
+      "source": "cfg",
+      "group": "game_hud",
+      "label": "Show FPS",
+      "control": "toggle",
+      "range_source": "clamp",
+      "subgroup": "readouts"
+    },
+    "hud_showtargetid": {
+      "source": "cfg",
+      "group": "game_hud",
+      "label": "Show target ID",
+      "control": "toggle",
+      "range_source": "clamp",
+      "subgroup": "readouts"
+    },
+    "cl_teamcounter_playercount_instead_of_avatars": {
+      "source": "cfg",
+      "group": "game_hud",
+      "label": "Player count instead of avatars",
+      "control": "toggle",
+      "range_source": "clamp",
+      "subgroup": "readouts"
+    },
+    "ui_steam_overlay_notification_position": {
+      "source": "cfg",
+      "group": "game_hud",
+      "label": "Overlay notification position",
+      "control": "select",
+      "options": {
+        "topleft": "Top left",
+        "topright": "Top right",
+        "bottomleft": "Bottom left",
+        "bottomright": "Bottom right"
+      },
+      "range_source": "clamp",
+      "subgroup": "layout"
+    },
+    "cl_radar_scale": {
+      "source": "cfg",
+      "group": "game_radar",
+      "label": "Radar map scale",
+      "control": "slider",
+      "min": 0.25,
+      "max": 1.0,
+      "step": 0.05,
+      "range_source": "clamp",
+      "subgroup": "size"
+    },
+    "cl_hud_radar_scale": {
+      "source": "cfg",
+      "group": "game_radar",
+      "label": "Radar size",
+      "control": "slider",
+      "min": 0.8,
+      "max": 1.3,
+      "step": 0.05,
+      "range_source": "clamp",
+      "subgroup": "size"
+    },
+    "cl_radar_icon_scale_min": {
+      "source": "cfg",
+      "group": "game_radar",
+      "label": "Minimum icon size",
+      "control": "slider",
+      "min": 0.4,
+      "max": 1.25,
+      "step": 0.05,
+      "range_source": "clamp",
+      "subgroup": "size"
+    },
+    "cl_radar_rotate": {
+      "source": "cfg",
+      "group": "game_radar",
+      "label": "Rotate with view",
+      "control": "toggle",
+      "range_source": "clamp",
+      "subgroup": "behaviour"
+    },
+    "cl_radar_always_centered": {
+      "source": "cfg",
+      "group": "game_radar",
+      "label": "Always centred",
+      "control": "toggle",
+      "range_source": "clamp",
+      "subgroup": "behaviour"
+    },
+    "cl_radar_square_with_scoreboard": {
+      "source": "cfg",
+      "group": "game_radar",
+      "label": "Square radar with scoreboard",
+      "control": "toggle",
+      "range_source": "clamp",
+      "subgroup": "behaviour"
+    },
+    "cl_teamid_overhead_mode": {
+      "source": "cfg",
+      "group": "game_team",
+      "label": "Teammate markers",
+      "control": "select",
+      "options": {
+        "0": "Off",
+        "1": "Basic",
+        "2": "With equipment"
+      },
+      "range_source": "clamp",
+      "subgroup": "markers"
+    },
+    "cl_teamid_overhead_colors_show": {
+      "source": "cfg",
+      "group": "game_team",
+      "label": "Show teammate colours",
+      "control": "toggle",
+      "range_source": "clamp",
+      "subgroup": "markers"
+    },
+    "cl_ping_fade_deadzone": {
+      "source": "cfg",
+      "group": "game_team",
+      "label": "Ping fade deadzone",
+      "control": "number",
+      "step": 10,
+      "range_source": "convention",
+      "subgroup": "pings"
+    },
+    "cl_ping_fade_distance": {
+      "source": "cfg",
+      "group": "game_team",
+      "label": "Ping fade distance",
+      "control": "number",
+      "step": 10,
+      "range_source": "convention",
+      "subgroup": "pings"
+    },
+    "sensitivity": {
+      "source": "cfg",
+      "group": "input_mouse",
+      "label": "Mouse sensitivity",
+      "control": "number",
+      "step": 0.001,
+      "range_source": "convention",
+      "help": "No slider: the engine accepts a very wide range and any bound here would be invented.",
+      "subgroup": "sensitivity"
+    },
+    "zoom_sensitivity_ratio": {
+      "source": "cfg",
+      "group": "input_mouse",
+      "label": "Zoom sensitivity ratio",
+      "control": "number",
+      "step": 0.001,
+      "range_source": "convention",
+      "subgroup": "sensitivity"
+    },
+    "sensitivity_y_scale": {
+      "source": "cfg",
+      "group": "input_mouse",
+      "label": "Vertical sensitivity scale",
+      "control": "number",
+      "step": 0.01,
+      "range_source": "convention",
+      "subgroup": "sensitivity"
+    },
+    "m_yaw": {
+      "source": "cfg",
+      "group": "input_mouse",
+      "label": "Mouse yaw",
+      "control": "number",
+      "step": 0.0001,
+      "range_source": "convention",
+      "subgroup": "sensitivity"
+    },
+    "m_pitch": {
+      "source": "cfg",
+      "group": "input_mouse",
+      "label": "Mouse pitch",
+      "control": "number",
+      "step": 0.0001,
+      "range_source": "convention",
+      "subgroup": "sensitivity"
+    },
+    "viewmodel_fov": {
+      "source": "cfg",
+      "group": "input_viewmodel",
+      "label": "Viewmodel FOV",
+      "control": "slider",
+      "min": 54,
+      "max": 68,
+      "step": 1,
+      "range_source": "clamp",
+      "subgroup": "position"
+    },
+    "viewmodel_offset_x": {
+      "source": "cfg",
+      "group": "input_viewmodel",
+      "label": "Offset X",
+      "control": "slider",
+      "min": -2.5,
+      "max": 2.5,
+      "step": 0.1,
+      "range_source": "clamp",
+      "subgroup": "position"
+    },
+    "viewmodel_offset_y": {
+      "source": "cfg",
+      "group": "input_viewmodel",
+      "label": "Offset Y",
+      "control": "slider",
+      "min": -2,
+      "max": 2,
+      "step": 0.1,
+      "range_source": "clamp",
+      "subgroup": "position"
+    },
+    "viewmodel_offset_z": {
+      "source": "cfg",
+      "group": "input_viewmodel",
+      "label": "Offset Z",
+      "control": "slider",
+      "min": -2,
+      "max": 2,
+      "step": 0.1,
+      "range_source": "clamp",
+      "subgroup": "position"
+    },
+    "cl_crosshairstyle": {
+      "source": "cfg",
+      "group": "crosshair_main",
+      "label": "Crosshair style",
+      "control": "select",
+      "options": {
+        "0": "Default",
+        "1": "Default static",
+        "2": "Classic",
+        "3": "Classic dynamic",
+        "4": "Classic static",
+        "5": "Legacy"
+      },
+      "range_source": "clamp",
+      "subgroup": "shape"
+    },
+    "cl_crosshairsize": {
+      "source": "cfg",
+      "group": "crosshair_main",
+      "label": "Length",
+      "control": "number",
+      "step": 0.5,
+      "range_source": "convention",
+      "subgroup": "shape"
+    },
+    "cl_crosshairthickness": {
+      "source": "cfg",
+      "group": "crosshair_main",
+      "label": "Thickness",
+      "control": "number",
+      "step": 0.1,
+      "range_source": "convention",
+      "subgroup": "shape"
+    },
+    "cl_crosshairgap": {
+      "source": "cfg",
+      "group": "crosshair_main",
+      "label": "Gap",
+      "control": "number",
+      "step": 0.5,
+      "range_source": "convention",
+      "subgroup": "shape"
+    },
+    "cl_crosshairdot": {
+      "source": "cfg",
+      "group": "crosshair_main",
+      "label": "Centre dot",
+      "control": "toggle",
+      "range_source": "clamp",
+      "subgroup": "shape"
+    },
+    "cl_crosshair_drawoutline": {
+      "source": "cfg",
+      "group": "crosshair_main",
+      "label": "Outline",
+      "control": "toggle",
+      "range_source": "clamp",
+      "subgroup": "outline"
+    },
+    "cl_crosshair_outlinethickness": {
+      "source": "cfg",
+      "group": "crosshair_main",
+      "label": "Outline thickness",
+      "control": "slider",
+      "min": 0,
+      "max": 3,
+      "step": 0.1,
+      "range_source": "clamp",
+      "subgroup": "outline"
+    },
+    "cl_crosshairalpha": {
+      "source": "cfg",
+      "group": "crosshair_main",
+      "label": "Alpha",
+      "control": "slider",
+      "min": 0,
+      "max": 255,
+      "step": 1,
+      "range_source": "clamp",
+      "subgroup": "outline"
+    },
+    "cl_crosshaircolor": {
+      "source": "cfg",
+      "group": "crosshair_main",
+      "label": "Colour",
+      "control": "select",
+      "options": {
+        "0": "Red",
+        "1": "Green",
+        "2": "Yellow",
+        "3": "Blue",
+        "4": "Cyan",
+        "5": "Custom"
+      },
+      "range_source": "clamp",
+      "subgroup": "colour"
+    },
+    "cl_crosshaircolor_r": {
+      "source": "cfg",
+      "group": "crosshair_main",
+      "label": "Custom red",
+      "control": "slider",
+      "min": 0,
+      "max": 255,
+      "step": 1,
+      "range_source": "clamp",
+      "subgroup": "colour"
+    },
+    "cl_crosshaircolor_g": {
+      "source": "cfg",
+      "group": "crosshair_main",
+      "label": "Custom green",
+      "control": "slider",
+      "min": 0,
+      "max": 255,
+      "step": 1,
+      "range_source": "clamp",
+      "subgroup": "colour"
+    },
+    "cl_crosshaircolor_b": {
+      "source": "cfg",
+      "group": "crosshair_main",
+      "label": "Custom blue",
+      "control": "slider",
+      "min": 0,
+      "max": 255,
+      "step": 1,
+      "range_source": "clamp",
+      "subgroup": "colour"
+    },
+    "cl_crosshair_t": {
+      "source": "cfg",
+      "group": "crosshair_main",
+      "label": "T-style crosshair",
+      "control": "toggle",
+      "range_source": "clamp",
+      "subgroup": "shape"
+    },
+    "cl_crosshair_recoil": {
+      "source": "cfg",
+      "group": "crosshair_main",
+      "label": "Follow recoil",
+      "control": "toggle",
+      "range_source": "clamp",
+      "subgroup": "dynamic"
+    },
+    "cl_crosshair_friendly_warning": {
+      "source": "cfg",
+      "group": "crosshair_main",
+      "label": "Friendly fire warning",
+      "control": "select",
+      "options": {
+        "0": "Off",
+        "1": "Cursor only",
+        "2": "Cursor and text",
+        "3": "Text only"
+      },
+      "range_source": "clamp",
+      "subgroup": "special"
+    },
+    "cl_crosshair_sniper_width": {
+      "source": "cfg",
+      "group": "crosshair_main",
+      "label": "Sniper crosshair width",
+      "control": "number",
+      "step": 1,
+      "range_source": "convention",
+      "subgroup": "special"
+    },
+    "cl_show_observer_crosshair": {
+      "source": "cfg",
+      "group": "crosshair_main",
+      "label": "Observer crosshair",
+      "control": "select",
+      "options": {
+        "0": "Never",
+        "1": "Friends only",
+        "2": "Everyone"
+      },
+      "range_source": "clamp",
+      "subgroup": "special"
+    },
+    "cl_fixedcrosshairgap": {
+      "source": "cfg",
+      "group": "crosshair_main",
+      "label": "Fixed crosshair gap",
+      "control": "number",
+      "step": 0.5,
+      "range_source": "convention",
+      "subgroup": "shape"
+    },
+    "fps_max": {
+      "source": "cfg",
+      "group": "perf_frames",
+      "label": "Frame rate cap",
+      "control": "number",
+      "step": 1,
+      "zero_means": "unlimited",
+      "range_source": "convention",
+      "help": "0 is unlimited. No slider: there is no meaningful upper bound to draw one against.",
+      "subgroup": "limits"
+    },
+    "fps_max_ui": {
+      "source": "cfg",
+      "group": "perf_frames",
+      "label": "Menu frame rate cap",
+      "control": "number",
+      "step": 1,
+      "zero_means": "unlimited",
+      "range_source": "convention",
+      "subgroup": "limits"
+    },
+    "rate": {
+      "source": "cfg",
+      "group": "perf_network",
+      "label": "Max bandwidth",
+      "control": "select",
+      "options": {
+        "196608": "196 kB/s",
+        "262144": "262 kB/s",
+        "393216": "393 kB/s",
+        "524288": "524 kB/s",
+        "786432": "786 kB/s (default and maximum)"
+      },
+      "range_source": "clamp",
+      "help": "CS2 defaults to 786432, which is also the maximum. Older configs often carry a CS:GO-era 128000.",
+      "subgroup": "bandwidth"
+    },
+    "setting.coop_fullscreen": {
+      "source": "video",
+      "group": "video_basic",
+      "label": "Co-op fullscreen",
+      "control": "toggle",
+      "range_source": "clamp",
+      "confidence": "medium",
+      "subgroup": "display"
+    },
+    "snd_musicvolume": {
+      "source": "cfg",
+      "group": "audio_music",
+      "label": "Overall music volume",
+      "control": "slider",
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "range_source": "clamp",
+      "default": "1",
+      "subgroup": "overall"
+    },
+    "snd_dzmusic_volume": {
+      "source": "cfg",
+      "group": "audio_music",
+      "label": "Danger Zone music volume",
+      "control": "slider",
+      "min": 0,
+      "max": 1,
+      "step": 0.005,
+      "range_source": "clamp",
+      "default": "0.1",
+      "subgroup": "overall"
+    },
+    "snd_music_selection": {
+      "source": "cfg",
+      "group": "audio_music",
+      "label": "Music kit selection",
+      "control": "number",
+      "step": 1,
+      "range_source": "convention",
+      "confidence": "medium",
+      "subgroup": "overall"
+    },
+    "voice_always_sample_mic": {
+      "source": "cfg",
+      "group": "audio_voice",
+      "label": "Always sample microphone",
+      "control": "toggle",
+      "range_source": "clamp",
+      "default": "0",
+      "subgroup": "input"
+    },
+    "voice_caster_enable": {
+      "source": "cfg",
+      "group": "audio_voice",
+      "label": "Enable caster voice",
+      "control": "toggle",
+      "range_source": "clamp",
+      "confidence": "medium",
+      "subgroup": "playback"
+    },
+    "cl_mute_enemy_team": {
+      "source": "cfg",
+      "group": "audio_voice",
+      "label": "Mute enemy team",
+      "control": "toggle",
+      "range_source": "clamp",
+      "default": "0",
+      "subgroup": "muting"
+    },
+    "cl_mute_all_but_friends_and_party": {
+      "source": "cfg",
+      "group": "audio_voice",
+      "label": "Mute all but friends and party",
+      "control": "toggle",
+      "range_source": "clamp",
+      "default": "0",
+      "subgroup": "muting"
+    },
+    "snd_pitchquality": {
+      "source": "cfg",
+      "group": "audio_main",
+      "label": "Sound pitch quality",
+      "control": "toggle",
+      "range_source": "clamp",
+      "confidence": "medium",
+      "subgroup": "processing"
+    },
+    "snd_mixahead": {
+      "source": "cfg",
+      "group": "audio_main",
+      "label": "Audio buffer ahead",
+      "control": "number",
+      "step": 0.005,
+      "range_source": "convention",
+      "confidence": "medium",
+      "help": "Lower reduces audio latency but risks crackling. Not exposed in the game's menu.",
+      "subgroup": "processing"
+    },
+    "mm_dedicated_search_maxping": {
+      "source": "cfg",
+      "group": "game_main",
+      "label": "Max acceptable matchmaking ping",
+      "control": "slider",
+      "min": 25,
+      "max": 350,
+      "step": 5,
+      "range_source": "clamp",
+      "default": "60",
+      "subgroup": "matchmaking"
+    },
+    "cl_use_opens_buy_menu": {
+      "source": "cfg",
+      "group": "game_main",
+      "label": "Use key opens buy menu",
+      "control": "toggle",
+      "range_source": "clamp",
+      "default": "1",
+      "subgroup": "gameplay"
+    },
+    "cl_dm_buyrandomweapons": {
+      "source": "cfg",
+      "group": "game_main",
+      "label": "Deathmatch random weapons",
+      "control": "toggle",
+      "range_source": "clamp",
+      "default": "1",
+      "subgroup": "gameplay"
+    },
+    "cl_showhelp": {
+      "source": "cfg",
+      "group": "game_main",
+      "label": "Show help",
+      "control": "toggle",
+      "range_source": "clamp",
+      "default": "1",
+      "subgroup": "interface"
+    },
+    "cl_join_advertise": {
+      "source": "cfg",
+      "group": "game_main",
+      "label": "Allow friends to join",
+      "control": "select",
+      "options": {
+        "0": "Nobody",
+        "1": "Friends",
+        "2": "Anyone"
+      },
+      "range_source": "clamp",
+      "confidence": "medium",
+      "subgroup": "matchmaking"
+    },
+    "spec_replay_autostart": {
+      "source": "cfg",
+      "group": "game_main",
+      "label": "Auto-start killcam replay",
+      "control": "toggle",
+      "range_source": "clamp",
+      "default": "1",
+      "subgroup": "gameplay"
+    },
+    "cl_disablefreezecam": {
+      "source": "cfg",
+      "group": "game_main",
+      "label": "Disable freeze cam",
+      "control": "toggle",
+      "range_source": "clamp",
+      "default": "0",
+      "subgroup": "gameplay"
+    },
+    "cl_autowepswitch": {
+      "source": "cfg",
+      "group": "game_main",
+      "label": "Auto weapon switch on pickup",
+      "control": "toggle",
+      "range_source": "clamp",
+      "default": "1",
+      "subgroup": "gameplay"
+    },
+    "player_nevershow_communityservermessage": {
+      "source": "cfg",
+      "group": "game_main",
+      "label": "Hide community server message",
+      "control": "toggle",
+      "range_source": "clamp",
+      "confidence": "medium",
+      "subgroup": "interface"
+    },
+    "hud_scaling": {
+      "source": "cfg",
+      "group": "game_hud",
+      "label": "HUD scale",
+      "control": "slider",
+      "min": 0.5,
+      "max": 0.95,
+      "step": 0.01,
+      "range_source": "clamp",
+      "default": "0.85",
+      "subgroup": "layout"
+    },
+    "cl_showpos": {
+      "source": "cfg",
+      "group": "game_hud",
+      "label": "Show position",
+      "control": "toggle",
+      "range_source": "clamp",
+      "default": "0",
+      "subgroup": "readouts"
+    },
+    "cl_hud_telemetry_net_misdelivery_show": {
+      "source": "cfg",
+      "group": "game_hud",
+      "label": "Show packet loss telemetry",
+      "control": "select",
+      "options": {
+        "0": "Never",
+        "1": "When bad",
+        "2": "Always"
+      },
+      "range_source": "clamp",
+      "confidence": "medium",
+      "subgroup": "telemetry"
+    },
+    "cl_hud_telemetry_ping_show": {
+      "source": "cfg",
+      "group": "game_hud",
+      "label": "Show ping telemetry",
+      "control": "select",
+      "options": {
+        "0": "Never",
+        "1": "When bad",
+        "2": "Always"
+      },
+      "range_source": "clamp",
+      "confidence": "medium",
+      "subgroup": "telemetry"
+    },
+    "cl_hud_telemetry_frametime_show": {
+      "source": "cfg",
+      "group": "game_hud",
+      "label": "Show frametime telemetry",
+      "control": "select",
+      "options": {
+        "0": "Never",
+        "1": "When bad",
+        "2": "Always"
+      },
+      "range_source": "clamp",
+      "confidence": "medium",
+      "subgroup": "telemetry"
+    },
+    "cl_teammate_colors_show": {
+      "source": "cfg",
+      "group": "game_team",
+      "label": "Show teammate colours",
+      "control": "select",
+      "options": {
+        "0": "Off",
+        "1": "On",
+        "2": "On with letters"
+      },
+      "range_source": "clamp",
+      "confidence": "medium",
+      "subgroup": "markers"
+    },
+    "cl_color": {
+      "source": "cfg",
+      "group": "game_team",
+      "label": "Preferred player colour",
+      "control": "select",
+      "options": {
+        "0": "Yellow",
+        "1": "Purple",
+        "2": "Green",
+        "3": "Blue",
+        "4": "Orange"
+      },
+      "range_source": "clamp",
+      "default": "0",
+      "subgroup": "markers"
+    },
+    "cl_spec_follow_grenade_key": {
+      "source": "cfg",
+      "group": "game_team",
+      "label": "Spectator grenade follow key",
+      "control": "select",
+      "options": {
+        "0": "Alt",
+        "1": "Attack",
+        "2": "Attack 2"
+      },
+      "range_source": "clamp",
+      "confidence": "medium",
+      "subgroup": "spectating"
+    },
+    "spec_show_xray": {
+      "source": "cfg",
+      "group": "game_team",
+      "label": "Spectator X-ray",
+      "control": "toggle",
+      "range_source": "clamp",
+      "confidence": "medium",
+      "subgroup": "spectating"
+    },
+    "m_rawinput": {
+      "source": "cfg",
+      "group": "input_mouse",
+      "label": "Raw input",
+      "control": "toggle",
+      "range_source": "clamp",
+      "default": "1",
+      "subgroup": "input"
+    },
+    "m_mouseaccel1": {
+      "source": "cfg",
+      "group": "input_mouse",
+      "label": "Mouse acceleration (initial)",
+      "control": "number",
+      "step": 0.1,
+      "range_source": "convention",
+      "default": "0",
+      "subgroup": "acceleration"
+    },
+    "m_mouseaccel2": {
+      "source": "cfg",
+      "group": "input_mouse",
+      "label": "Mouse acceleration (secondary)",
+      "control": "number",
+      "step": 0.1,
+      "range_source": "convention",
+      "default": "0",
+      "subgroup": "acceleration"
+    },
+    "m_customaccel_exponent": {
+      "source": "cfg",
+      "group": "input_mouse",
+      "label": "Acceleration exponent",
+      "control": "number",
+      "step": 0.05,
+      "range_source": "convention",
+      "default": "1",
+      "subgroup": "acceleration"
+    },
+    "cl_mouselook": {
+      "source": "cfg",
+      "group": "input_mouse",
+      "label": "Mouse look",
+      "control": "toggle",
+      "range_source": "clamp",
+      "default": "1",
+      "subgroup": "input"
+    },
+    "viewmodel_presetpos": {
+      "source": "cfg",
+      "group": "input_viewmodel",
+      "label": "Viewmodel preset",
+      "control": "select",
+      "options": {
+        "0": "Custom",
+        "1": "Desktop",
+        "2": "Couch",
+        "3": "Classic"
+      },
+      "range_source": "clamp",
+      "subgroup": "presets"
+    },
+    "cl_righthand": {
+      "source": "cfg",
+      "group": "input_viewmodel",
+      "label": "Right-handed viewmodel",
+      "control": "toggle",
+      "range_source": "clamp",
+      "default": "1",
+      "subgroup": "presets"
+    },
+    "cl_bob_lower_amt": {
+      "source": "cfg",
+      "group": "input_viewmodel",
+      "label": "Weapon lowering amount",
+      "control": "slider",
+      "min": 5,
+      "max": 30,
+      "step": 1,
+      "range_source": "clamp",
+      "default": "21",
+      "subgroup": "bob"
+    },
+    "cl_bobamt_lat": {
+      "source": "cfg",
+      "group": "input_viewmodel",
+      "label": "Bob, side to side",
+      "control": "slider",
+      "min": 0.1,
+      "max": 2.0,
+      "step": 0.05,
+      "range_source": "clamp",
+      "default": "0.4",
+      "subgroup": "bob"
+    },
+    "cl_bobamt_vert": {
+      "source": "cfg",
+      "group": "input_viewmodel",
+      "label": "Bob, vertical",
+      "control": "slider",
+      "min": 0.1,
+      "max": 2.0,
+      "step": 0.05,
+      "range_source": "clamp",
+      "default": "0.25",
+      "subgroup": "bob"
+    },
+    "cl_bobcycle": {
+      "source": "cfg",
+      "group": "input_viewmodel",
+      "label": "Bob cycle",
+      "control": "slider",
+      "min": 0.1,
+      "max": 2.0,
+      "step": 0.05,
+      "range_source": "clamp",
+      "default": "0.98",
+      "subgroup": "bob"
+    },
+    "cl_crosshairusealpha": {
+      "source": "cfg",
+      "group": "crosshair_main",
+      "label": "Use alpha",
+      "control": "toggle",
+      "range_source": "clamp",
+      "default": "1",
+      "subgroup": "outline"
+    },
+    "cl_crosshairgap_useweaponvalue": {
+      "source": "cfg",
+      "group": "crosshair_main",
+      "label": "Per-weapon gap",
+      "control": "toggle",
+      "range_source": "clamp",
+      "default": "0",
+      "subgroup": "shape"
+    },
+    "cl_crosshair_dynamic_splitdist": {
+      "source": "cfg",
+      "group": "crosshair_main",
+      "label": "Dynamic split distance",
+      "control": "number",
+      "step": 1,
+      "range_source": "convention",
+      "default": "7",
+      "subgroup": "dynamic"
+    },
+    "cl_crosshair_dynamic_maxdist_splitratio": {
+      "source": "cfg",
+      "group": "crosshair_main",
+      "label": "Dynamic max split ratio",
+      "control": "slider",
+      "min": 0,
+      "max": 1,
+      "step": 0.05,
+      "range_source": "clamp",
+      "default": "0.35",
+      "subgroup": "dynamic"
+    },
+    "cl_crosshair_dynamic_splitalpha_innermod": {
+      "source": "cfg",
+      "group": "crosshair_main",
+      "label": "Inner split alpha",
+      "control": "slider",
+      "min": 0,
+      "max": 1,
+      "step": 0.05,
+      "range_source": "clamp",
+      "default": "1",
+      "subgroup": "dynamic"
+    },
+    "cl_crosshair_dynamic_splitalpha_outermod": {
+      "source": "cfg",
+      "group": "crosshair_main",
+      "label": "Outer split alpha",
+      "control": "slider",
+      "min": 0.3,
+      "max": 1,
+      "step": 0.05,
+      "range_source": "clamp",
+      "default": "0.5",
+      "subgroup": "dynamic"
+    },
+    "cl_crosshair_sniper_show_normal_inaccuracy": {
+      "source": "cfg",
+      "group": "crosshair_main",
+      "label": "Sniper shows inaccuracy",
+      "control": "toggle",
+      "range_source": "clamp",
+      "default": "0",
+      "subgroup": "special"
+    },
+    "engine_low_latency_sleep_after_client_tick": {
+      "source": "cfg",
+      "group": "perf_frames",
+      "label": "Low latency sleep after tick",
+      "control": "toggle",
+      "range_source": "clamp",
+      "confidence": "medium",
+      "subgroup": "latency"
+    },
+    "cl_forcepreload": {
+      "source": "cfg",
+      "group": "perf_frames",
+      "label": "Force preload",
+      "control": "toggle",
+      "range_source": "clamp",
+      "confidence": "medium",
+      "subgroup": "latency"
+    },
+    "cl_predict_kill_ragdolls": {
+      "source": "cfg",
+      "group": "game_prediction",
+      "label": "Predict kill ragdolls",
+      "control": "toggle",
+      "range_source": "clamp",
+      "default": "1",
+      "help": "Damage prediction plays the hit feedback immediately instead of waiting for the server to confirm it. It feels more responsive, and it can be wrong -- aim punch, tagging, or a death your client has not seen yet can produce feedback for a hit that did not land. This one is on by default; the other two are off.",
+      "subgroup": "prediction"
+    },
+    "cl_predict_body_shot_fx": {
+      "source": "cfg",
+      "group": "game_prediction",
+      "label": "Predict body shot effects",
+      "control": "toggle",
+      "range_source": "clamp",
+      "default": "0",
+      "help": "Damage prediction plays the hit feedback immediately instead of waiting for the server to confirm it. It feels more responsive, and it can be wrong -- aim punch, tagging, or a death your client has not seen yet can produce feedback for a hit that did not land.",
+      "subgroup": "prediction"
+    },
+    "cl_predict_head_shot_fx": {
+      "source": "cfg",
+      "group": "game_prediction",
+      "label": "Predict head shot effects",
+      "control": "toggle",
+      "range_source": "clamp",
+      "default": "0",
+      "help": "Damage prediction plays the hit feedback immediately instead of waiting for the server to confirm it. It feels more responsive, and it can be wrong -- aim punch, tagging, or a death your client has not seen yet can produce feedback for a hit that did not land.",
+      "subgroup": "prediction"
+    },
+    "cl_disable_ragdolls": {
+      "source": "cfg",
+      "group": "perf_effects",
+      "label": "Disable ragdolls",
+      "control": "toggle",
+      "range_source": "clamp",
+      "default": "0",
+      "help": "Removes corpse physics entirely. Saves CPU and clears the view, but you lose the body as a marker of where someone died.",
+      "subgroup": "ragdolls"
+    },
+    "cl_ragdoll_limit": {
+      "source": "cfg",
+      "group": "perf_effects",
+      "label": "Maximum ragdolls",
+      "control": "number",
+      "step": 1,
+      "range_source": "convention",
+      "default": "-1",
+      "help": "How many corpses stay on screen. -1 is no limit.",
+      "subgroup": "ragdolls"
+    }
+  },
+  "layout_note": "Three levels: section, category, sub-category. A setting with no explicit sub-category falls back to the first one in its category, so nothing is ever hidden by being unclassified."
+}

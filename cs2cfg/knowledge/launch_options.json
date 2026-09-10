@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "updated": "2026-09-06",
+  "note": "CS2 inherited its launch-option parser from Source 2, and most of the folklore still circulating online is Source 1 advice that CS:GO honoured and CS2 silently drops. Status values: 'good' (does what people think), 'situational' (real effect, only sometimes wanted), 'dead' (parsed and ignored, harmless clutter), 'harmful' (measurably worse), 'invalid' (not a real flag). Confidence says how sure the entry is; 'medium' entries are worth re-checking after a major game update.",
+
+  "options": {
+    "-novid": {"status": "good", "takes_value": false, "confidence": "high", "reason": "Skips the intro movie. Saves a couple of seconds every launch."},
+    "-console": {"status": "good", "takes_value": false, "confidence": "high", "reason": "Opens the developer console at startup. Required if your config relies on console access."},
+    "-fullscreen": {"status": "good", "takes_value": false, "confidence": "high", "reason": "Forces exclusive fullscreen, which is the lowest-latency present mode."},
+    "-windowed": {"status": "situational", "takes_value": false, "confidence": "high", "reason": "Windowed mode. Costs latency versus exclusive fullscreen; only useful when you need to alt-tab constantly."},
+    "-noborder": {"status": "situational", "takes_value": false, "confidence": "high", "reason": "Removes the window border. Pairs with -windowed for borderless."},
+    "-w": {"status": "good", "takes_value": true, "confidence": "high", "reason": "Render width. Combined with -h this pins the resolution regardless of what the video config says."},
+    "-h": {"status": "good", "takes_value": true, "confidence": "high", "reason": "Render height."},
+    "-refresh": {"status": "good", "takes_value": true, "confidence": "high", "reason": "Pins the refresh rate. Worth setting explicitly when Windows keeps dropping the panel to 60 Hz."},
+    "-freq": {"status": "good", "takes_value": true, "confidence": "medium", "reason": "Older alias for -refresh. Harmless, but -refresh is the current spelling."},
+    "+exec": {"status": "good", "takes_value": true, "confidence": "high", "reason": "Executes a config file at startup. This is how an autoexec gets loaded reliably."},
+    "-language": {"status": "situational", "takes_value": true, "confidence": "high", "reason": "Forces the interface language."},
+    "-allow_third_party_software": {"status": "situational", "takes_value": false, "confidence": "medium", "reason": "Lets overlay and capture software inject. Needed by some streaming tools; leave it off otherwise."},
+    "-high": {"status": "situational", "takes_value": false, "confidence": "medium", "reason": "Starts the process at high priority. On older homogeneous CPUs this can help slightly. On Intel hybrid P/E-core parts it can fight the Thread Director and land the hot render thread badly, so this tool leaves it off there."},
+    "-fullhd": {"status": "invalid", "takes_value": false, "confidence": "medium", "reason": "Not a real flag."},
+    "-full": {"status": "invalid", "takes_value": false, "confidence": "high", "reason": "Not a real flag. The option you want is -fullscreen; -full is silently discarded."},
+    "-nojoy": {"status": "dead", "takes_value": false, "confidence": "high", "reason": "CS:GO used this to skip loading joystick support and save a little memory. CS2 does not read it."},
+    "-d3d9ex": {"status": "dead", "takes_value": false, "confidence": "high", "reason": "A Direct3D 9 path that only ever existed in Source 1. CS2 renders on Direct3D 11 / Vulkan."},
+    "-nod3d9ex": {"status": "dead", "takes_value": false, "confidence": "high", "reason": "Source 1 only."},
+    "-tickrate": {"status": "dead", "takes_value": true, "confidence": "high", "reason": "CS2 uses sub-tick updates, so there is no tickrate to set. In CS:GO this only ever affected locally hosted servers anyway, never matchmaking."},
+    "-threads": {"status": "harmful", "takes_value": true, "confidence": "medium", "reason": "Overrides the engine's worker thread count. CS2 sizes its job pool from the actual topology; pinning it to a hand-picked number usually costs frames, and on a hybrid CPU it can starve the render thread outright."},
+    "-processheap": {"status": "dead", "takes_value": false, "confidence": "medium", "reason": "Source 1 allocator switch."},
+    "-limitvsconst": {"status": "dead", "takes_value": false, "confidence": "high", "reason": "Source 1 shader constant limit."},
+    "-forcenovsync": {"status": "dead", "takes_value": false, "confidence": "medium", "reason": "Source 1. Turn V-Sync off in the video settings instead."},
+    "-softparticlesdefaultoff": {"status": "dead", "takes_value": false, "confidence": "medium", "reason": "Source 1 particle switch."},
+    "-disable_d3d9_hardware_shader_cache": {"status": "dead", "takes_value": false, "confidence": "medium", "reason": "Source 1."},
+    "-lv": {"status": "dead", "takes_value": false, "confidence": "medium", "reason": "Low-violence mode from Source 1; CS2 has no equivalent switch here."},
+    "-sw": {"status": "dead", "takes_value": false, "confidence": "medium", "reason": "Legacy windowed shorthand. Use -windowed."},
+    "-vulkan": {"status": "situational", "takes_value": false, "confidence": "high", "reason": "Selects the Vulkan backend. Linux only; ignored on Windows."},
+    "-insecure": {"status": "situational", "takes_value": false, "confidence": "high", "reason": "Disables VAC. You cannot play on secure servers. Never added automatically."},
+    "-perfectworld": {"status": "situational", "takes_value": false, "confidence": "high", "reason": "Perfect World client, for mainland China accounts."},
+    "+mat_queue_mode": {"status": "dead", "takes_value": true, "confidence": "high", "reason": "A Source 1 multithreaded material system toggle. The convar does not exist in CS2, so this does nothing."},
+    "+cl_updaterate": {"status": "dead", "takes_value": true, "confidence": "high", "reason": "Removed with the move to sub-tick networking."},
+    "+cl_cmdrate": {"status": "dead", "takes_value": true, "confidence": "high", "reason": "Removed with the move to sub-tick networking."},
+    "+cl_interp": {"status": "dead", "takes_value": true, "confidence": "medium", "reason": "Interpolation is handled by the engine in CS2; the old manual tuning no longer applies."},
+    "+cl_interp_ratio": {"status": "dead", "takes_value": true, "confidence": "medium", "reason": "See +cl_interp."},
+    "+rate": {"status": "harmful", "takes_value": true, "confidence": "high", "reason": "Still a real convar, but CS2 defaults to 786432 and the value carried over from CS:GO guides (128000) is a large downgrade in bandwidth ceiling. Leave it at the default unless a genuinely narrow connection forces otherwise.", "safe_minimum": 786432},
+    "+fps_max": {"status": "situational", "takes_value": true, "confidence": "high", "reason": "Better set in a config than on the command line, so it can be changed without editing Steam."}
+  },
+
+  "build_order": [
+    "-fullscreen", "-windowed", "-noborder", "-w", "-h", "-refresh",
+    "-novid", "-console", "-high", "-allow_third_party_software", "-language",
+    "+exec"
+  ]
+}
