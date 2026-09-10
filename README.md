@@ -56,7 +56,17 @@ when the thing you would be restarting is the thing that just set up your game.
 
 The download is checked against the checksum GitHub publishes for it before it
 is unpacked, and a failed install leaves the working version exactly where it
-was.
+was. Installing waits for anything still running out of the folder -- a second
+window, a console copy -- rather than forcing it.
+
+**Several people on one network.** GitHub allows 60 unauthenticated requests an
+hour, counted per address rather than per machine, and a conditional request
+answered "nothing changed" still spends one of them (measured, not assumed). A
+single copy checking every five minutes uses 12 an hour and never comes close.
+Five copies behind the same router use all 60, so once less than a third of the
+allowance is left each copy spreads its remaining checks over the time until the
+window resets. They slow each other down instead of locking each other out, and
+running out is reported as a wait rather than an error.
 
 ---
 
