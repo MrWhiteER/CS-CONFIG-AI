@@ -908,6 +908,24 @@ def _cfg_plugins(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     return payload
 
 
+def _unclaimed_keys(result, found) -> list:
+    """The script's keys that nothing else in the collection also binds.
+
+    A key some other line already binds is left alone. Adding ours after it
+    would settle which of the two wins by whichever happens to be read last,
+    and quietly overriding a bind the user wrote is worse than leaving the key
+    as they had it.
+    """
+    free = []
+    for binding in found.bound_to:
+        others = [b for b in result.binds.get(binding, [])
+                  if (b.body or "").strip().strip(chr(34)).lower()
+                  != (found.entry or "").lower()]
+        if not others:
+            free.append(binding)
+    return free
+
+
 def _cfg_plugin_toggle(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     """Switch one feature block off or back on, by commenting it out.
 
@@ -915,7 +933,7 @@ def _cfg_plugin_toggle(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     line numbers the page happens to be holding: the file may have been edited
     since it loaded, and commenting out the wrong span would be silent damage.
     """
-    from . import cfgscan, plugins
+    from . import cfgscan, defaults, plugins
 
     result = getattr(state, "cfg_scan", None)
     if result is None:
@@ -941,6 +959,18 @@ def _cfg_plugin_toggle(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     # ending back below -- the same round trip the editor uses.
     flat = cfglang.restore_newlines(original, chr(10), False)
     updated = plugins.set_enabled(flat, found.line, found.end_line, enable)
+
+    # The keys this script was holding, and what CS2 does with them itself.
+    restored, dropped = [], []
+    if enable:
+        updated, dropped = plugins.drop_stock(updated, found.bound_to)
+    else:
+        free = _unclaimed_keys(result, found)
+        if free:
+            table = defaults.load(state.cs2_install)
+            updated, restored = plugins.restore_stock(
+                updated, found.end_line, free, table)
+
     updated = cfglang.restore_newlines(
         updated, config.document.newline, config.document.trailing_newline)
 
@@ -953,6 +983,7 @@ def _cfg_plugin_toggle(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
     return {
         "path": found.file, "name": found.name, "enabled": enable,
+        "restored": restored, "dropped": len(dropped),
         "changed": True, "backup": session.stamp,
         "lines": found.end_line - found.line + 1,
     }

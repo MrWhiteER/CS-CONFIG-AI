@@ -344,6 +344,67 @@ def as_dict(plugins: List[Plugin]) -> dict:
     }
 
 
+# A restored stock bind is marked so it can be found and taken away again when
+# the script comes back on. Distinct from MARK, which switches a line off.
+STD = "//[std]//"
+
+_BIND_LINE = re.compile(r'^\s*bind\s+"?([^"\s]+)"?\s+', re.I)
+
+
+def stock_line(binding: str, command: str) -> str:
+    """One restored bind, written the way the rest of the collection writes them."""
+    return (f'bind "{binding}" "{command}"   {STD} '
+            "CS2's own bind, back while the script above is off")
+
+
+def restore_stock(text: str, after_line: int, bindings, table) -> tuple:
+    """Give each key its stock bind back, below a block that was switched off.
+
+    Placed after the block rather than inside it, so the block stays entirely
+    commented out and a later scan reads the key as genuinely bound to the
+    default -- which, while the script is off, it is.
+
+    A key the game does not bind gets nothing. Leaving it doing nothing is what
+    the game itself would do, and inventing a bind for it would be a guess.
+    """
+    from . import defaults
+
+    lines = text.split("\n")
+    restored, insert = [], []
+    for binding in bindings:
+        command = defaults.for_key(table, binding)
+        if not command:
+            continue
+        insert.append(stock_line(binding, command))
+        restored.append({"key": binding, "command": command,
+                         "label": keys.label(binding)})
+    if not insert:
+        return text, restored
+    at = min(max(after_line, 0), len(lines))
+    lines[at:at] = insert
+    return "\n".join(lines), restored
+
+
+def drop_stock(text: str, bindings) -> tuple:
+    """Take the restored binds away again, when the block comes back on.
+
+    Found by their marker and their key rather than by line number, so it does
+    not matter what has been edited around them since.
+    """
+    from . import defaults
+
+    wanted = {defaults.normalise(b) for b in bindings}
+    kept, removed = [], []
+    for line in text.split("\n"):
+        if STD in line:
+            match = _BIND_LINE.match(line.split(STD)[0])
+            if match and defaults.normalise(match.group(1)) in wanted:
+                removed.append(line.strip())
+                continue
+        kept.append(line)
+    return "\n".join(kept), removed
+
+
 def set_enabled(text: str, first_line: int, last_line: int, enable: bool) -> str:
     """Comment a block's active lines out, or put them back.
 

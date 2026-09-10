@@ -4233,8 +4233,13 @@ document.addEventListener("change", async e => {
     if (!r.changed) {
       status(r.name + " was already " + (r.enabled ? "on" : "off") + ".");
     } else {
+      // What the key does now matters more than how many lines moved, so it
+      // is said first and in the key's own terms.
+      const gave = (r.restored || []).map(k => k.label + " \u2192 " + k.command);
       status((want ? "Switched on " : "Switched off ") + r.name +
-             " \u2014 " + r.lines + " lines in " + r.path +
+             (gave.length ? " \u2014 " + gave.join(", ") +
+                            " (CS2's own bind" + (gave.length > 1 ? "s" : "") + ")"
+                          : " \u2014 " + r.lines + " lines in " + r.path) +
              (r.backup ? ", backup " + r.backup : ""));
     }
     await loadPlugins(true);
