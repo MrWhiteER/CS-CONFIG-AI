@@ -40,7 +40,25 @@ ROOT = Path(__file__).resolve().parents[1]
 INIT = ROOT / "cs2cfg" / "__init__.py"
 UPDATES = ROOT / "cs2cfg" / "updates.py"
 DIST = ROOT / "dist"
+ISS = ROOT / "installer.iss"
 BINARIES = ("CS2 Launcher.exe", "cs2cfg.exe")
+
+# Where Inno Setup's compiler normally lands. Looked for rather than assumed to
+# be on PATH, because its installer does not put it there.
+ISCC_CANDIDATES = (
+    r"C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
+    r"C:\Program Files\Inno Setup 6\ISCC.exe",
+)
+
+
+def find_iscc() -> str:
+    found = shutil.which("ISCC") or shutil.which("iscc")
+    if found:
+        return found
+    for candidate in ISCC_CANDIDATES:
+        if Path(candidate).is_file():
+            return candidate
+    return ""
 
 
 class Stop(SystemExit):
@@ -159,7 +177,16 @@ def notes_from_git(since: str) -> str:
 # --------------------------------------------------------------------------
 # the archive
 
+def _report(path: Path) -> Path:
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    size = path.stat().st_size / (1024 * 1024)
+    print(f"    {path.name}  {size:.1f} MB")
+    print(f"    sha256 {digest}")
+    return path
+
+
 def build_archive(version: str) -> Path:
+    """The portable edition: both executables, at the root of a zip."""
     missing = [name for name in BINARIES if not (DIST / name).is_file()]
     if missing:
         raise Stop("the build did not produce: " + ", ".join(missing))
@@ -171,12 +198,29 @@ def build_archive(version: str) -> Path:
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as bundle:
         for name in BINARIES:
             bundle.write(DIST / name, arcname=name)
+    return _report(archive)
 
-    digest = hashlib.sha256(archive.read_bytes()).hexdigest()
-    size = archive.stat().st_size / (1024 * 1024)
-    print(f"    {archive.name}  {size:.1f} MB")
-    print(f"    sha256 {digest}")
-    return archive
+
+def build_installer(version: str) -> Path:
+    """The installed edition, compiled by Inno Setup.
+
+    The version is passed in rather than written into the script, so it can
+    only ever come from the same place as everything else in this release.
+    """
+    iscc = find_iscc()
+    if not iscc:
+        raise Stop(
+            "Inno Setup is not installed, so the installer edition cannot be "
+            "built.\n    winget install -e --id JRSoftware.InnoSetup\n"
+            "  Releases carry both editions, so this is not optional -- an "
+            "installed copy\n  looks for the Setup.exe and would find nothing.")
+
+    setup = DIST / f"cs2-autoconfig-{version}-Setup.exe"
+    setup.unlink(missing_ok=True)
+    run([iscc, f"/DAppVersion={version}", str(ISS)])
+    if not setup.is_file():
+        raise Stop(f"Inno Setup ran but {setup.name} is not there")
+    return _report(setup)
 
 
 # --------------------------------------------------------------------------
@@ -228,11 +272,14 @@ def main() -> int:
                      "run the test suite",
                      f"set __version__ to {version}",
                      "build both executables",
-                     f"zip them as cs2-autoconfig-{version}-win64.zip",
+                     f"package cs2-autoconfig-{version}-win64.zip (portable)",
+                     f"compile cs2-autoconfig-{version}-Setup.exe (installed)",
                      f"commit, tag v{version}, push to {repo}",
                      "publish the release with the zip attached"):
             print(f"    - {step}")
-        print(f"\n  gh: {'found' if has_gh else 'NOT INSTALLED -- publishing would stop here'}")
+        iscc = find_iscc()
+        print(f"\n  gh:   {'found' if has_gh else 'NOT INSTALLED -- publishing would stop here'}")
+        print(f"  ISCC: {iscc or 'NOT INSTALLED -- the installer edition could not be built'}")
         print("\n  notes it would publish:")
         for line in notes.splitlines()[:12]:
             print(f"    {line}")
@@ -269,8 +316,9 @@ def main() -> int:
     print("\n  [4/6] building")
     run(str(ROOT / "dev.bat") + " build")
 
-    print("\n  [5/6] packaging")
+    print("\n  [5/6] packaging both editions")
     archive = build_archive(version)
+    setup = build_installer(version)
 
     print("\n  [6/6] publishing")
     run(["git", "add", "-A"])
@@ -278,7 +326,7 @@ def main() -> int:
     run(["git", "tag", "-a", f"v{version}", "-m", f"Release {version}"])
     run(["git", "push", "origin", "HEAD"])
     run(["git", "push", "origin", f"v{version}"])
-    run(["gh", "release", "create", f"v{version}", str(archive),
+    run(["gh", "release", "create", f"v{version}", str(archive), str(setup),
          "--title", f"{version}", "--notes", notes])
 
     print(f"\n  published: https://github.com/{repo}/releases/tag/v{version}")

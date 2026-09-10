@@ -25,12 +25,19 @@ this one touches all three, and backs up all three together.
 
 ## Download
 
-Grab the latest build from the [releases page][releases] -- one zip with two
-executables in it. Unpack it anywhere you like and run **CS2 Launcher.exe**.
+Two editions on the [releases page][releases], both kept up to date the same
+way. Take whichever suits.
 
-There is nothing to install. No Python, no account, no sign-in. Everything the
-application writes goes in a `cs2cfg-data` folder next to the executable, so it
-runs from a USB stick and leaves nothing behind on a machine it visited.
+| | | |
+|---|---|---|
+| **Installed** | `cs2-autoconfig-X.Y.Z-Setup.exe` | Start menu entry, desktop shortcut, an uninstaller, and an entry in Add/Remove Programs. Installs for you alone, so there is no administrator prompt. |
+| **Portable** | `cs2-autoconfig-X.Y.Z-win64.zip` | Unpack anywhere and run **CS2 Launcher.exe**. Nothing is registered and nothing is left behind &mdash; it runs from a USB stick and travels with its own data. |
+
+Neither needs Python, an account, or a sign-in.
+
+Both keep their settings, backups and session history in a `cs2cfg-data`
+folder beside the executable, and uninstalling deliberately leaves that alone
+so a reinstall does not lose your work.
 
 [releases]: ../../releases/latest
 
@@ -39,6 +46,12 @@ runs from a USB stick and leaves nothing behind on a machine it visited.
 While it is open it asks GitHub for the latest release every five minutes, and
 tells you when there is one -- a notice in the corner, wherever you happen to
 be in the application, and an **Updates** tab with the details.
+
+The application knows which edition it is and updates itself accordingly: an
+installed copy runs the next installer, so it stays a registered installation
+with its shortcuts and uninstaller intact; a portable copy replaces the files
+in its own folder. You never have to pick, and moving between the two is only
+ever a matter of downloading the other one.
 
 What happens next is yours to choose:
 

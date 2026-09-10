@@ -39,7 +39,8 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
 from . import __version__
-from .paths import app_dir, is_frozen, user_data_dir
+from .paths import (INSTALLED, PORTABLE, SOURCE, app_dir, install_kind,
+                    is_frozen, user_data_dir)
 
 # Where releases are published. Overridable so a fork, or a test, can point
 # somewhere else without editing the source.
@@ -50,9 +51,15 @@ API = "https://api.github.com"
 INTERVAL = 300.0          # five minutes
 TIMEOUT = 15.0
 
-# A release is expected to carry one zip holding the executables. Anything
-# else attached to it is ignored by the updater.
-ASSET_SUFFIX = ".zip"
+# A release carries both editions. Which one this copy wants depends on how it
+# was put here: a zip of the executables for a portable copy, an installer for
+# a registered installation.
+ASSET_FOR = {PORTABLE: "-win64.zip", INSTALLED: "-setup.exe"}
+
+
+def wanted_asset(kind: str = "") -> str:
+    """The tail of the asset filename this copy should be looking for."""
+    return ASSET_FOR.get(kind or install_kind(), ASSET_FOR[PORTABLE])
 
 # Unauthenticated GitHub allows 60 requests an hour, counted per address rather
 # than per machine -- so several copies behind one router share one budget.
@@ -191,8 +198,13 @@ def _get(url: str, etag: str = "") -> tuple:
         raise
 
 
-def parse_release(data: Dict[str, object]) -> Release:
-    """Read GitHub's release JSON into the handful of fields we use."""
+def parse_release(data: Dict[str, object], kind: str = "") -> Release:
+    """Read GitHub's release JSON into the handful of fields we use.
+
+    Picks the attachment matching this copy's edition. A release missing that
+    attachment leaves the fields empty, and the panel then offers the release
+    page rather than a download it cannot use.
+    """
     tag = str(data.get("tag_name") or "")
     release = Release(
         version=tag.lstrip("vV"),
@@ -201,9 +213,10 @@ def parse_release(data: Dict[str, object]) -> Release:
         page=str(data.get("html_url") or ""),
         published=str(data.get("published_at") or ""),
     )
+    suffix = wanted_asset(kind)
     for asset in data.get("assets") or []:
         name = str(asset.get("name") or "")
-        if not name.lower().endswith(ASSET_SUFFIX):
+        if not name.lower().endswith(suffix):
             continue
         release.asset_name = name
         release.asset_url = str(asset.get("browser_download_url") or "")
@@ -238,7 +251,7 @@ def fetch_latest(etag: str = "") -> tuple:
     status, body, new_etag, rate = _get(f"{API}/repos/{repo()}/releases/latest", etag)
     if status == 304:
         return None, new_etag, rate
-    return parse_release(json.loads(body.decode("utf-8"))), new_etag, rate
+    return (parse_release(json.loads(body.decode("utf-8"))), new_etag, rate)
 
 
 # --------------------------------------------------------------------------
@@ -267,6 +280,11 @@ def sha256_of(path: Path) -> str:
         for block in iter(lambda: handle.read(1024 * 256), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+def is_installer(release: Release) -> bool:
+    """Whether this release's attachment is an installer rather than a zip."""
+    return release.asset_name.lower().endswith(".exe")
 
 
 def download(release: Release,
@@ -318,7 +336,14 @@ def download(release: Release,
                 "the downloaded file does not match its published checksum")
 
     partial.replace(archive)
-    unpack(archive, release)
+    if is_installer(release):
+        # An installer is run, not unpacked. Marking it complete here keeps
+        # "have we got this version" one question with one answer for both.
+        ready = ready_dir(release)
+        ready.mkdir(parents=True, exist_ok=True)
+        (ready / ".complete").write_text(release.version, encoding="utf-8")
+    else:
+        unpack(archive, release)
     return archive
 
 
@@ -429,12 +454,15 @@ def _fill(pid: int, ready: str, target: str, relaunch: str) -> str:
 
 
 def install(release: Release, relaunch: bool = True) -> Path:
-    """Hand the file swap to a script and return its path.
+    """Put the new version in place and return the script doing it.
 
     The caller is expected to exit promptly afterwards -- the script is already
-    waiting for this process to disappear. Only the directory holding the
-    executables is written, and a failed copy leaves the working version
-    exactly where it was.
+    waiting for this process to disappear.
+
+    An installed copy runs the next Setup.exe, so its Add/Remove Programs
+    entry, shortcuts and uninstaller keep describing what is actually there. A
+    portable copy copies files over its own folder. Either way a failure leaves
+    the working version exactly where it was.
     """
     if not is_frozen():
         raise RuntimeError(
@@ -443,6 +471,9 @@ def install(release: Release, relaunch: bool = True) -> Path:
     ready = ready_dir(release)
     if not (ready / ".complete").is_file():
         raise RuntimeError("that version has not finished downloading yet")
+
+    if is_installer(release):
+        return _run_installer(release, relaunch)
 
     script = staging_dir() / "swap.cmd"
     script.parent.mkdir(parents=True, exist_ok=True)
@@ -453,12 +484,85 @@ def install(release: Release, relaunch: bool = True) -> Path:
         relaunch=str(Path(sys.executable)) if relaunch else "",
     ), encoding="utf-8")
 
+    _spawn(script)
+    return script
+
+
+INSTALL_SCRIPT = """@echo off
+setlocal EnableDelayedExpansion
+rem Written by cs2-autoconfig to finish an update on an installed copy. The
+rem installer refuses to replace files that are still locked, and under silent
+rem flags it does so without saying anything -- so this waits first.
+set "LOG=%~dp0swap.log"
+echo [%date% %time%] waiting for pid @@PID@@ > "%LOG%"
+
+set /a TRIES=0
+:waitpid
+tasklist /fi "PID eq @@PID@@" 2>nul | find "@@PID@@" >nul
+if errorlevel 1 goto waitlocks
+set /a TRIES+=1
+if !TRIES! GTR 120 goto runsetup
+ping -n 2 127.0.0.1 >nul
+goto waitpid
+
+:waitlocks
+set /a TRIES=0
+:lockloop
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$t='@@TARGET@@'; $p=Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($t,'OrdinalIgnoreCase') }; if ($p) { exit 1 } exit 0"
+if not errorlevel 1 goto runsetup
+set /a TRIES+=1
+if !TRIES! GTR 30 (
+  echo [%date% %time%] still in use; running the installer anyway >> "%LOG%"
+  goto runsetup
+)
+ping -n 3 127.0.0.1 >nul
+goto lockloop
+
+:runsetup
+rem /SILENT, not /VERYSILENT: a large copy with nothing on screen reads as a
+rem hang. /DIR is pinned rather than left to a registry lookup, so this cannot
+rem install somewhere other than where it is replacing.
+echo [%date% %time%] running the installer >> "%LOG%"
+start "" /wait "@@SETUP@@" /SILENT /SP- /NOCANCEL /NORESTART /DIR="@@TARGET@@" /LOG="%~dp0setup.log"
+if errorlevel 1 (
+  echo [%date% %time%] installer returned %ERRORLEVEL%; the old version is still installed >> "%LOG%"
+  goto done
+)
+echo [%date% %time%] restarting >> "%LOG%"
+if not "@@RELAUNCH@@"=="" start "" "@@RELAUNCH@@"
+
+:done
+(goto) 2>nul & del "%~f0"
+"""
+
+
+def _run_installer(release: Release, relaunch: bool) -> Path:
+    """Hand the downloaded Setup.exe to a script that waits, then runs it."""
+    setup = archive_path(release)
+    if not setup.is_file():
+        raise RuntimeError("the installer for that version is not on disk")
+
+    script = staging_dir() / "swap.cmd"
+    script.parent.mkdir(parents=True, exist_ok=True)
+    out = INSTALL_SCRIPT
+    for token, value in (("@@PID@@", str(os.getpid())),
+                         ("@@SETUP@@", str(setup)),
+                         ("@@TARGET@@", str(app_dir())),
+                         ("@@RELAUNCH@@",
+                          str(Path(sys.executable)) if relaunch else "")):
+        out = out.replace(token, value)
+    script.write_text(out, encoding="utf-8")
+    _spawn(script)
+    return script
+
+
+def _spawn(script: Path) -> None:
+    """Start a finishing script detached, so it outlives this process."""
     detached = 0
     if hasattr(subprocess, "CREATE_NEW_PROCESS_GROUP"):
         detached = subprocess.CREATE_NEW_PROCESS_GROUP | 0x00000008  # DETACHED_PROCESS
     subprocess.Popen(["cmd", "/c", str(script)], cwd=str(staging_dir()),
                      creationflags=detached, close_fds=True)
-    return script
 
 
 # --------------------------------------------------------------------------
@@ -521,6 +625,7 @@ class Checker:
                 "repo": repo(),
                 "configured": configured(),
                 "frozen": is_frozen(),
+                "edition": install_kind(),
                 "running": bool(self._thread and self._thread.is_alive()),
                 "available": newer,
                 "done": self._done,

@@ -4616,8 +4616,12 @@ function updCard(s) {
     return '<div class="upd-head"><i class="upd-dot news"></i><div>' +
       '<p class="upd-title">' + esc(latest.version || "") +
       " is downloaded and ready</p>" + vers +
-      '<p class="upd-note">It will be put in place when you say so. Nothing has ' +
-      "changed yet.</p>" + notes +
+      '<p class="upd-note">' +
+      (s.edition === "installed"
+        ? "The installer will run when you say so, keeping this a registered " +
+          "installation. Nothing has changed yet."
+        : "It will be put in place when you say so. Nothing has changed yet.") +
+      "</p>" + notes +
       '<div class="upd-actions">' +
       '<button class="btn primary small" id="upd-install"' +
       (cannot ? " disabled" : "") + ">Install now and restart</button>" +
@@ -4669,9 +4673,12 @@ function renderUpdates() {
     }
     const where = $("upd-where");
     if (where) {
-      where.textContent = s.frozen
-        ? "installed build, can update itself"
-        : "running from source, update with git";
+      // The two editions update by different means, so which one this is
+      // changes what pressing Install actually does.
+      where.textContent =
+        s.edition === "installed" ? "installed copy — updates run the installer"
+        : s.edition === "portable" ? "portable copy — updates replace the files here"
+        : "running from source — update with git";
     }
   }
   renderUpdToast();

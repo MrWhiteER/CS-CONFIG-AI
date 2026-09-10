@@ -53,6 +53,65 @@ def app_dir() -> Path:
     return Path(__file__).parent.parent
 
 
+# The installer's identity, fixed forever. Must match AppId in installer.iss:
+# Windows uses it to recognise a later Setup.exe as an update to the same
+# installation rather than a second copy of the program.
+APP_ID = "{52CB95CD-82DB-40CA-8E48-7DDE2C72820D}"
+UNINSTALL_KEY = (r"Software\Microsoft\Windows\CurrentVersion\Uninstall"
+                 rf"\{APP_ID}_is1")
+
+PORTABLE = "portable"
+INSTALLED = "installed"
+SOURCE = "source"
+
+
+def _registered_install() -> Optional[Path]:
+    """Where the installer says it put this program, if it ever did.
+
+    Per-user installs are recorded under HKCU, which needs no elevation to
+    read. Anything unexpected -- no key, no value, a non-Windows machine --
+    means "not installed", which is the safe answer: a portable copy that
+    updates itself by copying files can do no harm to an installed one.
+    """
+    try:
+        import winreg
+    except ImportError:
+        return None
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, UNINSTALL_KEY) as key:
+            location, _ = winreg.QueryValueEx(key, "InstallLocation")
+    except OSError:
+        return None
+    return Path(location) if location else None
+
+
+def install_kind() -> str:
+    """Which edition this copy is, which decides how it updates itself.
+
+    * ``source``    -- running from a checkout; updates are a git pull
+    * ``installed`` -- put here by the installer; updates run the next Setup.exe
+    * ``portable``  -- unpacked from the zip; updates copy files into place
+
+    Decided by asking the registry where the installer put things and seeing
+    whether that is here. The uninstaller sitting next to the executable is
+    accepted as a second opinion, for the case where the registry entry has
+    been cleaned away but the installation is still in use.
+    """
+    if not is_frozen():
+        return SOURCE
+    here = app_dir().resolve()
+    registered = _registered_install()
+    if registered is not None:
+        try:
+            if registered.resolve() == here:
+                return INSTALLED
+        except OSError:
+            pass
+    if (here / "unins000.exe").is_file():
+        return INSTALLED
+    return PORTABLE
+
+
 def _writable(directory: Path) -> bool:
     """Can we actually create files here? Ask, rather than assume.
 
