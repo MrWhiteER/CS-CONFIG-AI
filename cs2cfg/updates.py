@@ -44,7 +44,7 @@ from .paths import (INSTALLED, PORTABLE, SOURCE, app_dir, install_kind,
 
 # Where releases are published. Overridable so a fork, or a test, can point
 # somewhere else without editing the source.
-DEFAULT_REPO = "REPLACE_ME/cs2-autoconfig"
+DEFAULT_REPO = "MrWhiteER/CS-CONFIG-AI"
 REPO_ENV = "CS2CFG_UPDATE_REPO"
 
 API = "https://api.github.com"

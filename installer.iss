@@ -17,7 +17,7 @@
 #define AppName        "CS2 Launcher"
 #define AppPublisher   "cs2-autoconfig"
 #define AppExe         "CS2 Launcher.exe"
-#define AppUrl         "https://github.com/REPLACE_ME/cs2-autoconfig"
+#define AppUrl        "https://github.com/MrWhiteER/CS-CONFIG-AI"
 
 ; Passed in by tools/release.py so the version is never written twice.
 #ifndef AppVersion

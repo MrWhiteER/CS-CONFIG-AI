@@ -99,14 +99,32 @@ def origin_repo() -> str:
 
 
 def point_updater_at(repo: str) -> bool:
-    """Write the repository into the source the build will be made from."""
+    """Write the repository into everything built from this source.
+
+    Two places name it -- the updater, which asks it for releases, and the
+    installer, which shows it as the support and updates link. Both are filled
+    from the origin remote rather than typed, so a build cannot point somewhere
+    its own repository does not, and neither can drift from the other.
+    """
+    changed = False
+
     text = UPDATES.read_text(encoding="utf-8")
     new = re.sub(r'^DEFAULT_REPO = ".*"$', f'DEFAULT_REPO = "{repo}"',
                  text, count=1, flags=re.M)
-    if new == text:
-        return False
-    UPDATES.write_text(new, encoding="utf-8")
-    return True
+    if new != text:
+        UPDATES.write_text(new, encoding="utf-8")
+        changed = True
+
+    if ISS.is_file():
+        text = ISS.read_text(encoding="utf-8")
+        new = re.sub(r'^#define AppUrl\s+".*"$',
+                     f'#define AppUrl        "https://github.com/{repo}"',
+                     text, count=1, flags=re.M)
+        if new != text:
+            ISS.write_text(new, encoding="utf-8")
+            changed = True
+
+    return changed
 
 
 # --------------------------------------------------------------------------
