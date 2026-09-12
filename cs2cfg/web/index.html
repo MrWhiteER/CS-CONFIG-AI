@@ -567,7 +567,44 @@
     position: absolute; top: 3px; right: 5px; margin: 0;
     transform: scale(.82);
   }
-  .tabs .tab .ic { width: 15px; flex: none; text-align: center; font-style: normal; opacity: .8; }
+  /* Each section carries its own colour, so a folded rail still says which
+     row is which. Dimmed until hovered or open -- lighting all eight at once
+     would say nothing. */
+  .tabs .tab { --sec: #7f93ad; }
+  .tabs .tab[data-tab="launcher"] { --sec: #17e3a1; }
+  .tabs .tab[data-tab="cs2"]      { --sec: #4d94ff; }
+  .tabs .tab[data-tab="keyboard"] { --sec: #a970ff; }
+  .tabs .tab[data-tab="scripts"]  { --sec: #ff2d95; }
+  .tabs .tab[data-tab="files"]    { --sec: #ffb43a; }
+  .tabs .tab[data-tab="gpu"]      { --sec: #2fd0d6; }
+  .tabs .tab[data-tab="settings"] { --sec: #8ea2c0; }
+  .tabs .tab[data-tab="updates"]  { --sec: #5b8cff; }
+
+  .tabs .tab .ic, .rail-foot .tab .ic {
+    width: 22px; height: 22px; flex: none; font-style: normal;
+    display: grid; place-items: center;
+    color: var(--sec, #7f93ad);
+    opacity: .62;
+    transition: opacity 160ms ease, transform 160ms ease, filter 160ms ease;
+  }
+  .tabs .tab .ic svg, .rail-foot .tab .ic svg {
+    width: 20px; height: 20px; display: block;
+    fill: none; stroke: currentColor; stroke-width: 1.8;
+    stroke-linecap: round; stroke-linejoin: round;
+  }
+  /* The launcher's play mark reads better solid. */
+  .tabs .tab[data-tab="launcher"] .ic svg path { fill: currentColor; }
+
+  .tabs .tab:hover .ic, .rail-foot .tab:hover .ic {
+    opacity: 1; transform: scale(1.08);
+    filter: drop-shadow(0 0 7px color-mix(in srgb, var(--sec, #7f93ad) 70%, transparent));
+  }
+  .tabs .tab[aria-selected="true"] .ic {
+    opacity: 1;
+    filter: drop-shadow(0 0 9px color-mix(in srgb, var(--sec) 85%, transparent));
+  }
+  /* The bar down the side of the open row picks up its colour too. */
+  .tabs .tab[aria-selected="true"]::before { background: var(--sec); }
   .tabs .tab:hover { background: rgba(255, 255, 255, .05); color: var(--ink); }
   .tabs .tab[aria-selected="true"] {
     background: rgba(255, 255, 255, .09); color: var(--ink); font-weight: 600;
@@ -619,7 +656,7 @@
     transition: gap 260ms cubic-bezier(.22, 1, .36, 1),
                 padding 260ms cubic-bezier(.22, 1, .36, 1);
   }
-  .rail-foot .tab .ic { width: 15px; flex: none; text-align: center; font-style: normal; opacity: .8; }
+  .rail-foot .tab { --sec: #7f93ad; }
   .rail-foot .tab:hover { background: rgba(255, 255, 255, .05); color: var(--ink); }
   .rail-foot .ver {
     padding: 6px 9px 0; font-family: var(--mono); font-size: 9.5px; color: var(--faint);
@@ -1772,21 +1809,21 @@
 
     <div class="tabs" role="tablist">
       <button class="tab" data-tab="launcher" role="tab" aria-selected="true">
-        <i class="ic">&#9654;</i><span class="tx">Launcher</span></button>
+        <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg></i><span class="tx">Launcher</span></button>
       <button class="tab" data-tab="cs2" role="tab" aria-selected="false">
-        <i class="ic">&#9673;</i><span class="tx">CS2 Settings</span></button>
+        <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.3"/><circle cx="10" cy="17" r="2.3"/></svg></i><span class="tx">CS2 Settings</span></button>
       <button class="tab" data-tab="keyboard" role="tab" aria-selected="false">
-        <i class="ic">&#9000;</i><span class="tx">Keyboard</span></button>
+        <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2.5"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/></svg></i><span class="tx">Keyboard</span></button>
       <button class="tab" data-tab="scripts" role="tab" aria-selected="false">
-        <i class="ic">&#9881;</i><span class="tx">Scripts</span></button>
+        <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7l-5 5 5 5M15 7l5 5-5 5"/></svg></i><span class="tx">Scripts</span></button>
       <button class="tab" data-tab="files" role="tab" aria-selected="false">
-        <i class="ic">&#128193;</i><span class="tx">Files</span></button>
+        <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 012-2h4l2 2.5h8a2 2 0 012 2V18a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></i><span class="tx">Files</span></button>
       <button class="tab" data-tab="gpu" role="tab" aria-selected="false">
-        <i class="ic">&#9635;</i><span class="tx">Graphics</span></button>
+        <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="7" width="16" height="11" rx="2"/><rect x="9" y="11" width="6" height="4" rx="1"/><path d="M8 4v3M16 4v3M8 18v2M16 18v2"/></svg></i><span class="tx">Graphics</span></button>
       <button class="tab" data-tab="settings" role="tab" aria-selected="false">
-        <i class="ic">&#9881;</i><span class="tx">Settings</span></button>
+        <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.6M12 18.6v2.6M4.5 12H2M22 12h-2.5M6.2 6.2L4.4 4.4M19.6 19.6l-1.8-1.8M17.8 6.2l1.8-1.8M4.4 19.6l1.8-1.8"/></svg></i><span class="tx">Settings</span></button>
       <button class="tab" data-tab="updates" role="tab" aria-selected="false">
-        <i class="ic">&#8623;</i><span class="tx">Updates</span></button>
+        <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11M8 10.5l4 3.5 4-3.5"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg></i><span class="tx">Updates</span></button>
     </div>
 
     <!-- The section list lives in the rail, the way NGENUITY keeps its device
@@ -1799,7 +1836,7 @@
 
     <div class="rail-foot">
       <button class="tab" id="rescan" title="Re-read hardware">
-        <i class="ic">&#8635;</i><span class="tx">Rescan</span></button>
+        <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 10-1 5"/><path d="M20 4v6h-6"/></svg></i><span class="tx">Rescan</span></button>
       <div class="ver">__CS2CFG_VERSION__</div>
     </div>
   </aside>
