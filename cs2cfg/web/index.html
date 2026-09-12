@@ -515,7 +515,9 @@
   }
   .tabs .tab .tx, .rail-foot .tab .tx, .rail-profile .nm {
     display: inline-block; overflow: hidden; white-space: nowrap;
-    max-width: calc(var(--rail-text) * 130px);
+    /* Whatever the rail has spare once the symbol and its padding are taken.
+       Widening past the symbols is what brings the names in. */
+    max-width: calc(var(--rail) - 54px);
   }
   /* These are on their own line, so they give their height back as well. */
   .app.rail-tight .brand span,
@@ -1166,42 +1168,66 @@
   /* Fixed height with its own scroll: the list is long, and the buttons
      underneath must not walk off the bottom of the panel. */
   .kb-cmds {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
-    gap: 5px; max-height: 260px; overflow-y: auto; padding-right: 4px;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(228px, 1fr));
+    gap: 6px; max-height: 290px; overflow-y: auto; padding-right: 4px;
   }
   .kb-cmd {
     appearance: none; cursor: pointer; font: inherit; text-align: left;
     display: grid; grid-template-columns: auto minmax(0, 1fr);
     gap: 10px; align-items: center;
-    padding: 8px 11px; border-radius: 9px;
+    padding: 9px 11px; border-radius: 11px;
     color: var(--ink); background: rgba(255, 255, 255, .04);
     border: 1px solid var(--line); transition: background 140ms ease;
   }
   .kb-cmd-text { display: grid; gap: 2px; min-width: 0; }
 
   /* The disc. One shape for every command so the column reads as a column,
-     with the symbol inside saying which command it is. */
+     with the symbol inside saying which command it is, and a colour saying
+     which family it belongs to. Everything else on this page glows; a flat
+     grey icon would read as a different piece of software. */
+  .kb-cmd { --fam: #6f8fbe; }
+  .kb-cmd[data-fam="movement"]  { --fam: #4d94ff; }
+  .kb-cmd[data-fam="combat"]    { --fam: #ff4d7d; }
+  .kb-cmd[data-fam="weapons"]   { --fam: #a970ff; }
+  .kb-cmd[data-fam="buying"]    { --fam: #2fd39a; }
+  .kb-cmd[data-fam="comms"]     { --fam: #2fd0d6; }
+  .kb-cmd[data-fam="interface"] { --fam: #ffb43a; }
+  .kb-cmd[data-fam="session"]   { --fam: #ff6b6b; }
+  .kb-cmd[data-fam="scripts"]   { --fam: #ff2d95; }
+
   .kb-ico {
-    width: 34px; height: 34px; border-radius: 50%; flex: none;
+    width: 42px; height: 42px; border-radius: 50%; flex: none;
     display: grid; place-items: center;
-    background: rgba(255, 255, 255, .05);
-    border: 1px solid var(--line);
-    color: var(--muted);
-    transition: color 140ms ease, background 140ms ease, border-color 140ms ease;
+    color: var(--fam);
+    background:
+      radial-gradient(circle at 50% 30%,
+        color-mix(in srgb, var(--fam) 28%, transparent),
+        color-mix(in srgb, var(--fam) 9%, transparent) 70%);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fam) 42%, transparent),
+                0 0 12px -4px var(--fam);
+    transition: box-shadow 160ms ease, transform 160ms ease,
+                background 160ms ease;
   }
   .kb-ico-art {
-    width: 18px; height: 18px; display: block;
-    fill: none; stroke: currentColor; stroke-width: 1.7;
+    width: 23px; height: 23px; display: block;
+    fill: none; stroke: currentColor; stroke-width: 1.85;
     stroke-linecap: round; stroke-linejoin: round;
+    filter: drop-shadow(0 0 5px color-mix(in srgb, var(--fam) 75%, transparent));
   }
-  .kb-ico.script { border-color: rgba(255, 45, 149, .4); color: #ff8ccd; }
   .kb-cmd:hover:not(:disabled) .kb-ico {
-    color: #9cc4ff; border-color: rgba(61, 139, 253, .5);
-    background: rgba(61, 139, 253, .12);
+    transform: scale(1.06);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fam) 70%, transparent),
+                0 0 20px -3px var(--fam);
+    background:
+      radial-gradient(circle at 50% 30%,
+        color-mix(in srgb, var(--fam) 44%, transparent),
+        color-mix(in srgb, var(--fam) 14%, transparent) 70%);
   }
+  /* The one already on this key keeps its family colour -- the card border
+     and the tick already say it is chosen, and recolouring it would lose the
+     one thing the disc is for. */
   .kb-cmd.on .kb-ico {
-    color: var(--accent); border-color: rgba(23, 227, 161, .5);
-    background: rgba(23, 227, 161, .14);
+    box-shadow: inset 0 0 0 1.5px var(--fam), 0 0 22px -3px var(--fam);
   }
   .kb-cmd:hover:not(:disabled) {
     background: rgba(61, 139, 253, .13); border-color: rgba(61, 139, 253, .4);
@@ -4378,12 +4404,13 @@ function kbPicker() {
     for (const g of groups) {
       for (const c of g.commands) {
         if ((c.label + " " + c.command).toLowerCase().includes(find)) {
-          shown.push(Object.assign({ group: g.name }, c));
+          shown.push(Object.assign({ group: g.name, family: g.id }, c));
         }
       }
     }
   } else if (open) {
-    shown = open.commands.map(c => Object.assign({ group: open.name }, c));
+    shown = open.commands.map(c =>
+      Object.assign({ group: open.name, family: open.id }, c));
   }
 
   const tabs = groups.map(g =>
@@ -4396,6 +4423,7 @@ function kbPicker() {
     const active = c.command.toLowerCase() === now;
     return '<button class="kb-cmd' + (active ? " on" : "") +
       '" data-bindcmd="' + esc(c.command) + '"' +
+      ' data-fam="' + esc(c.script ? "scripts" : (c.family || open.id || "")) + '"' +
       (kbBusy ? " disabled" : "") + ">" +
       '<span class="kb-ico' + (c.script ? " script" : "") + '">' +
       kbIcon(c.script ? "dot" : c.icon) + "</span>" +
@@ -5236,33 +5264,53 @@ document.addEventListener("change", async e => {
    so it folds. Between that and RAIL_MIN the labels would be cut in half, so
    it springs back up. Above that it is whatever the user left it at.
    -------------------------------------------------------------------------- */
-const RAIL_TIGHT = 58;     // symbols only
-const RAIL_FOLD  = 132;    // drag below this and it folds
-const RAIL_MIN   = 150;    // the narrowest the labels still read at
-const RAIL_MAX   = 340;
-const RAIL_HOME  = 186;
+const RAIL_MIN  = 58;      // symbols alone, nothing narrower is useful
+const RAIL_MAX  = 340;
+const RAIL_HOME = 186;
+// Where the names start arriving and where they are fully in. Between the two
+// they fade, so widening past the symbols brings the labels with it.
+const RAIL_TEXT_FROM = 66;
+const RAIL_TEXT_FULL = 116;
 
 let railWidth = RAIL_HOME;
-let railTight = false;
+let railOpen = RAIL_HOME;        // what to go back to when unfolding
 let railNarrowWindow = false;
 
-function railApply(animate) {
+function railTextAt(width) {
+  const t = (width - RAIL_TEXT_FROM) / (RAIL_TEXT_FULL - RAIL_TEXT_FROM);
+  return Math.max(0, Math.min(1, t));
+}
+
+// One place that paints, so the width, the labels and the layout can never
+// disagree about how wide the rail currently is.
+function railPaint(width, animate) {
   const app = document.querySelector(".app");
   if (!app) return;
+  const shown = railNarrowWindow ? RAIL_MIN : width;
+  const text = railTextAt(shown);
   app.classList.toggle("rail-eased", !!animate);
-  const folded = railTight || railNarrowWindow;
-  app.classList.toggle("rail-tight", folded);
-  app.style.setProperty("--rail", (folded ? RAIL_TIGHT : railWidth) + "px");
+  app.classList.toggle("rail-tight", text < 0.5);
+  app.style.setProperty("--rail", Math.round(shown) + "px");
+  app.style.setProperty("--rail-text", text.toFixed(3));
 }
+
+function railApply(animate) { railPaint(railWidth, animate !== false); }
 
 function railRemember() {
-  api("/api/prefs", { rail_width: railTight ? 0 : Math.round(railWidth) })
-    .catch(() => {});
+  api("/api/prefs", { rail_width: Math.round(railWidth) }).catch(() => {});
 }
 
-function railSetTight(folded, animate) {
-  railTight = !!folded;
-  if (!railTight && railWidth < RAIL_MIN) railWidth = RAIL_HOME;
+// Folded is simply narrow. There is no separate state to be in, which is why
+// the rail can be left at any width at all.
+function railFolded() { return railWidth <= RAIL_TEXT_FROM; }
+
+function railSetTight(fold, animate) {
+  if (fold) {
+    if (!railFolded()) railOpen = railWidth;
+    railWidth = RAIL_MIN;
+  } else {
+    railWidth = Math.max(RAIL_TEXT_FULL, railOpen || RAIL_HOME);
+  }
   railApply(animate !== false);
   railRemember();
 }
@@ -5274,8 +5322,7 @@ function railSetTight(folded, animate) {
 
   grip.addEventListener("pointerdown", e => {
     if (e.button !== 0) return;
-    live = { id: e.pointerId, from: railTight ? RAIL_TIGHT : railWidth,
-             startX: e.clientX, moved: false };
+    live = { id: e.pointerId, from: railWidth, startX: e.clientX, moved: false };
     grip.classList.add("on");
     // Off for the duration: an animation chasing the pointer lags behind it.
     document.querySelector(".app").classList.remove("rail-eased");
@@ -5288,42 +5335,33 @@ function railSetTight(folded, animate) {
     const dx = e.clientX - live.startX;
     if (!live.moved && Math.abs(dx) < 3) return;
     live.moved = true;
-
-    const want = Math.min(RAIL_MAX, Math.max(RAIL_TIGHT, live.from + dx));
-    // Follows the pointer exactly while dragging, including through the
-    // fold point, so what is under the pointer is what you get.
-    railTight = want < RAIL_FOLD;
-    railWidth = want;
-    const app = document.querySelector(".app");
-    app.classList.toggle("rail-tight", railTight || railNarrowWindow);
-    app.style.setProperty("--rail",
-      (railTight ? RAIL_TIGHT : want) + "px");
+    // Exactly where the pointer is, within what is possible. Nothing snaps,
+    // so the rail is always the width it was left at.
+    railWidth = Math.min(RAIL_MAX, Math.max(RAIL_MIN, live.from + dx));
+    if (!railFolded()) railOpen = railWidth;
+    railPaint(railWidth, false);
     e.preventDefault();
   });
 
-  document.addEventListener("pointerup", e => {
+  function done(e) {
     if (!live || e.pointerId !== live.id) return;
     const moved = live.moved;
     live = null;
     grip.classList.remove("on");
     try { grip.releasePointerCapture(e.pointerId); } catch (err) {}
-    if (!moved) return;
-    // Settle: fold, or come back up to a width the labels actually read at.
-    if (railWidth < RAIL_FOLD) {
-      railTight = true;
-    } else {
-      railTight = false;
-      railWidth = Math.max(RAIL_MIN, Math.min(RAIL_MAX, railWidth));
-    }
-    railApply(true);
-    railRemember();
-  });
+    if (moved) railRemember();
+  }
+
+  document.addEventListener("pointerup", done);
+  // A drag that ends outside the window, or is taken over by something else,
+  // still has to let go -- otherwise the rail follows the pointer afterwards.
+  document.addEventListener("pointercancel", done);
 
   // The obvious shortcut, and the way back if it has been dragged shut.
-  grip.addEventListener("dblclick", () => railSetTight(!railTight));
+  grip.addEventListener("dblclick", () => railSetTight(!railFolded()));
 
-  // A window too narrow for a rail folds it regardless, and unfolds it again
-  // when there is room -- without overwriting what the user chose.
+  // A window too narrow for a rail folds it regardless, and gives it back
+  // when there is room -- without overwriting the width the user chose.
   const narrow = window.matchMedia("(max-width: 960px)");
   const watch = m => { railNarrowWindow = m.matches; railApply(true); };
   narrow.addEventListener ? narrow.addEventListener("change", watch)
@@ -5473,13 +5511,9 @@ function applyPrefs(ui) {
   if (ui.kb_shown && typeof ui.kb_shown.board === "boolean") {
     kbShown = ui.kb_shown;
   }
-  if (typeof ui.rail_width === "number") {
-    // Zero means folded; anything else is a width, clamped in case the
-    // window it was saved from was a different size.
-    railTight = ui.rail_width === 0;
-    if (!railTight) {
-      railWidth = Math.max(RAIL_MIN, Math.min(RAIL_MAX, ui.rail_width));
-    }
+  if (typeof ui.rail_width === "number" && ui.rail_width > 0) {
+    railWidth = Math.max(RAIL_MIN, Math.min(RAIL_MAX, ui.rail_width));
+    if (!railFolded()) railOpen = railWidth;
     railApply(false);
   }
   if (ui.tab) setTab(ui.tab);
