@@ -331,7 +331,7 @@ def _save_prefs(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         "intent", "target_fps", "account", "write_video", "write_cfg",
         "write_launch", "link_autoexec", "stretch_mode", "patch_video",
         "cfg_folder", "tab", "favourites", "mouse_shape", "kb_layout", "kb_shown",
-        "update_auto_download", "update_skip",
+        "update_auto_download", "update_skip", "rail_width",
     )
     for key in allowed:
         if key in body:

@@ -456,8 +456,36 @@
   /* ------------------------------------------------------------------ shell */
   .app {
     position: relative; z-index: 1; height: 100vh;
-    display: grid; grid-template-columns: 186px minmax(0, 1fr);
+    /* One number, read by the grid, the grip and the labels, so none of them
+       can disagree about how wide the rail currently is. */
+    --rail: 186px;
+    --rail-text: 1;          /* 1 while the labels are shown, 0 while folded */
+    display: grid; grid-template-columns: var(--rail) minmax(0, 1fr);
   }
+  /* Animated except while a drag is in progress: an animation that chases the
+     pointer lags behind it, which reads as the app being slow rather than
+     smooth. The class is taken off for the duration of the drag. */
+  .app.rail-eased {
+    transition: grid-template-columns 260ms cubic-bezier(.22, 1, .36, 1);
+  }
+
+  .app.rail-tight { --rail: 58px; --rail-text: 0; }
+
+  /* The grip. Wider than it looks so it is easy to grab, with only a hairline
+     showing once the pointer is near it. */
+  .rail-grip {
+    position: absolute; top: 0; bottom: 0; left: var(--rail);
+    width: 9px; margin-left: -5px; z-index: 40;
+    cursor: col-resize; touch-action: none;
+  }
+  .app.rail-eased .rail-grip { transition: left 260ms cubic-bezier(.22, 1, .36, 1); }
+  .rail-grip::after {
+    content: ""; position: absolute; top: 0; bottom: 0; left: 4px;
+    width: 2px; border-radius: 2px; background: var(--accent);
+    opacity: 0; transition: opacity 150ms ease;
+  }
+  .rail-grip:hover::after, .rail-grip.on::after { opacity: .85; }
+  .rail-grip.on { cursor: col-resize; }
 
   .rail {
     display: flex; flex-direction: column; min-height: 0;
@@ -469,8 +497,34 @@
   .brand {
     padding: 0 16px 14px; font-size: 13px; font-weight: 800; line-height: 1.15;
     letter-spacing: .30em; text-transform: uppercase;
+    transition: padding 260ms cubic-bezier(.22, 1, .36, 1),
+                font-size 200ms ease, letter-spacing 200ms ease;
+  }
+  .app.rail-tight .brand {
+    font-size: 10px; letter-spacing: .1em; padding: 0 10px 12px; text-align: center;
   }
   .brand span { display: block; font-size: 9px; letter-spacing: .34em; color: var(--muted); }
+
+  /* Folding, rather than hiding. Width carries the movement and opacity
+     carries the fade; display:none can do neither. Everything that folds is
+     listed here so the timing is written once. */
+  .brand span, .rail-label, .rail-profile .nm, .rail-foot .ver,
+  .tabs .tab .tx, .rail-foot .tab .tx {
+    opacity: var(--rail-text);
+    transition: opacity 150ms ease, max-width 260ms cubic-bezier(.22, 1, .36, 1);
+  }
+  .tabs .tab .tx, .rail-foot .tab .tx, .rail-profile .nm {
+    display: inline-block; overflow: hidden; white-space: nowrap;
+    max-width: calc(var(--rail-text) * 130px);
+  }
+  /* These are on their own line, so they give their height back as well. */
+  .app.rail-tight .brand span,
+  .app.rail-tight .rail-label,
+  .app.rail-tight .rail-foot .ver {
+    height: 0; padding-top: 0; padding-bottom: 0;
+    margin: 0; overflow: hidden;
+  }
+  .app.rail-tight .rail-label { border: 0; }
 
   .rail-label {
     padding: 14px 16px 5px; font-size: 9px; font-weight: 700;
@@ -493,9 +547,23 @@
   }
   .tabs .tab {
     appearance: none; background: none; border: 0; cursor: pointer; width: 100%;
-    display: flex; align-items: center; gap: 9px; text-align: left; position: relative;
+    display: flex; align-items: center; gap: calc(var(--rail-text) * 9px);
+    text-align: left; position: relative;
     padding: 8px 9px; border-radius: 8px; margin: 0;
     color: var(--ink-dim); font: inherit; font-size: 12.5px; font-weight: 400;
+    transition: gap 260ms cubic-bezier(.22, 1, .36, 1),
+                padding 260ms cubic-bezier(.22, 1, .36, 1);
+  }
+  .app.rail-tight .tabs .tab,
+  .app.rail-tight .rail-foot .tab { justify-content: center; padding: 9px 0; }
+  /* The section list has no symbols to fall back on, so it goes entirely. */
+  .app.rail-tight #cs2-tree { display: none; }
+  /* A count still has to be visible when there is no room beside the label. */
+  .app.rail-tight .tabs .tab .dirty-badge,
+  .app.rail-tight .tabs .tab .count,
+  .app.rail-tight .tabs .tab .upd-pip {
+    position: absolute; top: 3px; right: 5px; margin: 0;
+    transform: scale(.82);
   }
   .tabs .tab .ic { width: 15px; flex: none; text-align: center; font-style: normal; opacity: .8; }
   .tabs .tab:hover { background: rgba(255, 255, 255, .05); color: var(--ink); }
@@ -542,9 +610,12 @@
      the same way the section list does. */
   .rail-foot .tab {
     appearance: none; background: none; border: 0; cursor: pointer; width: 100%;
-    display: flex; align-items: center; gap: 9px; text-align: left; margin: 0;
+    display: flex; align-items: center; gap: calc(var(--rail-text) * 9px);
+    text-align: left; margin: 0;
     padding: 8px 9px; border-radius: 8px; color: var(--muted);
     font: inherit; font-size: 12.5px; font-weight: 400;
+    transition: gap 260ms cubic-bezier(.22, 1, .36, 1),
+                padding 260ms cubic-bezier(.22, 1, .36, 1);
   }
   .rail-foot .tab .ic { width: 15px; flex: none; text-align: center; font-style: normal; opacity: .8; }
   .rail-foot .tab:hover { background: rgba(255, 255, 255, .05); color: var(--ink); }
@@ -1650,13 +1721,10 @@
     .files-body > .editor-side { max-height: 230px; }
   }
 
-  /* Narrow windows: the rail becomes a strip of icons, the editor stacks. */
+  /* Narrow windows: the editor stacks. The rail folds too, but through the
+     same class the grip uses rather than through a second set of rules -- one
+     collapsed state, whichever way it was reached. */
   @media (max-width: 960px) {
-    .app { grid-template-columns: 58px minmax(0, 1fr); }
-    .brand span, .rail-label, .tabs .tab .tx, .rail-profile .nm, .rail-foot .ver { display: none; }
-    .brand { font-size: 10px; letter-spacing: .1em; padding: 0 10px 12px; }
-    .tabs .tab { justify-content: center; padding: 9px 0; }
-    #cs2-tree { display: none; }
     .editor-body { grid-template-columns: minmax(0, 1fr); }
     .editor-side { border-right: 0; border-bottom: 1px solid var(--line-soft); }
     .subtabs { flex-direction: row; flex-wrap: wrap; }
@@ -1666,6 +1734,9 @@
 </head>
 <body>
 <div class="app">
+
+  <div class="rail-grip" id="rail-grip" role="separator" aria-orientation="vertical"
+       title="Drag to resize \u00b7 double-click to fold"></div>
 
   <aside class="rail">
     <div class="brand">CS2<span>Launcher</span></div>
@@ -5158,6 +5229,109 @@ document.addEventListener("change", async e => {
   renderUpdates();
 });
 
+/* --------------------------------------------------------------------------
+   The rail: draggable, and foldable down to its symbols.
+
+   Three widths matter. Below RAIL_FOLD it is not worth showing labels at all,
+   so it folds. Between that and RAIL_MIN the labels would be cut in half, so
+   it springs back up. Above that it is whatever the user left it at.
+   -------------------------------------------------------------------------- */
+const RAIL_TIGHT = 58;     // symbols only
+const RAIL_FOLD  = 132;    // drag below this and it folds
+const RAIL_MIN   = 150;    // the narrowest the labels still read at
+const RAIL_MAX   = 340;
+const RAIL_HOME  = 186;
+
+let railWidth = RAIL_HOME;
+let railTight = false;
+let railNarrowWindow = false;
+
+function railApply(animate) {
+  const app = document.querySelector(".app");
+  if (!app) return;
+  app.classList.toggle("rail-eased", !!animate);
+  const folded = railTight || railNarrowWindow;
+  app.classList.toggle("rail-tight", folded);
+  app.style.setProperty("--rail", (folded ? RAIL_TIGHT : railWidth) + "px");
+}
+
+function railRemember() {
+  api("/api/prefs", { rail_width: railTight ? 0 : Math.round(railWidth) })
+    .catch(() => {});
+}
+
+function railSetTight(folded, animate) {
+  railTight = !!folded;
+  if (!railTight && railWidth < RAIL_MIN) railWidth = RAIL_HOME;
+  railApply(animate !== false);
+  railRemember();
+}
+
+(function railDragging() {
+  const grip = $("rail-grip");
+  if (!grip) return;
+  let live = null;
+
+  grip.addEventListener("pointerdown", e => {
+    if (e.button !== 0) return;
+    live = { id: e.pointerId, from: railTight ? RAIL_TIGHT : railWidth,
+             startX: e.clientX, moved: false };
+    grip.classList.add("on");
+    // Off for the duration: an animation chasing the pointer lags behind it.
+    document.querySelector(".app").classList.remove("rail-eased");
+    try { grip.setPointerCapture(e.pointerId); } catch (err) {}
+    e.preventDefault();
+  });
+
+  document.addEventListener("pointermove", e => {
+    if (!live || e.pointerId !== live.id) return;
+    const dx = e.clientX - live.startX;
+    if (!live.moved && Math.abs(dx) < 3) return;
+    live.moved = true;
+
+    const want = Math.min(RAIL_MAX, Math.max(RAIL_TIGHT, live.from + dx));
+    // Follows the pointer exactly while dragging, including through the
+    // fold point, so what is under the pointer is what you get.
+    railTight = want < RAIL_FOLD;
+    railWidth = want;
+    const app = document.querySelector(".app");
+    app.classList.toggle("rail-tight", railTight || railNarrowWindow);
+    app.style.setProperty("--rail",
+      (railTight ? RAIL_TIGHT : want) + "px");
+    e.preventDefault();
+  });
+
+  document.addEventListener("pointerup", e => {
+    if (!live || e.pointerId !== live.id) return;
+    const moved = live.moved;
+    live = null;
+    grip.classList.remove("on");
+    try { grip.releasePointerCapture(e.pointerId); } catch (err) {}
+    if (!moved) return;
+    // Settle: fold, or come back up to a width the labels actually read at.
+    if (railWidth < RAIL_FOLD) {
+      railTight = true;
+    } else {
+      railTight = false;
+      railWidth = Math.max(RAIL_MIN, Math.min(RAIL_MAX, railWidth));
+    }
+    railApply(true);
+    railRemember();
+  });
+
+  // The obvious shortcut, and the way back if it has been dragged shut.
+  grip.addEventListener("dblclick", () => railSetTight(!railTight));
+
+  // A window too narrow for a rail folds it regardless, and unfolds it again
+  // when there is room -- without overwriting what the user chose.
+  const narrow = window.matchMedia("(max-width: 960px)");
+  const watch = m => { railNarrowWindow = m.matches; railApply(true); };
+  narrow.addEventListener ? narrow.addEventListener("change", watch)
+                          : narrow.addListener(watch);
+  railNarrowWindow = narrow.matches;
+  railApply(false);
+})();
+
 // Two views over one page: what you do, and what you configure. The active
 // tab is remembered like every other preference.
 let activeTab = "launcher";
@@ -5298,6 +5472,15 @@ function applyPrefs(ui) {
   }
   if (ui.kb_shown && typeof ui.kb_shown.board === "boolean") {
     kbShown = ui.kb_shown;
+  }
+  if (typeof ui.rail_width === "number") {
+    // Zero means folded; anything else is a width, clamped in case the
+    // window it was saved from was a different size.
+    railTight = ui.rail_width === 0;
+    if (!railTight) {
+      railWidth = Math.max(RAIL_MIN, Math.min(RAIL_MAX, ui.rail_width));
+    }
+    railApply(false);
   }
   if (ui.tab) setTab(ui.tab);
   if (ui.account) {
