@@ -78,6 +78,27 @@ class TheCatalogue(unittest.TestCase):
         leaving = next(g for g in self.cat["groups"] if g["id"] == "session")
         self.assertTrue(leaving.get("care"))
 
+    def test_every_command_names_a_symbol(self):
+        for _group, entry in self._all():
+            self.assertTrue(entry.get("icon"),
+                            f"{entry['command']} has no symbol")
+
+    def test_every_symbol_named_has_a_drawing_in_the_page(self):
+        """A symbol with no drawing silently falls back to a plain dot.
+
+        The catalogue says which symbol a command wears and the page holds the
+        drawings, so the two can drift apart without anything failing -- the
+        list just quietly stops being readable.
+        """
+        page = (Path(__file__).resolve().parents[1] /
+                "cs2cfg" / "web" / "index.html").read_text(encoding="utf-8")
+        art = page[page.index("const KB_ICONS = {"):]
+        art = art[:art.index("\n};")]
+        undrawn = sorted({e["icon"] for _g, e in self._all()
+                          if f"\n  {e['icon']}:" not in art
+                          and f"\n  {e['icon']}: " not in art})
+        self.assertEqual(undrawn, [], "named in the catalogue, not drawn in the page")
+
     def test_a_missing_catalogue_does_not_break_the_picker(self):
         commands._cache = None
         with mock.patch.object(Path, "read_text", side_effect=OSError("gone")):

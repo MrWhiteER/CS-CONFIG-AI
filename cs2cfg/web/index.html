@@ -1100,9 +1100,37 @@
   }
   .kb-cmd {
     appearance: none; cursor: pointer; font: inherit; text-align: left;
-    display: grid; gap: 2px; padding: 8px 11px; border-radius: 9px;
+    display: grid; grid-template-columns: auto minmax(0, 1fr);
+    gap: 10px; align-items: center;
+    padding: 8px 11px; border-radius: 9px;
     color: var(--ink); background: rgba(255, 255, 255, .04);
     border: 1px solid var(--line); transition: background 140ms ease;
+  }
+  .kb-cmd-text { display: grid; gap: 2px; min-width: 0; }
+
+  /* The disc. One shape for every command so the column reads as a column,
+     with the symbol inside saying which command it is. */
+  .kb-ico {
+    width: 34px; height: 34px; border-radius: 50%; flex: none;
+    display: grid; place-items: center;
+    background: rgba(255, 255, 255, .05);
+    border: 1px solid var(--line);
+    color: var(--muted);
+    transition: color 140ms ease, background 140ms ease, border-color 140ms ease;
+  }
+  .kb-ico-art {
+    width: 18px; height: 18px; display: block;
+    fill: none; stroke: currentColor; stroke-width: 1.7;
+    stroke-linecap: round; stroke-linejoin: round;
+  }
+  .kb-ico.script { border-color: rgba(255, 45, 149, .4); color: #ff8ccd; }
+  .kb-cmd:hover:not(:disabled) .kb-ico {
+    color: #9cc4ff; border-color: rgba(61, 139, 253, .5);
+    background: rgba(61, 139, 253, .12);
+  }
+  .kb-cmd.on .kb-ico {
+    color: var(--accent); border-color: rgba(23, 227, 161, .5);
+    background: rgba(23, 227, 161, .14);
   }
   .kb-cmd:hover:not(:disabled) {
     background: rgba(61, 139, 253, .13); border-color: rgba(61, 139, 253, .4);
@@ -4196,6 +4224,66 @@ function kbDetail() {
 
 // The assignment panel. Categories across the top, what is in the open one
 // below, and the two "put it back" actions kept out of the list.
+// The symbols a command can wear. One 24x24 grid, stroked not filled, so they
+// read at the size they are drawn and follow the text colour around them.
+const KB_ICONS = {
+  up:        '<path d="M12 19V5M5 12l7-7 7 7"/>',
+  down:      '<path d="M12 5v14M5 12l7 7 7-7"/>',
+  left:      '<path d="M19 12H5M12 5l-7 7 7 7"/>',
+  right:     '<path d="M5 12h14M12 5l7 7-7 7"/>',
+  jump:      '<path d="M12 15V4M8 8l4-4 4 4"/><path d="M4 20h16"/>',
+  crouch:    '<path d="M12 4v11M8 11l4 4 4-4"/><path d="M4 20h16"/>',
+  walk:      '<circle cx="13" cy="5" r="1.6"/><path d="M11 21l2-5-3-3 1-4 3 2 2 1"/><path d="M9 13l-2 3"/>',
+  spin:      '<path d="M20 12a8 8 0 11-2.3-5.6"/><path d="M20 4v4h-4"/>',
+  crosshair: '<circle cx="12" cy="12" r="7"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>',
+  scope:     '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/><path d="M12 4v3M12 17v3M4 12h3M17 12h3"/>',
+  reload:    '<path d="M20 12a8 8 0 11-2.3-5.6"/><path d="M20 4v4h-4"/><circle cx="12" cy="12" r="2"/>',
+  hand:      '<path d="M9 11V5.5a1.5 1.5 0 013 0V11m0-1.5a1.5 1.5 0 013 0V12m0-1a1.5 1.5 0 013 0v4a5 5 0 01-5 5h-2a5 5 0 01-5-5v-3"/>',
+  eye:       '<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"/><circle cx="12" cy="12" r="2.5"/>',
+  zoom:      '<circle cx="10.5" cy="10.5" r="6.5"/><path d="M15 15l5 5"/><path d="M8 10.5h5"/>',
+  rifle:     '<path d="M3 9h14l3 2v2h-6l-2 3H8l1-3H3z"/><path d="M7 14v3"/>',
+  pistol:    '<path d="M4 8h11v4h-3l-2 3H7l1-3H4z"/><path d="M7 15l-1 4"/>',
+  knife:     '<path d="M4 14L14 4l3 3-8 10z"/><path d="M9 17l-3 3-2-2 3-3"/>',
+  grenade:   '<circle cx="12" cy="14" r="6"/><path d="M10 8V6h4v2"/><path d="M14 6l3-2"/>',
+  bomb:      '<circle cx="11" cy="15" r="6"/><path d="M15 9l3-3"/><path d="M18 6l1-3 2 1"/>',
+  box:       '<path d="M3 8l9-4 9 4v8l-9 4-9-4z"/><path d="M3 8l9 4 9-4M12 12v8"/>',
+  zap:       '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
+  swap:      '<path d="M4 8h13l-3-3M20 16H7l3 3"/>',
+  next:      '<path d="M8 5l7 7-7 7"/><path d="M17 5v14"/>',
+  prev:      '<path d="M16 5l-7 7 7 7"/><path d="M7 5v14"/>',
+  drop:      '<path d="M12 3v11M8 10l4 4 4-4"/><path d="M4 18v2h16v-2"/>',
+  hands:     '<path d="M8 13V7a1.5 1.5 0 013 0v5"/><path d="M16 13V7a1.5 1.5 0 00-3 0v5"/><path d="M5 13a7 7 0 0014 0"/>',
+  cart:      '<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.5 12h11L21 7H6"/>',
+  refresh:   '<path d="M20 11a8 8 0 10-1 5"/><path d="M20 4v6h-6"/>',
+  ammo:      '<path d="M7 21V10l2-6h6l2 6v11z"/><path d="M7 14h10"/>',
+  coins:     '<ellipse cx="12" cy="7" rx="7" ry="3"/><path d="M5 7v5c0 1.7 3.1 3 7 3s7-1.3 7-3V7"/><path d="M5 12v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5"/>',
+  mic:       '<rect x="9" y="3" width="6" height="10" rx="3"/><path d="M5 11a7 7 0 0014 0"/><path d="M12 18v3"/>',
+  chat:      '<path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/>',
+  chatteam:  '<path d="M17 10a6 6 0 01-6 6H5l-2 3V10a6 6 0 016-6h3a6 6 0 016 6z"/><path d="M14 16a6 6 0 006-6"/>',
+  pin:       '<path d="M12 21s7-6.4 7-11a7 7 0 10-14 0c0 4.6 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/>',
+  wheel:     '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/><path d="M12 4v4M12 16v4M4 12h4M16 12h4"/>',
+  tower:     '<path d="M12 10v11"/><path d="M8 21h8"/><path d="M8.5 7.5a5 5 0 017 0"/><path d="M6 5a8.5 8.5 0 0112 0"/><circle cx="12" cy="11" r="1.4"/>',
+  spray:     '<rect x="8" y="8" width="8" height="13" rx="2"/><path d="M10 8V5h4v3"/><path d="M17 5h2M17 8h2M17 2h2"/>',
+  people:    '<circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0112 0"/><circle cx="17.5" cy="9" r="2.2"/><path d="M16 15a5 5 0 015 5"/>',
+  board:     '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11"/>',
+  bag:       '<path d="M4 8h16v12H4z"/><path d="M9 8V6a3 3 0 016 0v2"/>',
+  terminal:  '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M13 15h4"/>',
+  camera:    '<path d="M3 8h4l2-3h6l2 3h4v11H3z"/><circle cx="12" cy="13" r="3.5"/>',
+  close:     '<circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/>',
+  mute:      '<path d="M11 5L6 9H3v6h3l5 4z"/><path d="M16 9l5 6M21 9l-5 6"/>',
+  eraser:    '<path d="M8 20l-4-4 9-9 6 6-7 7z"/><path d="M20 20H9"/>',
+  exit:      '<path d="M14 3h5a2 2 0 012 2v14a2 2 0 01-2 2h-5"/><path d="M3 12h12M11 8l4 4-4 4"/>',
+  power:     '<path d="M12 3v9"/><path d="M6.5 7a8 8 0 1011 0"/>',
+  // Anything without a symbol of its own, including a user's own script.
+  dot:       '<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5"/>',
+};
+
+function kbIcon(name) {
+  const art = KB_ICONS[name] || KB_ICONS.dot;
+  return '<svg class="kb-ico-art" viewBox="0 0 24 24" aria-hidden="true">' +
+    art + "</svg>";
+}
+
 function kbPicker() {
   if (!pickedKey) return "";
   if (kbOptions && kbOptions.error) {
@@ -4238,6 +4326,9 @@ function kbPicker() {
     return '<button class="kb-cmd' + (active ? " on" : "") +
       '" data-bindcmd="' + esc(c.command) + '"' +
       (kbBusy ? " disabled" : "") + ">" +
+      '<span class="kb-ico' + (c.script ? " script" : "") + '">' +
+      kbIcon(c.script ? "dot" : c.icon) + "</span>" +
+      '<span class="kb-cmd-text">' +
       '<span class="kb-cmd-name">' + esc(c.label) +
       (c.script ? ' <i class="kb-tag script">script</i>' : "") +
       (c.hold ? ' <i class="kb-tag hold" title="runs while the key is held">hold</i>' : "") +
@@ -4245,7 +4336,7 @@ function kbPicker() {
       '<span class="kb-cmd-run"><code>' + esc(c.command) + "</code></span>" +
       (find ? '<span class="kb-cmd-grp">' + esc(c.group) + "</span>" : "") +
       (c.note ? '<span class="kb-cmd-note">' + esc(c.note) + "</span>" : "") +
-      "</button>";
+      "</span></button>";
   }).join("") : '<p class="sub" style="padding:10px 2px">Nothing matches that.</p>';
 
   const stock = kbOptions.stock || "";
