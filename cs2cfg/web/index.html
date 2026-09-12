@@ -1060,6 +1060,80 @@
   .upd-toast p { margin: 0; font-size: 11.5px; color: var(--muted); line-height: 1.5; }
   .upd-toast .upd-actions { margin-top: 12px; gap: 7px; }
 
+  /* Assigning a command to a key. Categories, then what is in the open one,
+     the way a peripheral configurator lays this out -- it is the shape people
+     already know for this job. */
+  .kb-pick {
+    margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line);
+  }
+  .kb-pick-head {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 10px;
+  }
+  .kb-pick-head h4 {
+    margin: 0; font-size: 13px; font-weight: 650; color: var(--ink); flex: none;
+  }
+  .kb-search {
+    flex: 1; min-width: 0; appearance: none; font: inherit; font-size: 12px;
+    padding: 6px 10px; border-radius: 8px; color: var(--ink);
+    background: rgba(255, 255, 255, .05); border: 1px solid var(--line);
+  }
+  .kb-search:focus { outline: none; border-color: var(--accent); }
+
+  .kb-cats { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+  .kb-cat {
+    appearance: none; cursor: pointer; font: inherit; font-size: 11px;
+    padding: 5px 11px; border-radius: 999px; color: var(--muted);
+    background: rgba(255, 255, 255, .04); border: 1px solid var(--line);
+  }
+  .kb-cat:hover { color: var(--ink); }
+  .kb-cat[aria-pressed="true"] {
+    background: rgba(61, 139, 253, .16); border-color: rgba(61, 139, 253, .5);
+    color: #9cc4ff;
+  }
+  .kb-care { font-style: normal; color: var(--warn); font-weight: 700; }
+
+  /* Fixed height with its own scroll: the list is long, and the buttons
+     underneath must not walk off the bottom of the panel. */
+  .kb-cmds {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
+    gap: 5px; max-height: 260px; overflow-y: auto; padding-right: 4px;
+  }
+  .kb-cmd {
+    appearance: none; cursor: pointer; font: inherit; text-align: left;
+    display: grid; gap: 2px; padding: 8px 11px; border-radius: 9px;
+    color: var(--ink); background: rgba(255, 255, 255, .04);
+    border: 1px solid var(--line); transition: background 140ms ease;
+  }
+  .kb-cmd:hover:not(:disabled) {
+    background: rgba(61, 139, 253, .13); border-color: rgba(61, 139, 253, .4);
+  }
+  .kb-cmd:disabled { opacity: .5; cursor: default; }
+  .kb-cmd.on {
+    background: rgba(23, 227, 161, .12); border-color: rgba(23, 227, 161, .45);
+  }
+  .kb-cmd.on .kb-cmd-name::after {
+    content: " ¹3"; color: var(--accent); font-weight: 700;
+  }
+  .kb-cmd-name { font-size: 12.5px; font-weight: 600; }
+  .kb-cmd-run code {
+    font-family: var(--mono); font-size: 10.5px; color: var(--muted);
+  }
+  .kb-cmd-grp, .kb-cmd-note {
+    font-size: 10.5px; color: var(--muted); line-height: 1.4;
+  }
+  .kb-tag {
+    font-style: normal; font-size: 9px; font-weight: 700; letter-spacing: .04em;
+    padding: 1px 5px; border-radius: 4px; vertical-align: 1px;
+    text-transform: uppercase;
+  }
+  .kb-tag.hold { background: rgba(255, 180, 58, .16); color: var(--warn); }
+  .kb-tag.script { background: rgba(255, 45, 149, .16); color: #ff8ccd; }
+
+  .kb-pick-actions { display: flex; gap: 7px; margin-top: 11px; flex-wrap: wrap; }
+  .kb-hold-note {
+    margin: 9px 0 0; font-size: 10.5px; color: var(--muted); line-height: 1.5;
+  }
+
   /* A desk you can arrange: each piece carries its own position and scale. */
   .kb-scene {
     position: relative; min-height: 430px; overflow: hidden;
@@ -2076,7 +2150,13 @@ async function api(path, body) {
     : { method: "GET" };
   const res = await fetch(path, opts);
   const data = await res.json().catch(() => ({ ok: false, error: "response was not JSON" }));
-  if (!res.ok || data.ok === false) throw new Error(data.error || ("HTTP " + res.status));
+  if (!res.ok || data.ok === false) {
+    // The body is kept on the error: a refusal often says more than its
+    // message, such as that it only needs confirming and what is in the way.
+    const failure = new Error(data.error || ("HTTP " + res.status));
+    failure.data = data;
+    throw failure;
+  }
   return data;
 }
 
@@ -3627,6 +3707,13 @@ async function loadPlugins(force) {
 let keyData = null;
 let pickedKey = null;
 
+// What the picked key could be set to. Fetched per key, because the stock
+// bind and the current bind are both particular to the key being looked at.
+let kbOptions = null;
+let kbGroup = "";        // which category is open
+let kbFind = "";         // the search box
+let kbBusy = false;
+
 // Rows of "code:label:width". Width is in key units, 1 by default. The gaps
 // between clusters are entries with no code.
 const KB_ROWS = [
@@ -4080,7 +4167,8 @@ function kbDetail() {
   if (!hit) {
     return '<div class="kb-detail"><div class="kb-detail-key">' +
       esc(pickedKey.label) + "</div>" +
-      '<div class="sub">Nothing is bound to this key.</div></div>';
+      '<div class="sub">Nothing is bound to this key.</div>' +
+      kbPicker() + "</div>";
   }
   return '<div class="kb-detail"><div class="kb-detail-key">' +
     esc(hit.label) + "</div><div class=\"kb-detail-body\">" +
@@ -4103,7 +4191,88 @@ function kbDetail() {
     esc(hit.file) + ":" + hit.line + "</span></div>" +
     '<div class="actions"><button class="btn small" data-open-file="' +
     esc(hit.file) + '">Open the file</button></div>' +
-    "</div></div>";
+    "</div>" + kbPicker() + "</div>";
+}
+
+// The assignment panel. Categories across the top, what is in the open one
+// below, and the two "put it back" actions kept out of the list.
+function kbPicker() {
+  if (!pickedKey) return "";
+  if (kbOptions && kbOptions.error) {
+    return '<div class="kb-pick"><p class="upd-note bad">' +
+      esc(kbOptions.error) + "</p></div>";
+  }
+  if (!kbOptions) {
+    return '<div class="kb-pick"><p class="sub">' +
+      '<span class="spin"></span> Reading what this key can do&hellip;</p></div>';
+  }
+
+  const groups = kbOptions.groups || [];
+  const open = groups.find(g => g.id === kbGroup) || groups[0];
+  const now = (kbOptions.current && kbOptions.current.command || "").toLowerCase();
+  const find = kbFind.trim().toLowerCase();
+
+  // Searching looks across every category, because nobody knows which one
+  // holds the thing they are looking for.
+  let shown = [];
+  if (find) {
+    for (const g of groups) {
+      for (const c of g.commands) {
+        if ((c.label + " " + c.command).toLowerCase().includes(find)) {
+          shown.push(Object.assign({ group: g.name }, c));
+        }
+      }
+    }
+  } else if (open) {
+    shown = open.commands.map(c => Object.assign({ group: open.name }, c));
+  }
+
+  const tabs = groups.map(g =>
+    '<button class="kb-cat" data-kbgroup="' + esc(g.id) + '" aria-pressed="' +
+    (!find && open && g.id === open.id) + '">' + esc(g.name) +
+    (g.care ? ' <i class="kb-care" title="takes effect immediately">!</i>' : "") +
+    "</button>").join("");
+
+  const rows = shown.length ? shown.map(c => {
+    const active = c.command.toLowerCase() === now;
+    return '<button class="kb-cmd' + (active ? " on" : "") +
+      '" data-bindcmd="' + esc(c.command) + '"' +
+      (kbBusy ? " disabled" : "") + ">" +
+      '<span class="kb-cmd-name">' + esc(c.label) +
+      (c.script ? ' <i class="kb-tag script">script</i>' : "") +
+      (c.hold ? ' <i class="kb-tag hold" title="runs while the key is held">hold</i>' : "") +
+      "</span>" +
+      '<span class="kb-cmd-run"><code>' + esc(c.command) + "</code></span>" +
+      (find ? '<span class="kb-cmd-grp">' + esc(c.group) + "</span>" : "") +
+      (c.note ? '<span class="kb-cmd-note">' + esc(c.note) + "</span>" : "") +
+      "</button>";
+  }).join("") : '<p class="sub" style="padding:10px 2px">Nothing matches that.</p>';
+
+  const stock = kbOptions.stock || "";
+  const bound = !!(kbOptions.current && kbOptions.current.command);
+  const actions =
+    (stock && stock.toLowerCase() !== now
+      ? '<button class="btn small" data-bindstock="' + esc(stock) + '"' +
+        (kbBusy ? " disabled" : "") + ">Back to CS2's default (" +
+        esc(stock) + ")</button>"
+      : "") +
+    (bound
+      ? '<button class="btn small" id="kb-unbind"' + (kbBusy ? " disabled" : "") +
+        ">Clear this key</button>"
+      : "");
+
+  return '<div class="kb-pick">' +
+    '<div class="kb-pick-head">' +
+    "<h4>Assign something to " + esc(pickedKey.label) + "</h4>" +
+    '<input class="kb-search" id="kb-search" type="search" placeholder="Search commands" value="' +
+    esc(kbFind) + '">' +
+    "</div>" +
+    '<div class="kb-cats">' + tabs + "</div>" +
+    '<div class="kb-cmds">' + rows + "</div>" +
+    (actions ? '<div class="kb-pick-actions">' + actions + "</div>" : "") +
+    (kbOptions.hold_note
+      ? '<p class="kb-hold-note">' + esc(kbOptions.hold_note) + "</p>" : "") +
+    "</div>";
 }
 
 async function loadKeyboard(force) {
@@ -4138,8 +4307,108 @@ document.addEventListener("click", e => {
   const cap = e.target.closest("[data-kbcode]");
   if (!cap) return;
   pickedKey = { code: cap.dataset.kbcode, label: cap.dataset.kblabel };
+  kbOptions = null;
+  kbFind = "";
   renderKeyboard();
+  loadKeyOptions();
 });
+
+async function loadKeyOptions() {
+  if (!pickedKey) return;
+  const want = pickedKey.code;
+  try {
+    const answer = await api("/api/cfg/key/options", { code: want });
+    // The user may have clicked another key while this was in flight.
+    if (!pickedKey || pickedKey.code !== want) return;
+    kbOptions = answer;
+    if (!kbGroup && (answer.groups || []).length) {
+      kbGroup = answer.groups[0].id;
+    }
+  } catch (err) {
+    kbOptions = { error: String(err && err.message || err) };
+  }
+  renderKeyboard();
+}
+
+// Assigning, restoring and clearing all go through here so the confirm, the
+// reload and the reporting are written once.
+async function kbAssign(payload, describe) {
+  if (kbBusy) return;
+  kbBusy = true;
+  renderKeyboard();
+  try {
+    let answer = await api("/api/cfg/bind", payload)
+      .catch(e => e.data || { ok: false, error: e.message });
+    if (answer && answer.needs_confirm) {
+      const runs = (answer.taken && answer.taken[0] && answer.taken[0].runs) || "something";
+      if (!confirm(pickedKey.label + " already runs " + runs +
+                   ".\n\nReplace it?")) {
+        kbBusy = false;
+        renderKeyboard();
+        return;
+      }
+      answer = await api("/api/cfg/bind", Object.assign({}, payload, { force: true }));
+    }
+    if (!answer || answer.ok === false) {
+      status("Could not change " + pickedKey.label + ": " +
+             ((answer && answer.error) || "unknown problem"), true);
+    } else {
+      status(describe(answer) +
+             (answer.backup ? "  \u00b7  backup " + answer.backup : "") +
+             (answer.unknown ? "  \u00b7  note: this collection does not " +
+                               "recognise that command" : ""));
+      await loadKeyboard(true);
+      await loadKeyOptions();
+    }
+  } finally {
+    kbBusy = false;
+    renderKeyboard();
+  }
+}
+
+document.addEventListener("click", e => {
+  const cat = e.target.closest("[data-kbgroup]");
+  if (cat) {
+    kbGroup = cat.dataset.kbgroup;
+    kbFind = "";
+    renderKeyboard();
+    return;
+  }
+  const pick = e.target.closest("[data-bindcmd]");
+  if (pick) {
+    const command = pick.dataset.bindcmd;
+    kbAssign({ code: pickedKey.code, command },
+             a => pickedKey.label + " now runs " + a.command);
+    return;
+  }
+  const back = e.target.closest("[data-bindstock]");
+  if (back) {
+    kbAssign({ code: pickedKey.code, command: back.dataset.bindstock, force: true },
+             a => pickedKey.label + " is back to CS2's default, " + a.command);
+    return;
+  }
+  if (e.target.id === "kb-unbind") {
+    kbAssign({ code: pickedKey.code, unbind: true },
+             () => pickedKey.label + " does nothing now");
+  }
+});
+
+// Typed into rather than re-rendered on every keystroke: re-rendering the
+// board would take the focus out of the box mid-word.
+document.addEventListener("input", e => {
+  if (e.target.id !== "kb-search") return;
+  kbFind = e.target.value;
+  const host = document.querySelector(".kb-cmds");
+  if (host) host.outerHTML = kbPickerRows();
+});
+
+function kbPickerRows() {
+  // Only the list, so the search box keeps the caret where it was.
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = kbPicker();
+  const list = wrapper.querySelector(".kb-cmds");
+  return list ? list.outerHTML : '<div class="kb-cmds"></div>';
+}
 
 $("kb-reload").addEventListener("click", () => loadKeyboard(true));
 $("kb-reset").addEventListener("click", kbResetLayout);

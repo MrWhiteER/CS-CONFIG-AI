@@ -1,0 +1,122 @@
+{
+  "schema": 1,
+  "updated": "2026-09-12",
+  "note": "Commands offered when binding a key from the keyboard view. Every one is either bound by CS2 itself in game/csgo/cfg/user_keys_default.vcfg, or already listed in cs2cfg/cfgscan.py as an engine command or engine action -- so nothing here is a guess about what the engine accepts. A command that does not exist would bind silently and then do nothing when pressed, which is the failure this list exists to avoid.",
+  "sources": [
+    "CS2's own cfg/user_keys_default.vcfg, read at runtime by cs2cfg/defaults.py",
+    "KNOWN_ENGINE_COMMANDS and KNOWN_ENGINE_ACTIONS in cs2cfg/cfgscan.py"
+  ],
+  "hold_note": "A command written with a leading + is held, not tapped: the engine runs the + form while the key is down and the matching - form when it is released. Binding one is normal and needs no matching -bind.",
+  "groups": [
+    {
+      "id": "movement",
+      "name": "Movement",
+      "commands": [
+        {"command": "+forward", "label": "Move forward", "hold": true},
+        {"command": "+back", "label": "Move back", "hold": true},
+        {"command": "+left", "label": "Move left", "hold": true},
+        {"command": "+right", "label": "Move right", "hold": true},
+        {"command": "+jump", "label": "Jump", "hold": true},
+        {"command": "+duck", "label": "Crouch", "hold": true},
+        {"command": "+sprint", "label": "Walk quietly", "hold": true,
+         "note": "CS2 renamed this; older configs call it +speed."},
+        {"command": "+lookspin", "label": "Look behind", "hold": true}
+      ]
+    },
+    {
+      "id": "combat",
+      "name": "Shooting",
+      "commands": [
+        {"command": "+attack", "label": "Fire", "hold": true},
+        {"command": "+attack2", "label": "Secondary fire / scope", "hold": true},
+        {"command": "+reload", "label": "Reload", "hold": true},
+        {"command": "+use", "label": "Use / plant / defuse", "hold": true},
+        {"command": "+lookatweapon", "label": "Inspect weapon", "hold": true},
+        {"command": "+zoom", "label": "Zoom", "hold": true}
+      ]
+    },
+    {
+      "id": "weapons",
+      "name": "Weapons",
+      "commands": [
+        {"command": "slot1", "label": "Primary weapon"},
+        {"command": "slot2", "label": "Pistol"},
+        {"command": "slot3", "label": "Knife"},
+        {"command": "slot4", "label": "Grenade slot 4"},
+        {"command": "slot5", "label": "Bomb / C4"},
+        {"command": "slot6", "label": "Grenade slot 6"},
+        {"command": "slot7", "label": "Grenade slot 7"},
+        {"command": "slot8", "label": "Grenade slot 8"},
+        {"command": "slot9", "label": "Grenade slot 9"},
+        {"command": "slot10", "label": "Grenade slot 10"},
+        {"command": "slot11", "label": "Slot 11"},
+        {"command": "slot12", "label": "Zeus / taser"},
+        {"command": "lastinv", "label": "Last weapon"},
+        {"command": "invnext", "label": "Next weapon"},
+        {"command": "invprev", "label": "Previous weapon"},
+        {"command": "drop", "label": "Drop weapon"},
+        {"command": "switchhands", "label": "Swap gun hand"},
+        {"command": "switchhandsleft", "label": "Gun in left hand"},
+        {"command": "switchhandsright", "label": "Gun in right hand"}
+      ]
+    },
+    {
+      "id": "buying",
+      "name": "Buying",
+      "commands": [
+        {"command": "buymenu", "label": "Open the buy menu"},
+        {"command": "autobuy", "label": "Auto-buy"},
+        {"command": "rebuy", "label": "Buy the same as last round"},
+        {"command": "buyammo1", "label": "Buy primary ammo"},
+        {"command": "buyammo2", "label": "Buy pistol ammo"},
+        {"command": "sellbackall", "label": "Sell everything back",
+         "note": "Only works during the buy period, and only where refunds are on."}
+      ]
+    },
+    {
+      "id": "comms",
+      "name": "Talking",
+      "commands": [
+        {"command": "+voicerecord", "label": "Talk (hold)", "hold": true},
+        {"command": "messagemode", "label": "Type to everyone"},
+        {"command": "messagemode2", "label": "Type to your team"},
+        {"command": "player_ping", "label": "Ping where you are looking"},
+        {"command": "+radialradio", "label": "Radio wheel 1", "hold": true},
+        {"command": "+radialradio2", "label": "Radio wheel 2", "hold": true},
+        {"command": "+radialradio3", "label": "Radio wheel 3", "hold": true},
+        {"command": "radio", "label": "Radio menu"},
+        {"command": "radio1", "label": "Radio: standard"},
+        {"command": "radio2", "label": "Radio: group"},
+        {"command": "radio3", "label": "Radio: reports"},
+        {"command": "+spray_menu", "label": "Spray wheel", "hold": true},
+        {"command": "teammenu", "label": "Team menu"}
+      ]
+    },
+    {
+      "id": "interface",
+      "name": "On screen",
+      "commands": [
+        {"command": "+showscores", "label": "Scoreboard (hold)", "hold": true},
+        {"command": "+cl_show_team_equipment", "label": "Show team equipment", "hold": true},
+        {"command": "show_loadout_toggle", "label": "Show loadout"},
+        {"command": "toggleconsole", "label": "Console",
+         "note": "Needs the console enabled in the game's settings."},
+        {"command": "jpeg", "label": "Screenshot"},
+        {"command": "cancelselect", "label": "Close the open menu"},
+        {"command": "stopsound", "label": "Stop sounds"},
+        {"command": "clear", "label": "Clear the console"}
+      ]
+    },
+    {
+      "id": "session",
+      "name": "Leaving",
+      "care": true,
+      "commands": [
+        {"command": "disconnect", "label": "Leave the server",
+         "note": "Takes effect the moment the key is pressed."},
+        {"command": "cs_quit_prompt", "label": "Quit (asks first)",
+         "note": "CS2 binds this to F10 by default."}
+      ]
+    }
+  ]
+}

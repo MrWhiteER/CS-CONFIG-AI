@@ -52,6 +52,11 @@ KNOWN_ENGINE_COMMANDS = {
     "toggle_voice", "mp_pause_match", "mp_unpause_match", "mp_restartgame",
     "mp_warmup_end", "stopsound", "ent_fire", "sv_rethrow_last_grenade",
     "host_timescale", "quit_prompt", "callvote", "jointeam",
+    # Bound by CS2 itself in cfg/user_keys_default.vcfg, so a config using one
+    # of these is using a stock command, not a name that resolves to nothing.
+    # Their absence here meant a perfectly ordinary bind was reported unknown.
+    "invnext", "invprev", "buyammo1", "buyammo2", "show_loadout_toggle",
+    "jpeg", "cs_quit_prompt",
 }
 
 # Engine actions that come in +press / -release pairs. Listed without the sign.

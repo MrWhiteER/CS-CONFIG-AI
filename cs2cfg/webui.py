@@ -1034,6 +1034,138 @@ def _cfg_keys(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _cfg_key_options(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """What one key could be set to, and what it is set to now.
+
+    Read-only. The page asks for this when a key is picked, so the list is
+    built per key rather than once: the stock bind and the current bind are
+    both particular to the key being looked at.
+    """
+    from . import commands, keys
+
+    result = getattr(state, "cfg_scan", None)
+    binding = str(body.get("binding") or "").strip()
+    if not binding and body.get("code"):
+        binding = keys.from_code(str(body["code"])) or ""
+    if not binding:
+        return {"ok": False, "error": "no key given"}
+
+    state.refresh()
+    return {"ok": True, **commands.options(result, binding, state.cs2_install)}
+
+
+def _cfg_bind(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Put a command on a key, or take the key's binding away.
+
+    An existing bind for the key is rewritten in place so whatever comment sits
+    beside it survives; otherwise the line is added next to the other binds
+    rather than at the end of a file. A key that already runs something else is
+    refused unless the caller insists, because quietly taking a key is how a
+    config ends up with a feature nobody can find.
+    """
+    from . import cfgscan, commands, keys
+
+    result = _rescan(state)
+    if result is None:
+        return {"ok": False, "error": "scan a configuration folder first"}
+
+    binding = str(body.get("binding") or "").strip()
+    if not binding and body.get("code"):
+        binding = keys.from_code(str(body["code"])) or ""
+    if not binding:
+        return {"ok": False, "error": "no key given"}
+
+    command = str(body.get("command") or "").strip().strip(chr(34))
+    clearing = bool(body.get("unbind"))
+    if not command and not clearing:
+        return {"ok": False, "error": "no command given"}
+
+    existing = result.binds.get(binding) or []
+    if clearing and not existing:
+        return {"ok": False, "error": f"{keys.label(binding)} is not bound to anything"}
+
+    # Replacing something the user put there deliberately is worth a question.
+    if existing and not clearing and not body.get("force"):
+        winner = max(existing, key=lambda b: b.order)
+        already = (winner.body or "").strip().strip(chr(34))
+        if already.lower() != command.lower():
+            return {"ok": False, "needs_confirm": True,
+                    "taken": [{"file": winner.file, "line": winner.line,
+                               "runs": already}],
+                    "error": f"{keys.label(binding)} already runs {already}"}
+
+    # Where to write. An existing bind decides it; otherwise the file that
+    # holds the most binds already is where this one belongs.
+    if existing:
+        target_file = max(existing, key=lambda b: b.order).file
+    else:
+        counts: Dict[str, int] = {}
+        for entries in result.binds.values():
+            for b in entries:
+                counts[b.file] = counts.get(b.file, 0) + 1
+        if not counts:
+            return {"ok": False, "error": "no file in the scan holds any binds"}
+        target_file = max(counts.items(), key=lambda kv: kv[1])[0]
+
+    config = next((c for c in result.files.values() if c.relative == target_file), None)
+    if config is None:
+        return {"ok": False, "error": f"{target_file} is not part of the scan"}
+
+    original = config.path.read_bytes().decode(config.document.encoding, errors="replace")
+    flat = cfglang.restore_newlines(original, chr(10), False)
+    lines = flat.split(chr(10))
+
+    changed = None
+    for b in sorted(existing, key=lambda b: -b.order):
+        if b.file != target_file:
+            continue
+        index = b.line - 1
+        if not (0 <= index < len(lines) and "bind" in lines[index]):
+            continue
+        if clearing:
+            # Commented rather than deleted: the line says what the key used to
+            # do, which is the thing someone will want back.
+            lead = len(lines[index]) - len(lines[index].lstrip())
+            lines[index] = (lines[index][:lead] + "//" + lines[index][lead:])
+            changed = "unbound"
+        else:
+            was = (b.body or "").strip().strip(chr(34))
+            lines[index] = lines[index].replace(chr(34) + was + chr(34),
+                                                chr(34) + command + chr(34), 1)
+            changed = f"was {was}"
+        break
+
+    if changed is None:
+        if clearing:
+            return {"ok": False, "error": "could not find that bind to remove"}
+        anchor = next((i for i, l in enumerate(lines)
+                       if l.lstrip().startswith("bind ")), None)
+        if anchor is None:
+            return {"ok": False, "error": f"{target_file} has no binds to sit beside"}
+        pad = lines[anchor][:len(lines[anchor]) - len(lines[anchor].lstrip())]
+        lines.insert(anchor, f'{pad}bind "{binding}" "{command}"')
+        changed = "added"
+
+    note = ("unbound " if clearing else "bind ") + keys.label(binding)
+    session = backup.BackupSession(note=note if clearing else f"{note} to {command}")
+    session.add(config.path)
+    body_text = cfglang.restore_newlines(chr(10).join(lines), config.document.newline,
+                                         config.document.trailing_newline)
+    cfglang.write_config_text(config.path, body_text, config.document.encoding)
+    backup.prune()
+    state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+
+    return {
+        "ok": True, "binding": binding, "label": keys.label(binding),
+        "command": "" if clearing else command,
+        "unbound": clearing, "changed": changed, "file": target_file,
+        "backup": session.stamp,
+        # Said rather than refused: an unknown command is more likely an
+        # incomplete catalogue than a mistake, but a typo looks identical.
+        "unknown": bool(command) and not commands.is_offered(command),
+    }
+
+
 def _cfg_plugin_bind(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     """Move a script onto a different key.
 
@@ -1511,6 +1643,8 @@ def make_handler(state: State):
         "/api/cfg/plugin/toggle": _cfg_plugin_toggle,
         "/api/cfg/plugin/bind": _cfg_plugin_bind,
         "/api/cfg/keys": _cfg_keys,
+        "/api/cfg/key/options": _cfg_key_options,
+        "/api/cfg/bind": _cfg_bind,
         "/api/cfg/settings": _cfg_settings,
         "/api/cfg/settings/apply": _cfg_settings_apply,
         "/api/cfg/suggest": _cfg_suggest,
