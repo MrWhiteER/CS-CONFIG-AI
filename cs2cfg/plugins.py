@@ -25,6 +25,7 @@ from __future__ import annotations
 import re
 
 from . import keys
+from .cfglang import parse_command_string
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set
 
@@ -39,6 +40,16 @@ _COMMAND = re.compile(r"Command\s+([^|\"]+)", re.IGNORECASE)
 # Prefixed onto every active line of a block that has been switched off. It has
 # to be recognisable on the way back in, and has to be a comment to the engine.
 MARK = "//[off]//"
+
+# Commands that flip whatever is currently set rather than setting a value.
+# A state built on one of these cannot know what it is flipping from, so it
+# only stays correct for as long as nothing else touches the same setting.
+RELATIVE_COMMANDS = frozenset({"toggle", "toggle_voice", "incrementvar"})
+
+# Commands that say something rather than change something. A state made only
+# of these is not doing anything the game can drift away from.
+_SAYS_ONLY = frozenset({"echo", "say", "say_team", "play", "playvol", "alias",
+                        "bind", "clear"})
 
 
 def strip_mark(line: str) -> tuple:
@@ -79,6 +90,23 @@ class Plugin:
     end_line: int = 0
     enabled: bool = True
     layout: List[dict] = field(default_factory=list)   # state -> what it runs
+    flips: List[str] = field(default_factory=list)     # relative commands used
+    anchors: List[str] = field(default_factory=list)   # absolute settings used
+
+    @property
+    def drifts(self) -> bool:
+        """Whether this can end up saying the opposite of what it does.
+
+        True when every state flips a setting and none of them sets one. Such
+        a script tracks its own state in an alias and has no way of checking
+        it, so anything else touching the same setting -- the game's own menu,
+        another script, re-exec'ing the config mid-session -- leaves the label
+        and the effect pointing opposite ways for good.
+
+        A script that flips *and* sets something absolute is not counted: the
+        absolute part re-establishes what the flip assumed.
+        """
+        return bool(self.flips) and not self.anchors
 
     @property
     def broken(self) -> bool:
@@ -289,6 +317,24 @@ def find(result) -> List[Plugin]:
                 if step["does"] or step["says"]:
                     layout.append({"state": name, **step})
 
+            # What each state actually does to the game, as opposed to what
+            # it says. See the drifts property above.
+            flips, anchors = [], []
+            for state in states:
+                body = bodies.get(state.lower())
+                if body is None:
+                    continue
+                for command in parse_command_string(body, line_no):
+                    head = (command.lname or "").lower()
+                    if head in RELATIVE_COMMANDS:
+                        spelled = " ".join(
+                            [command.name] + [a.text for a in command.args])
+                        if spelled not in flips:
+                            flips.append(spelled.strip())
+                    elif head and head not in _SAYS_ONLY:
+                        if head not in anchors:
+                            anchors.append(head)
+
             plugin = Plugin(
                 name=title, file=config.relative, line=line_no,
                 description=description, kind=kind,
@@ -297,6 +343,8 @@ def find(result) -> List[Plugin]:
                 bound_to=sorted(set(binds.get(entry.lower(), []))),
                 applies=sorted(set(applied)),
                 notes=notes,
+                flips=flips,
+                anchors=anchors,
                 end_line=end_line,
                 enabled=disabled_lines == 0,
                 layout=layout,
@@ -337,6 +385,7 @@ def as_dict(plugins: List[Plugin]) -> dict:
                 "notes": p.notes, "suspect": p.suspect,
                 "end_line": p.end_line, "enabled": p.enabled,
                 "layout": p.layout,
+                "drifts": p.drifts, "flips": p.flips, "anchors": p.anchors,
                 "id": p.file + ":" + str(p.line),
             }
             for p in plugins

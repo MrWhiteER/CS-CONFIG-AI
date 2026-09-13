@@ -1386,6 +1386,14 @@
   .kb-live .dot.ok { background: var(--accent); }
   .adrift-code { color: var(--warn); }
 
+  .plug-drift {
+    margin: 8px 0 0; padding: 8px 10px; border-radius: 8px;
+    background: rgba(255, 180, 58, .09);
+    border: 1px solid rgba(255, 180, 58, .28);
+    font-size: 11.5px; line-height: 1.5; color: var(--ink-dim);
+  }
+  .plug-drift code { color: var(--warn); font-family: var(--mono); font-size: 11px; }
+
   /* A desk you can arrange: each piece carries its own position and scale. */
   .kb-scene {
     position: relative; min-height: 430px; overflow: hidden;
@@ -3862,14 +3870,27 @@ function plugLayout(p) {
 
 function plugCard(p) {
   const [kindName, kindWhy] = PLUG_KIND[p.kind] || ["", ""];
-  const state = !p.enabled ? "off" : p.broken ? "broken" : p.suspect ? "suspect" : "ok";
+  const state = !p.enabled ? "off" : p.broken ? "broken"
+    : p.suspect ? "suspect" : p.drifts ? "suspect" : "ok";
+  // Said in full, because the failure is not obvious and the fix is not
+  // something the application should make on somebody's behalf.
+  const driftNote = p.drifts
+    ? '<p class="plug-drift">Flips <code>' + esc((p.flips || []).join(", ")) +
+      "</code> rather than setting a value, so it only knows which state it is " +
+      "in by remembering. Change the same setting anywhere else — the game's " +
+      "own menu, another script, or re-running this config mid-match — and the " +
+      "key starts saying one thing while doing the other, and pressing it again " +
+      "flips both, so it never comes back into line.</p>"
+    : "";
   const badge = !p.enabled
     ? '<span class="fbadge idle">switched off</span>'
     : p.broken ? '<span class="fbadge bad">does not work</span>'
-    : p.suspect ? '<span class="fbadge warn">wired oddly</span>' : "";
+    : p.suspect ? '<span class="fbadge warn">wired oddly</span>'
+    : p.drifts ? '<span class="fbadge warn">can lose track</span>' : "";
   const starred = favourites.has(p.id);
 
   return '<div class="plug ' + state + (starred ? " fav" : "") + '">' +
+    driftNote.replace("<p ", "<p data-hoist ") +
     '<div class="plug-top">' +
     '<button class="plug-star' + (starred ? " on" : "") + '" data-fav="' + esc(p.id) +
     '" title="' + (starred ? "Remove from favourites" : "Keep at the top") + '">' +
