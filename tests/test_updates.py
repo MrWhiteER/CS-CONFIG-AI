@@ -206,34 +206,86 @@ class Installing(unittest.TestCase):
 
     def test_the_swap_script_waits_before_it_copies(self):
         """Copying over a running exe fails on Windows, so order matters."""
-        script = updates._fill(pid=4321, ready=r"C:\ready", target=r"C:\app",
+        script = updates._fill(updates.COPY_SCRIPT, pid=4321,
+                               ready=r"C:\ready", target=r"C:\app",
                                relaunch=r"C:\app\CS2 Launcher.exe")
-        order = [script.index(":waitpid"), script.index(":waitlocks"),
-                 script.index("\n:copyfiles")]
+        order = [script.index("Wait-Process"),
+                 script.index("still in use"),
+                 script.index("robocopy")]
         self.assertEqual(order, sorted(order),
                          "it must wait for the window, then for any other "
                          "lock holder, and only then copy")
-        self.assertIn("tasklist", script)
-        # A failed copy must leave the working version alone.
-        self.assertIn("leaving the old version in place", script)
+        self.assertIn("the old version is still in place", script)
 
     def test_the_swap_script_waits_for_other_copies_too(self):
         """A console cs2cfg.exe left open locks a file the copy needs."""
-        script = updates._fill(pid=1, ready=r"C:\ready", target=r"C:\app",
-                               relaunch="")
+        script = updates._fill(updates.COPY_SCRIPT, pid=1, ready=r"C:\ready",
+                               target=r"C:\app", relaunch="")
         self.assertIn("StartsWith", script, "it should look for processes by path")
-        self.assertNotIn("taskkill", script.lower(),
+        self.assertNotIn("Stop-Process", script,
                          "a window the user opened is theirs; wait, do not kill")
+
+    def test_no_script_shells_out_per_check(self):
+        """The batch version opened a window for every test it made.
+
+        tasklist, ping and powershell each get a console when the parent has
+        one, so the loops flashed windows -- and `find`, reading a console it
+        should never have had, hung one of them forever.
+        """
+        for script in (updates.COPY_SCRIPT, updates.INSTALL_SCRIPT):
+            for offender in ("tasklist", "ping -n", "find \"", "cmd /c"):
+                self.assertNotIn(offender, script)
 
     def test_every_token_in_the_swap_script_is_filled(self):
         """A leftover token would run as a literal and do the wrong thing."""
-        script = updates._fill(pid=7, ready=r"C:\r", target=r"C:\t", relaunch="")
-        self.assertNotIn("@@", script)
+        for script in (updates.COPY_SCRIPT, updates.INSTALL_SCRIPT):
+            filled = updates._fill(script, pid=7, ready=r"C:\r", setup=r"C:\s.exe",
+                                   target=r"C:\t", relaunch="")
+            self.assertNotIn("@@", filled)
 
     def test_both_waits_are_bounded(self):
         """Something that never lets go must not hang the update forever."""
-        script = updates._fill(pid=7, ready=r"C:\r", target=r"C:\t", relaunch="")
-        self.assertEqual(script.count("GTR"), 2)
+        script = updates._fill(updates.COPY_SCRIPT, pid=7, ready=r"C:\r",
+                               target=r"C:\t", relaunch="")
+        self.assertIn("-Timeout 240", script)
+        self.assertIn("$i -lt 30", script)
+
+    @unittest.skipUnless(sys.platform == "win32", "PowerShell is the point here")
+    def test_the_copy_script_actually_runs_and_copies(self):
+        """The one the old tests were missing.
+
+        The batch script read correctly and still hung, because no test ever
+        ran it. This one does: a real PowerShell process, a real folder, and
+        the file checked afterwards.
+        """
+        import subprocess
+
+        root = Path(self.root) if hasattr(self, "root") else None
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            (base / "ready").mkdir()
+            (base / "target").mkdir()
+            (base / "target" / "app.txt").write_text("old", encoding="utf-8")
+            (base / "ready" / "app.txt").write_text("new", encoding="utf-8")
+
+            script = base / "swap.ps1"
+            # A pid that is long gone, so the wait has to fall through rather
+            # than block -- which is exactly what the batch version got wrong.
+            script.write_text(updates._fill(
+                updates.COPY_SCRIPT, pid=999999,
+                ready=str(base / "ready"), target=str(base / "target"),
+                relaunch=""), encoding="utf-8")
+
+            done = subprocess.run(
+                ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
+                 "-WindowStyle", "Hidden", "-File", str(script)],
+                capture_output=True, text=True, timeout=120,
+                stdin=subprocess.DEVNULL)
+
+            self.assertEqual(done.returncode, 0, done.stderr)
+            self.assertEqual((base / "target" / "app.txt").read_text(encoding="utf-8").strip(),
+                             "new", "the new file should have replaced the old")
+            self.assertFalse(script.exists(), "it should remove itself when done")
 
 
 class TheTimer(unittest.TestCase):

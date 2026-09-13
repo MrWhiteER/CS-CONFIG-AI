@@ -399,72 +399,118 @@ def clean_old(keep: str = "") -> None:
 # --------------------------------------------------------------------------
 # installing
 
-SWAP_SCRIPT = """@echo off
-setlocal EnableDelayedExpansion
-rem Written by cs2-autoconfig to finish an update. Windows will not let a
-rem running executable be replaced, so this waits for the application to close
-rem before copying the new files over it.
-set "LOG=%~dp0swap.log"
-echo [%date% %time%] waiting for pid @@PID@@ > "%LOG%"
+# Finishing an update: one hidden PowerShell process, whichever edition.
+#
+# This was a batch file and could not be made to work. Its wait loop was
+#
+#     tasklist /fi "PID eq N" 2>nul | find "N" >nul
+#
+# and the script is started detached, so it has no usable standard input.
+# `find` read from a console it should never have had, opened a window and sat
+# there forever with a cursor in it -- the loop never advanced, the installer
+# never ran, and the application never came back. Every turn of the loops
+# flashed up another window besides, because tasklist, ping and powershell each
+# get one when the parent has one.
+#
+# A batch file cannot avoid that: every test it makes is another process.
+# PowerShell does the whole job in one -- wait for the window to go, look for
+# anything still holding the folder, run the installer or copy the files, bring
+# the application back -- started with no window at all.
 
-set /a TRIES=0
-:waitpid
-tasklist /fi "PID eq @@PID@@" 2>nul | find "@@PID@@" >nul
-if errorlevel 1 goto waitlocks
-set /a TRIES+=1
-if !TRIES! GTR 120 (
-  echo [%date% %time%] gave up waiting for the window >> "%LOG%"
-  goto copyfiles
-)
-ping -n 2 127.0.0.1 >nul
-goto waitpid
+_PREAMBLE = """
+$ErrorActionPreference = 'SilentlyContinue'
+$log = Join-Path $PSScriptRoot 'swap.log'
+function Say($m) {
+  "[{0}] {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $m |
+    Out-File -FilePath $log -Append -Encoding utf8
+}
 
-:waitlocks
-rem A second window or a console copy running out of the same folder holds a
-rem lock on a file about to be overwritten. Wait for those too -- they belong
-rem to the user, so they are not killed.
-set /a TRIES=0
-:lockloop
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$t='@@TARGET@@'; $p=Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($t,'OrdinalIgnoreCase') }; if ($p) { exit 1 } exit 0"
-if not errorlevel 1 goto copyfiles
-set /a TRIES+=1
-if !TRIES! GTR 30 (
-  echo [%date% %time%] something is still running from the folder; trying anyway >> "%LOG%"
-  goto copyfiles
-)
-echo [%date% %time%] still in use, waiting >> "%LOG%"
-ping -n 3 127.0.0.1 >nul
-goto lockloop
+Say 'waiting for the application to close (pid @@PID@@)'
+try { Wait-Process -Id @@PID@@ -Timeout 240 -ErrorAction Stop } catch { }
 
-:copyfiles
-echo [%date% %time%] copying >> "%LOG%"
-robocopy "@@READY@@" "@@TARGET@@" /E /IS /IT /R:5 /W:2 /XF .complete >> "%LOG%" 2>&1
-rem robocopy reports 0-7 for success; 8 and above mean nothing was copied.
-if %ERRORLEVEL% GEQ 8 (
-  echo [%date% %time%] copy failed, leaving the old version in place >> "%LOG%"
-  goto done
-)
-echo [%date% %time%] restarting >> "%LOG%"
-if not "@@RELAUNCH@@"=="" start "" "@@RELAUNCH@@"
-
-:done
-rem Remove this script now that it has finished with itself.
-(goto) 2>nul & del "%~f0"
+# Anything else running out of the folder about to be written holds a lock on
+# it. Waited for rather than killed: a second window belongs to the user.
+$target = '@@TARGET@@'
+for ($i = 0; $i -lt 30; $i++) {
+  $busy = @(Get-Process | Where-Object {
+    $_.Path -and $_.Path.StartsWith($target, 'OrdinalIgnoreCase') })
+  if ($busy.Count -eq 0) { break }
+  Say ("still in use by {0} process(es); waiting" -f $busy.Count)
+  Start-Sleep -Seconds 2
+}
 """
 
+_RELAUNCH = """
+$relaunch = '@@RELAUNCH@@'
+if ($relaunch) {
+  Say 'restarting'
+  Start-Process -FilePath $relaunch
+}
+Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
+"""
 
-def _fill(pid: int, ready: str, target: str, relaunch: str) -> str:
-    """Fill the template by token, not by format.
+# Portable: the new files are copied over the folder this copy runs from.
+COPY_SCRIPT = _PREAMBLE + """
+Say 'copying the new files into place'
+& robocopy '@@READY@@' $target /E /IS /IT /R:5 /W:2 /XF .complete | Out-Null
+# robocopy reports 0-7 for success; 8 and above mean nothing was copied.
+if ($LASTEXITCODE -ge 8) {
+  Say ('copy failed ({0}); the old version is still in place' -f $LASTEXITCODE)
+  exit 1
+}
+Say ('copied, robocopy said {0}' -f $LASTEXITCODE)
+""" + _RELAUNCH
 
-    The script contains PowerShell, and PowerShell is mostly braces. str.format
-    would need every one of them doubled, and one missed pair produces a script
-    that runs and does the wrong thing.
+# Installed: the next installer is run, so the installation stays registered.
+#
+# /SILENT rather than /VERYSILENT: minutes with nothing on screen during a
+# large copy reads as a hang. /DIR is pinned rather than left to a registry
+# lookup, so an update cannot install somewhere other than where it replaces.
+INSTALL_SCRIPT = _PREAMBLE + """
+Say 'running the installer'
+$setuplog = Join-Path $PSScriptRoot 'setup.log'
+$run = Start-Process -FilePath '@@SETUP@@' -Wait -PassThru -ArgumentList @(
+  '/SILENT', '/SP-', '/NOCANCEL', '/NORESTART',
+  ('/DIR="{0}"' -f $target), ('/LOG="{0}"' -f $setuplog))
+if ($run.ExitCode -ne 0) {
+  Say ('the installer returned {0}; the old version is still installed' -f $run.ExitCode)
+  exit 1
+}
+Say 'installed'
+""" + _RELAUNCH
+
+
+def _fill(script: str, **values) -> str:
+    """Fill a script by token.
+
+    Not str.format: the script is mostly braces, and one missed pair produces
+    something that runs and does the wrong thing.
     """
-    out = SWAP_SCRIPT
-    for token, value in (("@@PID@@", str(pid)), ("@@READY@@", ready),
-                         ("@@TARGET@@", target), ("@@RELAUNCH@@", relaunch)):
-        out = out.replace(token, value)
+    out = script
+    for token, value in values.items():
+        out = out.replace("@@" + token.upper() + "@@", str(value))
     return out
+
+
+def _write_and_run(script: str) -> Path:
+    """Put the finishing script on disk and start it with no window."""
+    path = staging_dir() / "swap.ps1"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(script, encoding="utf-8")
+
+    # CREATE_NO_WINDOW rather than DETACHED_PROCESS. Detached leaves the child
+    # without usable standard handles, which is exactly what hung the batch
+    # version; this gives it working ones and still shows nothing.
+    flags = 0
+    for name in ("CREATE_NO_WINDOW", "CREATE_NEW_PROCESS_GROUP"):
+        flags |= getattr(subprocess, name, 0)
+    subprocess.Popen(
+        ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
+         "-WindowStyle", "Hidden", "-File", str(path)],
+        cwd=str(staging_dir()), creationflags=flags, close_fds=True,
+        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL)
+    return path
 
 
 def install(release: Release, relaunch: bool = True) -> Path:
@@ -486,97 +532,20 @@ def install(release: Release, relaunch: bool = True) -> Path:
     if not (ready / ".complete").is_file():
         raise RuntimeError("that version has not finished downloading yet")
 
+    target = str(app_dir())
+    back = str(Path(sys.executable)) if relaunch else ""
+
     if is_installer(release):
-        return _run_installer(release, relaunch)
+        setup = archive_path(release)
+        if not setup.is_file():
+            raise RuntimeError("the installer for that version is not on disk")
+        return _write_and_run(_fill(
+            INSTALL_SCRIPT, pid=os.getpid(), setup=setup,
+            target=target, relaunch=back))
 
-    script = staging_dir() / "swap.cmd"
-    script.parent.mkdir(parents=True, exist_ok=True)
-    script.write_text(_fill(
-        pid=os.getpid(),
-        ready=str(ready),
-        target=str(app_dir()),
-        relaunch=str(Path(sys.executable)) if relaunch else "",
-    ), encoding="utf-8")
-
-    _spawn(script)
-    return script
-
-
-INSTALL_SCRIPT = """@echo off
-setlocal EnableDelayedExpansion
-rem Written by cs2-autoconfig to finish an update on an installed copy. The
-rem installer refuses to replace files that are still locked, and under silent
-rem flags it does so without saying anything -- so this waits first.
-set "LOG=%~dp0swap.log"
-echo [%date% %time%] waiting for pid @@PID@@ > "%LOG%"
-
-set /a TRIES=0
-:waitpid
-tasklist /fi "PID eq @@PID@@" 2>nul | find "@@PID@@" >nul
-if errorlevel 1 goto waitlocks
-set /a TRIES+=1
-if !TRIES! GTR 120 goto runsetup
-ping -n 2 127.0.0.1 >nul
-goto waitpid
-
-:waitlocks
-set /a TRIES=0
-:lockloop
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$t='@@TARGET@@'; $p=Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($t,'OrdinalIgnoreCase') }; if ($p) { exit 1 } exit 0"
-if not errorlevel 1 goto runsetup
-set /a TRIES+=1
-if !TRIES! GTR 30 (
-  echo [%date% %time%] still in use; running the installer anyway >> "%LOG%"
-  goto runsetup
-)
-ping -n 3 127.0.0.1 >nul
-goto lockloop
-
-:runsetup
-rem /SILENT, not /VERYSILENT: a large copy with nothing on screen reads as a
-rem hang. /DIR is pinned rather than left to a registry lookup, so this cannot
-rem install somewhere other than where it is replacing.
-echo [%date% %time%] running the installer >> "%LOG%"
-start "" /wait "@@SETUP@@" /SILENT /SP- /NOCANCEL /NORESTART /DIR="@@TARGET@@" /LOG="%~dp0setup.log"
-if errorlevel 1 (
-  echo [%date% %time%] installer returned %ERRORLEVEL%; the old version is still installed >> "%LOG%"
-  goto done
-)
-echo [%date% %time%] restarting >> "%LOG%"
-if not "@@RELAUNCH@@"=="" start "" "@@RELAUNCH@@"
-
-:done
-(goto) 2>nul & del "%~f0"
-"""
-
-
-def _run_installer(release: Release, relaunch: bool) -> Path:
-    """Hand the downloaded Setup.exe to a script that waits, then runs it."""
-    setup = archive_path(release)
-    if not setup.is_file():
-        raise RuntimeError("the installer for that version is not on disk")
-
-    script = staging_dir() / "swap.cmd"
-    script.parent.mkdir(parents=True, exist_ok=True)
-    out = INSTALL_SCRIPT
-    for token, value in (("@@PID@@", str(os.getpid())),
-                         ("@@SETUP@@", str(setup)),
-                         ("@@TARGET@@", str(app_dir())),
-                         ("@@RELAUNCH@@",
-                          str(Path(sys.executable)) if relaunch else "")):
-        out = out.replace(token, value)
-    script.write_text(out, encoding="utf-8")
-    _spawn(script)
-    return script
-
-
-def _spawn(script: Path) -> None:
-    """Start a finishing script detached, so it outlives this process."""
-    detached = 0
-    if hasattr(subprocess, "CREATE_NEW_PROCESS_GROUP"):
-        detached = subprocess.CREATE_NEW_PROCESS_GROUP | 0x00000008  # DETACHED_PROCESS
-    subprocess.Popen(["cmd", "/c", str(script)], cwd=str(staging_dir()),
-                     creationflags=detached, close_fds=True)
+    return _write_and_run(_fill(
+        COPY_SCRIPT, pid=os.getpid(), ready=str(ready),
+        target=target, relaunch=back))
 
 
 # --------------------------------------------------------------------------

@@ -129,19 +129,15 @@ class HowEachInstalls(unittest.TestCase):
                                   asset_name="cs2-autoconfig-1.4.0-Setup.exe")
         self._ready(release, with_setup=True)
         with mock.patch.object(updates, "is_frozen", lambda: True), \
-             mock.patch.object(updates, "_spawn") as spawn:
-            script = updates.install(release)
-        spawn.assert_called_once()
+             mock.patch.object(updates, "_write_and_run",
+                               side_effect=lambda s: Path("x")) as ran:
+            updates.install(release)
+        body = ran.call_args[0][0]
 
-        body = script.read_text(encoding="utf-8")
-        # The flags on the command itself, not the comment above it that
-        # explains which one was chosen.
-        command = next(l for l in body.splitlines()
-                       if l.startswith("start ") and "/wait" in l)
-        self.assertIn("/SILENT", command)
-        self.assertNotIn("/VERYSILENT", command,
+        self.assertIn("/SILENT", body)
+        self.assertNotIn("/VERYSILENT", body,
                          "a large copy with nothing on screen reads as a hang")
-        self.assertIn("/DIR=", command, "the target must be pinned, not looked up")
+        self.assertIn("/DIR=", body, "the target must be pinned, not looked up")
         self.assertNotIn("robocopy", body)
         self.assertNotIn("@@", body, "a token was left unfilled")
 
@@ -150,10 +146,12 @@ class HowEachInstalls(unittest.TestCase):
                                   asset_name="cs2-autoconfig-1.4.0-Setup.exe")
         self._ready(release, with_setup=True)
         with mock.patch.object(updates, "is_frozen", lambda: True), \
-             mock.patch.object(updates, "_spawn"):
-            body = updates.install(release).read_text(encoding="utf-8")
-        order = [body.index(":waitpid"), body.index(":waitlocks"),
-                 body.index("\n:runsetup")]
+             mock.patch.object(updates, "_write_and_run",
+                               side_effect=lambda s: Path("x")) as ran:
+            updates.install(release)
+        body = ran.call_args[0][0]
+        order = [body.index("Wait-Process"), body.index("still in use"),
+                 body.index("running the installer")]
         self.assertEqual(order, sorted(order))
 
     def test_a_failed_install_says_the_old_version_is_still_there(self):
@@ -161,17 +159,20 @@ class HowEachInstalls(unittest.TestCase):
                                   asset_name="cs2-autoconfig-1.4.0-Setup.exe")
         self._ready(release, with_setup=True)
         with mock.patch.object(updates, "is_frozen", lambda: True), \
-             mock.patch.object(updates, "_spawn"):
-            body = updates.install(release).read_text(encoding="utf-8")
-        self.assertIn("still installed", body)
+             mock.patch.object(updates, "_write_and_run",
+                               side_effect=lambda s: Path("x")) as ran:
+            updates.install(release)
+        self.assertIn("still installed", ran.call_args[0][0])
 
     def test_portable_still_copies_files(self):
         release = updates.Release(version="1.4.0",
                                   asset_name="cs2-autoconfig-1.4.0-win64.zip")
         self._ready(release)
         with mock.patch.object(updates, "is_frozen", lambda: True), \
-             mock.patch.object(updates, "_spawn"):
-            body = updates.install(release).read_text(encoding="utf-8")
+             mock.patch.object(updates, "_write_and_run",
+                               side_effect=lambda s: Path("x")) as ran:
+            updates.install(release)
+        body = ran.call_args[0][0]
         self.assertIn("robocopy", body)
         self.assertNotIn("/SILENT", body)
 
@@ -179,7 +180,8 @@ class HowEachInstalls(unittest.TestCase):
         release = updates.Release(version="1.4.0",
                                   asset_name="cs2-autoconfig-1.4.0-Setup.exe")
         self._ready(release, with_setup=False)
-        with mock.patch.object(updates, "is_frozen", lambda: True):
+        with mock.patch.object(updates, "is_frozen", lambda: True), \
+             mock.patch.object(updates, "_write_and_run"):
             with self.assertRaisesRegex(RuntimeError, "not on disk"):
                 updates.install(release)
 
