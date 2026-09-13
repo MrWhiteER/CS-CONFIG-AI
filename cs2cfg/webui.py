@@ -712,6 +712,100 @@ def _cfg_suggest(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     ], "remembered": remembered}
 
 
+def _cfg_source(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """What the user pointed at, and what is in the folder it resolves to.
+
+    Read-only. A file names the folder it sits in and is kept as the entry
+    point, because a config is almost never one file.
+    """
+    from . import cfgsource
+
+    found = cfgsource.resolve(str(body.get("path") or ""))
+    files = cfgsource.survey(Path(found["folder"])) if found["folder"] else []
+    return {"ok": True, **found, "files": files,
+            "convertible": [f["name"] for f in files if f["convertible"]]}
+
+
+def _cfg_convert(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Copy a console-script .cfg to .vcfg, keeping the original.
+
+    Only ever reached because the user pressed the button, and only ever a
+    copy: nothing they had is removed, so a conversion that turns out wrong
+    costs nothing.
+    """
+    from . import cfgsource
+
+    folder = Path(str(body.get("folder") or "").strip())
+    name = str(body.get("name") or "").strip()
+    if not name or not folder.is_dir():
+        return {"ok": False, "error": "no file given"}
+
+    source = folder / name
+    # Resolved and compared, so a name like ..\..\something cannot reach out
+    # of the folder the user chose.
+    try:
+        inside = source.resolve().parent == folder.resolve()
+    except OSError:
+        inside = False
+    if not inside or not source.is_file():
+        return {"ok": False, "error": f"{name} is not a file in that folder"}
+
+    try:
+        made = cfgsource.convert(source, overwrite=bool(body.get("overwrite")))
+    except (ValueError, FileExistsError, OSError) as exc:
+        return {"ok": False, "error": str(exc)}
+
+    # A file nothing execs never runs. The autoexec is the one file that does
+    # not need an exec line of its own -- it is the entry point -- so it is
+    # only wired up for everything else.
+    wiring = {"changed": False, "action": "it is the entry point itself"}
+    if made.stem.lower() != "autoexec":
+        autoexec = _autoexec_for(folder)
+        if autoexec is None:
+            wiring = {"changed": False,
+                      "action": "no autoexec found, so nothing execs it yet"}
+        else:
+            try:
+                wiring = cfgsource.ensure_exec(
+                    autoexec, _cfg_root_for(folder), made, replaced=source)
+            except OSError as exc:
+                wiring = {"changed": False, "action": f"could not edit the "
+                                                      f"autoexec: {exc}"}
+
+    return {"ok": True, "from": source.name, "to": made.name,
+            "kept": source.name, "wiring": wiring,
+            "files": cfgsource.survey(folder)}
+
+
+def _autoexec_for(folder: Path):
+    """The autoexec governing this folder, looking upwards if need be.
+
+    A collection is usually a folder of parts with one autoexec at its root,
+    so a file in tools/ is exec'd from the autoexec one level up.
+    """
+    from . import cfgsource
+
+    here = Path(folder).resolve()
+    for candidate in (here, *here.parents):
+        for suffix in cfgsource.CONFIG_SUFFIXES:
+            found = candidate / ("autoexec" + suffix)
+            if found.is_file():
+                return found
+        # Do not wander past the game's own cfg directory.
+        if candidate.name.lower() == "cfg":
+            break
+    return None
+
+
+def _cfg_root_for(folder: Path) -> Path:
+    """The cfg directory exec paths are written relative to."""
+    here = Path(folder).resolve()
+    for candidate in (here, *here.parents):
+        if candidate.name.lower() == "cfg":
+            return candidate
+    return here.parent
+
+
 def _cfg_browse(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     """Open the native folder picker."""
     from . import cfgscan
@@ -1747,6 +1841,8 @@ def make_handler(state: State):
         "/api/cfg/settings/apply": _cfg_settings_apply,
         "/api/cfg/suggest": _cfg_suggest,
         "/api/cfg/browse": _cfg_browse,
+        "/api/cfg/source": _cfg_source,
+        "/api/cfg/convert": _cfg_convert,
         "/api/cfg/check": _cfg_check,
         "/api/cfg/polish": _cfg_polish_apply,
         "/api/cfg/rename": _cfg_rename_preview,
