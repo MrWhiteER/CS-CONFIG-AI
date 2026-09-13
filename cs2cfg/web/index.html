@@ -5189,12 +5189,6 @@ let updState = null;
 let updTimer = null;
 let updDismissed = "";     // a version whose notice was waved away this session
 
-function fmtBytes(n) {
-  if (!n) return "";
-  const mb = n / (1024 * 1024);
-  return mb >= 1 ? mb.toFixed(1) + " MB" : Math.round(n / 1024) + " KB";
-}
-
 function fmtWhen(seconds) {
   if (!seconds) return "not yet";
   const ago = Math.max(0, Date.now() / 1000 - seconds);
