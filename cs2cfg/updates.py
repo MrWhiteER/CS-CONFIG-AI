@@ -655,6 +655,16 @@ class Checker:
                 and self._state in (AVAILABLE, DOWNLOADING, READY))
         return out
 
+    def latest(self) -> Optional[Release]:
+        """The release itself, rather than the summary of it.
+
+        The summary is shaped for the page. Anything that has to act on a
+        release -- installing it above all -- needs the attachment too, and
+        that does not survive being rebuilt from the summary.
+        """
+        with self._lock:
+            return self._latest
+
     def set_auto_download(self, on: bool) -> None:
         with self._lock:
             self._auto = bool(on)

@@ -184,6 +184,48 @@ class HowEachInstalls(unittest.TestCase):
                 updates.install(release)
 
 
+class WhatTheInstallEndpointHandsOver(unittest.TestCase):
+    """The release that reaches install() has to be the one that was found.
+
+    This is the bug that shipped in 1.0.1: the endpoint rebuilt a Release from
+    the summary, which describes a release for the page and carries no
+    attachment. is_installer() then answered False for every release, so an
+    installed copy was handed the portable file-copy script -- which copies an
+    unpacked folder that an installer release never has. It copied nothing and
+    relaunched the version already there.
+    """
+
+    def _checker_holding(self, asset):
+        checker = updates.Checker(current="1.0.1")
+        checker._latest = updates.Release(version="1.1.0", asset_name=asset)
+        checker._state = updates.READY
+        return checker
+
+    def test_the_checker_hands_back_the_release_itself(self):
+        checker = self._checker_holding("cs2-autoconfig-1.1.0-Setup.exe")
+        found = checker.latest()
+        self.assertEqual(found.asset_name, "cs2-autoconfig-1.1.0-Setup.exe")
+        self.assertTrue(updates.is_installer(found))
+
+    def test_the_summary_alone_is_not_enough_to_install_from(self):
+        """Why latest() exists: rebuilding from the summary loses the asset."""
+        checker = self._checker_holding("cs2-autoconfig-1.1.0-Setup.exe")
+        summary = checker.summary()
+        rebuilt = updates.Release(
+            version=str((summary["latest"] or {}).get("version", "")))
+        self.assertEqual(rebuilt.version, "1.1.0")
+        self.assertFalse(
+            updates.is_installer(rebuilt),
+            "a Release rebuilt from the summary cannot know it is an installer")
+
+    def test_a_portable_release_still_reads_as_portable(self):
+        checker = self._checker_holding("cs2-autoconfig-1.1.0-win64.zip")
+        self.assertFalse(updates.is_installer(checker.latest()))
+
+    def test_nothing_found_means_nothing_to_install(self):
+        self.assertIsNone(updates.Checker().latest())
+
+
 class TheInstallerScript(unittest.TestCase):
     """The Inno script itself, read as text."""
 

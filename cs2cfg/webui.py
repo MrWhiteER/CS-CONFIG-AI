@@ -1569,7 +1569,13 @@ def _update_install(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     if summary["state"] != updates.READY:
         return {"ok": False, "error": "there is nothing downloaded to install"}
 
-    release = updates.Release(version=str((summary["latest"] or {}).get("version", "")))
+    # The release as it was found, attachment and all. Rebuilding one from
+    # the summary loses the attachment, and the attachment is what decides
+    # whether this copy is installed by running an installer or by copying
+    # files over itself.
+    release = checker.latest()
+    if release is None:
+        return {"ok": False, "error": "nothing is known to install"}
     try:
         script = updates.install(release, relaunch=bool(body.get("relaunch", True)))
     except Exception as exc:
