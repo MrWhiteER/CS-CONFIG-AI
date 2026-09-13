@@ -16,6 +16,8 @@ No test here calls NVAPI. The driver layer is stubbed throughout.
 
 from __future__ import annotations
 
+import os
+import tempfile
 import sys
 import unittest
 from pathlib import Path

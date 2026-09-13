@@ -340,9 +340,18 @@ def cmd_plan(ctx: Context) -> int:
     current_launch = steam.read_launch_options(ctx.user)
 
     exec_target = f"{ctx.args.cfg_folder}/{ctx.args.cfg_name}"
+    # The launch options exec the autoexec when there is one: it is what
+    # runs everything else, the generated file included. Naming the
+    # generated file directly would load the performance settings and
+    # leave the binds unloaded.
+    from . import starter
+
+    entry = starter.launch_exec_path(
+        steam.cfg_dir(ctx.cs2_install) if ctx.cs2_install else Path("."),
+        ctx.args.cfg_folder, ctx.args.cfg_name)
     launch = plan_launch_options(
         current_launch, machine, ctx.kb,
-        exec_path=exec_target.replace("/", "\\"),
+        exec_path=entry,
         want_console=ctx.args.console,
     )
 
@@ -366,9 +375,18 @@ def cmd_apply(ctx: Context) -> int:
     current_launch = steam.read_launch_options(ctx.user)
 
     exec_target = f"{ctx.args.cfg_folder}/{ctx.args.cfg_name}"
+    # The launch options exec the autoexec when there is one: it is what
+    # runs everything else, the generated file included. Naming the
+    # generated file directly would load the performance settings and
+    # leave the binds unloaded.
+    from . import starter
+
+    entry = starter.launch_exec_path(
+        steam.cfg_dir(ctx.cs2_install) if ctx.cs2_install else Path("."),
+        ctx.args.cfg_folder, ctx.args.cfg_name)
     launch = plan_launch_options(
         current_launch, machine, ctx.kb,
-        exec_path=exec_target.replace("/", "\\"),
+        exec_path=entry,
         want_console=ctx.args.console,
     )
 

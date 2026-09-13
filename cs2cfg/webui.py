@@ -126,7 +126,9 @@ def _plan_payload(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     )
     launch = plan_launch_options(
         current_launch, state.machine, kb,
-        exec_path=f"{state.cfg_folder}\\{state.cfg_name}",
+        exec_path=_exec_entry_point(
+            steam.cfg_dir(state.cs2_install) if state.cs2_install else Path("."),
+            state.cfg_folder, state.cfg_name),
     )
 
     settings = []
@@ -183,6 +185,12 @@ def _plan_payload(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _exec_entry_point(cfg_root, folder: str, name: str) -> str:
+    from . import starter
+
+    return starter.launch_exec_path(cfg_root, folder, name)
+
+
 def _scaling_step() -> Dict[str, Any]:
     """Set the display to stretch a narrow mode, as part of applying settings.
 
@@ -231,7 +239,9 @@ def _apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     )
     launch = plan_launch_options(
         steam.read_launch_options(user), state.machine, kb,
-        exec_path=f"{state.cfg_folder}\\{state.cfg_name}",
+        exec_path=_exec_entry_point(
+            steam.cfg_dir(state.cs2_install) if state.cs2_install else Path("."),
+            state.cfg_folder, state.cfg_name),
     )
 
     write_launch = bool(body.get("write_launch", True))
@@ -1354,6 +1364,89 @@ def _cfg_key_options(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     return {"ok": True, **commands.options(result, binding, state.cs2_install)}
 
 
+def _cfg_starter(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Report, or build, the config a fresh account does not have yet.
+
+    Without ``create`` this only looks: the page can show what is missing and
+    what would be written before anything is. Nothing existing is ever
+    overwritten either way -- see :mod:`cs2cfg.starter`.
+    """
+    from . import cfgscan, starter
+
+    state.refresh()
+    if not state.cs2_install:
+        return {"ok": False, "error":
+                "CS2 could not be found, so there is nowhere to put a config."}
+
+    cfg_root = steam.cfg_dir(state.cs2_install)
+    folder = str(body.get("folder") or state.cfg_folder).strip().strip("/\\")
+    if not folder:
+        return {"ok": False, "error": "no folder name given"}
+
+    outcome = starter.plan(cfg_root, folder)
+    shape = {
+        "ok": True,
+        "folder": str(outcome.root),
+        "name": folder,
+        "complete": outcome.complete,
+        "launch_target": outcome.launch_target,
+        "missing": [{"file": p.relative, "purpose": p.purpose}
+                    for p in outcome.missing],
+        "present": [p.relative for p in outcome.pieces if p.exists],
+        "autoexec": outcome.autoexec_exists,
+    }
+    if not body.get("create"):
+        return shape
+
+    session = backup.BackupSession(note=f"starter config in {folder}")
+    try:
+        result = starter.create(cfg_root, folder, session)
+    except OSError as exc:
+        return {"ok": False, "error": f"could not write into {outcome.root}: {exc}"}
+
+    backup.prune()
+    # The new files only matter once something scans them.
+    try:
+        state.cfg_scan = cfgscan.scan(outcome.root)
+    except OSError:
+        pass
+    result.update(shape)
+    result["complete"] = True
+    result["backup"] = None if session.empty else session.stamp
+    return result
+
+
+def _first_binds_file(result) -> Optional[str]:
+    """Where a bind goes in a collection that has none yet.
+
+    Preference in order: the file the starter creates for binds, then anything
+    else named like a binds file, then the last plain command file the startup
+    chain reaches -- last because a bind should win over what ran before it.
+
+    Generated files are never chosen. They are rewritten wholesale by `apply`,
+    so a bind written into one would disappear without explanation.
+    """
+    from . import starter
+
+    usable = [c for c in result.files.values()
+              if c.is_commands and not c.generated_by]
+    if not usable:
+        return None
+
+    by_relative = {c.relative: c for c in usable}
+    for candidate in by_relative:
+        if candidate.lower().endswith(starter.BINDS_FILE):
+            return candidate
+    named = [r for r in by_relative if "bind" in r.rsplit("/", 1)[-1].lower()]
+    if named:
+        return sorted(named)[0]
+
+    ordered = [name for name, _depth in result.exec_chain if name in by_relative]
+    if ordered:
+        return ordered[-1]
+    return sorted(by_relative)[-1]
+
+
 def _cfg_bind(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     """Put a command on a key, or take the key's binding away.
 
@@ -1403,9 +1496,20 @@ def _cfg_bind(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         for entries in result.binds.values():
             for b in entries:
                 counts[b.file] = counts.get(b.file, 0) + 1
-        if not counts:
-            return {"ok": False, "error": "no file in the scan holds any binds"}
-        target_file = max(counts.items(), key=lambda kv: kv[1])[0]
+        if counts:
+            target_file = max(counts.items(), key=lambda kv: kv[1])[0]
+        else:
+            # A collection with no binds in it yet -- a new account, or one the
+            # starter has just built. There is no busiest file to follow, so
+            # fall back to the file meant for binds. Without this the very
+            # first bind anyone makes is refused, which is exactly when the
+            # Keyboard tab most needs to work.
+            target_file = _first_binds_file(result)
+            if target_file is None:
+                return {"ok": False, "error":
+                        "nothing here can hold a bind. Create a starter config on "
+                        "the Settings tab, or point the app at the folder your "
+                        "config already lives in."}
 
     config = next((c for c in result.files.values() if c.relative == target_file), None)
     if config is None:
@@ -1441,9 +1545,15 @@ def _cfg_bind(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         anchor = next((i for i, l in enumerate(lines)
                        if l.lstrip().startswith("bind ")), None)
         if anchor is None:
-            return {"ok": False, "error": f"{target_file} has no binds to sit beside"}
-        pad = lines[anchor][:len(lines[anchor]) - len(lines[anchor].lstrip())]
-        lines.insert(anchor, f'{pad}bind "{binding}" "{command}"')
+            # Nothing to sit beside: a binds file that still has only its
+            # header. Appending is right anyway -- a later bind overrides an
+            # earlier one, so the end of the file is where a new one belongs.
+            while lines and not lines[-1].strip():
+                lines.pop()
+            lines.append(f'bind "{binding}" "{command}"')
+        else:
+            pad = lines[anchor][:len(lines[anchor]) - len(lines[anchor].lstrip())]
+            lines.insert(anchor, f'{pad}bind "{binding}" "{command}"')
         changed = "added"
 
     note = ("unbound " if clearing else "bind ") + keys.label(binding)
@@ -1524,9 +1634,20 @@ def _cfg_plugin_bind(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         for entries in result.binds.values():
             for b in entries:
                 counts[b.file] = counts.get(b.file, 0) + 1
-        if not counts:
-            return {"ok": False, "error": "no file in the scan holds any binds"}
-        target_file = max(counts.items(), key=lambda kv: kv[1])[0]
+        if counts:
+            target_file = max(counts.items(), key=lambda kv: kv[1])[0]
+        else:
+            # A collection with no binds in it yet -- a new account, or one the
+            # starter has just built. There is no busiest file to follow, so
+            # fall back to the file meant for binds. Without this the very
+            # first bind anyone makes is refused, which is exactly when the
+            # Keyboard tab most needs to work.
+            target_file = _first_binds_file(result)
+            if target_file is None:
+                return {"ok": False, "error":
+                        "nothing here can hold a bind. Create a starter config on "
+                        "the Settings tab, or point the app at the folder your "
+                        "config already lives in."}
 
     config = next((c for c in result.files.values() if c.relative == target_file), None)
     if config is None:
@@ -1549,11 +1670,15 @@ def _cfg_plugin_bind(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     if changed is None:
         anchor = next((i for i, l in enumerate(lines)
                        if l.lstrip().startswith("bind ")), None)
+        line = f'bind "{binding}" "{found.entry}"'.ljust(60) + f"// {found.name.upper()}"
         if anchor is None:
-            return {"ok": False, "error": f"{target_file} has no binds to sit beside"}
-        pad = lines[anchor][:len(lines[anchor]) - len(lines[anchor].lstrip())]
-        lines.insert(anchor, f'{pad}bind "{binding}" "{found.entry}"'.ljust(60) +
-                     f"// {found.name.upper()}")
+            # See the note in _cfg_bind: a binds file with only a header yet.
+            while lines and not lines[-1].strip():
+                lines.pop()
+            lines.append(line)
+        else:
+            pad = lines[anchor][:len(lines[anchor]) - len(lines[anchor].lstrip())]
+            lines.insert(anchor, pad + line)
         changed = "added"
 
     session = backup.BackupSession(note=f"bind {found.name} to {keys.label(binding)}")
@@ -1981,6 +2106,7 @@ def make_handler(state: State):
         "/api/cfg/suggest": _cfg_suggest,
         "/api/cfg/browse": _cfg_browse,
         "/api/cfg/source": _cfg_source,
+        "/api/cfg/starter": _cfg_starter,
         "/api/cfg/convert": _cfg_convert,
         "/api/cfg/check": _cfg_check,
         "/api/cfg/polish": _cfg_polish_apply,

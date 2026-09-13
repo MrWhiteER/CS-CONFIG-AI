@@ -2295,6 +2295,21 @@
 
       <div id="results"></div>
 
+      <section class="panel hidden" id="starter-card">
+        <h2>Start a config</h2>
+        <p class="sub" style="margin:0 0 9px">
+          This account has no config of its own yet, so there is nothing to read and nowhere
+          to write a key bind to. Creating one lays out the usual folders and an
+          <code>autoexec.vcfg</code> that execs them, ready for the Keyboard and Scripts tabs.
+          Nothing that already exists is ever overwritten.
+        </p>
+        <div id="starter-what" class="sub2"></div>
+        <div class="actions">
+          <button class="btn primary" id="starter-make">Create it</button>
+        </div>
+        <div id="starter-out"></div>
+      </section>
+
       <section class="panel" id="cfg-card">
         <h2>Configuration studio</h2>
         <p class="sub" style="margin:0 0 9px">
@@ -3820,12 +3835,78 @@ async function ensureScan(force) {
   }
 }
 
+/* --------------------------------------------------------------------------
+   A fresh account has no config at all: no folder, no autoexec, nothing to
+   bind a key into. Rather than show four empty tabs and leave the player to
+   work out that they need to hand-build a config first, the app offers to lay
+   one out -- and on a machine where there is genuinely nothing, just does it.
+
+   Only ever creates what is missing, so this is safe to run on every start.
+   -------------------------------------------------------------------------- */
+let starterInfo = null;
+
+async function checkStarter() {
+  try {
+    starterInfo = await api("/api/cfg/starter", {});
+  } catch (err) {
+    starterInfo = { ok: false, error: String(err && err.message || err) };
+  }
+  const card = $("starter-card");
+  if (!card) return starterInfo;
+  const needed = starterInfo.ok && !starterInfo.complete;
+  card.classList.toggle("hidden", !needed);
+  if (needed && $("starter-what")) {
+    $("starter-what").innerHTML =
+      "Would create in <span class=\"mono\">" + esc(starterInfo.folder) + "</span>:<br>" +
+      starterInfo.missing.map(m =>
+        '<span class="mono">' + esc(m.file) + "</span> — " + esc(m.purpose)).join("<br>") +
+      (starterInfo.autoexec ? "" :
+        '<br><span class="mono">autoexec.vcfg</span> — execs the files above at startup');
+  }
+  return starterInfo;
+}
+
+async function makeStarter(quiet) {
+  const button = $("starter-make");
+  if (button) { button.disabled = true; button.textContent = "Creating…"; }
+  try {
+    const r = await api("/api/cfg/starter", { create: true });
+    if (!r.ok) throw new Error(r.error || "could not create it");
+    if ($("cfg-folder")) {
+      $("cfg-folder").value = r.folder;
+      if (typeof checkCfgFolder === "function") await checkCfgFolder();
+      rememberPrefs();
+    }
+    scannedFolder = null;
+    await ensureScan(true);
+    await loadSource(r.folder);
+    if ($("starter-card")) $("starter-card").classList.add("hidden");
+    const made = (r.created || []).length;
+    status(made
+      ? "Created a starter config in " + r.folder + " (" + made + " files). " +
+        "Launch options should exec " + r.launch_target + "."
+      : "A config was already there; nothing was changed.");
+    // The tabs that were empty have something to show now.
+    treeData = null; plugData = null; keyData = null; cfgSettings = null;
+    setTab(activeTab);
+    return r;
+  } catch (err) {
+    if (!quiet) status("Could not create a config: " + (err && err.message || err), true);
+    return null;
+  } finally {
+    if (button) { button.disabled = false; button.textContent = "Create it"; }
+  }
+}
+
+if ($("starter-make")) $("starter-make").addEventListener("click", () => makeStarter(false));
+
 function noFolderYet(box, what) {
   if (!box) return;
   box.innerHTML = '<span class="sub">' +
     ($("cfg-folder") && $("cfg-folder").value.trim()
       ? "That folder could not be read, so there is no " + what + " to show."
-      : "No config folder chosen yet — pick one on the Settings tab.") +
+      : "No config yet. The Settings tab can create one, or point the app at a " +
+        "folder your config already lives in.") +
     "</span>";
 }
 
@@ -5754,11 +5835,20 @@ async function reloadForAccount() {
     await loadSource(folder);
   } else {
     renderSource();
-    if ($("cfg-folder-state")) {
+    if ($("cfg-out")) $("cfg-out").innerHTML = "";
+    // No folder set for this account. If there is no config on this machine at
+    // all, build one rather than presenting four empty tabs and a picker for a
+    // folder that does not exist yet. Where something is already there, the
+    // card offers instead -- that config is someone's, and picking it is
+    // theirs to do.
+    const info = await checkStarter();
+    if (info && info.ok && !info.complete && !info.present.length && !info.autoexec) {
+      await makeStarter(true);
+    }
+    if ($("cfg-folder-state") && !$("cfg-folder").value.trim()) {
       $("cfg-folder-state").textContent =
         "No config folder set for this account yet — choose one below.";
     }
-    if ($("cfg-out")) $("cfg-out").innerHTML = "";
   }
   status(($("who-name").textContent || "That account") + "'s settings are shown now.");
   setTab(activeTab);
@@ -6539,6 +6629,17 @@ $("rescan").addEventListener("click", () => scan(true));
   $("preview").click();
   loadHistory();
   refreshCfgSuggestions();
+  // A fresh install has no config anywhere. Offer to lay one out -- and where
+  // the machine has nothing at all, just do it, so the Keyboard and Scripts
+  // tabs have somewhere to write instead of four empty panels.
+  try {
+    const first = await checkStarter();
+    if (first && first.ok && !first.complete &&
+        !first.present.length && !first.autoexec &&
+        !($("cfg-folder") && $("cfg-folder").value.trim())) {
+      await makeStarter(true);
+    }
+  } catch (e) { /* said on the card */ }
   if ($("cfg-folder") && $("cfg-folder").value.trim()) loadSource();
   startLive();
   pollUpdates();

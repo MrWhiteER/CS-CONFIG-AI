@@ -10,6 +10,7 @@ Everything runs on copies in a temp directory.
 from __future__ import annotations
 
 import shutil
+import os
 import sys
 import tempfile
 import unittest
@@ -19,6 +20,7 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from cs2cfg import backup, cfglang, cfgscan, webui  # noqa: E402
+from sandbox import redirect_backups  # noqa: E402
 
 CRLF = "\r\n"
 
@@ -46,6 +48,7 @@ class TestRestoreNewlines(unittest.TestCase):
 
 class SaveCase(unittest.TestCase):
     def setUp(self):
+        redirect_backups(self)
         self.tmp = Path(tempfile.mkdtemp(prefix="cs2cfg-save-"))
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
 
