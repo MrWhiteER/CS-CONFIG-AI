@@ -807,14 +807,30 @@ def _cfg_root_for(folder: Path) -> Path:
 
 
 def _cfg_browse(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
-    """Open the native folder picker."""
-    from . import cfgscan
+    """Open the native picker, for a folder or for a single file.
 
-    chosen = cfgscan.browse_for_folder(str(body.get("initial") or ""))
+    Both are the ordinary Explorer window -- search, Quick access, address bar
+    -- rather than the old tree. A chosen file is resolved to its folder here,
+    so the caller gets the same shape either way.
+    """
+    from . import cfgscan, cfgsource
+
+    initial = str(body.get("initial") or "")
+    if str(body.get("kind") or "folder").lower() == "file":
+        chosen = cfgscan.browse_for_file(initial)
+    else:
+        chosen = cfgscan.browse_for_folder(initial)
+
     if not chosen:
         return {"ok": True, "cancelled": True, "path": None}
-    return {"ok": True, "cancelled": False, "path": chosen,
-            "info": cfgscan.describe_folder(Path(chosen))}
+
+    found = cfgsource.resolve(chosen)
+    folder = found["folder"] or chosen
+    return {"ok": True, "cancelled": False, "path": folder,
+            "picked": chosen, "entry": found["entry"],
+            "note": found["error"],
+            "files": cfgsource.survey(Path(folder)) if found["folder"] else [],
+            "info": cfgscan.describe_folder(Path(folder))}
 
 
 def _cfg_check(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:

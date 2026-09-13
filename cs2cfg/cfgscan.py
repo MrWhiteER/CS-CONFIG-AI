@@ -1072,51 +1072,24 @@ def suggest_folders(extra: Optional[Sequence[Path]] = None) -> List[FolderSugges
 
 def browse_for_folder(initial: Optional[str] = None,
                       title: str = "Choose a configuration folder") -> Optional[str]:
-    """Open the native folder picker and return the chosen path.
+    """Open the folder picker and return the chosen path.
 
-    Runs in a separate STA PowerShell process. The dialog needs a single
-    threaded apartment, which the server's worker threads are not, and shelling
-    out keeps that requirement from leaking into the rest of the process.
+    The modern Explorer dialog -- search, Quick access, address bar -- rather
+    than the old tree with none of them. See cs2cfg/picker.py; it lives there
+    because reaching it means declaring a COM interface .NET Framework does
+    not expose, which is a lot of code to leave in the middle of this module.
     """
-    import subprocess
-    import tempfile
+    from . import picker
 
-    start = initial or ""
-    script = (
-        "Add-Type -AssemblyName System.Windows.Forms\n"
-        "$d = New-Object System.Windows.Forms.FolderBrowserDialog\n"
-        f"$d.Description = {_ps_literal(title)}\n"
-        "$d.ShowNewFolderButton = $false\n"
-        f"$start = {_ps_literal(start)}\n"
-        "if ($start -and (Test-Path $start)) { $d.SelectedPath = $start }\n"
-        "$top = New-Object System.Windows.Forms.Form\n"
-        "$top.TopMost = $true\n"
-        "if ($d.ShowDialog($top) -eq [System.Windows.Forms.DialogResult]::OK) "
-        "{ [Console]::Out.Write($d.SelectedPath) }\n"
-        "$top.Dispose(); $d.Dispose()\n"
-    )
+    return picker.pick_folder(initial or "", title)
 
-    with tempfile.NamedTemporaryFile("w", suffix=".ps1", delete=False, encoding="utf-8") as handle:
-        handle.write(script)
-        script_path = handle.name
 
-    try:
-        proc = subprocess.run(
-            ["powershell", "-NoProfile", "-STA", "-ExecutionPolicy", "Bypass",
-             "-File", script_path],
-            capture_output=True, text=True, timeout=300,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-        )
-    except (OSError, subprocess.SubprocessError):
-        return None
-    finally:
-        try:
-            Path(script_path).unlink()
-        except OSError:
-            pass
+def browse_for_file(initial: Optional[str] = None,
+                    title: str = "Choose a configuration file") -> Optional[str]:
+    """Open the file picker, filtered to .vcfg and .cfg."""
+    from . import picker
 
-    chosen = (proc.stdout or "").strip()
-    return chosen or None
+    return picker.pick_file(initial or "", title)
 
 
 def _ps_literal(value: str) -> str:
