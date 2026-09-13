@@ -511,14 +511,24 @@ setting, not part of the mode switch. Left on *aspect ratio* the narrow desktop
 sits in the middle of the screen with a black bar down each side, which looks
 like the stretch simply failed.
 
-A launch now sets it to full-screen first and puts it back on the way out,
-alongside the desktop mode. Standalone:
+`apply` sets it to full-screen along with everything else it writes, and keeps
+it that way -- pressing Apply is asking for it, so the change is yours. A launch
+also checks, and on a machine that has had `apply` run it finds nothing to do;
+where it does change something it puts it back on the way out, because nobody
+asked it to.
 
 ```
+cs2cfg.bat apply                      includes it; --no-scaling to skip
 cs2cfg.bat scaling                    report what each screen does
 cs2cfg.bat scaling --fix              set every letterboxed screen to full-screen
 cs2cfg.bat scaling --mode aspect      put it back
 ```
+
+Note this is *not* one of the "Manage 3D settings" the Graphics panel lists.
+Those stay read-only for the reason given there -- the driver does not publish
+what their values mean. Scaling is a different NVIDIA page ("Adjust desktop
+size and position"), it is a documented enum, and that is why this one can be
+written when those cannot.
 
 This goes through NVAPI's display configuration, which -- unlike the 3D profile
 database the Graphics panel reads -- publishes what its values mean, so nothing

@@ -437,6 +437,26 @@ def cmd_apply(ctx: Context) -> int:
         except steam.SteamError as exc:
             print(f"  {out.red('--')}  launch options: {exc}")
 
+    if not ctx.args.no_scaling:
+        from . import scaling
+
+        try:
+            filled = scaling.ensure_fill(apply=True, persist=True)
+        except Exception as exc:            # never fail an apply over this
+            filled = {"ok": False, "error": str(exc)}
+        if filled.get("already"):
+            print(f"  {out.green('ok')}  display scaling  "
+                  f"{out.dim('(already full-screen)')}")
+        elif filled.get("changed"):
+            was = filled.get("was", "letterboxed")
+            print(f"  {out.green('ok')}  display scaling  "
+                  f"{out.dim(f'({was} -> full-screen)')}")
+            print(out.dim("      a stretched resolution now fills the panel instead of"))
+            print(out.dim("      sitting between black bars; undo: cs2cfg scaling --mode aspect"))
+        else:
+            print(f"  {out.yellow('--')}  display scaling: "
+                  f"{filled.get('error', 'unchanged')}")
+
     print()
     if session.empty:
         print(out.dim("  No backup needed; nothing existed to overwrite."))
@@ -1291,6 +1311,8 @@ def build_parser() -> argparse.ArgumentParser:
         cmd.add_argument("--no-video", action="store_true", help="do not touch cs2_video.txt")
         cmd.add_argument("--no-launch", action="store_true", help="do not touch Steam launch options")
         cmd.add_argument("--no-cfg", action="store_true", help="do not write a .vcfg file")
+        cmd.add_argument("--no-scaling", action="store_true",
+                         help="do not set the display to full-screen scaling")
         cmd.add_argument("--link-autoexec", action="store_true",
                          help="append an exec line for the generated config to your autoexec")
         if name == "apply":

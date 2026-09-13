@@ -257,5 +257,54 @@ class InTheLaunch(unittest.TestCase):
             self.assertIsNone(self.launcher._make_it_fill(self._report))
 
 
+class WhenSettingsAreApplied(unittest.TestCase):
+    """Applying settings sets it for good, rather than borrowing it.
+
+    The launcher changes the scaling for one session and gives it back, because
+    it is changing something nobody asked it to. Pressing Apply is asking, so
+    the change stays -- and the launcher then finds nothing to do.
+    """
+
+    def setUp(self):
+        from cs2cfg import webui
+        self.webui = webui
+
+    def test_a_letterboxed_display_is_fixed_and_persisted(self):
+        with mock.patch.object(scaling, "ensure_fill",
+                               return_value={"ok": True, "changed": True,
+                                             "was": "aspect ratio", "previous": 5,
+                                             "display_id": 7}) as fill:
+            step = self.webui._scaling_step()
+        self.assertTrue(step["ok"])
+        self.assertIn("full-screen", step["detail"])
+        self.assertIn("black bars", step["detail"])
+        fill.assert_called_once_with(apply=True, persist=True)
+
+    def test_a_display_that_is_already_right_says_so_without_writing(self):
+        with mock.patch.object(scaling, "ensure_fill",
+                               return_value={"ok": True, "changed": False,
+                                             "already": True}):
+            step = self.webui._scaling_step()
+        self.assertTrue(step["ok"])
+        self.assertIn("already", step["detail"])
+
+    def test_no_nvidia_driver_is_a_failed_step_not_a_failed_apply(self):
+        with mock.patch.object(scaling, "ensure_fill",
+                               return_value={"ok": False, "changed": False,
+                                             "error": "no NVIDIA driver on this machine"}):
+            step = self.webui._scaling_step()
+        self.assertFalse(step["ok"])
+        self.assertIn("NVIDIA", step["detail"])
+
+    def test_a_driver_that_throws_does_not_take_the_apply_down_with_it(self):
+        """Everything else in an apply has already been written by this point,
+        so raising here would report a failure for work that succeeded."""
+        with mock.patch.object(scaling, "ensure_fill",
+                               side_effect=OSError("driver fell over")):
+            step = self.webui._scaling_step()
+        self.assertFalse(step["ok"])
+        self.assertIn("driver fell over", step["detail"])
+
+
 if __name__ == "__main__":
     unittest.main()

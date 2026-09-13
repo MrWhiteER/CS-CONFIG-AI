@@ -2285,6 +2285,7 @@
         <label class="opt"><input type="checkbox" id="w-cfg" checked> Generated .vcfg config</label>
         <label class="opt"><input type="checkbox" id="w-launch" checked> Steam launch options</label>
         <label class="opt"><input type="checkbox" id="w-autoexec"> Add exec line to autoexec.vcfg</label>
+        <label class="opt"><input type="checkbox" id="w-scaling" checked> Full-screen scaling (no black bars when stretched)</label>
         <div class="actions">
           <button class="btn primary" id="preview">Preview changes</button>
           <button class="btn" id="apply" disabled>Apply</button>
@@ -2813,6 +2814,7 @@ function requestBody() {
     account: $("account").value || null,
     write_video: $("w-video").checked, write_cfg: $("w-cfg").checked,
     write_launch: $("w-launch").checked, link_autoexec: $("w-autoexec").checked,
+    fix_scaling: $("w-scaling").checked,
   };
 }
 
@@ -5972,6 +5974,7 @@ const PREF_FIELDS = {
   write_cfg: () => $("w-cfg").checked,
   write_launch: () => $("w-launch").checked,
   link_autoexec: () => $("w-autoexec").checked,
+  fix_scaling: () => $("w-scaling").checked,
   stretch_mode: () => stretchMode,
   cfg_folder: () => $("cfg-folder").value.trim(),
   tab: () => activeTab,
@@ -5990,6 +5993,7 @@ function applyPrefs(ui) {
   const set = (id, v) => { if (v !== undefined && v !== null) $(id).checked = !!v; };
   set("w-video", ui.write_video); set("w-cfg", ui.write_cfg);
   set("w-launch", ui.write_launch); set("w-autoexec", ui.link_autoexec);
+  set("w-scaling", ui.fix_scaling);
   set("p-video", ui.patch_video);
   if (ui.stretch_mode) setStretchMode(
     { window: "borderless", desktop: "borderless", none: "fullscreen" }[ui.stretch_mode]

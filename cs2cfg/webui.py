@@ -183,6 +183,39 @@ def _plan_payload(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _scaling_step() -> Dict[str, Any]:
+    """Set the display to stretch a narrow mode, as part of applying settings.
+
+    Persisted rather than restored afterwards. The launcher borrows the setting
+    for one session and gives it back, because it changed something nobody
+    asked it to; this is somebody pressing Apply, so the change is theirs and
+    it stays. It also means the launcher then finds nothing to do.
+
+    The previous value is reported rather than backed up. Backups here are a
+    file-restore mechanism and this is a driver setting, so saying what it was
+    is the honest version of undo -- `cs2cfg scaling --mode aspect` puts it back.
+    """
+    from . import scaling
+
+    what = "Display scaling"
+    try:
+        result = scaling.ensure_fill(apply=True, persist=True)
+    except Exception as exc:                # never fail an apply over this
+        return {"ok": False, "what": what, "detail": str(exc)}
+
+    if result.get("already"):
+        return {"ok": True, "what": what,
+                "detail": "already full-screen; a stretched mode fills the panel"}
+    if not result.get("ok"):
+        return {"ok": False, "what": what,
+                "detail": result.get("error", "could not be read")}
+    if not result.get("changed"):
+        return {"ok": True, "what": what, "detail": result.get("note", "unchanged")}
+    return {"ok": True, "what": what,
+            "detail": f"{result.get('was', 'letterboxed')} -> full-screen, "
+                      f"so a stretched resolution has no black bars down the sides"}
+
+
 def _apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     state.refresh()
     user = state.user_for(body.get("account"))
@@ -242,6 +275,9 @@ def _apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
             steps.append({"ok": True, "what": "Steam launch options", "detail": action})
         except steam.SteamError as exc:
             steps.append({"ok": False, "what": "Steam launch options", "detail": str(exc)})
+
+    if body.get("fix_scaling", True):
+        steps.append(_scaling_step())
 
     backup.prune()
     return {"ok": True, "steps": steps, "backup": None if session.empty else session.stamp}
