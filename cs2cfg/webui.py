@@ -1191,7 +1191,7 @@ def _cfg_plugin_toggle(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _cfg_keys(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+def _cfg_keys(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     """What every key in the collection is bound to, ready to draw.
 
     Where a key runs one of the collection's own features, that is worth
@@ -1229,10 +1229,72 @@ def _cfg_keys(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
             "enabled": feature.enabled if feature else True,
         }
 
+    # What the game itself currently has. The configs say what would happen if
+    # they were exec'd; this says what is actually bound, and the two disagree
+    # more often than people expect -- a bind made in the settings menu never
+    # touches a config file, and a config that never ran describes a state that
+    # does not exist.
+    live_binds, differences, written, live_why = {}, [], None, ""
+    try:
+        from . import live as livecfg
+
+        state.refresh()
+        user = state.user_for(body.get("account"))
+        folder = user.video_cfg.parent
+        # Both sides keyed the same way. A config writing bind "e" and the
+        # game writing scancode8 mean the same key, and comparing them as
+        # written reports one key as two.
+        from . import defaults as keydefaults
+
+        # Every entry that stands for the same physical key, not just the
+        # first: a collection can bind one key under more than one spelling.
+        canon: Dict[str, list] = {}
+        for key in bound:
+            canon.setdefault(keydefaults.normalise(key), []).append(key)
+        configured = {keydefaults.normalise(k): b["command"]
+                      for k, b in bound.items()}
+        found = livecfg.summary(folder, configured)
+        live_binds = found["binds"]
+        differences = found["differences"]
+        written = found["written"]
+        for key, command in live_binds.items():
+            same = canon.get(key) or ([key] if key in bound else [])
+            if same:
+                for name in same:
+                    entry = bound[name]
+                    entry["live"] = command
+                    entry["agrees"] = livecfg._same_command(
+                        command, entry["command"])
+            else:
+                # Bound in the game and nowhere in the collection. Shown, or
+                # the board would call a key free that is not.
+                bound[key] = {
+                    "key": key, "label": keys.label(key), "command": command,
+                    "file": "", "line": 0, "comment": "", "shadowed": 0,
+                    "script": None, "script_id": None, "kind": None,
+                    "enabled": True, "live": command, "agrees": True,
+                    "game_only": True,
+                }
+        # A key the collection binds and the game does not. Easy to miss and
+        # the most telling of the three: it usually means the file never ran.
+        for key, entry in bound.items():
+            if (keydefaults.normalise(key) not in live_binds
+                    and not entry.get("game_only")):
+                entry["live"] = ""
+                entry["agrees"] = False
+    except Exception as exc:
+        # Reading the game's own files is a bonus, not a requirement -- the
+        # board still works from the configs alone -- but swallowing the reason
+        # is how a silent failure stays silent, so it is reported.
+        live_why = f"{type(exc).__name__}: {exc}"
+
     return {
         "bound": bound,
         "count": len(bound),
         "scripted": sum(1 for b in bound.values() if b["script"]),
+        "live": {"available": bool(live_binds), "count": len(live_binds),
+                 "written": written, "differences": differences,
+                 "why": live_why},
     }
 
 

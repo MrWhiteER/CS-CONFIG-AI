@@ -1372,6 +1372,20 @@
   .src-kind.empty, .src-kind.unknown { background: rgba(255, 255, 255, .07); color: var(--muted); }
   .src-note { font-size: 10.5px; color: var(--muted); }
 
+  /* A key the game and the config disagree about. Worth more than either
+     side's value alone, so it is marked where the key is drawn rather than
+     left in a panel nobody opens. */
+  .kb-key.adrift::after {
+    content: ""; position: absolute; top: 2px; right: 2px;
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--warn); box-shadow: 0 0 6px var(--warn);
+  }
+  .ms-zone.adrift .ms-face { stroke: var(--warn); stroke-width: 2.5; }
+  .kb-live { display: inline-flex; align-items: center; gap: 6px; }
+  .kb-live .dot.adrift { background: var(--warn); }
+  .kb-live .dot.ok { background: var(--accent); }
+  .adrift-code { color: var(--warn); }
+
   /* A desk you can arrange: each piece carries its own position and scale. */
   .kb-scene {
     position: relative; min-height: 430px; overflow: hidden;
@@ -4063,8 +4077,11 @@ function kbCap(spec) {
     : hit.script ? (hit.enabled ? "script" : "script off")
     : "bound";
   const picked = pickedKey && pickedKey.code === code ? " picked" : "";
+  // The game and the config disagreeing about a key matters more than what
+  // either of them says alone, so it is marked where the key is drawn.
+  const odd = hit && hit.agrees === false ? " adrift" : "";
 
-  return '<button class="kb-key ' + cls + picked + '" style="--w:' + w + '"' +
+  return '<button class="kb-key ' + cls + picked + odd + '" style="--w:' + w + '"' +
     ' data-kbcode="' + esc(code) + '" data-kblabel="' + esc(label) + '"' +
     ' title="' + esc(hit ? (hit.script || hit.command) : label + " \u2014 free") + '">' +
     '<span class="kb-cap">' + esc(label) + "</span>" +
@@ -4092,7 +4109,9 @@ function msZone(code, label, shape, labelAt, extra) {
     : "bound";
   const picked = pickedKey && pickedKey.code === code ? " picked" : "";
   const title = esc(hit ? (hit.script || hit.command) : label + " \u2014 free");
-  return '<g class="ms-zone ' + cls + picked + '" data-kbcode="' + esc(code) +
+  // Most disagreements land on the mouse, so it is marked here too.
+  const odd = hit && hit.agrees === false ? " adrift" : "";
+  return '<g class="ms-zone ' + cls + picked + odd + '" data-kbcode="' + esc(code) +
     '" data-kblabel="' + esc(label) + '"' + (extra || "") + ">" +
     "<title>" + label + " \u2014 " + title + "</title>" +
     shape +
@@ -4399,6 +4418,14 @@ function renderKeyboard() {
     '<span><i class="dot script"></i>one of your scripts</span>' +
     '<span><i class="dot bound"></i>bound to something else</span>' +
     '<span><i class="dot free"></i>free</span>' +
+    (keyData && keyData.live && keyData.live.available
+      ? '<span class="kb-live">' +
+        (keyData.live.differences.length
+          ? '<i class="dot adrift"></i>' + keyData.live.differences.length +
+            " differ from CS2"
+          : '<i class="dot ok"></i>matches CS2') +
+        "</span>"
+      : "") +
     "</div>" + kbDetail();
 
   ["board", "mouse"].forEach(kbPlace);
@@ -4420,6 +4447,19 @@ function kbDetail() {
     esc(hit.label) + "</div><div class=\"kb-detail-body\">" +
     '<div class="row"><span class="k">Runs</span><span class="v"><code>' +
     esc(hit.command) + "</code></span></div>" +
+    (hit.agrees === false
+      ? '<div class="row"><span class="k">In CS2</span>' +
+        '<span class="v"><code class="adrift-code">' +
+        esc(hit.live || "nothing") + "</code></span></div>" +
+        '<div class="row"><span class="k"></span><span class="v sub">' +
+        "The game has this key set to something else. A bind made in the " +
+        "game's own menu never reaches a config, and a config that has not " +
+        "been exec'd has not taken effect.</span></div>"
+      : "") +
+    (hit.game_only
+      ? '<div class="row"><span class="k">Note</span><span class="v sub">' +
+        "Bound in CS2, but nothing in this collection binds it.</span></div>"
+      : "") +
     (hit.script
       ? '<div class="row"><span class="k">Script</span><span class="v">' +
         esc(hit.script) + ' <span class="plug-kind">' + esc(hit.kind || "") +

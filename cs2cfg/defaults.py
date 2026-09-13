@@ -36,6 +36,14 @@ _NAMED = {
     "alt": 226, "ralt": 230,
     "-": 45, "=": 46, "[": 47, "]": 48, "\\": 49, ";": 51, "'": 52,
     "`": 53, ",": 54, ".": 55, "/": 56,
+    # The keypad, which CS2 writes as KP_*. Without these the same bind reads
+    # as two: once under the game's name and once under the config's scancode.
+    "kp_slash": 84, "kp_multiply": 85, "kp_minus": 86, "kp_plus": 87,
+    "kp_enter": 88, "kp_end": 89, "kp_downarrow": 90, "kp_pgdn": 91,
+    "kp_leftarrow": 92, "kp_5": 93, "kp_rightarrow": 94, "kp_home": 95,
+    "kp_uparrow": 96, "kp_pgup": 97, "kp_ins": 98, "kp_del": 99,
+    "kp_1": 89, "kp_2": 90, "kp_3": 91, "kp_4": 92,
+    "kp_6": 94, "kp_7": 95, "kp_8": 96, "kp_9": 97, "kp_0": 98,
 }
 
 # Mouse and wheel are not HID keyboard usages; the engine names them directly
