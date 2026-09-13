@@ -24,7 +24,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Tuple
 
-from . import __version__, backup, cfglang, emit, steam, window
+from . import __version__, backup, cfglang, emit, profiles, steam, window
 from .hardware import Machine, ProbeError, detect
 from .kb import KnowledgeBase
 from .profile import build_profile, plan_launch_options
@@ -318,12 +318,103 @@ def _play_stop(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     return {"ok": True, "closed": state.launch.stop(close_game=close_game, force=force)}
 
 
+def _active_account(state: State) -> Optional[str]:
+    """Which account this window is showing.
+
+    An explicit choice wins -- somebody looking at another account's setup
+    should not have it swapped out from under them -- and otherwise it follows
+    whichever account Steam is signed in to.
+    """
+    from . import whoami
+    from .cli import load_prefs
+
+    state.refresh()
+    if state.steam_root is None:
+        return None
+    known = [u.account_id for u in state.users]
+    chosen = str(load_prefs().get("ui", {}).get("account") or "")
+    if chosen and chosen in known:
+        return chosen
+    found, _how = whoami.current(state.steam_root, known)
+    return found
+
+
+def _profile(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Who this window is configuring, and who else it could be.
+
+    Read-only. The list is every account on this machine that owns CS2, so the
+    page can offer a switch without another round trip.
+    """
+    from . import whoami
+    from .cli import load_prefs, save_prefs
+
+    state.refresh()
+    if state.steam_root is None:
+        return {"ok": True, "account": None, "accounts": [],
+                "how": "", "steam": False}
+
+    known = [u.account_id for u in state.users]
+    records = whoami.login_records(state.steam_root)
+    signed_in, how = whoami.current(state.steam_root, known)
+
+    prefs = load_prefs()
+    chosen = str(prefs.get("ui", {}).get("account") or "")
+    active = chosen if chosen in known else signed_in
+
+    # A first run has one account's settings sitting in the shared half.
+    if profiles.migrate(prefs, active):
+        prefs.setdefault("ui", {})["account"] = active
+        save_prefs(prefs)
+
+    listed = []
+    for user in state.users:
+        info = records.get(user.account_id, {})
+        listed.append({
+            "account": user.account_id,
+            "name": info.get("persona") or user.persona or user.account_id,
+            "login": info.get("account_name") or "",
+            "active": user.account_id == active,
+            "signed_in": user.account_id == signed_in,
+        })
+
+    return {"ok": True, "account": active, "accounts": listed,
+            "how": how if active == signed_in else "chosen here",
+            "following": not chosen, "steam": True}
+
+
+def _profile_use(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Look at a particular account, or go back to following Steam."""
+    from .cli import load_prefs, save_prefs
+
+    state.refresh()
+    known = [u.account_id for u in state.users]
+    wanted = str(body.get("account") or "")
+
+    prefs = load_prefs()
+    prefs.setdefault("ui", {})
+    if body.get("follow") or not wanted:
+        prefs["ui"].pop("account", None)
+    elif wanted in known:
+        prefs["ui"]["account"] = wanted
+    else:
+        return {"ok": False, "error": f"no CS2 account here with id {wanted}"}
+    save_prefs(prefs)
+
+    # The folder, the scan and the watcher all belonged to the account before.
+    state.cfg_scan = None
+    state.ingame = None
+    return _profile(state, {})
+
+
 def _save_prefs(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     """Remember what the user chose, so the next run starts where they left off."""
     from .cli import load_prefs, save_prefs
 
     prefs = load_prefs()
     prefs.setdefault("ui", {})
+    # Which account these belong to, so one account's folder is never handed
+    # to another. See cs2cfg/profiles.py for the split.
+    account = _active_account(_state)
     # An allowlist rather than a blind update, so the page cannot write
     # arbitrary keys into the config file. Anything the UI remembers has to be
     # named here too, or it is silently dropped.
@@ -333,11 +424,10 @@ def _save_prefs(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         "cfg_folder", "tab", "favourites", "mouse_shape", "kb_layout", "kb_shown",
         "update_auto_download", "update_skip", "rail_width",
     )
-    for key in allowed:
-        if key in body:
-            prefs["ui"][key] = body[key]
+    changes = {key: body[key] for key in allowed if key in body}
+    profiles.remember(prefs, account, changes)
     save_prefs(prefs)
-    return {"ok": True, "saved": prefs["ui"]}
+    return {"ok": True, "saved": profiles.ui_for(prefs, account)}
 
 
 def _history(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -1665,6 +1755,8 @@ def make_handler(state: State):
         "/api/gpu": _gpu,
         "/api/display/refresh": _display_refresh,
         "/api/env": _environment,
+        "/api/profile": _profile,
+        "/api/profile/use": _profile_use,
         "/api/update": _update_status,
         "/api/update/check": _update_check,
         "/api/update/download": _update_download,
@@ -1752,9 +1844,17 @@ def make_handler(state: State):
                 })
                 return
             if path == "/api/prefs":
-                from .cli import load_prefs
+                from .cli import load_prefs, save_prefs
 
-                self._send_json({"ok": True, "ui": load_prefs().get("ui", {})})
+                account = _active_account(state)
+                prefs = load_prefs()
+                # A first run still has everything in the shared half; move it
+                # onto the account it was describing before handing it over.
+                if profiles.migrate(prefs, account):
+                    prefs.setdefault("ui", {})["account"] = account
+                    save_prefs(prefs)
+                self._send_json({"ok": True,
+                                 "ui": profiles.ui_for(prefs, account)})
                 return
             if path == "/api/scan":
                 try:
