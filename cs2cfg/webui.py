@@ -1732,11 +1732,34 @@ def _play_fix(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _gpu(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
-    """Driver profile and per-monitor display modes. Reads only."""
-    from . import displays, nvidia
+    """Driver profile, per-monitor display modes and scaling. Reads only."""
+    from . import displays, nvidia, scaling
 
     return {"nvidia": nvidia.as_dict(nvidia.probe(("cs2.exe", "csgo.exe"))),
-            "displays": displays.summary()}
+            "displays": displays.summary(),
+            "scaling": scaling.summary()}
+
+
+def _display_fill(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Stop a stretched mode being letterboxed down the sides.
+
+    Without ``apply`` the change is only validated against the driver, so the
+    page can say whether it would be accepted without changing anything. With
+    ``persist`` it is written into the driver's own store and outlives the
+    session; without, it lasts until something sets it back -- which is what a
+    launch does, since it restores the scaling along with the desktop mode.
+    """
+    from . import scaling
+
+    raw = body.get("display_id")
+    display_id = None
+    if raw not in (None, ""):
+        try:
+            display_id = int(raw, 0) if isinstance(raw, str) else int(raw)
+        except (TypeError, ValueError):
+            raise ValueError("display_id must be a number")
+    return scaling.ensure_fill(display_id, apply=bool(body.get("apply")),
+                               persist=bool(body.get("persist")))
 
 
 def _display_refresh(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -1930,6 +1953,7 @@ def make_handler(state: State):
         "/api/cfg/behaviour": _cfg_behaviour_preview,
         "/api/gpu": _gpu,
         "/api/display/refresh": _display_refresh,
+        "/api/display/fill": _display_fill,
         "/api/env": _environment,
         "/api/profile": _profile,
         "/api/profile/use": _profile_use,
@@ -2011,12 +2035,13 @@ def make_handler(state: State):
                 self._send_json(payload)
                 return
             if path == "/api/gpu":
-                from . import displays, nvidia
+                from . import displays, nvidia, scaling
 
                 self._send_json({
                     "ok": True,
                     "nvidia": nvidia.as_dict(nvidia.probe(("cs2.exe", "csgo.exe"))),
                     "displays": displays.summary(),
+                    "scaling": scaling.summary(),
                 })
                 return
             if path == "/api/prefs":

@@ -599,6 +599,92 @@ def cmd_use(ctx: Context) -> int:
     return 0
 
 
+# The scaling modes worth naming on a command line. The driver knows more, but
+# these are the three the NVIDIA Control Panel offers and the only ones that
+# mean anything for a stretched resolution.
+SCALING_MODES = {
+    "full-screen": 2,
+    "aspect": 5,
+    "centred": 3,
+}
+
+
+def cmd_scaling(ctx: Context) -> int:
+    """Report, and optionally fix, the black bars beside a stretched mode."""
+    from . import scaling
+
+    out = ctx.out
+    args = ctx.args
+    report = scaling.read()
+
+    out.header("Display scaling")
+    if not report.available:
+        print(out.dim(f"  {report.reason}"))
+        print(out.dim("  On AMD or Intel the same setting lives in the driver's own"))
+        print(out.dim("  control panel, under scaling or display options."))
+        return 1
+
+    for screen in report.screens:
+        tag = out.green("fills the screen") if screen.fills else out.yellow(screen.name)
+        where = " (primary)" if screen.primary else ""
+        print(f"  0x{screen.display_id:08X}{where:<10} {screen.width}x{screen.height}"
+              f" @ {screen.refresh} Hz   {tag}")
+
+    # --mode is the way back. --fix only ever sets full-screen, so without this
+    # the command could put a display into a state it could not take it out of.
+    if args.mode is not None:
+        wanted = SCALING_MODES[args.mode]
+        print()
+        changed = 0
+        for screen in report.screens:
+            if args.display and f"0x{screen.display_id:08X}".lower() != args.display.lower():
+                continue
+            result = scaling.set_scaling(screen.display_id, wanted, apply=True,
+                                         persist=not args.session_only)
+            if not result.get("ok"):
+                print(f"  {out.red('no')}  0x{screen.display_id:08X}"
+                      f" {result.get('error', 'nothing changed')}")
+            elif result.get("changed"):
+                changed += 1
+                print(f"  {out.green('ok')}  0x{screen.display_id:08X} {screen.name}"
+                      f" -> {args.mode}")
+            else:
+                print(out.dim(f"  --  0x{screen.display_id:08X} already {args.mode}"))
+        return 0 if changed else 1
+
+    if report.all_fill:
+        print()
+        print(out.dim("  A stretched mode will reach the edges on every screen."))
+        return 0
+
+    print()
+    print(out.yellow("  A mode narrower than the panel is letterboxed on the screens above:"))
+    print(out.dim("  the picture sits in the middle with a black bar down each side."))
+
+    if not args.fix:
+        print(out.dim("  fix it with:  cs2cfg scaling --fix"))
+        return 0
+
+    changed = 0
+    for screen in report.screens:
+        if screen.fills:
+            continue
+        result = scaling.set_scaling(screen.display_id, scaling.PREFERRED,
+                                     apply=True, persist=not args.session_only)
+        if result.get("ok") and result.get("changed"):
+            changed += 1
+            print(f"  {out.green('ok')}  0x{screen.display_id:08X} {screen.name}"
+                  f" -> full-screen")
+        else:
+            print(f"  {out.red('no')}  0x{screen.display_id:08X}"
+                  f" {result.get('error', 'nothing changed')}")
+
+    if changed and args.session_only:
+        print(out.dim("  not written to the driver's store; it lasts until something"
+                      " sets it back"))
+    return 0 if changed else 1
+
+
 def cmd_stretch(ctx: Context) -> int:
     """Borderless and stretched-borderless window control."""
     from . import window
@@ -644,8 +730,8 @@ def cmd_stretch(ctx: Context) -> int:
     print(f"  process     {args.process}")
     if change_display:
         print(out.dim("  The desktop switches to that mode, and the driver's scaler stretches it"))
-        print(out.dim("  across the panel. Set GPU scaling to full-screen in the NVIDIA or AMD"))
-        print(out.dim("  control panel, or the panel will letterbox instead of filling."))
+        print(out.dim("  across the panel. Scaling has to be full-screen or the panel letterboxes"))
+        print(out.dim("  the narrow mode -- a black bar down each side; check with: cs2cfg scaling"))
     else:
         print(out.dim("  Frame removed and window sized to the monitor. The game renders at the"))
         print(out.dim("  monitor's resolution, so this is borderless but not stretched."))
@@ -655,6 +741,18 @@ def cmd_stretch(ctx: Context) -> int:
         window.watch(width, height, args.process, args.refresh, change_display,
                      on_event=lambda message: print(f"  {message}"))
         return 0
+
+    if change_display:
+        # Same order as the launcher: make the display fill before the mode
+        # lands on it, so the stretch is stretched from the first frame.
+        from . import scaling
+
+        filled = scaling.ensure_fill(apply=True)
+        if filled.get("changed"):
+            print(f"  {out.green('ok')}  scaling {filled.get('was', 'letterboxed')}"
+                  f" -> full-screen (no black bars)")
+        elif not filled.get("ok") and not filled.get("already"):
+            print(out.dim(f"  scaling not checked: {filled.get('error', 'unknown')}"))
 
     try:
         result = window.apply_stretch(width, height, args.process, args.refresh, change_display)
@@ -1261,6 +1359,27 @@ def build_parser() -> argparse.ArgumentParser:
     stretch.add_argument("--list", action="store_true",
                          help="list matching windows ('--process *' for all)")
 
+    scaling_cmd = sub.add_parser(
+        "scaling", parents=[shared],
+        help="check whether a stretched mode fills the screen or gets black bars",
+        description=(
+            "A stretched resolution is a narrow desktop mode scaled back out by the "
+            "GPU. Whether that scale fills the panel or preserves the aspect ratio is "
+            "a driver setting, and on 'aspect ratio' the picture sits in the middle "
+            "with a black bar down each side. This reports it, and --fix sets it to "
+            "full-screen."
+        ),
+    )
+    scaling_cmd.add_argument("--fix", action="store_true",
+                             help="set every letterboxed screen to full-screen scaling")
+    scaling_cmd.add_argument("--session-only", action="store_true",
+                             help="do not write the change to the driver's store")
+    scaling_cmd.add_argument("--mode", choices=sorted(SCALING_MODES),
+                             help="set this scaling mode instead; 'aspect' is the one "
+                                  "that letterboxes, and is how to undo --fix")
+    scaling_cmd.add_argument("--display",
+                             help="limit --mode to one display id, as printed above")
+
     shortcut = sub.add_parser(
         "shortcut", parents=[shared],
         help="create a desktop shortcut that launches CS2 seamlessly through Steam",
@@ -1369,6 +1488,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         "play": cmd_play,
         "shortcut": cmd_shortcut,
         "stretch": cmd_stretch,
+        "scaling": cmd_scaling,
         "web": cmd_web,
         "desktop": cmd_desktop,
         "cfg": cmd_cfg,

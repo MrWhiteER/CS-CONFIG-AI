@@ -272,6 +272,44 @@ def wait_for_exit(
     return True
 
 
+def _make_it_fill(report: Callable[[str, str], None]) -> Optional[Tuple[int, int]]:
+    """Set the display to stretch a narrow mode rather than letterbox it.
+
+    Returns ``(display_id, previous)`` when something was changed, so the
+    caller can put it back on the way out, and ``None`` when there was nothing
+    to do -- which is the common case, because a display already set to
+    full-screen is left completely alone.
+
+    Never fatal. A machine with an AMD or Intel GPU has no NVAPI to call and a
+    stretched launch there is still perfectly good; it just cannot be checked
+    from here, so it says so once and gets out of the way.
+    """
+    try:
+        from . import scaling
+    except Exception:                       # pragma: no cover - import guard
+        return None
+
+    try:
+        result = scaling.ensure_fill(apply=True)
+    except Exception as exc:                # never let this stop a launch
+        report(f"  could not check display scaling: {exc}", "dim")
+        return None
+
+    if result.get("already"):
+        return None
+    if not result.get("ok"):
+        report(f"  {result.get('error', 'display scaling could not be read')}", "dim")
+        report("  if the picture has black bars down the sides, set NVIDIA Control Panel"
+               " -> Adjust desktop size and position -> Full-screen", "dim")
+        return None
+    if not result.get("changed"):
+        return None
+
+    report(f"  scaling {result.get('was', 'letterboxed')} -> full-screen "
+           f"(no black bars down the sides)", "good")
+    return result["display_id"], result["previous"]
+
+
 def play(
     user: steam.SteamUser,
     width: int,
@@ -331,8 +369,15 @@ def play(
     #    takes the mode itself, so switching the desktop first would just be
     #    undone by the game.
     mode_before: Optional[Tuple[int, int, int]] = None
+    scaling_before: Optional[Tuple[int, int]] = None
     if stretch_mode == "borderless":
         mark("switching")
+        # Before the mode switch, not after. The narrow mode is only stretched
+        # if the driver scales it out to the panel; left on "aspect ratio" the
+        # desktop shrinks into the middle of the screen with a black bar down
+        # each side, which looks like the stretch simply failed. Doing it first
+        # means the mode lands on a display already set to fill.
+        scaling_before = _make_it_fill(report)
         mode_before = window.current_mode()
         if (mode_before[0], mode_before[1]) == (width, height):
             report(f"  desktop is already {width}x{height}", "dim")
@@ -475,6 +520,22 @@ def play(
             except window.WindowError as exc:
                 report(f"  could not restore the desktop mode: {exc}", "bad")
                 report(f"  set it back manually: {mode_before[0]}x{mode_before[1]} @ {mode_before[2]} Hz", "dim")
+        if scaling_before is not None:
+            # The scaling was only changed to make this session fill the screen.
+            # Leaving it changed would quietly alter how every other program
+            # renders a non-native mode, so it goes back with the desktop.
+            display_id, previous = scaling_before
+            try:
+                from . import scaling as _scaling
+                put_back = _scaling.set_scaling(display_id, previous, apply=True)
+                if put_back.get("ok"):
+                    report(f"  display scaling restored to "
+                           f"{_scaling.NAMES.get(previous, previous)}", "good")
+                else:
+                    report(f"  could not restore display scaling: "
+                           f"{put_back.get('error', 'unknown reason')}", "warn")
+            except Exception as exc:
+                report(f"  could not restore display scaling: {exc}", "warn")
 
 
 class LaunchSession:

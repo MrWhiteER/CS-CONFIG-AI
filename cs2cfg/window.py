@@ -455,9 +455,12 @@ def set_mode(width: int, height: int, refresh: int = 0, test_only: bool = False,
              persist: bool = False) -> None:
     """Switch the desktop to a mode. This is what produces the stretch.
 
-    The driver's scaler does the stretching, so GPU scaling must be set to
-    full-screen in the NVIDIA or AMD control panel or the panel will letterbox
-    the narrow mode instead of filling.
+    The driver's scaler does the stretching, so GPU scaling has to be set to
+    full-screen or the panel letterboxes the narrow mode instead of filling it
+    -- a black bar down each side, which looks like the stretch failed.
+    :func:`cs2cfg.scaling.ensure_fill` sets that, and the launcher calls it
+    before coming here. Anything calling ``set_mode`` on its own should too, or
+    say why it has not.
 
     By default the change is *temporary*: ``CDS_FULLSCREEN`` without
     ``CDS_UPDATEREGISTRY`` tells Windows this mode belongs to the calling

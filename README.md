@@ -500,11 +500,35 @@ cs2cfg.bat stretch --list             show what windows are open
 ### Stretching
 
 The desktop switches to the narrow mode for as long as you play, and the
-graphics driver scales it across the panel. GPU scaling has to be set to
-full-screen in the NVIDIA or AMD control panel, or you get letterboxing instead
-of filling. The desktop is put back when you quit -- including on Ctrl+C or a
-crash, because the mode is set without `CDS_UPDATEREGISTRY`, so Windows reverts
-it if the process dies.
+graphics driver scales it across the panel. The desktop is put back when you
+quit -- including on Ctrl+C or a crash, because the mode is set without
+`CDS_UPDATEREGISTRY`, so Windows reverts it if the process dies.
+
+### Black bars down the sides
+
+Whether that scale fills the panel or keeps the aspect ratio is a driver
+setting, not part of the mode switch. Left on *aspect ratio* the narrow desktop
+sits in the middle of the screen with a black bar down each side, which looks
+like the stretch simply failed.
+
+A launch now sets it to full-screen first and puts it back on the way out,
+alongside the desktop mode. Standalone:
+
+```
+cs2cfg.bat scaling                    report what each screen does
+cs2cfg.bat scaling --fix              set every letterboxed screen to full-screen
+cs2cfg.bat scaling --mode aspect      put it back
+```
+
+This goes through NVAPI's display configuration, which -- unlike the 3D profile
+database the Graphics panel reads -- publishes what its values mean, so nothing
+is guessed. The whole configuration is read, one field is changed and the rest
+goes back exactly as the driver handed it over, and the change is validated
+with `VALIDATE_ONLY` before it is committed, the same way a display mode is
+probed with `CDS_TEST`.
+
+On AMD and Intel there is no NVAPI to call, so the app says so and leaves the
+setting to the driver's own control panel.
 
 A second mode used to resize only the game window and leave the desktop native.
 It depended on CS2 keeping its swapchain at the old size so the present would

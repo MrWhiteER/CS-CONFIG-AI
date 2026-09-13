@@ -2467,6 +2467,36 @@ function renderDisplays(d) {
   }).join("");
 }
 
+function renderScaling(d) {
+  if (!d || !d.available) {
+    return '<div class="subcat">Stretched resolution</div>' +
+      '<span class="sub">' + esc(d && d.reason || "Scaling could not be read.") +
+      " On AMD or Intel the same setting lives in the driver’s own control " +
+      "panel, under scaling or display options.</span>";
+  }
+  const rows = (d.displays || []).map(s => {
+    const state = s.fills
+      ? '<span class="flag">fills the screen</span>'
+      : '<span class="flag warn">' + esc(s.name) + "</span>";
+    const control = s.fills
+      ? '<span class="sub">no black bars</span>'
+      : '<button class="btn small" data-fill-display="' + esc(s.id) + '">Fix</button>';
+    return '<div class="setting"><div class="top"><div class="name"><b>' +
+      esc(s.width + "×" + s.height + " @ " + s.refresh + " Hz") + "</b>" +
+      (s.primary ? '<span class="flag">primary</span>' : "") + state +
+      '<br><span class="sub mono">' + esc(s.id) + "</span></div>" +
+      '<div class="ctl">' + control + "</div></div>" +
+      '<div class="src">' + (s.fills
+        ? "A narrow mode is scaled out to the whole panel, which is what makes a " +
+          "stretched resolution actually stretch."
+        : "A mode narrower than this panel is letterboxed: the picture sits in the " +
+          "middle with a black bar down each side. Launching stretched from here " +
+          "fixes this automatically and puts it back on exit — Fix makes it " +
+          "permanent.") + "</div></div>";
+  }).join("");
+  return '<div class="subcat">Stretched resolution</div>' + rows;
+}
+
 function renderProfile(p, caption) {
   if (!p) return "";
   const named = p.settings.filter(s => s.known);
@@ -2541,7 +2571,8 @@ function renderGpu() {
   if (!box || !gpuData) return;
   const nv = gpuData.nvidia || {};
 
-  let html = '<div class="subcat">Displays</div>' + renderDisplays(gpuData.displays);
+  let html = '<div class="subcat">Displays</div>' + renderDisplays(gpuData.displays) +
+    renderScaling(gpuData.scaling);
 
   if (!nv.available) {
     html += '<div class="subcat">Graphics driver</div>' +
@@ -2583,6 +2614,31 @@ async function loadGpu() {
       esc(String(err && err.message || err)) + "</span>";
   }
 }
+
+document.addEventListener("click", async e => {
+  const button = e.target.closest("[data-fill-display]");
+  if (!button) return;
+  const id = button.dataset.fillDisplay;
+  button.disabled = true;
+  const said = button.textContent;
+  button.textContent = "Fixing…";
+  try {
+    // Validated by the driver first, the same way a display mode is tested
+    // before it is committed.
+    const trial = await api("/api/display/fill", { display_id: id, apply: false });
+    if (!trial.ok) throw new Error(trial.error || "the driver refused full-screen scaling");
+    const done = await api("/api/display/fill",
+                           { display_id: id, apply: true, persist: true });
+    if (!done.ok) throw new Error(done.error || "could not apply");
+    status(done.note + (done.was ? "  (was " + done.was + ")" : ""));
+    await loadGpu();
+  } catch (err) {
+    status("Scaling unchanged: " + (err && err.message || err), true);
+  } finally {
+    button.disabled = false;
+    button.textContent = said;
+  }
+});
 
 document.addEventListener("click", async e => {
   const button = e.target.closest("[data-apply-display]");
@@ -6367,8 +6423,9 @@ const STRETCH_DESC = {
   borderless: "Borderless windowed, with the display switched to CS2's resolution and "
             + "scaled across the panel by the GPU. The game never owns the display mode, "
             + "so alt-tab does not have to renegotiate it \u2014 which is the black screen "
-            + "you get on multiple monitors. Needs GPU scaling set to full-screen in the "
-            + "NVIDIA or AMD control panel. Your desktop is put back when you quit.",
+            + "you get on multiple monitors. On NVIDIA the scaling is set to full-screen "
+            + "first, so the picture reaches the edges instead of sitting between black "
+            + "bars. Your desktop and its scaling are both put back when you quit.",
   fullscreen: "Exclusive fullscreen, the way CS2 runs out of the box. Nothing is stretched "
             + "and the desktop is not touched. The game owns the display mode, so leaving "
             + "and returning makes Windows renegotiate it \u2014 the pause you see when "
