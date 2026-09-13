@@ -3730,10 +3730,44 @@ function syncCode() {
   if (scroll && gutter) gutter.style.transform = "translateY(" + -scroll.scrollTop + "px)";
 }
 
+// The scan every config view needs. Kept in one place because three tabs
+// depend on it and none of them used to ask: the folder was chosen, the tabs
+// said "scan a configuration folder first", and the way to fix it was to
+// visit a fourth tab that happened to scan on the way in.
+//
+// The folder it last scanned is remembered rather than a bare flag, so
+// changing folder -- or switching Steam account -- scans again instead of
+// showing the previous one's files.
+let scannedFolder = null;
+
+async function ensureScan(force) {
+  const folder = $("cfg-folder") ? $("cfg-folder").value.trim() : "";
+  if (!folder) return false;
+  if (!force && scannedFolder === folder) return true;
+  try {
+    await api("/api/cfg/scan", { folder });
+    scannedFolder = folder;
+    return true;
+  } catch (err) {
+    scannedFolder = null;
+    return false;
+  }
+}
+
+function noFolderYet(box, what) {
+  if (!box) return;
+  box.innerHTML = '<span class="sub">' +
+    ($("cfg-folder") && $("cfg-folder").value.trim()
+      ? "That folder could not be read, so there is no " + what + " to show."
+      : "No config folder chosen yet — pick one on the Settings tab.") +
+    "</span>";
+}
+
 async function loadTree(force) {
   const box = $("files-tree");
   if (treeData && !force) { renderTree(); return; }
   if (box) box.innerHTML = '<div class="sub" style="padding:10px"><span class="spin"></span> Reading&hellip;</div>';
+  if (!await ensureScan(force)) { noFolderYet(box, "files"); return; }
   try {
     treeData = await api("/api/cfg/tree", {});
     const t = treeData.totals;
@@ -3947,6 +3981,7 @@ async function loadPlugins(force) {
   const box = $("plug-out");
   if (plugData && !force) { renderPlugins(); return; }
   if (box) box.innerHTML = '<span class="sub"><span class="spin"></span> Reading&hellip;</span>';
+  if (!await ensureScan(force)) { noFolderYet(box, "scripts"); return; }
   try {
     plugData = await api("/api/cfg/plugins", {});
     renderPlugins();
@@ -4630,6 +4665,7 @@ async function loadKeyboard(force) {
   const box = $("kb-out");
   if (keyData && !force) { renderKeyboard(); return; }
   if (box) box.innerHTML = '<span class="sub"><span class="spin"></span> Reading&hellip;</span>';
+  if (!await ensureScan(force)) { noFolderYet(box, "binds"); return; }
   try {
     keyData = await api("/api/cfg/keys", {});
     renderKeyboard();
@@ -5129,6 +5165,7 @@ async function loadCs2Settings(force, keepEdits) {
         return;
       }
       renderCfg(await api("/api/cfg/scan", { folder }));
+      scannedFolder = folder;
     }
     cs2Data = await api("/api/cfg/settings", { account: $("account").value || null });
     if (!keepEdits) cs2Edits.clear();
@@ -5632,7 +5669,8 @@ async function reloadForAccount() {
     applyPrefs(ui);
   } catch (err) { /* a first run has nothing stored yet */ }
   cs2Data = null; gpuData = null; keyData = null; cfgSettings = null;
-  pickedKey = null; kbOptions = null;
+  pickedKey = null; kbOptions = null; treeData = null; plugData = null;
+  scannedFolder = null;
   const folder = $("cfg-folder") ? $("cfg-folder").value.trim() : "";
   srcFiles = null;
   if (folder) {
@@ -6213,7 +6251,10 @@ $("cfg-scan").addEventListener("click", async () => {
   busy("Scanning configuration…");
   try {
     renderCfg(await api("/api/cfg/scan", { folder }));
+    scannedFolder = folder;
     await loadCfgSettings();
+    // A deliberate rescan means the other tabs are showing stale reads.
+    treeData = plugData = keyData = null;
     status("Scan complete. Nothing has been written.");
     rememberPrefs();
   } catch (e) { status("Scan failed: " + esc(e.message), true); }
