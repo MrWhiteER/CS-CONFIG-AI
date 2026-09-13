@@ -67,8 +67,10 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Shortcuts:"
 
 [Files]
-Source: "dist\CS2 Launcher.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "dist\cs2cfg.exe";       DestDir: "{app}"; Flags: ignoreversion
+; The whole built folder. A folder build rather than one file, because the
+; one-file bootloader validates its parent process and anti-cheat software
+; blocks that query -- see cs2cfg.spec.
+Source: "dist\cs2-autoconfig\*"; DestDir: "{app}";   Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#AppName}";              Filename: "{app}\{#AppExe}"

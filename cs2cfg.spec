@@ -1,9 +1,16 @@
-# PyInstaller spec for a portable, single-file cs2cfg.exe.
+# PyInstaller spec: a folder holding both executables and what they need.
 #
-# One file, no installer, no Python needed on the target machine. Everything
-# read-only is bundled; everything writable goes beside the exe at runtime (see
-# cs2cfg/paths.py), so the whole tool travels on a USB stick and leaves nothing
-# on the machine it ran on.
+# A folder rather than one file, deliberately. A one-file build unpacks itself
+# to a temporary directory at every launch and guards that directory by asking
+# the operating system for its parent process's executable path. FACEIT's
+# anti-cheat blocks that query, so the check cannot complete and the bootloader
+# refuses to start -- "Security validation failure: failed to obtain executable
+# path for parent process!" -- with nothing actually wrong with the program.
+#
+# A folder build extracts nothing, so there is no directory to guard and no
+# check to fail, and it starts faster besides. Everything writable still goes
+# beside the executables at runtime (see cs2cfg/paths.py), so the whole tool
+# still travels on a USB stick and leaves nothing behind.
 
 import pathlib
 
@@ -83,15 +90,29 @@ common = dict(
 )
 
 app = EXE(
-    pyz, a.scripts, a.binaries, a.zipfiles, a.datas, [],
+    pyz, a.scripts, [],
+    exclude_binaries=True,
     name="CS2 Launcher",
     console=False,
     **common,
 )
 
 cli = EXE(
-    pyz, a.scripts, a.binaries, a.zipfiles, a.datas, [],
+    pyz, a.scripts, [],
+    exclude_binaries=True,
     name="cs2cfg",
     console=True,
     **common,
+)
+
+# Both executables and everything they need, in one folder. The name is what
+# the folder under dist/ is called; the installer and the portable zip both
+# take its contents rather than the folder itself, so the program still sits
+# directly in its install directory.
+COLLECT(
+    app, cli,
+    a.binaries, a.zipfiles, a.datas,
+    strip=False,
+    upx=False,
+    name="cs2-autoconfig",
 )

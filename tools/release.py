@@ -42,6 +42,8 @@ INIT = ROOT / "cs2cfg" / "__init__.py"
 UPDATES = ROOT / "cs2cfg" / "updates.py"
 DIST = ROOT / "dist"
 ISS = ROOT / "installer.iss"
+# The folder PyInstaller collects into, and the two executables inside it.
+BUILT = DIST / "cs2-autoconfig"
 BINARIES = ("CS2 Launcher.exe", "cs2cfg.exe")
 
 # Where Inno Setup's compiler lands. Looked for rather than assumed to be on
@@ -234,18 +236,20 @@ def _report(path: Path) -> Path:
 
 
 def build_archive(version: str) -> Path:
-    """The portable edition: both executables, at the root of a zip."""
-    missing = [name for name in BINARIES if not (DIST / name).is_file()]
+    """The portable edition: the built folder's contents, at the zip's root."""
+    missing = [name for name in BINARIES if not (BUILT / name).is_file()]
     if missing:
         raise Stop("the build did not produce: " + ", ".join(missing))
 
     archive = DIST / f"cs2-autoconfig-{version}-win64.zip"
     archive.unlink(missing_ok=True)
-    # Stored at the root of the zip, because the updater copies the unpacked
-    # contents straight over the folder the executables live in.
+    # The folder's contents rather than the folder, so unpacking the zip gives
+    # the program directly -- and so the updater can copy what it unpacks
+    # straight over the folder the executables already live in.
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as bundle:
-        for name in BINARIES:
-            bundle.write(DIST / name, arcname=name)
+        for item in sorted(BUILT.rglob("*")):
+            if item.is_file():
+                bundle.write(item, arcname=str(item.relative_to(BUILT)))
     return _report(archive)
 
 
