@@ -113,6 +113,76 @@
   input[type=number] { width: 92px; }
   select { width: auto; }
 
+
+  /* "Optimise for" as one ball on a track. Three stops, because there are
+     three profiles -- a continuous slider would imply blends that do not
+     exist. Dragging settles on the nearest. */
+  .dial { padding: 6px 2px 0; outline: none; }
+  .dial-track {
+    position: relative; height: 30px; margin: 0 11px;
+    display: flex; align-items: center;
+  }
+  .dial-track::before {
+    content: ""; position: absolute; left: 0; right: 0; height: 5px;
+    border-radius: 3px; background: var(--line);
+  }
+  .dial-fill {
+    position: absolute; left: 50%; width: 0; height: 5px; border-radius: 3px;
+    background: linear-gradient(90deg, var(--accent-deep), var(--accent));
+    transition: left .18s ease, width .18s ease;
+  }
+  .dial.dragging .dial-fill, .dial.dragging .dial-ball { transition: none; }
+  .dial-stop {
+    position: absolute; width: 13px; height: 13px; margin-left: -6px; padding: 0;
+    border-radius: 50%; border: 2px solid var(--line);
+    background: var(--panel); cursor: pointer;
+  }
+  .dial-stop:nth-of-type(1) { left: 0; }
+  .dial-stop:nth-of-type(2) { left: 50%; }
+  .dial-stop:nth-of-type(3) { left: 100%; }
+  .dial-ball {
+    position: absolute; left: 50%; width: 22px; height: 22px; margin-left: -11px;
+    border-radius: 50%; background: var(--accent);
+    border: 2px solid var(--panel);
+    box-shadow: 0 2px 9px rgba(0, 0, 0, .45);
+    cursor: grab; touch-action: none;
+    transition: left .18s ease;
+  }
+  .dial.dragging .dial-ball { cursor: grabbing; transform: scale(1.12); }
+  .dial:focus-visible .dial-ball { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .dial-labels {
+    display: flex; justify-content: space-between; margin: 3px 0 0;
+  }
+  .dial-labels > span {
+    flex: 1; text-align: center; cursor: pointer; opacity: .55;
+    transition: opacity .18s ease;
+  }
+  .dial-labels > span:first-child { text-align: left; }
+  .dial-labels > span:last-child { text-align: right; }
+  .dial-labels > span[aria-pressed="true"] { opacity: 1; }
+  .dial-labels strong { display: block; font-size: 12px; font-weight: 650; }
+  .dial-labels span span, .dial-labels > span > span {
+    display: block; color: var(--muted); font-size: 11px;
+  }
+
+  /* The unconfirmed-change prompt. Deliberately blocking: its whole job is to
+     be answered before anything else happens. */
+  .confirm-veil {
+    position: fixed; inset: 0; z-index: 900;
+    background: rgba(4, 6, 12, .72); backdrop-filter: blur(2px);
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .confirm-box {
+    background: var(--panel); border: 1px solid var(--accent-deep);
+    border-radius: 12px; padding: 18px 20px; max-width: 440px; width: 100%;
+    box-shadow: 0 18px 48px rgba(0, 0, 0, .6);
+  }
+  .confirm-box h3 { margin: 0 0 6px; font-size: 15px; }
+  .confirm-box ul {
+    margin: 10px 0 0; padding-left: 18px; max-height: 190px; overflow-y: auto;
+  }
+  .confirm-box li { font-size: 12px; color: var(--text); margin: 3px 0; }
+  .confirm-box .actions { margin-top: 14px; }
   .seg { display: flex; gap: 7px; flex-wrap: wrap; }
   .seg button {
     flex: 1 1 auto; min-width: 100px; padding: 9px 12px; cursor: pointer;
@@ -2259,10 +2329,21 @@
 
       <section class="panel">
         <h2>Optimise for</h2>
-        <div class="seg" id="intents">
-          <button data-intent="competitive"><strong>Competitive</strong><span>frames &amp; clarity</span></button>
-          <button data-intent="balanced" aria-pressed="true"><strong>Balanced</strong><span>the default</span></button>
-          <button data-intent="quality"><strong>Quality</strong><span>best picture</span></button>
+        <div class="dial" id="intents" role="slider" tabindex="0"
+             aria-label="Optimise for" aria-valuemin="0" aria-valuemax="2" aria-valuenow="1"
+             aria-valuetext="Balanced">
+          <div class="dial-track">
+            <div class="dial-fill" id="dial-fill"></div>
+            <button class="dial-stop" data-intent="competitive" type="button" tabindex="-1"></button>
+            <button class="dial-stop" data-intent="balanced" type="button" tabindex="-1"></button>
+            <button class="dial-stop" data-intent="quality" type="button" tabindex="-1"></button>
+            <div class="dial-ball" id="dial-ball"></div>
+          </div>
+          <div class="dial-labels">
+            <span data-for="competitive"><strong>Competitive</strong><span>frames &amp; clarity</span></span>
+            <span data-for="balanced"><strong>Balanced</strong><span>the default</span></span>
+            <span data-for="quality"><strong>Quality</strong><span>best picture</span></span>
+          </div>
         </div>
         <p class="sub" id="intent-desc" style="margin:9px 0 0"></p>
 
@@ -2294,6 +2375,20 @@
       </section>
 
       <div id="results"></div>
+
+      <div class="confirm-veil hidden" id="confirm-veil">
+        <div class="confirm-box" role="alertdialog" aria-modal="true"
+             aria-labelledby="confirm-title">
+          <h3 id="confirm-title">You changed something</h3>
+          <p class="sub">You left the app with a change still unconfirmed. Keep it, or put
+             it back the way it was.</p>
+          <ul id="confirm-list"></ul>
+          <div class="actions">
+            <button class="btn primary" id="confirm-keep">Keep</button>
+            <button class="btn" id="confirm-undo">Put it back</button>
+          </div>
+        </div>
+      </div>
 
       <section class="panel hidden" id="starter-card">
         <h2>Start a config</h2>
@@ -2833,16 +2928,231 @@ function requestBody() {
   };
 }
 
-$("intents").addEventListener("click", e => {
-  const btn = e.target.closest("button[data-intent]");
-  if (!btn) return;
-  intent = btn.dataset.intent;
-  [...$("intents").children].forEach(b => b.setAttribute("aria-pressed", b === btn));
+/* --------------------------------------------------------------------------
+   Changes that have not been answered for.
+
+   A change made and then abandoned -- the window clicked away from, the app
+   alt-tabbed out of -- is the one most likely to be forgotten and then
+   blamed on the tool later. So each change records how to undo itself, and
+   leaving with one outstanding brings the window back and asks.
+
+   Two things this deliberately does not do. It does not fire for work already
+   written to disk: a key bind is saved, with a backup, the moment it is made,
+   so there is nothing outstanding to answer for. And it does not grab focus
+   while CS2 is in front -- see _focus in webui.py; the prompt still appears,
+   it just waits rather than pulling somebody out of a live round.
+   -------------------------------------------------------------------------- */
+let pendingChanges = [];
+let confirmOpen = false;
+
+function noteChange(label, revert) {
+  // The same control moved twice is still one thing to answer for, and the
+  // older revert is the one that goes all the way back.
+  const already = pendingChanges.find(c => c.label.split("→")[0] === label.split("→")[0]);
+  if (already) { already.label = label; return; }
+  pendingChanges.push({ label, revert });
+}
+
+function settleChanges() {
+  pendingChanges = [];
+  closeConfirm();
+}
+
+function undoChanges() {
+  // Newest first, so a control moved more than once ends where it started.
+  for (const change of [...pendingChanges].reverse()) {
+    try { change.revert(); } catch (e) { /* a gone control is already back */ }
+  }
+  pendingChanges = [];
+  closeConfirm();
+  status("Put back.");
+}
+
+function closeConfirm() {
+  confirmOpen = false;
+  const veil = $("confirm-veil");
+  if (veil) veil.classList.add("hidden");
+}
+
+function openConfirm() {
+  if (confirmOpen || !pendingChanges.length) return;
+  confirmOpen = true;
+  const list = $("confirm-list");
+  if (list) {
+    list.innerHTML = pendingChanges.map(c => "<li>" + esc(c.label) + "</li>").join("");
+  }
+  $("confirm-veil").classList.remove("hidden");
+  const keep = $("confirm-keep");
+  if (keep) keep.focus();
+}
+
+async function chaseFocus() {
+  if (!pendingChanges.length || confirmOpen) return;
+  openConfirm();
+  try { await api("/api/focus", {}); } catch (e) { /* browser tab, or refused */ }
+}
+
+window.addEventListener("blur", () => { setTimeout(chaseFocus, 120); });
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") setTimeout(chaseFocus, 120);
+});
+
+if ($("confirm-keep")) $("confirm-keep").addEventListener("click", settleChanges);
+if ($("confirm-undo")) $("confirm-undo").addEventListener("click", undoChanges);
+$("confirm-veil").addEventListener("keydown", e => {
+  // No escape hatch: the point is that it gets answered.
+  if (e.key === "Escape") e.preventDefault();
+});
+
+/* Every other control on the Settings tab, wired the same way.
+
+   Each remembers the value it had and how to put it back, so "Put it back"
+   restores exactly what was there rather than a guess at a default.
+*/
+(function wirePendingChanges() {
+  const TOGGLES = {
+    "w-video": "Picture quality",
+    "w-cfg": "Generated .vcfg config",
+    "w-launch": "Steam launch options",
+    "w-autoexec": "Add exec line to autoexec.vcfg",
+    "w-scaling": "Full-screen scaling",
+    "p-video": "Patch video settings before launch",
+  };
+  for (const [id, label] of Object.entries(TOGGLES)) {
+    const el = $(id);
+    if (!el) continue;
+    el.addEventListener("change", () => {
+      const was = !el.checked;
+      noteChange(label + " → " + (el.checked ? "on" : "off"),
+                 () => { el.checked = was; rememberPrefs(); });
+    });
+  }
+
+  const target = $("target");
+  if (target) {
+    let was = target.value;
+    target.addEventListener("focus", () => { was = target.value; });
+    target.addEventListener("change", () => {
+      const before = was;
+      noteChange("Target fps → " + (target.value || "auto"),
+                 () => { target.value = before; rememberPrefs(); });
+      was = target.value;
+    });
+  }
+
+  const account = $("account");
+  if (account) {
+    let was = account.value;
+    account.addEventListener("change", () => {
+      const before = was;
+      const name = account.options[account.selectedIndex];
+      noteChange("Account → " + (name ? name.textContent.trim() : account.value),
+                 () => { account.value = before; account.dispatchEvent(new Event("change")); });
+      was = account.value;
+    });
+  }
+})();
+
+/* The optimise-for dial.
+
+   Three stops rather than a free slider: there are three profiles, and a
+   continuous track would promise blends between them that do not exist. The
+   ball follows the pointer while dragging and settles on the nearest stop when
+   released, so it reads as one control rather than three buttons.
+
+   Pointer capture is taken on the ball so a drag that leaves the track keeps
+   working, and released on pointerup -- the same shape the rail divider uses.
+*/
+const INTENTS = ["competitive", "balanced", "quality"];
+
+function paintIntent(name, live) {
+  const at = Math.max(0, INTENTS.indexOf(name));
+  const pct = at * 50;
+  if (live === undefined) {
+    $("dial-ball").style.left = pct + "%";
+    $("dial-fill").style.left = Math.min(50, pct) + "%";
+    $("dial-fill").style.width = Math.abs(pct - 50) + "%";
+  } else {
+    $("dial-ball").style.left = live + "%";
+    $("dial-fill").style.left = Math.min(50, live) + "%";
+    $("dial-fill").style.width = Math.abs(live - 50) + "%";
+  }
+  const dial = $("intents");
+  dial.setAttribute("aria-valuenow", String(at));
+  dial.setAttribute("aria-valuetext", name);
+  dial.querySelectorAll(".dial-labels > span").forEach(el =>
+    el.setAttribute("aria-pressed", el.dataset.for === name));
+  dial.querySelectorAll(".dial-stop").forEach(el =>
+    el.setAttribute("aria-pressed", el.dataset.intent === name));
+}
+
+function chooseIntent(name, quiet) {
+  if (!INTENTS.includes(name) || name === intent) { paintIntent(name || intent); return; }
+  const before = intent;
+  intent = name;
+  paintIntent(name);
   $("apply").disabled = true;
   planned = null;
   rememberPrefs();
-  $("preview").click();
-});
+  if (!quiet) {
+    noteChange("Optimise for → " + name, () => chooseIntent(before, true));
+    $("preview").click();
+  }
+}
+
+(function wireDial() {
+  const dial = $("intents");
+  const track = dial.querySelector(".dial-track");
+  const ball = $("dial-ball");
+  let dragging = false;
+
+  const nearest = pct => INTENTS[Math.min(2, Math.max(0, Math.round(pct / 50)))];
+  const pctFor = event => {
+    const box = track.getBoundingClientRect();
+    if (!box.width) return 50;
+    return Math.min(100, Math.max(0, ((event.clientX - box.left) / box.width) * 100));
+  };
+
+  ball.addEventListener("pointerdown", e => {
+    dragging = true;
+    dial.classList.add("dragging");
+    ball.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  ball.addEventListener("pointermove", e => {
+    if (!dragging) return;
+    paintIntent(intent, pctFor(e));
+  });
+  ball.addEventListener("pointerup", e => {
+    if (!dragging) return;
+    dragging = false;
+    dial.classList.remove("dragging");
+    try { ball.releasePointerCapture(e.pointerId); } catch (_) { /* already gone */ }
+    chooseIntent(nearest(pctFor(e)));
+  });
+
+  // Clicking the track, a stop, or a label jumps there.
+  dial.addEventListener("click", e => {
+    if (dragging) return;
+    const stop = e.target.closest("[data-intent]");
+    if (stop) { chooseIntent(stop.dataset.intent); return; }
+    const label = e.target.closest(".dial-labels > span");
+    if (label) { chooseIntent(label.dataset.for); return; }
+    if (e.target.closest(".dial-track")) chooseIntent(nearest(pctFor(e)));
+  });
+
+  dial.addEventListener("keydown", e => {
+    const at = INTENTS.indexOf(intent);
+    if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
+      chooseIntent(INTENTS[Math.max(0, at - 1)]); e.preventDefault();
+    } else if (e.key === "ArrowRight" || e.key === "ArrowUp") {
+      chooseIntent(INTENTS[Math.min(2, at + 1)]); e.preventDefault();
+    } else if (e.key === "Home") { chooseIntent(INTENTS[0]); e.preventDefault(); }
+    else if (e.key === "End") { chooseIntent(INTENTS[2]); e.preventDefault(); }
+  });
+
+  paintIntent(intent);
+})();
 
 $("preview").addEventListener("click", async () => {
   busy("Building plan…");
@@ -2860,6 +3170,7 @@ $("apply").addEventListener("click", async () => {
   $("apply").disabled = true;
   try {
     const r = await api("/api/apply", requestBody());
+    settleChanges();          // written to disk; nothing left to answer for
     $("results").insertAdjacentHTML("afterbegin",
       '<section class="card"><h2>Written</h2>' +
       r.steps.map(s => '<div class="note"><div class="t" style="color:' +
@@ -6076,8 +6387,7 @@ function applyPrefs(ui) {
   if (!ui) return;
   if (ui.intent) {
     intent = ui.intent;
-    [...$("intents").children].forEach(b =>
-      b.setAttribute("aria-pressed", b.dataset.intent === intent));
+    paintIntent(intent);
   }
   if (ui.target_fps) $("target").value = ui.target_fps;
   const set = (id, v) => { if (v !== undefined && v !== null) $(id).checked = !!v; };

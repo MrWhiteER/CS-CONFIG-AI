@@ -19,6 +19,7 @@ How it holds together:
 from __future__ import annotations
 
 import ctypes
+import os
 import socket
 import sys
 import threading
@@ -76,8 +77,19 @@ class SingleInstance:
             self.handle = None
 
 
-def focus_existing_window(title_fragment: str = APP_NAME) -> bool:
-    """Bring an already-running instance to the front."""
+def focus_existing_window(title_fragment: str = APP_NAME,
+                          same_process: bool = False) -> bool:
+    """Bring a window of this application to the front.
+
+    ``same_process`` restricts the search to windows this process owns. The
+    single-instance path wants the opposite -- it is looking for the *other*
+    copy, which is the whole point -- but anything raising the window on its
+    own behalf must not reach across processes: run from source with a copy
+    of the installed app also open, a title match finds that one and yanks an
+    unrelated window to the front. With this set, a session that owns no
+    window (the interface open in an ordinary browser tab) simply raises
+    nothing, which is the honest answer.
+    """
     try:
         user32 = ctypes.WinDLL("user32", use_last_error=True)
     except OSError:
@@ -92,19 +104,73 @@ def focus_existing_window(title_fragment: str = APP_NAME) -> bool:
             return True
         buffer = ctypes.create_unicode_buffer(length + 1)
         user32.GetWindowTextW(hwnd, buffer, length + 1)
-        if title_fragment.lower() in buffer.value.lower() and user32.IsWindowVisible(hwnd):
-            found.append(hwnd)
-            return False
-        return True
+        if title_fragment.lower() not in buffer.value.lower():
+            return True
+        if not user32.IsWindowVisible(hwnd):
+            return True
+        if same_process:
+            pid = wintypes.DWORD()
+            user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+            if pid.value != os.getpid():
+                return True
+        found.append(hwnd)
+        return False
 
     user32.EnumWindows(callback, 0)
     if not found:
         return False
 
-    hwnd = found[0]
-    user32.ShowWindow(hwnd, 9)      # SW_RESTORE
-    user32.SetForegroundWindow(hwnd)
-    return True
+    return _to_front(user32, found[0])
+
+
+class _FlashInfo(ctypes.Structure):
+    _fields_ = [("cbSize", wintypes.UINT), ("hwnd", wintypes.HWND),
+                ("dwFlags", wintypes.DWORD), ("uCount", wintypes.UINT),
+                ("dwTimeout", wintypes.DWORD)]
+
+
+FLASHW_ALL = 0x00000003
+FLASHW_TIMERNOFG = 0x0000000C
+
+
+def _to_front(user32, hwnd) -> bool:
+    """Actually raise a window, not merely ask to.
+
+    Windows refuses ``SetForegroundWindow`` from a process that is not already
+    foreground -- it is what stops background programs stealing the keyboard
+    mid-sentence. The documented way to be allowed is to share an input queue
+    with the window that currently holds focus, so this attaches to that
+    thread for the length of the call and detaches straight after.
+
+    When even that is refused -- a full-screen exclusive app owns the input --
+    the window is flashed in the taskbar instead. Flashing is the fallback
+    rather than the failure: the request was to get the player's attention,
+    and a taskbar flash does that without fighting the OS.
+    """
+    user32.ShowWindow(hwnd, 9)          # SW_RESTORE
+    current = user32.GetForegroundWindow()
+    if current == hwnd:
+        return True
+
+    ours = user32.GetWindowThreadProcessId(hwnd, None)
+    theirs = user32.GetWindowThreadProcessId(current, None) if current else 0
+
+    attached = bool(theirs and ours and theirs != ours
+                    and user32.AttachThreadInput(theirs, ours, True))
+    try:
+        user32.BringWindowToTop(hwnd)
+        raised = bool(user32.SetForegroundWindow(hwnd))
+    finally:
+        if attached:
+            user32.AttachThreadInput(theirs, ours, False)
+
+    if raised and user32.GetForegroundWindow() == hwnd:
+        return True
+
+    flash = _FlashInfo(ctypes.sizeof(_FlashInfo), hwnd,
+                       FLASHW_ALL | FLASHW_TIMERNOFG, 0, 0)
+    user32.FlashWindowEx(ctypes.byref(flash))
+    return False
 
 
 # ---------------------------------------------------------------------------

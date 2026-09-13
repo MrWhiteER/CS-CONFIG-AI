@@ -1364,6 +1364,34 @@ def _cfg_key_options(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     return {"ok": True, **commands.options(result, binding, state.cs2_install)}
 
 
+def _focus(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Pull the app back in front, for changes waiting to be confirmed.
+
+    Refused outright while CS2 holds the foreground. Taking focus from a game
+    in progress does not just annoy -- it drops the player out of a live round,
+    which is a far worse outcome than a setting staying unconfirmed for a few
+    minutes. The page keeps its prompt either way; the only thing withheld is
+    the grab.
+    """
+    from . import desktop, window
+
+    try:
+        game = window.find_game_window("cs2.exe")
+        if game is not None and window.foreground_hwnd() == game.hwnd:
+            return {"ok": True, "raised": False, "reason": "cs2_foreground"}
+    except Exception:
+        pass                            # never let the check block the raise
+
+    try:
+        raised = desktop.focus_existing_window(same_process=True)
+    except Exception as exc:
+        return {"ok": False, "raised": False, "error": str(exc)}
+    # False means Windows would not hand focus over and the taskbar entry was
+    # flashed instead; the prompt is still up, so this is not an error.
+    return {"ok": True, "raised": bool(raised),
+            "reason": "" if raised else "flashed_instead"}
+
+
 def _cfg_starter(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     """Report, or build, the config a fresh account does not have yet.
 
@@ -2107,6 +2135,7 @@ def make_handler(state: State):
         "/api/cfg/browse": _cfg_browse,
         "/api/cfg/source": _cfg_source,
         "/api/cfg/starter": _cfg_starter,
+        "/api/focus": _focus,
         "/api/cfg/convert": _cfg_convert,
         "/api/cfg/check": _cfg_check,
         "/api/cfg/polish": _cfg_polish_apply,
