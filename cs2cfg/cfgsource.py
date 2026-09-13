@@ -250,7 +250,9 @@ def survey(folder: Path) -> List[Dict[str, Any]]:
     folder = Path(folder)
     found: List[Dict[str, Any]] = []
     try:
-        entries = sorted(folder.iterdir())
+        # The whole collection: an autoexec at the root execs the scripts and
+        # binds beside it, and those are where a .cfg is most likely to be.
+        entries = sorted(folder.rglob("*"))
     except OSError:
         return found
 
@@ -259,8 +261,12 @@ def survey(folder: Path) -> List[Dict[str, Any]]:
             continue
         kind = looks_like(item)
         twin = converted_name(item)
+        try:
+            shown = str(item.relative_to(folder)).replace("\\", "/")
+        except ValueError:
+            shown = item.name
         found.append({
-            "name": item.name,
+            "name": shown,
             "kind": kind,
             "size": item.stat().st_size,
             "convertible": item.suffix.lower() == ".cfg" and kind == SCRIPT,

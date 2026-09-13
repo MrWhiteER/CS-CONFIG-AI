@@ -41,9 +41,14 @@ MACHINE_KEYS = frozenset({
 # record of what this copy is currently looking at.
 ACTIVE_KEY = "account"
 
+# Set only when somebody chooses an account, never by the application working
+# one out. The difference matters: a record of which account the settings were
+# moved to is not a request to stop following Steam.
+PINNED_KEY = "pinned_account"
+
 
 def is_machine(key: str) -> bool:
-    return key in MACHINE_KEYS or key == ACTIVE_KEY
+    return key in MACHINE_KEYS or key in (ACTIVE_KEY, PINNED_KEY)
 
 
 def accounts(prefs: Dict[str, Any]) -> Dict[str, Any]:

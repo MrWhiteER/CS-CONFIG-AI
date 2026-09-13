@@ -332,7 +332,7 @@ def _active_account(state: State) -> Optional[str]:
     if state.steam_root is None:
         return None
     known = [u.account_id for u in state.users]
-    chosen = str(load_prefs().get("ui", {}).get("account") or "")
+    chosen = str(load_prefs().get("ui", {}).get("pinned_account") or "")
     if chosen and chosen in known:
         return chosen
     found, _how = whoami.current(state.steam_root, known)
@@ -358,12 +358,12 @@ def _profile(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     signed_in, how = whoami.current(state.steam_root, known)
 
     prefs = load_prefs()
-    chosen = str(prefs.get("ui", {}).get("account") or "")
+    chosen = str(prefs.get("ui", {}).get("pinned_account") or "")
     active = chosen if chosen in known else signed_in
 
     # A first run has one account's settings sitting in the shared half.
+    # Moving them records nothing about what to show: that still follows Steam.
     if profiles.migrate(prefs, active):
-        prefs.setdefault("ui", {})["account"] = active
         save_prefs(prefs)
 
     listed = []
@@ -393,9 +393,9 @@ def _profile_use(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     prefs = load_prefs()
     prefs.setdefault("ui", {})
     if body.get("follow") or not wanted:
-        prefs["ui"].pop("account", None)
+        prefs["ui"].pop("pinned_account", None)
     elif wanted in known:
-        prefs["ui"]["account"] = wanted
+        prefs["ui"]["pinned_account"] = wanted
     else:
         return {"ok": False, "error": f"no CS2 account here with id {wanted}"}
     save_prefs(prefs)
@@ -422,7 +422,7 @@ def _save_prefs(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         "intent", "target_fps", "account", "write_video", "write_cfg",
         "write_launch", "link_autoexec", "stretch_mode", "patch_video",
         "cfg_folder", "tab", "favourites", "mouse_shape", "kb_layout", "kb_shown",
-        "update_auto_download", "update_skip", "rail_width",
+        "update_auto_download", "update_skip", "rail_width", "pinned_account",
     )
     changes = {key: body[key] for key in allowed if key in body}
     profiles.remember(prefs, account, changes)
@@ -741,10 +741,12 @@ def _cfg_convert(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         return {"ok": False, "error": "no file given"}
 
     source = folder / name
-    # Resolved and compared, so a name like ..\..\something cannot reach out
-    # of the folder the user chose.
+    # Resolved and compared, so a name that climbs out with .. cannot reach
+    # past the collection the user chose. Subfolders are fine -- that is where
+    # scripts and binds live -- anything above the folder is not.
     try:
-        inside = source.resolve().parent == folder.resolve()
+        root = folder.resolve()
+        inside = root == source.resolve() or root in source.resolve().parents
     except OSError:
         inside = False
     if not inside or not source.is_file():
@@ -1963,7 +1965,6 @@ def make_handler(state: State):
                 # A first run still has everything in the shared half; move it
                 # onto the account it was describing before handing it over.
                 if profiles.migrate(prefs, account):
-                    prefs.setdefault("ui", {})["account"] = account
                     save_prefs(prefs)
                 self._send_json({"ok": True,
                                  "ui": profiles.ui_for(prefs, account)})

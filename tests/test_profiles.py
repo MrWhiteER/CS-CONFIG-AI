@@ -120,6 +120,37 @@ class MovingOldSettingsAcross(unittest.TestCase):
         self.assertEqual(prefs["ui"]["cfg_folder"], r"G:\white")
 
 
+class PinningAnAccount(unittest.TestCase):
+    """Choosing an account and recording one are different statements.
+
+    The bug this guards: moving the old shared settings onto an account also
+    wrote that account id, and anything reading an account id took it for a
+    deliberate choice. So the first launch after upgrading pinned everybody to
+    whoever they happened to be signed in as, and the application stopped
+    following Steam -- the one thing it was asked to do.
+    """
+
+    def test_moving_settings_does_not_pin_anything(self):
+        prefs = {"ui": {"cfg_folder": r"G:\white"}}
+        profiles.migrate(prefs, WHITE)
+        self.assertNotIn(profiles.PINNED_KEY, prefs["ui"],
+                         "a migration is not a request to stop following Steam")
+
+    def test_the_pin_is_kept_on_the_machine_not_the_account(self):
+        """It says which account to show, so it cannot live inside one."""
+        self.assertTrue(profiles.is_machine(profiles.PINNED_KEY))
+        prefs = {}
+        profiles.remember(prefs, WHITE, {profiles.PINNED_KEY: KAREN})
+        self.assertEqual(prefs["ui"][profiles.PINNED_KEY], KAREN)
+
+    def test_the_active_account_is_reported_without_being_a_pin(self):
+        prefs = {}
+        profiles.remember(prefs, WHITE, {"cfg_folder": "x"})
+        shown = profiles.ui_for(prefs, WHITE)
+        self.assertEqual(shown[profiles.ACTIVE_KEY], WHITE)
+        self.assertNotIn(profiles.PINNED_KEY, shown)
+
+
 class WorkingOutWhoIsSignedIn(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

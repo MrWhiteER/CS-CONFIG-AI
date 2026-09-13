@@ -1296,6 +1296,82 @@
     margin: 9px 0 0; font-size: 10.5px; color: var(--muted); line-height: 1.5;
   }
 
+  /* Whose settings these are. The one thing on the page that changes what
+     everything else means, so it says how it was decided as well as who. */
+  .rail-profile {
+    appearance: none; border: 0; cursor: pointer; font: inherit; width: calc(100% - 16px);
+    text-align: left;
+  }
+  .rail-profile:hover { background: rgba(255, 255, 255, .06); }
+  .rail-profile .nm { display: grid; min-width: 0; }
+  .rail-profile .nm b {
+    font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .rail-profile .nm small {
+    font-size: 9.5px; color: var(--faint); letter-spacing: .02em;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  /* Folded to symbols there is no room for a name, and the orb alone is
+     enough to click. */
+  .app.rail-tight .rail-profile .nm { display: none; }
+  .app.rail-tight .rail-profile { justify-content: center; }
+
+  .who-menu {
+    margin: 4px 8px 0; padding: 5px; border-radius: 10px;
+    background: rgba(22, 22, 30, .96); border: 1px solid var(--line);
+    box-shadow: 0 14px 34px rgba(0, 0, 0, .55);
+    max-height: 300px; overflow-y: auto;
+  }
+  .who-row {
+    appearance: none; border: 0; cursor: pointer; font: inherit; width: 100%;
+    display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px;
+    align-items: center; text-align: left;
+    padding: 7px 9px; border-radius: 7px; background: none; color: var(--ink-dim);
+  }
+  .who-row:hover { background: rgba(255, 255, 255, .07); color: var(--ink); }
+  .who-row[aria-current="true"] { background: rgba(61, 139, 253, .16); color: var(--ink); }
+  .who-row .dot {
+    width: 9px; height: 9px; border-radius: 50%; background: var(--line);
+  }
+  .who-row.live .dot { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  .who-row .who-nm { font-size: 12px; font-weight: 600; }
+  .who-row .who-sub {
+    font-size: 10px; color: var(--muted); font-family: var(--mono);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .who-foot {
+    margin-top: 4px; padding: 7px 9px; border-top: 1px solid var(--line-soft);
+  }
+  .who-foot button {
+    appearance: none; border: 0; background: none; cursor: pointer; font: inherit;
+    font-size: 11px; color: var(--accent); padding: 0;
+  }
+
+  /* What a config folder actually holds. The kinds matter: CS2 writes .vcfg
+     for itself in a different format from the one people write, and telling
+     them apart is the difference between converting a file and damaging one. */
+  .src-head {
+    display: flex; align-items: baseline; gap: 9px; margin: 12px 0 7px;
+  }
+  .src-head h4 { margin: 0; font-size: 12.5px; font-weight: 650; color: var(--ink); }
+  .src-list { display: grid; gap: 4px; }
+  .src-row {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 9px;
+    align-items: center; padding: 7px 10px; border-radius: 8px;
+    background: rgba(255, 255, 255, .035); border: 1px solid var(--line);
+  }
+  .src-row .nm { font-family: var(--mono); font-size: 11.5px; min-width: 0;
+                 overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .src-row .nm b { color: var(--accent); font-weight: 600; }
+  .src-kind {
+    font-size: 9.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+    padding: 2px 7px; border-radius: 999px; white-space: nowrap;
+  }
+  .src-kind.script { background: rgba(61, 139, 253, .16); color: #9cc4ff; }
+  .src-kind.keyvalues { background: rgba(255, 180, 58, .16); color: var(--warn); }
+  .src-kind.empty, .src-kind.unknown { background: rgba(255, 255, 255, .07); color: var(--muted); }
+  .src-note { font-size: 10.5px; color: var(--muted); }
+
   /* A desk you can arrange: each piece carries its own position and scale. */
   .kb-scene {
     position: relative; min-height: 430px; overflow: hidden;
@@ -1805,7 +1881,13 @@
     <div class="brand">CS2<span>Launcher</span></div>
 
     <div class="rail-label">Profile</div>
-    <div class="rail-profile"><i class="orb"></i><span class="nm"><b>Default</b></span></div>
+    <button class="rail-profile" id="who" aria-haspopup="true" aria-expanded="false"
+            title="Whose settings are shown">
+      <i class="orb"></i>
+      <span class="nm"><b id="who-name">Looking&hellip;</b>
+        <small id="who-how"></small></span>
+    </button>
+    <div class="who-menu hidden" id="who-menu"></div>
 
     <div class="tabs" role="tablist">
       <button class="tab" data-tab="launcher" role="tab" aria-selected="true">
@@ -2207,7 +2289,8 @@
           <span class="k"></span>
           <span class="v">
             <input type="text" id="cfg-folder" placeholder="or type / paste a path" style="flex:1;min-width:0">
-            <button class="btn" id="cfg-browse" title="Open the folder picker">Browse&hellip;</button>
+            <button class="btn" id="cfg-browse" title="Choose the folder your configs are in">Folder&hellip;</button>
+            <button class="btn" id="cfg-browse-file" title="Choose one config; its folder is used">File&hellip;</button>
           </span>
         </div>
         <div class="row">
@@ -2218,6 +2301,7 @@
           <button class="btn primary" id="cfg-scan" disabled>Scan folder</button>
           <button class="btn hidden" id="cfg-apply-polish">Apply formatting</button>
         </div>
+        <div id="cfg-files"></div>
         <div id="cfg-out"></div>
       </section>
 
@@ -5407,6 +5491,230 @@ function railSetTight(fold, animate) {
   railApply(false);
 })();
 
+/* --------------------------------------------------------------------------
+   Whose settings are on screen.
+
+   Everything below the rail -- the folder, the binds, the scripts -- belongs
+   to one Steam account. Which one is worked out from Steam rather than asked
+   for, and saying so plainly is worth more than the space it takes: editing
+   the wrong account's config is the mistake this is here to prevent.
+   -------------------------------------------------------------------------- */
+let whoData = null;
+
+async function loadWho() {
+  try {
+    whoData = await api("/api/profile", {});
+  } catch (err) {
+    whoData = { ok: false, error: String(err && err.message || err) };
+  }
+  renderWho();
+}
+
+function renderWho() {
+  const name = $("who-name"), how = $("who-how");
+  if (!name) return;
+  if (!whoData || whoData.ok === false || !whoData.steam) {
+    name.textContent = "No Steam account";
+    if (how) how.textContent = whoData && whoData.error ? "" : "Steam not found";
+    return;
+  }
+  const mine = (whoData.accounts || []).find(a => a.active);
+  name.textContent = mine ? mine.name : "No account";
+  if (how) {
+    // Pinned is worth saying out loud: it is the state people forget they
+    // are in, and the one where the app stops following Steam.
+    how.textContent = whoData.following ? (whoData.how || "")
+      : "pinned \u00b7 not following Steam";
+  }
+}
+
+function whoMenu() {
+  const box = $("who-menu");
+  if (!box || !whoData || !whoData.accounts) return;
+  box.innerHTML =
+    whoData.accounts.map(a =>
+      '<button class="who-row' + (a.signed_in ? " live" : "") +
+      '" data-use="' + esc(a.account) + '" aria-current="' + (!!a.active) + '">' +
+      '<i class="dot" title="' + (a.signed_in ? "signed in to Steam" : "") + '"></i>' +
+      '<span><span class="who-nm">' + esc(a.name) + "</span><br>" +
+      '<span class="who-sub">' + esc(a.login || a.account) + "</span></span>" +
+      "</button>").join("") +
+    '<div class="who-foot">' +
+    (whoData.following
+      ? '<span class="sub" style="font-size:11px">Following Steam</span>'
+      : '<button id="who-follow">Follow Steam again</button>') +
+    "</div>";
+}
+
+function whoOpen(open) {
+  const box = $("who-menu"), button = $("who");
+  if (!box || !button) return;
+  if (open) whoMenu();
+  box.classList.toggle("hidden", !open);
+  button.setAttribute("aria-expanded", String(!!open));
+}
+
+document.addEventListener("click", async e => {
+  if (e.target.closest("#who")) {
+    whoOpen($("who-menu").classList.contains("hidden"));
+    return;
+  }
+  const row = e.target.closest("[data-use]");
+  const back = e.target.closest("#who-follow");
+  if (row || back) {
+    whoOpen(false);
+    const body = back ? { follow: true } : { account: row.dataset.use };
+    try {
+      whoData = await api("/api/profile/use", body);
+    } catch (err) {
+      status("Could not switch account: " + (err && err.message || err), true);
+      return;
+    }
+    renderWho();
+    // Everything on screen belonged to the account before this one.
+    await reloadForAccount();
+    return;
+  }
+  if (!e.target.closest("#who-menu")) whoOpen(false);
+});
+
+// Switching account changes which files every view is reading, so the views
+// are reloaded rather than left showing the previous account's contents.
+async function reloadForAccount() {
+  try {
+    const prefs = await api("/api/prefs");
+    const ui = prefs.ui || {};
+    // Emptied first. applyPrefs only sets fields it has values for, which is
+    // right at startup and wrong here: an account with no folder of its own
+    // would otherwise keep showing the previous account's.
+    if ($("cfg-folder")) $("cfg-folder").value = ui.cfg_folder || "";
+    favourites = new Set();
+    applyPrefs(ui);
+  } catch (err) { /* a first run has nothing stored yet */ }
+  cs2Data = null; gpuData = null; keyData = null; cfgSettings = null;
+  pickedKey = null; kbOptions = null;
+  const folder = $("cfg-folder") ? $("cfg-folder").value.trim() : "";
+  srcFiles = null;
+  if (folder) {
+    try { await api("/api/cfg/scan", { folder }); } catch (err) { /* said below */ }
+    // The line may still be describing the account we just came from.
+    if ($("cfg-folder-state")) $("cfg-folder-state").textContent = "";
+    if (typeof checkCfgFolder === "function") checkCfgFolder();
+    await loadSource(folder);
+  } else {
+    renderSource();
+    if ($("cfg-folder-state")) {
+      $("cfg-folder-state").textContent =
+        "No config folder set for this account yet — choose one below.";
+    }
+    if ($("cfg-out")) $("cfg-out").innerHTML = "";
+  }
+  status(($("who-name").textContent || "That account") + "'s settings are shown now.");
+  setTab(activeTab);
+}
+
+/* --------------------------------------------------------------------------
+   What is in the config folder, and what can be done with it.
+
+   CS2 uses .vcfg for two different formats: the KeyValues it writes for
+   itself, and the lines of console commands people write. A .cfg is the same
+   as the second kind, so converting one is a change of extension -- but a
+   file in the game's own format is not ours to rewrite, and the list says
+   which is which rather than leaving it to be guessed from the name.
+   -------------------------------------------------------------------------- */
+let srcFiles = null;
+
+async function loadSource(path) {
+  const where = (path || ($("cfg-folder") ? $("cfg-folder").value : "")).trim();
+  if (!where) { srcFiles = null; renderSource(); return; }
+  try {
+    srcFiles = await api("/api/cfg/source", { path: where });
+  } catch (err) {
+    srcFiles = { ok: false, error: String(err && err.message || err) };
+  }
+  renderSource();
+}
+
+function renderSource() {
+  const box = $("cfg-files");
+  if (!box) return;
+  if (!srcFiles || srcFiles.ok === false || !(srcFiles.files || []).length) {
+    box.innerHTML = "";
+    return;
+  }
+
+  const canConvert = srcFiles.files.filter(f => f.convertible && !f.already);
+  box.innerHTML =
+    '<div class="src-head"><h4>In this folder</h4>' +
+    '<span class="src-note">' + srcFiles.files.length + " config" +
+    (srcFiles.files.length === 1 ? "" : "s") +
+    (srcFiles.entry ? "  \u00b7  runs from " + esc(srcFiles.entry) : "") +
+    "</span></div>" +
+    (canConvert.length
+      ? '<p class="src-note" style="margin:0 0 7px">' + canConvert.length +
+        " file" + (canConvert.length === 1 ? "" : "s") +
+        " could be converted to .vcfg. The original is kept either way, and " +
+        "the autoexec is pointed at the new file so it still runs.</p>"
+      : "") +
+    '<div class="src-list">' +
+    srcFiles.files.map(f =>
+      '<div class="src-row">' +
+      '<span class="nm">' +
+      (f.name === srcFiles.entry ? "<b>" + esc(f.name) + "</b>" : esc(f.name)) +
+      "</span>" +
+      '<span class="src-kind ' + esc(f.kind) + '" title="' +
+      (f.kind === "keyvalues"
+        ? "CS2's own format; this tool will not rewrite it"
+        : f.kind === "script" ? "lines of console commands" : "") +
+      '">' + esc(f.kind === "keyvalues" ? "CS2's own" : f.kind) + "</span>" +
+      (f.convertible && !f.already
+        ? '<button class="btn small" data-convert="' + esc(f.name) + '">To .vcfg</button>'
+        : f.already
+          ? '<span class="src-note">already ' + esc(f.already) + "</span>"
+          : "<span></span>") +
+      "</div>").join("") +
+    "</div>";
+}
+
+document.addEventListener("click", async e => {
+  const pick = e.target.closest("#cfg-browse-file");
+  if (pick) {
+    let answer;
+    try {
+      answer = await api("/api/cfg/browse",
+                         { kind: "file", initial: $("cfg-folder").value });
+    } catch (err) {
+      status("Could not open the picker: " + (err && err.message || err), true);
+      return;
+    }
+    if (answer.cancelled) return;
+    $("cfg-folder").value = answer.path;
+    if (answer.note) status(answer.note);
+    else if (answer.entry) status("Using " + answer.path + ", starting at " + answer.entry);
+    $("cfg-folder").dispatchEvent(new Event("input", { bubbles: true }));
+    await loadSource(answer.path);
+    return;
+  }
+
+  const turn = e.target.closest("[data-convert]");
+  if (!turn) return;
+  const name = turn.dataset.convert;
+  turn.disabled = true;
+  try {
+    const done = await api("/api/cfg/convert",
+                           { folder: srcFiles.folder, name });
+    srcFiles.files = done.files;
+    renderSource();
+    const wiring = done.wiring || {};
+    status("Made " + done.to + " and kept " + done.kept +
+           (wiring.changed ? "  \u00b7  autoexec " + wiring.action
+                           : "  \u00b7  " + (wiring.action || "")));
+  } catch (err) {
+    turn.disabled = false;
+    status("Could not convert " + name + ": " + (err && err.message || err), true);
+  }
+});
+
 // Two views over one page: what you do, and what you configure. The active
 // tab is remembered like every other preference.
 let activeTab = "launcher";
@@ -6074,8 +6382,10 @@ $("rescan").addEventListener("click", () => scan(true));
   $("preview").click();
   loadHistory();
   refreshCfgSuggestions();
+  if ($("cfg-folder") && $("cfg-folder").value.trim()) loadSource();
   startLive();
   pollUpdates();
+  loadWho();
   try {
     const s = await api("/api/play/status");
     if (s.active) {
