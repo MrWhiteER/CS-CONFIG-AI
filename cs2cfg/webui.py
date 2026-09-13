@@ -1549,7 +1549,9 @@ def _update_download(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     checker = _updater(state)
     if checker.summary()["state"] == updates.DOWNLOADING:
         return {"ok": True, **checker.summary()}
-    checker.want_download()
+    # Started here and nowhere else. Asking the timer as well used to start a
+    # second one, and two downloads share one part-file and fight over it.
+    # download_once() drops an overlapping call, so this is belt and braces.
     threading.Thread(target=checker.download_once, daemon=True,
                      name="cs2cfg-update-download").start()
     return {"ok": True, **checker.summary()}

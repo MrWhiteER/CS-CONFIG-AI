@@ -447,6 +447,56 @@ class TheRateLimit(unittest.TestCase):
                          "a bare status code tells the reader nothing")
         self.assertIn("no releases", summary["error"])
 
+    def test_two_downloads_cannot_run_at_once(self):
+        """The bug this guards: pressing Download started two of them.
+
+        The endpoint woke the timer and started a thread, and both downloaded.
+        They share one .part file, so whichever got there first held it while
+        the other tried to rename it -- WinError 32 on a file the application
+        had open itself.
+        """
+        checker = updates.Checker(current="1.0.0")
+        checker._latest = updates.Release(version="1.4.0", asset_url="https://x/a.zip")
+
+        running = threading.Event()
+        overlapped = []
+        inside = []
+
+        def slow_download(release, progress=None, cancelled=None):
+            inside.append(1)
+            overlapped.append(len(inside))
+            running.set()
+            time.sleep(0.25)
+            inside.pop()
+
+        with mock.patch.object(updates, "download", slow_download), \
+             mock.patch.object(updates, "is_ready", lambda r: False), \
+             mock.patch.object(updates, "clean_old", lambda keep="": None):
+            first = threading.Thread(target=checker.download_once)
+            first.start()
+            running.wait(timeout=5)
+            # Straight in on top of the one already going.
+            checker.download_once()
+            first.join(timeout=5)
+
+        self.assertEqual(max(overlapped), 1,
+                         "two downloads were inside the fetch at once")
+        self.assertEqual(len(overlapped), 1,
+                         "the overlapping call should be dropped, not queued")
+
+    def test_a_download_can_run_again_once_the_first_has_finished(self):
+        """Dropping an overlapping call must not wedge it shut."""
+        checker = updates.Checker(current="1.0.0")
+        checker._latest = updates.Release(version="1.4.0", asset_url="https://x/a.zip")
+        calls = []
+        with mock.patch.object(updates, "download",
+                               lambda *a, **k: calls.append(1)), \
+             mock.patch.object(updates, "is_ready", lambda r: False), \
+             mock.patch.object(updates, "clean_old", lambda keep="": None):
+            checker.download_once()
+            checker.download_once()
+        self.assertEqual(len(calls), 2)
+
     def test_summary_does_not_deadlock(self):
         """summary() holds the lock and calls _delay(); the lock is not reentrant."""
         checker = updates.Checker()

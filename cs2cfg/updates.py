@@ -591,6 +591,10 @@ class Checker:
         self._skip = skip or ""
         self._want = False
         self._rate = Rate()
+        # Held for the length of a download. Taken without waiting, so a
+        # second attempt while one is running is dropped rather than queued --
+        # two of them share one .part file and fight over it.
+        self._fetching = threading.Lock()
 
     # -- what the server reads --------------------------------------------
     def summary(self) -> Dict[str, object]:
@@ -700,6 +704,14 @@ class Checker:
         self._set(state=READY if is_ready(latest) else AVAILABLE)
 
     def download_once(self) -> None:
+        if not self._fetching.acquire(blocking=False):
+            return          # one is already running; this is not a second one
+        try:
+            self._download_locked()
+        finally:
+            self._fetching.release()
+
+    def _download_locked(self) -> None:
         with self._lock:
             latest = self._latest
             self._want = False
