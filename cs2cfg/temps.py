@@ -48,6 +48,11 @@ _CREATE_NO_WINDOW = 0x08000000
 WARM = {"cpu": 85, "gpu": 83, "drive": 60}
 HOT = {"cpu": 95, "gpu": 87, "drive": 70}
 
+# Where the scale starts. A part idling at 35 should not already read as a
+# third full: nothing interesting happens below room temperature, so the gauge
+# spends its range on the part that matters.
+IDLE = 25
+
 
 def _elevated() -> bool:
     try:
@@ -240,9 +245,15 @@ def as_dict(found: Readings) -> dict:
     return {
         "elevated": found.elevated,
         "at": found.at,
+        # The thresholds travel with the reading. The gauge draws how full the
+        # part is against its own limit, and a second copy of these numbers in
+        # the page would be one to keep in step.
         "parts": [{"part": p.part, "label": p.label, "celsius": p.celsius,
                    "state": p.state, "known": p.known,
-                   "unavailable": p.unavailable}
+                   "unavailable": p.unavailable,
+                   "floor": IDLE,
+                   "warm": WARM.get(p.part, 80),
+                   "hot": HOT.get(p.part, 90)}
                   for p in found.parts],
         "hottest": (found.hottest.celsius if found.hottest else None),
     }

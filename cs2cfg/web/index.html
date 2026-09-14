@@ -249,33 +249,42 @@
   }
 
 
-  /* Temperatures, beside the load gauges. Heat is why a machine that
-     benchmarks well plays badly: nothing errors, the part just stops boosting
-     and the frame rate sags in the long rounds. */
-  .temps { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
-  .temps .t {
-    display: flex; align-items: baseline; gap: 6px;
-    padding: 4px 9px; border-radius: 999px;
-    border: 1px solid var(--line); background: var(--panel-2);
-    font-size: 11px;
+
+  /* Temperatures: the same footprint as the load gauges, shaped as the sign. */
+  .temps { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+  .temp-gauge { --t: var(--accent); }
+  .temp-gauge.warm    { --t: var(--warn); }
+  .temp-gauge.hot     { --t: var(--bad); }
+  .temp-gauge.unknown { --t: var(--line); opacity: .55; }
+
+  .temp-gauge .t-glass {
+    fill: rgba(255, 255, 255, .045);
+    stroke: var(--line); stroke-width: 2;
   }
-  .temps .t b { font-family: var(--mono); font-size: 12px; font-weight: 600; }
-  .temps .t .n { color: var(--muted); }
-  .temps .t.warm { border-color: var(--warn); }
-  .temps .t.warm b { color: var(--warn); }
-  .temps .t.hot {
-    border-color: var(--bad); background: rgba(255, 92, 108, .1);
-    animation: temp-pulse 1.4s ease-in-out infinite;
+  .temp-gauge .t-ticks line {
+    /* --line is almost invisible at this size, and a scale you cannot see is
+       just noise in the markup. */
+    stroke: rgba(255, 255, 255, .22); stroke-width: 1.6; stroke-linecap: round;
   }
-  .temps .t.hot b { color: var(--bad); }
-  .temps .t.unknown { opacity: .55; }
+  /* y and height animate as CSS properties, which is why the nodes are
+     patched rather than rebuilt: a fresh element cannot transition from
+     anything, and the column would jump between readings. */
+  .temp-gauge .t-fill {
+    fill: var(--t);
+    transition: y .6s ease, height .6s ease, fill .4s ease;
+  }
+  .temp-gauge .t-bulb { fill: var(--t); transition: fill .4s ease; }
+  .temp-gauge.hot .t-bulb { animation: temp-pulse 1.4s ease-in-out infinite; }
+  .temp-gauge .t-read { font-family: var(--mono); }
   @keyframes temp-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 92, 108, .5); }
-    50%      { box-shadow: 0 0 0 5px rgba(255, 92, 108, 0); }
+    0%, 100% { opacity: 1; }
+    50%      { opacity: .4; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .temps .t.hot { animation: none; }
+    .temp-gauge .t-fill { transition: none; }
+    .temp-gauge.hot .t-bulb { animation: none; }
   }
+
   .seg { display: flex; gap: 7px; flex-wrap: wrap; }
   .seg button {
     flex: 1 1 auto; min-width: 100px; padding: 9px 12px; cursor: pointer;
@@ -3671,30 +3680,99 @@ function sparkline(id, series, colour) {
     ' stroke-linejoin="round" stroke-linecap="round"/>';
 }
 
-/* Temperatures, and telling somebody when one is past the point where it
-   costs them frames.
+/* Temperatures, drawn the way the load gauges are.
 
-   Said once per part per spell rather than on every poll: a gauge that polls
-   each second would otherwise raise the same alarm sixty times a minute, which
-   is how people learn to ignore it. It arms again only after the part has come
-   back down, so a machine hovering on the threshold does not chatter.
+   Same 92px ring as CPU and GPU, so the row reads as one set of instruments
+   rather than a gauge next to a badge. Inside sits a thermometer whose level
+   rises and falls with the reading -- the shape people already know, doing the
+   thing it is shaped to do.
+
+   The ring is filled against the part's own limit rather than against 100
+   degrees. A GPU is in trouble at 87 and a drive at 70, so one shared scale
+   would leave every gauge sitting near empty and say nothing.
+
+   Rebuilt only when the set of parts changes; otherwise the existing nodes are
+   patched in place. That is what lets the level slide between readings instead
+   of jumping -- a fresh element every second cannot transition from anything.
 */
 const tempAlarm = {};
+
+function thermoGauge(part) {
+  // Sized to the load gauges beside it so the row reads as one set of
+  // instruments, but shaped as a thermometer rather than wrapped in a ring --
+  // the symbol people already know, doing the thing it is shaped to do.
+  return '<div class="gauge temp-gauge" data-label="' + esc(part.label) + '">' +
+    '<svg width="92" height="92" viewBox="0 0 92 92" aria-hidden="true">' +
+      // the glass: one stem and a bulb, drawn as a single outline
+      '<path class="t-glass" d="M46 12 a9 9 0 0 1 9 9 v33.5 a15 15 0 1 1 -18 0 V21 a9 9 0 0 1 9 -9 z"/>' +
+      // the scale, so it reads as an instrument rather than a lozenge
+      '<g class="t-ticks">' +
+        '<line x1="58" y1="26" x2="65" y2="26"/>' +
+        '<line x1="58" y1="34" x2="62" y2="34"/>' +
+        '<line x1="58" y1="42" x2="65" y2="42"/>' +
+        '<line x1="58" y1="50" x2="62" y2="50"/>' +
+      "</g>" +
+      // what moves. Clipped to the stem so the column keeps the glass shape.
+      '<clipPath id="tc-' + esc(part.part + "-" + part.label).replace(/[^a-z0-9-]/gi, "") + '">' +
+        '<path d="M46 12 a9 9 0 0 1 9 9 v33.5 a15 15 0 1 1 -18 0 V21 a9 9 0 0 1 9 -9 z"/>' +
+      "</clipPath>" +
+      '<rect class="t-fill" x="34" y="56" width="24" height="30"' +
+      ' clip-path="url(#tc-' + esc(part.part + "-" + part.label).replace(/[^a-z0-9-]/gi, "") + ')"/>' +
+      '<circle class="t-bulb" cx="46" cy="64" r="10"/>' +
+    "</svg>" +
+    '<span class="cap">' + esc(part.label) + "</span>" +
+    '<span class="sub2 t-read">' +
+      (part.known ? Math.round(part.celsius) + "°C"
+                  : esc(part.unavailable || "—")) +
+    "</span></div>";
+}
+
+function paintTempGauge(el, part) {
+  const known = !!part.known;
+  const floor = part.floor != null ? part.floor : 25;
+  const hot = part.hot != null ? part.hot : 90;
+  const span = Math.max(1, hot - floor);
+  const level = known
+    ? Math.max(0, Math.min(1, (part.celsius - floor) / span)) : 0;
+
+  // The column runs from just under the bulb up to the top of the stem. The
+  // bulb stays full whatever the reading: an empty bulb reads as a broken
+  // thermometer, not as a cold one.
+  const top = 18, bottom = 56;
+  const y = bottom - level * (bottom - top);
+
+  el.className = "gauge temp-gauge " + (known ? part.state : "unknown");
+  const fill = el.querySelector(".t-fill");
+  if (fill) {
+    fill.setAttribute("y", y.toFixed(1));
+    fill.setAttribute("height", (86 - y).toFixed(1));
+  }
+  const read = el.querySelector(".t-read");
+  if (read) {
+    read.textContent = known ? Math.round(part.celsius) + "°C"
+                             : (part.unavailable || "—");
+  }
+}
 
 function renderTemps(data) {
   const box = document.getElementById("live-temps");
   if (!box) return;
   if (!data || !data.parts || !data.parts.length) { box.innerHTML = ""; return; }
 
-  box.innerHTML = data.parts.map(p => {
-    const value = p.known ? Math.round(p.celsius) + "°C" : "—";
-    const title = p.known ? "" : ' title="' + esc(p.unavailable || "not reported") + '"';
-    return '<span class="t ' + esc(p.state) + '"' + title + '>' +
-      '<span class="n">' + esc(p.label) + "</span><b>" + value + "</b>" +
-      (p.known ? "" : ' <span class="n">' + esc(p.unavailable || "") + "</span>") +
-      "</span>";
-  }).join("");
+  const signature = data.parts.map(p => p.label).join("|");
+  if (box.dataset.signature !== signature) {
+    box.dataset.signature = signature;
+    box.innerHTML = data.parts.map(thermoGauge).join("");
+  }
+  const gauges = box.querySelectorAll(".temp-gauge");
+  data.parts.forEach((part, i) => {
+    if (gauges[i]) paintTempGauge(gauges[i], part);
+  });
 
+  // Said once per part per spell. A gauge polling every second would otherwise
+  // raise the same alarm sixty times a minute, which is how people learn to
+  // ignore it. It arms again only once the part is properly back down, so one
+  // sitting on the threshold does not chatter.
   for (const part of data.parts) {
     if (!part.known) continue;
     const key = part.part + ":" + part.label;
@@ -3706,8 +3784,6 @@ function renderTemps(data) {
              "°C — past the point where it stops boosting. Expect the frame " +
              "rate to sag until it cools.", true);
     } else if (!isHot && wasHot && part.state === "fine") {
-      // Only re-arm once it is properly back down, not the moment it dips
-      // below the line, or a part sitting on the threshold alarms repeatedly.
       tempAlarm[key] = false;
     }
   }
