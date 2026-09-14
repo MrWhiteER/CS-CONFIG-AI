@@ -257,10 +257,8 @@
   .temp-gauge.hot     { --t: var(--bad); }
   .temp-gauge.unknown { --t: var(--line); opacity: .55; }
 
-  .temp-gauge .t-glass {
-    fill: rgba(255, 255, 255, .045);
-    stroke: var(--line); stroke-width: 2;
-  }
+  .temp-gauge .t-glass { fill: rgba(255, 255, 255, .045); stroke: none; }
+  .temp-gauge .t-rim { fill: none; stroke: var(--line); stroke-width: 2; }
   .temp-gauge .t-ticks line {
     /* --line is almost invisible at this size, and a scale you cannot see is
        just noise in the markup. */
@@ -273,8 +271,7 @@
     fill: var(--t);
     transition: y .6s ease, height .6s ease, fill .4s ease;
   }
-  .temp-gauge .t-bulb { fill: var(--t); transition: fill .4s ease; }
-  .temp-gauge.hot .t-bulb { animation: temp-pulse 1.4s ease-in-out infinite; }
+  .temp-gauge.hot .t-fill { animation: temp-pulse 1.4s ease-in-out infinite; }
   .temp-gauge .t-read { font-family: var(--mono); }
   @keyframes temp-pulse {
     0%, 100% { opacity: 1; }
@@ -282,7 +279,7 @@
   }
   @media (prefers-reduced-motion: reduce) {
     .temp-gauge .t-fill { transition: none; }
-    .temp-gauge.hot .t-bulb { animation: none; }
+    .temp-gauge.hot .t-fill { animation: none; }
   }
 
   .seg { display: flex; gap: 7px; flex-wrap: wrap; }
@@ -3697,28 +3694,35 @@ function sparkline(id, series, colour) {
 */
 const tempAlarm = {};
 
+// One outline for the glass, used three times per gauge: the empty body, the
+// clip that shapes the mercury, and the rim drawn back over the top. Written
+// once so they cannot drift apart -- a clip that disagrees with the outline by
+// a couple of pixels is exactly how a bulb ends up not filling.
+const THERMO_PATH =
+  "M46 12 a9 9 0 0 1 9 9 v33.5 a15 15 0 1 1 -18 0 V21 a9 9 0 0 1 9 -9 z";
+
 function thermoGauge(part) {
   // Sized to the load gauges beside it so the row reads as one set of
   // instruments, but shaped as a thermometer rather than wrapped in a ring --
   // the symbol people already know, doing the thing it is shaped to do.
+  const id = "tc-" + String(part.part + "-" + part.label).replace(/[^a-z0-9-]/gi, "");
   return '<div class="gauge temp-gauge" data-label="' + esc(part.label) + '">' +
     '<svg width="92" height="92" viewBox="0 0 92 92" aria-hidden="true">' +
-      // the glass: one stem and a bulb, drawn as a single outline
-      '<path class="t-glass" d="M46 12 a9 9 0 0 1 9 9 v33.5 a15 15 0 1 1 -18 0 V21 a9 9 0 0 1 9 -9 z"/>' +
-      // the scale, so it reads as an instrument rather than a lozenge
+      '<defs><clipPath id="' + id + '"><path d="' + THERMO_PATH + '"/></clipPath></defs>' +
+      '<path class="t-glass" d="' + THERMO_PATH + '"/>' +
       '<g class="t-ticks">' +
         '<line x1="58" y1="26" x2="65" y2="26"/>' +
         '<line x1="58" y1="34" x2="62" y2="34"/>' +
         '<line x1="58" y1="42" x2="65" y2="42"/>' +
         '<line x1="58" y1="50" x2="62" y2="50"/>' +
       "</g>" +
-      // what moves. Clipped to the stem so the column keeps the glass shape.
-      '<clipPath id="tc-' + esc(part.part + "-" + part.label).replace(/[^a-z0-9-]/gi, "") + '">' +
-        '<path d="M46 12 a9 9 0 0 1 9 9 v33.5 a15 15 0 1 1 -18 0 V21 a9 9 0 0 1 9 -9 z"/>' +
-      "</clipPath>" +
-      '<rect class="t-fill" x="34" y="56" width="24" height="30"' +
-      ' clip-path="url(#tc-' + esc(part.part + "-" + part.label).replace(/[^a-z0-9-]/gi, "") + ')"/>' +
-      '<circle class="t-bulb" cx="46" cy="64" r="10"/>' +
+      // What moves. One rectangle, clipped to the glass, so the bulb is filled
+      // by the very shape that draws it -- there is no second circle to line
+      // up, and the bottom cannot come out short.
+      '<rect class="t-fill" x="28" y="54" width="36" height="38"' +
+      ' clip-path="url(#' + id + ')"/>' +
+      // The rim, back over the top, so the mercury does not swallow the glass.
+      '<path class="t-rim" d="' + THERMO_PATH + '"/>' +
     "</svg>" +
     '<span class="cap">' + esc(part.label) + "</span>" +
     '<span class="sub2 t-read">' +
@@ -3735,17 +3739,17 @@ function paintTempGauge(el, part) {
   const level = known
     ? Math.max(0, Math.min(1, (part.celsius - floor) / span)) : 0;
 
-  // The column runs from just under the bulb up to the top of the stem. The
-  // bulb stays full whatever the reading: an empty bulb reads as a broken
-  // thermometer, not as a cold one.
-  const top = 18, bottom = 56;
+  // Only the top of the column moves. It always runs past the bottom of the
+  // frame and the clip shapes it, so the bulb is solid at every reading -- an
+  // empty bulb reads as a broken thermometer, not as a cold one.
+  const top = 18, bottom = 54;
   const y = bottom - level * (bottom - top);
 
   el.className = "gauge temp-gauge " + (known ? part.state : "unknown");
   const fill = el.querySelector(".t-fill");
   if (fill) {
     fill.setAttribute("y", y.toFixed(1));
-    fill.setAttribute("height", (86 - y).toFixed(1));
+    fill.setAttribute("height", (92 - y).toFixed(1));
   }
   const read = el.querySelector(".t-read");
   if (read) {
