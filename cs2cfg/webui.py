@@ -2245,7 +2245,12 @@ def make_handler(state: State):
                 # and the GPU query is cached, so this is safe to poll.
                 from . import monitor
 
+                from . import temps
+
                 payload = {"ok": True, **monitor.shared().sample()}
+                # Read from a cache refreshed on its own thread, so a poll that
+                # happens every second never waits on a PowerShell start.
+                payload["temps"] = temps.as_dict(temps.shared().read())
                 watcher = _ingame_watcher(state)
                 if watcher is not None:
                     payload["ingame"] = watcher.summary()

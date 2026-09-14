@@ -114,75 +114,168 @@
   select { width: auto; }
 
 
-  /* "Optimise for" as one ball on a track. Three stops, because there are
-     three profiles -- a continuous slider would imply blends that do not
-     exist. Dragging settles on the nearest. */
-  .dial { padding: 6px 2px 0; outline: none; }
+  /* "Optimise for" as one ball on a track.
+
+     Three stops, because there are three profiles -- a continuous slider would
+     imply blends that do not exist. Dragging settles on the nearest.
+
+     Each profile carries its own colour, and the whole control is lit by it:
+     the ball, the bar behind it, the label, and a wash across the panel. The
+     point is that the mode is readable from across the room without reading a
+     word -- amber runs hot for frames, green is the house default, violet is
+     the expensive one. Colour alone is never the only signal: the ball's
+     position and the lit label say the same thing for anyone who cannot
+     separate the hues.
+  */
+  .dial {
+    --neon: var(--accent);
+    --neon-ink: #0b1017;
+    position: relative;
+    padding: 20px 4px 4px;
+    outline: none;
+    transition: --neon .25s ease;
+  }
+  .dial[data-intent="competitive"] { --neon: var(--neon-competitive); }
+  .dial[data-intent="balanced"]    { --neon: var(--neon-balanced); }
+  .dial[data-intent="quality"]     { --neon: var(--neon-quality); }
+
+  /* Ambient wash, so the panel itself carries the mode. Sits behind
+     everything and never eats a pointer event. */
+  .dial::before {
+    content: "";
+    position: absolute; inset: -14px -18px;
+    border-radius: 16px;
+    background: radial-gradient(60% 120% at var(--glow-x, 50%) 42%,
+                                color-mix(in srgb, var(--neon) 22%, transparent) 0%,
+                                transparent 70%);
+    opacity: .9;
+    transition: background .28s ease;
+    pointer-events: none;
+  }
+
   .dial-track {
-    position: relative; height: 30px; margin: 0 11px;
+    position: relative; height: 26px; margin: 0 13px;
     display: flex; align-items: center;
   }
+  /* A recessed groove rather than a flat line: the inset highlight is what
+     stops it reading as a plain div with a background colour. */
   .dial-track::before {
-    content: ""; position: absolute; left: 0; right: 0; height: 5px;
-    border-radius: 3px; background: var(--line);
+    content: ""; position: absolute; left: 0; right: 0; height: 7px;
+    border-radius: 4px;
+    background: linear-gradient(180deg, #080d14, #131c27);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, .9),
+                inset 0 -1px 0 rgba(255, 255, 255, .04);
   }
   .dial-fill {
-    position: absolute; left: 50%; width: 0; height: 5px; border-radius: 3px;
-    background: linear-gradient(90deg, var(--accent-deep), var(--accent));
-    transition: left .18s ease, width .18s ease;
+    position: absolute; left: 50%; width: 0; height: 7px; border-radius: 4px;
+    background: linear-gradient(180deg,
+                color-mix(in srgb, var(--neon) 85%, white 15%), var(--neon));
+    box-shadow: 0 0 10px var(--neon),
+                0 0 22px color-mix(in srgb, var(--neon) 55%, transparent);
+    transition: left .2s cubic-bezier(.2, .9, .3, 1),
+                width .2s cubic-bezier(.2, .9, .3, 1),
+                background .28s ease, box-shadow .28s ease;
   }
   .dial.dragging .dial-fill, .dial.dragging .dial-ball { transition: none; }
+
   .dial-stop {
-    position: absolute; width: 13px; height: 13px; margin-left: -6px; padding: 0;
-    border-radius: 50%; border: 2px solid var(--line);
-    background: var(--panel); cursor: pointer;
+    position: absolute; width: 11px; height: 11px; margin-left: -5px; padding: 0;
+    border-radius: 50%; border: 0;
+    background: #1b2635;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .07);
+    cursor: pointer;
+    transition: background .2s ease, box-shadow .2s ease;
   }
   .dial-stop:nth-of-type(1) { left: 0; }
   .dial-stop:nth-of-type(2) { left: 50%; }
   .dial-stop:nth-of-type(3) { left: 100%; }
+  .dial-stop[aria-pressed="true"] {
+    background: var(--neon);
+    box-shadow: 0 0 10px var(--neon);
+  }
+
   .dial-ball {
-    position: absolute; left: 50%; width: 22px; height: 22px; margin-left: -11px;
-    border-radius: 50%; background: var(--accent);
-    border: 2px solid var(--panel);
-    box-shadow: 0 2px 9px rgba(0, 0, 0, .45);
+    position: absolute; left: 50%; width: 26px; height: 26px; margin-left: -13px;
+    border-radius: 50%;
+    /* Lit from above, so it reads as a sphere rather than a filled circle. */
+    background:
+      radial-gradient(circle at 34% 28%,
+        #ffffff 0%,
+        color-mix(in srgb, var(--neon) 55%, white) 26%,
+        var(--neon) 62%,
+        color-mix(in srgb, var(--neon) 72%, black) 100%);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--neon) 60%, transparent),
+      0 0 12px var(--neon),
+      0 0 28px color-mix(in srgb, var(--neon) 70%, transparent),
+      0 4px 12px rgba(0, 0, 0, .55);
     cursor: grab; touch-action: none;
-    transition: left .18s ease;
+    transition: left .2s cubic-bezier(.2, .9, .3, 1),
+                background .28s ease, box-shadow .28s ease, transform .12s ease;
   }
-  .dial.dragging .dial-ball { cursor: grabbing; transform: scale(1.12); }
-  .dial:focus-visible .dial-ball { outline: 2px solid var(--accent); outline-offset: 3px; }
-  .dial-labels {
-    display: flex; justify-content: space-between; margin: 3px 0 0;
+  .dial-ball:hover { transform: scale(1.06); }
+  .dial.dragging .dial-ball { cursor: grabbing; transform: scale(1.16); }
+  .dial:focus-visible .dial-ball {
+    outline: 2px solid var(--neon); outline-offset: 4px;
   }
+
+  .dial-labels { display: flex; justify-content: space-between; margin: 9px 0 0; }
   .dial-labels > span {
-    flex: 1; text-align: center; cursor: pointer; opacity: .55;
-    transition: opacity .18s ease;
+    flex: 1; text-align: center; cursor: pointer;
+    color: var(--muted);
+    transition: color .22s ease, text-shadow .22s ease;
   }
   .dial-labels > span:first-child { text-align: left; }
   .dial-labels > span:last-child { text-align: right; }
-  .dial-labels > span[aria-pressed="true"] { opacity: 1; }
-  .dial-labels strong { display: block; font-size: 12px; font-weight: 650; }
-  .dial-labels span span, .dial-labels > span > span {
-    display: block; color: var(--muted); font-size: 11px;
+  .dial-labels strong {
+    display: block; font-size: 13px; font-weight: 700; letter-spacing: .2px;
+    color: inherit;
+  }
+  .dial-labels > span > span {
+    display: block; color: var(--muted); font-size: 11px; opacity: .8;
+  }
+  .dial-labels > span[aria-pressed="true"] {
+    color: var(--neon);
+    text-shadow: 0 0 14px color-mix(in srgb, var(--neon) 75%, transparent);
+  }
+  .dial-labels > span[aria-pressed="true"] > span { color: var(--neon); opacity: .75; }
+
+  /* Everything above leans on colour-mix. Where that is unsupported the neon
+     simply renders flat instead of glowing -- the control still works, and the
+     position and lit label still say which mode is selected. */
+  @supports not (color: color-mix(in srgb, red 50%, blue)) {
+    .dial::before { display: none; }
+    .dial-ball { background: var(--neon); }
   }
 
-  /* The unconfirmed-change prompt. Deliberately blocking: its whole job is to
-     be answered before anything else happens. */
-  .confirm-veil {
-    position: fixed; inset: 0; z-index: 900;
-    background: rgba(4, 6, 12, .72); backdrop-filter: blur(2px);
-    display: flex; align-items: center; justify-content: center; padding: 20px;
+
+  /* Temperatures, beside the load gauges. Heat is why a machine that
+     benchmarks well plays badly: nothing errors, the part just stops boosting
+     and the frame rate sags in the long rounds. */
+  .temps { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+  .temps .t {
+    display: flex; align-items: baseline; gap: 6px;
+    padding: 4px 9px; border-radius: 999px;
+    border: 1px solid var(--line); background: var(--panel-2);
+    font-size: 11px;
   }
-  .confirm-box {
-    background: var(--panel); border: 1px solid var(--accent-deep);
-    border-radius: 12px; padding: 18px 20px; max-width: 440px; width: 100%;
-    box-shadow: 0 18px 48px rgba(0, 0, 0, .6);
+  .temps .t b { font-family: var(--mono); font-size: 12px; font-weight: 600; }
+  .temps .t .n { color: var(--muted); }
+  .temps .t.warm { border-color: var(--warn); }
+  .temps .t.warm b { color: var(--warn); }
+  .temps .t.hot {
+    border-color: var(--bad); background: rgba(255, 92, 108, .1);
+    animation: temp-pulse 1.4s ease-in-out infinite;
   }
-  .confirm-box h3 { margin: 0 0 6px; font-size: 15px; }
-  .confirm-box ul {
-    margin: 10px 0 0; padding-left: 18px; max-height: 190px; overflow-y: auto;
+  .temps .t.hot b { color: var(--bad); }
+  .temps .t.unknown { opacity: .55; }
+  @keyframes temp-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 92, 108, .5); }
+    50%      { box-shadow: 0 0 0 5px rgba(255, 92, 108, 0); }
   }
-  .confirm-box li { font-size: 12px; color: var(--text); margin: 3px 0; }
-  .confirm-box .actions { margin-top: 14px; }
+  @media (prefers-reduced-motion: reduce) {
+    .temps .t.hot { animation: none; }
+  }
   .seg { display: flex; gap: 7px; flex-wrap: wrap; }
   .seg button {
     flex: 1 1 auto; min-width: 100px; padding: 9px 12px; cursor: pointer;
@@ -480,6 +573,13 @@
 
     /* The stage gradient, overridden per section below. */
     --g1: #2b3f7a; --g2: #6d2f6a; --g3: #163f52;
+
+    /* One colour per profile, named once. The dial, the labels and the light
+       across the whole window all read from here, so they can never drift
+       apart into three slightly different greens. */
+    --neon-competitive: #ff9d2e;
+    --neon-balanced:    #17e3a1;
+    --neon-quality:     #a56bff;
   }
 
   /* ------------------------------------------------------------- the stage */
@@ -509,6 +609,37 @@
   @media (prefers-reduced-motion: reduce) { body::before { animation: none; } }
 
   /* One palette per section, so where you are is legible before you read. */
+  /* The selected profile lights the whole window, not just the control.
+
+     A separate layer rather than a change to the three drifting blobs above:
+     those carry the tab's own identity, and overwriting them would make every
+     tab look the same. This sits over them, so the room takes the colour of
+     the mode while each tab still reads as itself.
+  */
+  body { --mode-neon: var(--neon-balanced); }
+  body[data-intent="competitive"] { --mode-neon: var(--neon-competitive); }
+  body[data-intent="balanced"]    { --mode-neon: var(--neon-balanced); }
+  body[data-intent="quality"]     { --mode-neon: var(--neon-quality); }
+
+  #mode-glow {
+    position: fixed; inset: -20%; z-index: 0; pointer-events: none;
+    background:
+      radial-gradient(44% 40% at 50% 8%,
+        color-mix(in srgb, var(--mode-neon) 42%, transparent) 0%, transparent 70%),
+      radial-gradient(70% 60% at 12% 82%,
+        color-mix(in srgb, var(--mode-neon) 16%, transparent) 0%, transparent 72%);
+    filter: blur(58px) saturate(130%);
+    opacity: .75;
+    transition: background 650ms ease, opacity 650ms ease;
+  }
+  /* The accent edges pick it up too, so panels and buttons belong to the mode
+     rather than sitting on top of a differently coloured room. */
+  body[data-intent] .panel { border-color: color-mix(in srgb, var(--mode-neon) 14%, var(--line)); }
+
+  @supports not (color: color-mix(in srgb, red 50%, blue)) {
+    #mode-glow { display: none; }
+  }
+
   body[data-hue="launcher"]  { --g1:#7a1f2e; --g2:#3a2166; --g3:#123049; }
   body[data-hue="tools"]     { --g1:#2c3550; --g2:#4a2f62; --g3:#16333f; }
   body[data-hue="gpu"]       { --g1:#1d6b3f; --g2:#2b4a7a; --g3:#153a45; }
@@ -1964,6 +2095,7 @@
 </style>
 </head>
 <body>
+<div id="mode-glow"></div>
 <div class="app">
 
   <div class="rail-grip" id="rail-grip" role="separator" aria-orientation="vertical"
@@ -2116,6 +2248,7 @@
         <section class="panel" id="live-card">
           <h2>System</h2>
           <div class="gauges" id="live-gauges"></div>
+          <div class="temps" id="live-temps"></div>
           <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:12px">
             <div style="flex:1 1 200px;min-width:170px">
               <div class="sub" style="margin-bottom:2px">CPU load</div>
@@ -3147,6 +3280,14 @@ function paintIntent(name, live) {
     $("dial-fill").style.width = Math.abs(live - 50) + "%";
   }
   const dial = $("intents");
+  // What drives the colour. Set here rather than in each caller so a drag, a
+  // click, a key and a restored preference all light the same way.
+  dial.dataset.intent = name;
+  // The whole window takes the mode's colour, not just the control.
+  document.body.dataset.intent = name;
+  // Keep the ambient wash under the ball while it is being dragged, so the
+  // glow travels with it instead of snapping at the end.
+  dial.style.setProperty("--glow-x", (live === undefined ? pct : live) + "%");
   dial.setAttribute("aria-valuenow", String(at));
   dial.setAttribute("aria-valuetext", name);
   dial.querySelectorAll(".dial-labels > span").forEach(el =>
@@ -3190,7 +3331,11 @@ function chooseIntent(name, quiet) {
   });
   ball.addEventListener("pointermove", e => {
     if (!dragging) return;
-    paintIntent(intent, pctFor(e));
+    // Paint the stop being dragged towards, not the one still selected, so the
+    // colour answers "where am I about to land" while the ball is moving.
+    // Nothing is committed until pointerup.
+    const where = pctFor(e);
+    paintIntent(nearest(where), where);
   });
   ball.addEventListener("pointerup", e => {
     if (!dragging) return;
@@ -3526,6 +3671,48 @@ function sparkline(id, series, colour) {
     ' stroke-linejoin="round" stroke-linecap="round"/>';
 }
 
+/* Temperatures, and telling somebody when one is past the point where it
+   costs them frames.
+
+   Said once per part per spell rather than on every poll: a gauge that polls
+   each second would otherwise raise the same alarm sixty times a minute, which
+   is how people learn to ignore it. It arms again only after the part has come
+   back down, so a machine hovering on the threshold does not chatter.
+*/
+const tempAlarm = {};
+
+function renderTemps(data) {
+  const box = document.getElementById("live-temps");
+  if (!box) return;
+  if (!data || !data.parts || !data.parts.length) { box.innerHTML = ""; return; }
+
+  box.innerHTML = data.parts.map(p => {
+    const value = p.known ? Math.round(p.celsius) + "°C" : "—";
+    const title = p.known ? "" : ' title="' + esc(p.unavailable || "not reported") + '"';
+    return '<span class="t ' + esc(p.state) + '"' + title + '>' +
+      '<span class="n">' + esc(p.label) + "</span><b>" + value + "</b>" +
+      (p.known ? "" : ' <span class="n">' + esc(p.unavailable || "") + "</span>") +
+      "</span>";
+  }).join("");
+
+  for (const part of data.parts) {
+    if (!part.known) continue;
+    const key = part.part + ":" + part.label;
+    const wasHot = !!tempAlarm[key];
+    const isHot = part.state === "hot";
+    if (isHot && !wasHot) {
+      tempAlarm[key] = true;
+      status(part.label + " is at " + Math.round(part.celsius) +
+             "°C — past the point where it stops boosting. Expect the frame " +
+             "rate to sag until it cools.", true);
+    } else if (!isHot && wasHot && part.state === "fine") {
+      // Only re-arm once it is properly back down, not the moment it dips
+      // below the line, or a part sitting on the threshold alarms repeatedly.
+      tempAlarm[key] = false;
+    }
+  }
+}
+
 // --- live system readout --------------------------------------------------
 let liveTimer = null;
 
@@ -3549,6 +3736,7 @@ async function pollLive() {
 
     sparkline("spark-cpu", d.history.cpu, "#e4002b");
     sparkline("spark-gpu", d.history.gpu, "#3d8bfd");
+    renderTemps(d.temps);
 
     const note = [];
     if (!gpu.available) note.push("GPU figures need nvidia-smi; not found on this machine.");
