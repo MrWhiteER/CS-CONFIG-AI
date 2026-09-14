@@ -2255,6 +2255,7 @@
           <h2>System</h2>
           <div class="gauges" id="live-gauges"></div>
           <div class="temps" id="live-temps"></div>
+          <div class="sub2" id="temps-note" style="margin-top:6px"></div>
           <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:12px">
             <div style="flex:1 1 200px;min-width:170px">
               <div class="sub" style="margin-bottom:2px">CPU load</div>
@@ -3694,6 +3695,36 @@ function sparkline(id, series, colour) {
 */
 const tempAlarm = {};
 
+/* Turning the locked gauges into something answerable.
+
+   CPU-adjacent and drive sensors are behind administrator. Rather than
+   elevating the whole app -- which would start Steam elevated too, since CS2
+   is launched through the steam:// protocol -- one prompt starts a small
+   reader that publishes those two sources for the app to read.
+*/
+async function unlockTemps(button) {
+  button.disabled = true;
+  const said = button.textContent;
+  button.textContent = "Asking…";
+  try {
+    const r = await api("/api/temps/elevate", {});
+    if (r.declined) { status("Left as it was — the prompt was declined."); return; }
+    if (!r.ok) throw new Error(r.error || "could not start the reader");
+    status(r.already ? "Already reading those sensors."
+                     : "Reading drive and board sensors now.");
+  } catch (err) {
+    status("Could not start the reader: " + (err && err.message || err), true);
+  } finally {
+    button.disabled = false;
+    button.textContent = said;
+  }
+}
+
+document.addEventListener("click", e => {
+  const button = e.target.closest("#temps-unlock");
+  if (button) unlockTemps(button);
+});
+
 // One outline for the glass, used three times per gauge: the empty body, the
 // clip that shapes the mercury, and the rim drawn back over the top. Written
 // once so they cannot drift apart -- a clip that disagrees with the outline by
@@ -3772,6 +3803,18 @@ function renderTemps(data) {
   data.parts.forEach((part, i) => {
     if (gauges[i]) paintTempGauge(gauges[i], part);
   });
+
+  // Offered only while something is actually locked, and only where a prompt
+  // could help -- an offer that changes nothing is worse than no offer.
+  const locked = data.parts.some(p => !p.known &&
+    /administrator/i.test(p.unavailable || ""));
+  const note = document.getElementById("temps-note");
+  if (note) {
+    note.innerHTML = (locked && data.can_elevate)
+      ? '<button class="btn small" id="temps-unlock">Read drive &amp; board sensors</button>' +
+        '<span class="sub"> one administrator prompt; the app itself stays as it is</span>'
+      : "";
+  }
 
   // Said once per part per spell. A gauge polling every second would otherwise
   // raise the same alarm sixty times a minute, which is how people learn to

@@ -655,6 +655,18 @@ SCALING_MODES = {
 }
 
 
+def cmd_temp_helper(ctx: Context) -> int:
+    """Read the temperatures that need administrator, for the running app.
+
+    Not meant to be typed. The application starts this behind a UAC prompt so
+    that it does not have to be elevated itself -- see the note in
+    :mod:`cs2cfg.temps` about what elevating the whole thing would do to Steam.
+    """
+    from . import temps
+
+    return temps.run_helper(int(ctx.args.parent or 0))
+
+
 def cmd_net(ctx: Context) -> int:
     """Measure the connection the way sub-tick cares about."""
     from . import netcheck
@@ -1460,6 +1472,19 @@ def build_parser() -> argparse.ArgumentParser:
     stretch.add_argument("--list", action="store_true",
                          help="list matching windows ('--process *' for all)")
 
+    helper = sub.add_parser(
+        "temp-helper", parents=[shared],
+        help=argparse.SUPPRESS,
+        description=(
+            "Reads CPU and drive temperatures for a running copy of the app and "
+            "publishes them to a file it can read. Started behind a UAC prompt by "
+            "the app itself; there is no reason to run it by hand. It exits when "
+            "the application that asked for it does."
+        ),
+    )
+    helper.add_argument("--parent", type=int, default=0,
+                        help="process id to follow; the helper exits with it")
+
     net = sub.add_parser(
         "net", parents=[shared],
         help="measure packet loss and jitter, the two things that stop shots registering",
@@ -1604,6 +1629,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         "stretch": cmd_stretch,
         "scaling": cmd_scaling,
         "net": cmd_net,
+        "temp-helper": cmd_temp_helper,
         "web": cmd_web,
         "desktop": cmd_desktop,
         "cfg": cmd_cfg,

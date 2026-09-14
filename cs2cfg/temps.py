@@ -29,11 +29,14 @@ from __future__ import annotations
 
 import ctypes
 import json
+import os
+import re
 import subprocess
 import sys
 import threading
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Dict, List, Optional
 
 # Long enough that the cost disappears, short enough to catch a machine heating
@@ -45,8 +48,8 @@ _CREATE_NO_WINDOW = 0x08000000
 # Where a part stops boosting and starts losing frames. Not damage thresholds --
 # silicon protects itself long before this -- but the point at which the number
 # explains a frame rate that has quietly dropped.
-WARM = {"cpu": 85, "gpu": 83, "drive": 60}
-HOT = {"cpu": 95, "gpu": 87, "drive": 70}
+WARM = {"system": 55, "gpu": 83, "drive": 60}
+HOT = {"system": 70, "gpu": 87, "drive": 70}
 
 # Where the scale starts. A part idling at 35 should not already read as a
 # third full: nothing interesting happens below room temperature, so the gauge
@@ -76,7 +79,7 @@ def _powershell(script: str, timeout: int = 25) -> str:
 @dataclass
 class Reading:
     """One sensor, or the reason there is no sensor."""
-    part: str                  # "cpu" | "gpu" | "drive"
+    part: str                  # "gpu" | "system" | "drive"
     label: str
     celsius: Optional[float] = None
     unavailable: str = ""
@@ -101,6 +104,9 @@ class Readings:
     parts: List[Reading] = field(default_factory=list)
     elevated: bool = False
     at: float = 0.0
+    # Whether the privileged readings are coming from the helper rather than
+    # from this process. The page uses it to decide whether to offer the prompt.
+    assisted: bool = False
 
     @property
     def hottest(self) -> Optional[Reading]:
@@ -108,14 +114,26 @@ class Readings:
         return max(known, key=lambda p: p.celsius) if known else None
 
 
-def _cpu() -> Reading:
-    """The ACPI thermal zone, when the machine exposes one and we may read it.
+def _system_zone() -> Reading:
+    """The ACPI thermal zone -- and it is not the CPU, whatever guides claim.
+
+    Measured on a 12900K desktop this reads 27.9 C while the machine is awake:
+    close to room temperature, and nowhere near a CPU package under any load.
+    On most desktop boards TZ00 is a chipset or chassis sensor. It is a real
+    temperature and worth showing, so it is shown -- as "System", which is what
+    it is.
+
+    Calling it CPU would be the exact failure this module exists to avoid: a
+    plausible number from the wrong sensor, which is worse than no number
+    because somebody acts on it. A true package temperature needs a kernel
+    driver reading the MSRs, and installing one for a read-out is not a trade
+    worth making behind anyone's back.
 
     Reported in tenths of a kelvin. Anything outside a plausible range is
-    dropped rather than shown: some firmware fills this field with a constant,
-    and a fixed 27 degrees looks like a working sensor.
+    dropped: some firmware answers with a constant, and a fixed value looks
+    exactly like a working sensor.
     """
-    found = Reading("cpu", "CPU")
+    found = Reading("system", "System")
     if not _elevated():
         found.unavailable = "needs administrator"
         return found
@@ -133,11 +151,38 @@ def _cpu() -> Reading:
         if 5 < celsius < 125:
             values.append(celsius)
     if not values:
-        found.unavailable = "this machine exposes no thermal zone"
+        found.unavailable = "no thermal zone on this machine"
         return found
     # The warmest zone is the one worth showing; the others are chassis points.
     found.celsius = round(max(values), 1)
     return found
+
+
+
+# Makers put their own name and the capacity in the product string, which is
+# the least useful part of it when four of them are stacked in a row: the
+# model is what tells them apart.
+_MAKERS = ("samsung", "western digital", "wd", "seagate", "crucial", "kingston",
+           "sk hynix", "hynix", "intel", "corsair", "sabrent", "adata", "toshiba")
+_CAPACITY = re.compile(r"\b\d+(?:\.\d+)?\s*[TGM]B\b", re.I)
+
+
+def _short_drive(name: str) -> str:
+    """A drive's model, without the maker and the size.
+
+    Falls back to the full string rather than to nothing: an unrecognised
+    naming scheme should read oddly, not vanish.
+    """
+    trimmed = _CAPACITY.sub("", name or "").strip()
+    low = trimmed.lower()
+    for maker in _MAKERS:
+        if low.startswith(maker):
+            trimmed = trimmed[len(maker):].strip()
+            break
+    trimmed = trimmed.lstrip("-").strip()
+    if trimmed.lower().startswith("ssd"):
+        trimmed = trimmed[3:].strip()
+    return trimmed or (name or "drive").strip()
 
 
 def _drives() -> List[Reading]:
@@ -171,7 +216,8 @@ def _drives() -> List[Reading]:
             continue
         if not 5 < celsius < 125:
             continue
-        found.append(Reading("drive", name, celsius=round(celsius, 1)))
+        found.append(Reading("drive", _short_drive(name),
+                             celsius=round(celsius, 1)))
     return found
 
 
@@ -203,9 +249,19 @@ class Watcher:
         self._working = False
 
     def _collect(self) -> Readings:
-        parts = [_gpu(), _cpu()]
-        parts.extend(_drives())
-        return Readings(parts=parts, elevated=_elevated(), at=time.time())
+        # The GPU never needs privileges, so it is always read here. The other
+        # two come from the elevated helper when one is running; without it,
+        # reading them directly is what produces the "needs administrator"
+        # note, which is the honest answer rather than a blank.
+        parts = [_gpu()]
+        published = _published()
+        if published:
+            parts.extend(published)
+        else:
+            parts.append(_system_zone())
+            parts.extend(_drives())
+        return Readings(parts=parts, elevated=_elevated() or bool(published),
+                        at=time.time(), assisted=bool(published))
 
     def _refresh(self) -> None:
         try:
@@ -244,6 +300,8 @@ def shared() -> Watcher:
 def as_dict(found: Readings) -> dict:
     return {
         "elevated": found.elevated,
+        "assisted": found.assisted,
+        "can_elevate": sys.platform == "win32" and not found.assisted,
         "at": found.at,
         # The thresholds travel with the reading. The gauge draws how full the
         # part is against its own limit, and a second copy of these numbers in
@@ -257,3 +315,156 @@ def as_dict(found: Readings) -> dict:
                   for p in found.parts],
         "hottest": (found.hottest.celsius if found.hottest else None),
     }
+
+# ---------------------------------------------------------------------------
+# The elevated half
+# ---------------------------------------------------------------------------
+#
+# CPU and drive temperatures need administrator, and the obvious answer -- run
+# the whole application elevated -- is the wrong one here. This app launches
+# CS2 through the ``steam://`` protocol, and a protocol handler invoked from an
+# elevated process starts Steam elevated too when Steam is not already up.
+# Steam then writes its files as administrator, which is a permission mess to
+# unpick and something Valve advises against. A UAC prompt on every launch, to
+# read a thermometer, is a poor trade on its own; one that can leave the game
+# library owned by the wrong user is not a trade at all.
+#
+# So only the reader is elevated. A small helper process is started on request,
+# samples the two privileged sources, and publishes them to a file the
+# unelevated application reads. One prompt, and the app -- and therefore Steam
+# -- stays exactly as it was.
+
+HELPER_FILE = "temps_elevated.json"
+
+# How long a published reading is worth trusting. Three refreshes: enough that
+# a slow sample does not blink the display out, short enough that a helper
+# which has died stops being believed.
+HELPER_STALE = REFRESH * 3
+
+
+def helper_path() -> "Path":
+    from .paths import user_data_dir
+
+    return user_data_dir() / HELPER_FILE
+
+
+def _parent_alive(pid: int) -> bool:
+    """Whether the application that asked for this helper is still running.
+
+    The helper holds administrator rights, so it must not outlive the thing
+    that wanted them. Tying it to the parent means closing the app closes it,
+    including on a crash.
+    """
+    if not pid:
+        return False
+    try:
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    except OSError:
+        return False
+    SYNCHRONIZE = 0x00100000
+    handle = kernel32.OpenProcess(SYNCHRONIZE, False, int(pid))
+    if not handle:
+        return False
+    # WAIT_TIMEOUT means it is still running; WAIT_OBJECT_0 means it has gone.
+    still = kernel32.WaitForSingleObject(handle, 0) != 0
+    kernel32.CloseHandle(handle)
+    return still
+
+
+def run_helper(parent_pid: int) -> int:
+    """Sample the privileged sources until the application goes away.
+
+    This is what runs behind the UAC prompt. It writes and exits; it never
+    reads the application's own state, and it has no other entry point.
+    """
+    path = helper_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    while _parent_alive(parent_pid):
+        parts = [_system_zone()]
+        parts.extend(_drives())
+        payload = {
+            "at": time.time(),
+            "parts": [{"part": p.part, "label": p.label, "celsius": p.celsius,
+                       "unavailable": p.unavailable} for p in parts],
+        }
+        try:
+            path.write_text(json.dumps(payload), encoding="utf-8")
+        except OSError:
+            return 1
+        time.sleep(REFRESH)
+    try:
+        path.unlink()
+    except OSError:
+        pass
+    return 0
+
+
+def _published() -> List[Reading]:
+    """Readings from the elevated helper, if one is running and current."""
+    try:
+        raw = helper_path().read_text(encoding="utf-8")
+        payload = json.loads(raw)
+    except (OSError, ValueError):
+        return []
+    if time.time() - float(payload.get("at") or 0) > HELPER_STALE:
+        return []
+    out: List[Reading] = []
+    for row in payload.get("parts") or []:
+        out.append(Reading(part=str(row.get("part") or ""),
+                           label=str(row.get("label") or ""),
+                           celsius=row.get("celsius"),
+                           unavailable=str(row.get("unavailable") or "")))
+    return out
+
+
+def helper_running() -> bool:
+    return bool(_published())
+
+
+def start_helper() -> dict:
+    """Ask Windows for the one prompt, and start the reader behind it.
+
+    Returns without waiting: the prompt is the user's to answer, and the first
+    readings appear a moment later through the normal refresh.
+    """
+    if sys.platform != "win32":
+        return {"ok": False, "error": "administrator rights are a Windows thing"}
+    if helper_running():
+        return {"ok": True, "already": True, "note": "already reading"}
+    if _elevated():
+        # Already administrator, so no prompt is needed or wanted.
+        threading.Thread(target=run_helper, args=(os.getpid(),), daemon=True).start()
+        return {"ok": True, "elevated": True, "note": "reading directly"}
+
+    exe, args = _helper_command()
+    if not exe:
+        return {"ok": False, "error": "could not work out how to start the reader"}
+    try:
+        # SW_HIDE, and "runas" is what raises the prompt.
+        result = ctypes.windll.shell32.ShellExecuteW(None, "runas", exe, args, None, 0)
+    except Exception as exc:                # pragma: no cover - shell refusal
+        return {"ok": False, "error": str(exc)}
+    if int(result) <= 32:
+        # 5 is ERROR_ACCESS_DENIED, which here means the prompt was declined.
+        if int(result) == 5:
+            return {"ok": False, "declined": True,
+                    "error": "the administrator prompt was declined"}
+        return {"ok": False, "error": f"Windows refused to start the reader ({result})"}
+    return {"ok": True, "started": True}
+
+
+def _helper_command() -> tuple:
+    """The executable and arguments that run this module as the helper.
+
+    Frozen, the application is its own helper. From source it is the
+    interpreter running the package. Either way the parent's id goes with it so
+    the helper cannot outlive the app that asked for it.
+    """
+    from .paths import is_frozen
+
+    pid = os.getpid()
+    if is_frozen():
+        return sys.executable, f'temp-helper --parent {pid}'
+    script = str(Path(__file__).resolve().parents[1])
+    return sys.executable, f'-m cs2cfg temp-helper --parent {pid}'
+

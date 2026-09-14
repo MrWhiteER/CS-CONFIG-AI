@@ -1389,6 +1389,18 @@ def _net(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     return netcheck.as_dict(netcheck.survey(samples=samples))
 
 
+def _temps_elevate(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Raise the one prompt, and start the privileged reader behind it.
+
+    Only the reader is elevated. See the note in :mod:`cs2cfg.temps`: this app
+    starts CS2 through the steam:// protocol, and doing that from an elevated
+    process starts Steam elevated too.
+    """
+    from . import temps
+
+    return temps.start_helper()
+
+
 def _focus(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     """Pull the app back in front, for changes waiting to be confirmed.
 
@@ -2162,6 +2174,7 @@ def make_handler(state: State):
         "/api/cfg/starter": _cfg_starter,
         "/api/focus": _focus,
         "/api/net": _net,
+        "/api/temps/elevate": _temps_elevate,
         "/api/cfg/convert": _cfg_convert,
         "/api/cfg/check": _cfg_check,
         "/api/cfg/polish": _cfg_polish_apply,
