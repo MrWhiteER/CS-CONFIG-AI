@@ -282,6 +282,88 @@
     .temp-gauge.hot .t-fill { animation: none; }
   }
 
+  /* Fix It, as a toolbox rather than a document.
+
+     A column of prose panels reads as documentation. A wall of tiles with an
+     icon apiece reads as a set of tools, which is what these are. The icon
+     carries the family colour, so the four groups separate before a word is
+     read -- and never only by colour: every tile is captioned with its family
+     and titled with what it does. */
+  .fix-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+    gap: 12px;
+    /* Stretch rather than start: tiles in a row match height, which is what
+       lets margin-top:auto line the buttons up across them. */
+    align-items: stretch;
+  }
+  .fix-banner {
+    border: 1px solid var(--warn); border-radius: var(--r);
+    background: color-mix(in srgb, var(--warn) 9%, var(--panel));
+    color: var(--warn);
+    padding: 11px 14px; margin: 0 0 12px; font-size: 12px; line-height: 1.5;
+  }
+
+  .fix-tile {
+    --fam: var(--accent);
+    display: flex; flex-direction: column;
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: var(--r); padding: 15px 16px 14px;
+    transition: border-color .2s ease, transform .2s ease, box-shadow .2s ease;
+  }
+  .fix-tile[data-family="network"]  { --fam: #4d94ff; }
+  .fix-tile[data-family="graphics"] { --fam: #2fd0d6; }
+  .fix-tile[data-family="devices"]  { --fam: #a970ff; }
+  .fix-tile[data-family="sound"]    { --fam: #ff9d2e; }
+  .fix-tile:hover {
+    border-color: color-mix(in srgb, var(--fam) 45%, var(--line));
+    transform: translateY(-1px);
+    box-shadow: 0 10px 26px rgba(0, 0, 0, .35);
+  }
+
+  .fix-head { display: flex; gap: 13px; align-items: flex-start; }
+  .fix-ic {
+    flex: 0 0 auto; width: 52px; height: 52px; border-radius: 15px;
+    display: grid; place-items: center;
+    background: color-mix(in srgb, var(--fam) 15%, transparent);
+    border: 1px solid color-mix(in srgb, var(--fam) 35%, transparent);
+    color: var(--fam);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06);
+  }
+  .fix-ic svg {
+    width: 28px; height: 28px;
+    fill: none; stroke: currentColor; stroke-width: 1.7;
+    stroke-linecap: round; stroke-linejoin: round;
+  }
+  .fix-title { min-width: 0; padding-top: 2px; }
+  .fix-fam {
+    display: block; font-size: 10px; letter-spacing: .09em; text-transform: uppercase;
+    color: var(--fam); font-weight: 700; margin-bottom: 2px;
+  }
+  /* The badges sit side by side and need to read as two, not one run-on word. */
+  .fix-title .flag { margin: 0 5px 0 0; }
+  .fix-title h3 {
+    margin: 0 0 4px; font-size: 15px; font-weight: 650; line-height: 1.25;
+    color: var(--ink);
+  }
+  .fix-blurb {
+    margin: 11px 0 0; font-size: 12px; line-height: 1.55; color: var(--muted);
+  }
+  .fix-danger {
+    margin: 9px 0 0; font-size: 11.5px; line-height: 1.5; color: var(--warn);
+  }
+  /* Pushes the controls to the bottom, so buttons line up across a row of
+     tiles whose text runs to different lengths. */
+  .fix-body { margin-top: auto; padding-top: 12px; }
+  .fix-body select { width: 100%; }
+  .fix-body .actions { margin-top: 9px; }
+  .fix-said { font-size: 11.5px; line-height: 1.5; margin-top: 9px; }
+  .fix-said:empty { margin-top: 0; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .fix-tile, .fix-tile:hover { transition: none; transform: none; }
+  }
+
   .seg { display: flex; gap: 7px; flex-wrap: wrap; }
   .seg button {
     flex: 1 1 auto; min-width: 100px; padding: 9px 12px; cursor: pointer;
@@ -3768,20 +3850,68 @@ async function loadFixes(force) {
   }
 }
 
+/* Each repair gets a face.
+
+   A column of prose panels reads as documentation; a wall of tiles with an
+   icon apiece reads as a toolbox, which is what this is. The icon carries the
+   family colour so the four groups are separable before a word is read, and
+   the colour is never the only signal -- every tile still says what it is.
+*/
+const FIX_ART = {
+  "net.restart":
+    '<path d="M2.5 9.5a15 15 0 0119 0M6 13a10 10 0 0112 0M9.5 16.5a5 5 0 015 0"/>' +
+    '<circle cx="12" cy="20" r="1.4" fill="currentColor" stroke="none"/>',
+  "net.flush":
+    '<path d="M5 6h14M9 6V4.5h6V6M7 6l1 13.5a1.5 1.5 0 001.5 1.4h5a1.5 1.5 0 001.5-1.4L17 6"/>' +
+    '<path d="M10.5 10v7M13.5 10v7"/>',
+  "gpu.restart":
+    '<rect x="3" y="6" width="18" height="12" rx="2.2"/>' +
+    '<rect x="8.5" y="10" width="7" height="4.5" rx="1"/>' +
+    '<path d="M7 3.5v2.5M17 3.5v2.5M7 18v2.5M17 18v2.5"/>',
+  "device.restart":
+    '<rect x="8" y="2.8" width="8" height="18.4" rx="4"/><path d="M12 6.5v3.5"/>',
+  "sound.apps":
+    '<path d="M11 5L6.5 9H3.5v6h3L11 19z"/><path d="M15.5 9.2a4 4 0 010 5.6"/>' +
+    '<path d="M18.2 6.5a8 8 0 010 11"/>',
+  "sound.restart":
+    '<path d="M4 13a8 8 0 0116 0"/><path d="M4 13v3.5a2 2 0 002 2h1.5V13z"/>' +
+    '<path d="M20 13v3.5a2 2 0 01-2 2h-1.5V13z"/>',
+};
+
+const FIX_FAMILY_NAME = {
+  network: "Connection",
+  graphics: "Picture",
+  devices: "Devices",
+  sound: "Sound",
+};
+
+function fixIcon(fix) {
+  const art = FIX_ART[fix.id] || '<circle cx="12" cy="12" r="8"/>';
+  return '<span class="fix-ic"><svg viewBox="0 0 24 24" aria-hidden="true">' +
+    art + "</svg></span>";
+}
+
 function fixSaidId(id) { return "fix-said-" + id.split(".").join("-"); }
 
-function fixCard(fix, inner) {
+function fixTile(fix, inner) {
   if (!fix) return "";
   const tags =
     (fix.needs_admin ? '<span class="flag warn">administrator</span>' : "") +
-    (fix.disruptive ? '<span class="flag warn">interrupts play</span>' : "");
-  return '<section class="panel"><h2>' + esc(fix.title) + tags + "</h2>" +
-    '<p class="sub" style="margin:0 0 9px">' + esc(fix.blurb) + "</p>" +
+    (fix.disruptive && !fix.allowed_in_game
+      ? '<span class="flag warn">not during a match</span>' : "");
+  return '<section class="fix-tile" data-family="' + esc(fix.family) + '">' +
+    '<div class="fix-head">' + fixIcon(fix) +
+      '<div class="fix-title"><span class="fix-fam">' +
+        esc(FIX_FAMILY_NAME[fix.family] || fix.family) + "</span>" +
+        "<h3>" + esc(fix.title) + "</h3>" + tags +
+      "</div>" +
+    "</div>" +
+    '<p class="fix-blurb">' + esc(fix.blurb) + "</p>" +
     (fix.danger
-      ? '<p class="sub2" style="color:var(--warn);margin:0 0 9px">' + esc(fix.danger) + "</p>"
+      ? '<p class="fix-danger">' + esc(fix.danger) + "</p>"
       : "") +
-    inner +
-    '<div class="sub2" style="margin-top:8px" id="' + fixSaidId(fix.id) + '"></div></section>';
+    '<div class="fix-body">' + inner + "</div>" +
+    '<div class="fix-said" id="' + fixSaidId(fix.id) + '"></div></section>';
 }
 
 function fixButton(id, label, disabled) {
@@ -3797,56 +3927,58 @@ function renderFixes() {
   let html = "";
 
   if (fixData.game_running) {
-    html += '<section class="panel"><p class="sub" style="margin:0;color:var(--warn)">' +
-      "CS2 is running. Anything that would interrupt it is held back until you close it." +
-      "</p></section>";
+    html += '<div class="fix-banner">CS2 is running. Anything that would ' +
+      "interrupt it is held back until you close it — the graphics driver " +
+      "aside, which is safe to reset mid-game and is the reason it exists.</div>";
   }
+
+  html += '<div class="fix-grid">';
 
   const adapters = fixData.adapters || [];
   const options = adapters.map(a =>
     '<option value="' + esc(a.name) + '">' + esc(a.name) + " · " + esc(a.speed) +
     (a.wireless ? " · Wi-Fi" : " · wired") + "</option>").join("");
-  html += fixCard(by["net.restart"],
-    '<div class="row"><span class="k">Connection</span><span class="v">' +
+  html += fixTile(by["net.restart"],
     (adapters.length
       ? '<select id="fix-adapter">' + options + "</select>"
       : '<span class="sub">no connected adapter found</span>') +
-    '</span></div><div class="actions">' +
-    fixButton("net.restart", "Restart it", !adapters.length) +
-    fixButton("net.flush", "Flush DNS", false) + "</div>");
+    '<div class="actions">' + fixButton("net.restart", "Restart it", !adapters.length) +
+    "</div>");
 
-  html += fixCard(by["gpu.restart"],
-    '<div class="actions">' + fixButton("gpu.restart", "Restart the driver", false) + "</div>");
+  html += fixTile(by["net.flush"],
+    '<div class="actions">' + fixButton("net.flush", "Flush it", false) + "</div>");
+
+  html += fixTile(by["gpu.restart"],
+    '<div class="actions">' + fixButton("gpu.restart", "Reset the driver", false) + "</div>");
 
   const devices = fixData.devices || [];
   const listFor = show => devices.filter(d => show || d.common).map(d =>
     '<option value="' + esc(d.id) + '"' + (d.restartable ? "" : " disabled") + ">" +
     esc(d.class) + " · " + esc(d.name) +
     (d.restartable ? "" : "  (the only one)") + "</option>").join("");
-  html += fixCard(by["device.restart"],
-    '<div class="row"><span class="k">Device</span><span class="v">' +
-    '<select id="fix-device">' + listFor(false) + "</select></span></div>" +
+  html += fixTile(by["device.restart"],
+    '<select id="fix-device">' + listFor(false) + "</select>" +
     '<label class="opt"><input type="checkbox" id="fix-all-devices"> ' +
-    "Show every device, not just the usual ones (" + devices.length + " in all)</label>" +
+    "Everything, not just the usual (" + devices.length + ")</label>" +
     '<div class="actions">' + fixButton("device.restart", "Restart it", !devices.length) +
     "</div>");
 
   const sound = fixData.sound || {};
   const special = sound.special || [];
-  html += fixCard(by["sound.apps"],
+  html += fixTile(by["sound.apps"],
     (special.length
-      ? '<p class="sub2" style="color:var(--warn);margin:0 0 9px">' +
-        "Audio here runs through " + esc(special.join(", ")) + ". Changing the Windows " +
-        "default would move everything with it, streams included — which is why this " +
-        "gives CS2 its own device instead, and why the app will not write that routing " +
-        "for you: the interface behind it is undocumented, and guessing at a mixer " +
-        "somebody streams through is not a small mistake." + "</p>"
+      ? '<p class="fix-danger">Audio here runs through ' + esc(special.join(", ")) +
+        ". Changing the Windows default would move everything with it, streams " +
+        "included — so this gives CS2 its own device instead. The app will not " +
+        "write that routing for you: the interface behind it is undocumented, and " +
+        "guessing at a mixer somebody streams through is not a small mistake.</p>"
       : "") +
-    '<div class="actions">' + fixButton("sound.apps", "Open the volume mixer", false) + "</div>");
+    '<div class="actions">' + fixButton("sound.apps", "Open the mixer", false) + "</div>");
 
-  html += fixCard(by["sound.restart"],
+  html += fixTile(by["sound.restart"],
     '<div class="actions">' + fixButton("sound.restart", "Restart audio", false) + "</div>");
 
+  html += "</div>";
   box.innerHTML = html;
 
   const toggle = $("fix-all-devices");
