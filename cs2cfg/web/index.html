@@ -2060,6 +2060,39 @@
         </div>
       </div>
 
+      <section class="panel">
+        <h2>Optimise for</h2>
+        <div class="dial" id="intents" role="slider" tabindex="0"
+             aria-label="Optimise for" aria-valuemin="0" aria-valuemax="2" aria-valuenow="1"
+             aria-valuetext="Balanced">
+          <div class="dial-track">
+            <div class="dial-fill" id="dial-fill"></div>
+            <button class="dial-stop" data-intent="competitive" type="button" tabindex="-1"></button>
+            <button class="dial-stop" data-intent="balanced" type="button" tabindex="-1"></button>
+            <button class="dial-stop" data-intent="quality" type="button" tabindex="-1"></button>
+            <div class="dial-ball" id="dial-ball"></div>
+          </div>
+          <div class="dial-labels">
+            <span data-for="competitive"><strong>Competitive</strong><span>frames &amp; clarity</span></span>
+            <span data-for="balanced"><strong>Balanced</strong><span>the default</span></span>
+            <span data-for="quality"><strong>Quality</strong><span>best picture</span></span>
+          </div>
+        </div>
+        <p class="sub" id="intent-desc" style="margin:9px 0 0"></p>
+
+        <div class="row" style="margin-top:10px">
+          <span class="k">Target fps</span>
+          <span class="v">
+            <input type="number" id="target" min="30" max="1000" placeholder="auto">
+            <span class="sub">blank = refresh rate</span>
+          </span>
+        </div>
+        <div class="row" id="account-row">
+          <span class="k">Account</span>
+          <span class="v"><select id="account"></select></span>
+        </div>
+      </section>
+
       <section class="editor" id="launch-card">
         <div class="editor-head">
           <span class="etitle">Launch mode</span>
@@ -2101,6 +2134,21 @@
           <div id="hw"><span class="sub">&hellip;</span></div>
         </section>
       </div>
+
+      <section class="panel" id="net-card">
+        <h2>Connection</h2>
+        <p class="sub" style="margin:0 0 9px">
+          CS2 timestamps the exact moment you click, so a packet that never arrives is a
+          shot the server never saw &mdash; however clearly it landed on your screen. That is
+          what &ldquo;no reg&rdquo; usually is. This measures loss and jitter to your own router and
+          out to the internet separately, so you can tell which side the trouble is on.
+          It takes about a minute and changes nothing.
+        </p>
+        <div class="actions">
+          <button class="btn primary" id="net-run">Measure my connection</button>
+        </div>
+        <div id="net-out"></div>
+      </section>
 
       <section class="panel" id="ingame-card">
         <h2>Changed in-game</h2>
@@ -2326,39 +2374,6 @@
           </p>
         </div>
       </div>
-
-      <section class="panel">
-        <h2>Optimise for</h2>
-        <div class="dial" id="intents" role="slider" tabindex="0"
-             aria-label="Optimise for" aria-valuemin="0" aria-valuemax="2" aria-valuenow="1"
-             aria-valuetext="Balanced">
-          <div class="dial-track">
-            <div class="dial-fill" id="dial-fill"></div>
-            <button class="dial-stop" data-intent="competitive" type="button" tabindex="-1"></button>
-            <button class="dial-stop" data-intent="balanced" type="button" tabindex="-1"></button>
-            <button class="dial-stop" data-intent="quality" type="button" tabindex="-1"></button>
-            <div class="dial-ball" id="dial-ball"></div>
-          </div>
-          <div class="dial-labels">
-            <span data-for="competitive"><strong>Competitive</strong><span>frames &amp; clarity</span></span>
-            <span data-for="balanced"><strong>Balanced</strong><span>the default</span></span>
-            <span data-for="quality"><strong>Quality</strong><span>best picture</span></span>
-          </div>
-        </div>
-        <p class="sub" id="intent-desc" style="margin:9px 0 0"></p>
-
-        <div class="row" style="margin-top:10px">
-          <span class="k">Target fps</span>
-          <span class="v">
-            <input type="number" id="target" min="30" max="1000" placeholder="auto">
-            <span class="sub">blank = refresh rate</span>
-          </span>
-        </div>
-        <div class="row" id="account-row">
-          <span class="k">Account</span>
-          <span class="v"><select id="account"></select></span>
-        </div>
-      </section>
 
       <section class="panel">
         <h2>Write</h2>
@@ -3052,6 +3067,60 @@ $("confirm-veil").addEventListener("keydown", e => {
     });
   }
 })();
+
+/* The connection check. Never automatic: it is forty seconds of pinging, and
+   a check that runs itself is one nobody reads. */
+async function runNetCheck() {
+  const button = $("net-run");
+  const box = $("net-out");
+  button.disabled = true;
+  const said = button.textContent;
+  button.textContent = "Measuring…";
+  box.innerHTML = '<div class="sub" style="padding:10px"><span class="spin"></span> ' +
+    "Sending probes to your router and out to the internet… about a minute.</div>";
+  try {
+    const r = await api("/api/net", {});
+    if (r.error) throw new Error(r.error);
+    let html = "";
+    if (r.adapter) {
+      html += '<div class="row"><span class="k">Adapter</span><span class="v">' +
+        esc(r.adapter.name) + " " + '<span class="sub">' + esc(r.adapter.speed) + "</span>" +
+        (r.adapter.wireless
+          ? '<span class="flag warn">Wi-Fi</span>'
+          : '<span class="flag">wired</span>') + "</span></div>";
+    }
+    for (const probe of [r.gateway, r.internet]) {
+      if (!probe) continue;
+      if (!probe.reachable) {
+        html += '<div class="row"><span class="k">' + esc(probe.label) + '</span>' +
+          '<span class="v sub">' + esc(probe.error || "no answer") + "</span></div>";
+        continue;
+      }
+      html += '<div class="row"><span class="k">' + esc(probe.label) + "</span>" +
+        '<span class="v mono">' + probe.average + " ms avg &middot; jitter " + probe.jitter +
+        " ms &middot; " +
+        (probe.loss > 0
+          ? '<span style="color:var(--bad)">' + probe.loss + "% loss</span>"
+          : '<span style="color:var(--good)">no loss</span>') +
+        ' <span class="sub">(' + probe.received + "/" + probe.sent + " replied)</span></span></div>";
+    }
+    html += (r.findings || []).map(f => {
+      const colour = f.severity === "bad" ? "var(--bad)"
+                   : f.severity === "warn" ? "var(--warn)" : "var(--good)";
+      return '<div class="note"><div class="t" style="color:' + colour + '">' +
+        esc(f.title) + '</div><div class="d">' + esc(f.detail) + "</div></div>";
+    }).join("");
+    box.innerHTML = html;
+  } catch (err) {
+    box.innerHTML = '<span class="sub warn">Could not measure: ' +
+      esc(String(err && err.message || err)) + "</span>";
+  } finally {
+    button.disabled = false;
+    button.textContent = said;
+  }
+}
+
+if ($("net-run")) $("net-run").addEventListener("click", runNetCheck);
 
 /* The optimise-for dial.
 

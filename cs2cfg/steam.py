@@ -227,6 +227,29 @@ def steam_running() -> bool:
     return "steam.exe" in result.stdout.lower()
 
 
+def cs2_running() -> bool:
+    """True if cs2.exe is up.
+
+    The same trap as :func:`steam_running`, for a different file. CS2 holds its
+    video settings in memory and writes cs2_video.txt out when it exits, from
+    what it has rather than from what is on disk. So a change written while the
+    game is running is not merely ignored -- it is overwritten on quit, and the
+    setting comes back looking as though the tool never applied it. V-Sync is
+    the one people notice, because a frame of extra latency is felt.
+    """
+    try:
+        result = subprocess.run(
+            ["tasklist", "/FI", "IMAGENAME eq cs2.exe", "/NH"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return "cs2.exe" in result.stdout.lower()
+
+
 # ---------------------------------------------------------------------------
 # Launch options
 # ---------------------------------------------------------------------------
@@ -317,15 +340,30 @@ def write_video_cfg(
     user: SteamUser,
     changes: Dict[str, int],
     session: Optional[BackupSession] = None,
+    force: bool = False,
 ) -> Dict[str, tuple]:
     """Apply ``changes`` to cs2_video.txt, leaving every other key alone.
 
     Returns ``{key: (before, after)}`` for the keys that actually moved.
+
+    Refused while CS2 is running, because the game rewrites this whole file
+    from memory when it quits. Writing underneath it does not fail -- the file
+    changes, the settings apply, and then the game quietly puts every one of
+    them back. That is indistinguishable from the tool having done nothing,
+    and it is why people report V-Sync switching itself back on. ``force``
+    exists for a caller that has already made the trade knowingly.
     """
     path = user.video_cfg
     if not path.exists():
         raise SteamError(
             f"cs2_video.txt not found at {path}. Launch CS2 once so it writes its video settings, then re-run."
+        )
+
+    if not force and cs2_running():
+        raise SteamError(
+            "CS2 is running. It rewrites cs2_video.txt from memory when it quits, so "
+            "every picture setting written now would be silently put back -- V-Sync "
+            "included. Close the game and apply again."
         )
 
     if session is not None:

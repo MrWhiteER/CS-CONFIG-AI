@@ -244,6 +244,15 @@ def _apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
             state.cfg_folder, state.cfg_name),
     )
 
+    # Same trap as Steam and localconfig.vdf, one file along: CS2 rewrites
+    # cs2_video.txt from memory on quit, so a picture setting written now comes
+    # back on its own and reads as the tool not having worked.
+    if body.get("write_video", True) and steam.cs2_running():
+        return {"ok": False, "error":
+                "CS2 is running. It rewrites cs2_video.txt when it quits, so the picture "
+                "settings would be put back the moment you close the game -- V-Sync "
+                "included. Close CS2, or untick the picture quality box."}
+
     write_launch = bool(body.get("write_launch", True))
     if write_launch and steam.steam_running():
         return {"ok": False, "error":
@@ -1364,6 +1373,22 @@ def _cfg_key_options(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     return {"ok": True, **commands.options(result, binding, state.cs2_install)}
 
 
+def _net(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Measure loss and jitter. Reads only; takes about a minute.
+
+    Deliberately not run on a timer or at startup. It is forty seconds of
+    pinging, and a check that runs itself constantly is a check nobody reads
+    and a small amount of traffic on the very link being measured.
+    """
+    from . import netcheck
+
+    try:
+        samples = max(5, min(60, int(body.get("samples") or netcheck.SAMPLES)))
+    except (TypeError, ValueError):
+        samples = netcheck.SAMPLES
+    return netcheck.as_dict(netcheck.survey(samples=samples))
+
+
 def _focus(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     """Pull the app back in front, for changes waiting to be confirmed.
 
@@ -2136,6 +2161,7 @@ def make_handler(state: State):
         "/api/cfg/source": _cfg_source,
         "/api/cfg/starter": _cfg_starter,
         "/api/focus": _focus,
+        "/api/net": _net,
         "/api/cfg/convert": _cfg_convert,
         "/api/cfg/check": _cfg_check,
         "/api/cfg/polish": _cfg_polish_apply,

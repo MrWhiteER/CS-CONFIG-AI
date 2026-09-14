@@ -396,6 +396,14 @@ def cmd_apply(ctx: Context) -> int:
     report_launch(ctx, launch, current_launch)
     report_advisories(ctx, profile)
 
+    if not ctx.args.no_video and steam.cs2_running():
+        print()
+        print(out.yellow("  CS2 is running, so the picture settings cannot be written."))
+        print(out.dim("  It rewrites cs2_video.txt from memory when it quits, which would"))
+        print(out.dim("  put every one of them back -- V-Sync included."))
+        print(out.dim("  Close the game and re-run, or pass --no-video to skip that part."))
+        return 2
+
     writes_launch = not ctx.args.no_launch
     if writes_launch and steam.steam_running():
         print()
@@ -645,6 +653,59 @@ SCALING_MODES = {
     "aspect": 5,
     "centred": 3,
 }
+
+
+def cmd_net(ctx: Context) -> int:
+    """Measure the connection the way sub-tick cares about."""
+    from . import netcheck
+
+    out = ctx.out
+    out.header("Connection")
+    print(out.dim("  Measuring loss and jitter to your router and out to the internet."))
+    print(out.dim("  This takes about a minute; it cannot be rushed without measuring"))
+    print(out.dim("  noise instead of the connection."))
+    print()
+
+    found = netcheck.survey(samples=ctx.args.samples)
+    if found.error:
+        print(out.red(f"  {found.error}"))
+        return 1
+
+    if found.adapter:
+        kind = out.yellow("Wi-Fi") if found.adapter.wireless else out.green("wired")
+        print(f"  adapter     {found.adapter.name}  {out.dim(found.adapter.speed)}  [{kind}]")
+
+    for probe in (found.gateway, found.internet):
+        if probe is None:
+            continue
+        if not probe.reachable:
+            print(f"  {probe.label:<11} {out.dim(probe.error or 'no answer')}")
+            continue
+        loss = out.green("0% loss") if probe.loss == 0 else out.red(f"{probe.loss}% loss")
+        print(f"  {probe.label:<11} {probe.average:>6.1f} ms avg   "
+              f"jitter {probe.jitter:>5.1f} ms   {loss}   "
+              f"{out.dim(f'({probe.received}/{probe.sent} replied)')}")
+
+    print()
+    for note in found.findings:
+        paint = {"bad": out.red, "warn": out.yellow, "good": out.green}[note.severity]
+        print(f"  {paint(note.title)}")
+        for line in _wrap(note.detail, 70):
+            print(out.dim(f"    {line}"))
+    return 0 if found.ok else 2
+
+
+def _wrap(text: str, width: int) -> List[str]:
+    words, lines, row = text.split(), [], ""
+    for word in words:
+        if len(row) + len(word) + 1 > width:
+            lines.append(row)
+            row = word
+        else:
+            row = f"{row} {word}".strip()
+    if row:
+        lines.append(row)
+    return lines
 
 
 def cmd_scaling(ctx: Context) -> int:
@@ -1399,6 +1460,19 @@ def build_parser() -> argparse.ArgumentParser:
     stretch.add_argument("--list", action="store_true",
                          help="list matching windows ('--process *' for all)")
 
+    net = sub.add_parser(
+        "net", parents=[shared],
+        help="measure packet loss and jitter, the two things that stop shots registering",
+        description=(
+            "CS2 timestamps the exact moment you click, so a packet that never "
+            "arrives is a shot the server never saw -- however clearly it landed on "
+            "your screen. This measures loss and jitter to your own router and out "
+            "to the internet separately, so you can tell which side the trouble is on."
+        ),
+    )
+    net.add_argument("--samples", type=int, default=20,
+                     help="probes per host (default: 20)")
+
     scaling_cmd = sub.add_parser(
         "scaling", parents=[shared],
         help="check whether a stretched mode fills the screen or gets black bars",
@@ -1529,6 +1603,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         "shortcut": cmd_shortcut,
         "stretch": cmd_stretch,
         "scaling": cmd_scaling,
+        "net": cmd_net,
         "web": cmd_web,
         "desktop": cmd_desktop,
         "cfg": cmd_cfg,
