@@ -649,6 +649,7 @@
   body[data-hue="launcher"]  { --g1:#7a1f2e; --g2:#3a2166; --g3:#123049; }
   body[data-hue="tools"]     { --g1:#2c3550; --g2:#4a2f62; --g3:#16333f; }
   body[data-hue="gpu"]       { --g1:#1d6b3f; --g2:#2b4a7a; --g3:#153a45; }
+  body[data-hue="fix"]       { --g1:#7a3a16; --g2:#25405e; --g3:#4a2440; }
   body[data-hue="files"]     { --g1:#3a3550; --g2:#215a6a; --g3:#4a2f52; }
   body[data-hue="scripts"]   { --g1:#5a3a1c; --g2:#2f4a7a; --g3:#3d2f5a; }
   body[data-hue="keyboard"]  { --g1:#6a1f5a; --g2:#1f3a7a; --g3:#2a2f55; }
@@ -784,6 +785,7 @@
   .tabs .tab[data-tab="scripts"]  { --sec: #ff2d95; }
   .tabs .tab[data-tab="files"]    { --sec: #ffb43a; }
   .tabs .tab[data-tab="gpu"]      { --sec: #2fd0d6; }
+  .tabs .tab[data-tab="fix"]      { --sec: #ff7a45; }
   .tabs .tab[data-tab="settings"] { --sec: #8ea2c0; }
   .tabs .tab[data-tab="updates"]  { --sec: #5b8cff; }
 
@@ -2132,6 +2134,8 @@
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 012-2h4l2 2.5h8a2 2 0 012 2V18a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></i><span class="tx">Files</span></button>
       <button class="tab" data-tab="gpu" role="tab" aria-selected="false">
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="7" width="16" height="11" rx="2"/><rect x="9" y="11" width="6" height="4" rx="1"/><path d="M8 4v3M16 4v3M8 18v2M16 18v2"/></svg></i><span class="tx">Graphics</span></button>
+      <button class="tab" data-tab="fix" role="tab" aria-selected="false">
+        <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a4 4 0 00-5.4 5.4L4 17v3h3l5.3-5.3a4 4 0 005.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg></i><span class="tx">Fix It</span></button>
       <button class="tab" data-tab="settings" role="tab" aria-selected="false">
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.6M12 18.6v2.6M4.5 12H2M22 12h-2.5M6.2 6.2L4.4 4.4M19.6 19.6l-1.8-1.8M17.8 6.2l1.8-1.8M4.4 19.6l1.8-1.8"/></svg></i><span class="tx">Settings</span></button>
       <button class="tab" data-tab="updates" role="tab" aria-selected="false">
@@ -2435,6 +2439,21 @@
           <div class="editor-main" id="files-view"></div>
         </div>
       </section>
+    </div>
+
+    <div class="tab-panel hidden" data-panel="fix">
+      <div class="hero">
+        <div class="hero-copy">
+          <div class="eyebrow">When something has gone wrong</div>
+          <h2>Fix It</h2>
+          <p>
+            The things people restart the whole machine for, done one at a time. Each
+            says what it will do before it does it, nothing runs while a match is on
+            that it could interrupt, and anything taken down is put straight back.
+          </p>
+        </div>
+      </div>
+      <div id="fix-out"><span class="sub"><span class="spin"></span> Looking&hellip;</span></div>
     </div>
 
     <div class="tab-panel hidden" data-panel="gpu">
@@ -3723,6 +3742,167 @@ async function unlockTemps(button) {
 document.addEventListener("click", e => {
   const button = e.target.closest("#temps-unlock");
   if (button) unlockTemps(button);
+});
+
+/* ---------------------------------------------------------------------------
+   Fix It.
+
+   Each repair is a card that says what it will do, and what it costs, before
+   it does anything. The guards that matter live on the server -- a disruptive
+   repair is refused while CS2 is running, and the only mouse or keyboard is
+   never offered -- because those are properties of the repair rather than of
+   this page, and must hold whoever calls it.
+   --------------------------------------------------------------------------- */
+let fixData = null;
+
+async function loadFixes(force) {
+  const box = $("fix-out");
+  if (fixData && !force) { renderFixes(); return; }
+  if (box) box.innerHTML = '<span class="sub"><span class="spin"></span> Looking&hellip;</span>';
+  try {
+    fixData = await api("/api/fix/survey", {});
+    renderFixes();
+  } catch (err) {
+    if (box) box.innerHTML = '<span class="sub warn">Could not read the machine: ' +
+      esc(String(err && err.message || err)) + "</span>";
+  }
+}
+
+function fixSaidId(id) { return "fix-said-" + id.split(".").join("-"); }
+
+function fixCard(fix, inner) {
+  if (!fix) return "";
+  const tags =
+    (fix.needs_admin ? '<span class="flag warn">administrator</span>' : "") +
+    (fix.disruptive ? '<span class="flag warn">interrupts play</span>' : "");
+  return '<section class="panel"><h2>' + esc(fix.title) + tags + "</h2>" +
+    '<p class="sub" style="margin:0 0 9px">' + esc(fix.blurb) + "</p>" +
+    (fix.danger
+      ? '<p class="sub2" style="color:var(--warn);margin:0 0 9px">' + esc(fix.danger) + "</p>"
+      : "") +
+    inner +
+    '<div class="sub2" style="margin-top:8px" id="' + fixSaidId(fix.id) + '"></div></section>';
+}
+
+function fixButton(id, label, disabled) {
+  return '<button class="btn primary" data-fix="' + esc(id) + '"' +
+    (disabled ? " disabled" : "") + ">" + esc(label) + "</button>";
+}
+
+function renderFixes() {
+  const box = $("fix-out");
+  if (!box || !fixData) return;
+  const by = {};
+  (fixData.fixes || []).forEach(f => { by[f.id] = f; });
+  let html = "";
+
+  if (fixData.game_running) {
+    html += '<section class="panel"><p class="sub" style="margin:0;color:var(--warn)">' +
+      "CS2 is running. Anything that would interrupt it is held back until you close it." +
+      "</p></section>";
+  }
+
+  const adapters = fixData.adapters || [];
+  const options = adapters.map(a =>
+    '<option value="' + esc(a.name) + '">' + esc(a.name) + " · " + esc(a.speed) +
+    (a.wireless ? " · Wi-Fi" : " · wired") + "</option>").join("");
+  html += fixCard(by["net.restart"],
+    '<div class="row"><span class="k">Connection</span><span class="v">' +
+    (adapters.length
+      ? '<select id="fix-adapter">' + options + "</select>"
+      : '<span class="sub">no connected adapter found</span>') +
+    '</span></div><div class="actions">' +
+    fixButton("net.restart", "Restart it", !adapters.length) +
+    fixButton("net.flush", "Flush DNS", false) + "</div>");
+
+  html += fixCard(by["gpu.restart"],
+    '<div class="actions">' + fixButton("gpu.restart", "Restart the driver", false) + "</div>");
+
+  const devices = fixData.devices || [];
+  const listFor = show => devices.filter(d => show || d.common).map(d =>
+    '<option value="' + esc(d.id) + '"' + (d.restartable ? "" : " disabled") + ">" +
+    esc(d.class) + " · " + esc(d.name) +
+    (d.restartable ? "" : "  (the only one)") + "</option>").join("");
+  html += fixCard(by["device.restart"],
+    '<div class="row"><span class="k">Device</span><span class="v">' +
+    '<select id="fix-device">' + listFor(false) + "</select></span></div>" +
+    '<label class="opt"><input type="checkbox" id="fix-all-devices"> ' +
+    "Show every device, not just the usual ones (" + devices.length + " in all)</label>" +
+    '<div class="actions">' + fixButton("device.restart", "Restart it", !devices.length) +
+    "</div>");
+
+  const sound = fixData.sound || {};
+  const special = sound.special || [];
+  html += fixCard(by["sound.apps"],
+    (special.length
+      ? '<p class="sub2" style="color:var(--warn);margin:0 0 9px">' +
+        "Audio here runs through " + esc(special.join(", ")) + ". Changing the Windows " +
+        "default would move everything with it, streams included — which is why this " +
+        "gives CS2 its own device instead, and why the app will not write that routing " +
+        "for you: the interface behind it is undocumented, and guessing at a mixer " +
+        "somebody streams through is not a small mistake." + "</p>"
+      : "") +
+    '<div class="actions">' + fixButton("sound.apps", "Open the volume mixer", false) + "</div>");
+
+  html += fixCard(by["sound.restart"],
+    '<div class="actions">' + fixButton("sound.restart", "Restart audio", false) + "</div>");
+
+  box.innerHTML = html;
+
+  const toggle = $("fix-all-devices");
+  if (toggle) {
+    toggle.addEventListener("change", () => {
+      const select = $("fix-device");
+      if (!select) return;
+      const held = select.value;
+      select.innerHTML = listFor(toggle.checked);
+      select.value = held;
+    });
+  }
+}
+
+async function runFix(button) {
+  const id = button.dataset.fix;
+  const fix = ((fixData && fixData.fixes) || []).find(f => f.id === id);
+  if (!fix) return;
+  if (fix.danger && !confirm(fix.title + "\n\n" + fix.danger + "\n\nGo ahead?")) return;
+
+  const said = $(fixSaidId(id));
+  const body = { id: id };
+  if (id === "net.restart" && $("fix-adapter")) body.adapter = $("fix-adapter").value;
+  if (id === "device.restart" && $("fix-device")) body.device = $("fix-device").value;
+
+  button.disabled = true;
+  const label = button.textContent;
+  button.textContent = "Working…";
+  if (said) {
+    said.innerHTML = '<span class="sub"><span class="spin"></span> ' +
+      (fix.needs_admin ? "Answer the administrator prompt…" : "Working…") + "</span>";
+  }
+  try {
+    const r = await api("/api/fix/run", body);
+    const good = !!r.ok;
+    const text = r.detail || r.error || (good ? "Done." : "Nothing changed.");
+    if (said) {
+      said.innerHTML = '<span style="color:' +
+        (good ? "var(--good)" : r.declined ? "var(--muted)" : "var(--bad)") + '">' +
+        esc(text) + "</span>";
+    }
+    status(text, !good && !r.declined);
+    if (good && id !== "sound.apps") loadFixes(true);
+  } catch (err) {
+    const text = String(err && err.message || err);
+    if (said) said.innerHTML = '<span style="color:var(--bad)">' + esc(text) + "</span>";
+    status("Could not run that: " + text, true);
+  } finally {
+    button.disabled = false;
+    button.textContent = label;
+  }
+}
+
+document.addEventListener("click", e => {
+  const button = e.target.closest("[data-fix]");
+  if (button) runFix(button);
 });
 
 // One outline for the glass, used three times per gauge: the empty body, the
@@ -6658,6 +6838,7 @@ function setTab(name) {
   if (name === "files") loadTree(false);
   if (name === "scripts") loadPlugins(false);
   if (name === "keyboard") loadKeyboard(false);
+  if (name === "fix") loadFixes(false);
   if (name === "updates") renderUpdates();
   document.querySelectorAll(".tabs .tab").forEach(b =>
     b.setAttribute("aria-selected", String(b.dataset.tab === name)));

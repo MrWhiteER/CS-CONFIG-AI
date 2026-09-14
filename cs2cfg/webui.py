@@ -1373,6 +1373,29 @@ def _cfg_key_options(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     return {"ok": True, **commands.options(result, binding, state.cs2_install)}
 
 
+def _fix_survey(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Everything the repairs tab draws. Reads only."""
+    from . import quickfix
+
+    return quickfix.survey()
+
+
+def _fix_run(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Run one repair.
+
+    The guards live in :mod:`cs2cfg.quickfix` rather than here, because they
+    are properties of the repair -- whether it would disconnect a match,
+    whether it would take away the only keyboard -- and must hold whoever calls
+    it, not only this endpoint.
+    """
+    from . import quickfix
+
+    fix_id = str(body.get("id") or "")
+    if not fix_id:
+        raise ValueError("which repair?")
+    return quickfix.run(fix_id, body)
+
+
 def _net(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     """Measure loss and jitter. Reads only; takes about a minute.
 
@@ -2174,6 +2197,8 @@ def make_handler(state: State):
         "/api/cfg/starter": _cfg_starter,
         "/api/focus": _focus,
         "/api/net": _net,
+        "/api/fix/survey": _fix_survey,
+        "/api/fix/run": _fix_run,
         "/api/temps/elevate": _temps_elevate,
         "/api/cfg/convert": _cfg_convert,
         "/api/cfg/check": _cfg_check,
