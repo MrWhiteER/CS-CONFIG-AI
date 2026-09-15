@@ -407,7 +407,7 @@
      carries its name for hover and for a screen reader. */
   /* The circle rises 20px above the bar, and the panel is the top of a
      scrolling column -- without room reserved for it, it is simply cut off. */
-  .navwrap { margin: 0 0 18px; padding-top: 26px; }
+  .navwrap { margin: 0 0 18px; padding: 26px 0 30px; }
   .navbar {
     position: relative;
     display: flex; align-items: stretch;
@@ -465,10 +465,32 @@
   }
   .nav-item[aria-selected="true"] svg { stroke-width: 2.1; }
 
-  .nav-name {
-    text-align: center; max-width: 320px; margin: 11px 0 0;
-    font-size: 12.5px; font-weight: 650; letter-spacing: .2px;
+  /* The name belongs to the icon, not to the bar.
+
+     One caption centred under the whole bar meant reading a label that was
+     nowhere near the thing it named. These sit under their own icon: the live
+     one arrives as the sphere lands on it, and hovering any of the others
+     names that one straight away, so the bar can be read without clicking
+     through it. */
+  .nav-tip {
+    position: absolute; top: 55px; left: 50%;
+    width: 140px; margin-left: -70px; text-align: center;
+    font-size: 12px; font-weight: 650; letter-spacing: .2px;
+    white-space: nowrap; pointer-events: none;
+    color: var(--muted);
+    opacity: 0; transform: translateY(-5px);
+    transition: opacity .18s ease, transform .18s ease, color .2s ease;
+  }
+  .nav-item:hover .nav-tip { opacity: 1; transform: translateY(0); color: var(--ink); }
+  /* After hover on purpose: when the live icon is also the hovered one, this
+     is the rule that should win, and both carry the same weight. */
+  .nav-item[aria-selected="true"] .nav-tip {
+    opacity: 1;
     color: var(--mode-neon, var(--accent));
+    /* The button is lifted 20px into the sphere; hold its name where it was. */
+    transform: translateY(20px);
+    /* Arrives as the sphere settles rather than racing it there. */
+    transition-delay: .24s;
   }
 
   /* The box the settings live in has no edges of its own -- the bar above is
@@ -2739,12 +2761,11 @@
       <div class="navwrap">
         <div class="navbar" id="settings-subtabs" role="tablist">
           <div class="nav-blob" id="nav-blob"></div>
-          <button class="nav-item" data-sub="apply" role="tab" aria-selected="true" title="Apply" aria-label="Apply"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6.5L9.5 17 4 11.5"/></svg></button>
-          <button class="nav-item" data-sub="sound" role="tab" aria-selected="false" title="Sound" aria-label="Sound"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5L6.5 9H3.5v6h3L11 19z"/><path d="M15.5 9.2a4 4 0 010 5.6"/><path d="M18.2 6.5a8 8 0 010 11"/></svg></button>
-          <button class="nav-item" data-sub="config" role="tab" aria-selected="false" title="Config files" aria-label="Config files"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 012-2h4l2 2.5h8a2 2 0 012 2V18a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></button>
-          <button class="nav-item" data-sub="editing" role="tab" aria-selected="false" title="Editing" aria-label="Editing"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 12h14M5 18h14"/><circle cx="9" cy="6" r="2.1"/><circle cx="15" cy="12" r="2.1"/><circle cx="8" cy="18" r="2.1"/></svg></button>
+          <button class="nav-item" data-sub="apply" role="tab" aria-selected="true" title="Apply" aria-label="Apply"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6.5L9.5 17 4 11.5"/></svg><span class="nav-tip">Apply</span></button>
+          <button class="nav-item" data-sub="sound" role="tab" aria-selected="false" title="Sound" aria-label="Sound"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5L6.5 9H3.5v6h3L11 19z"/><path d="M15.5 9.2a4 4 0 010 5.6"/><path d="M18.2 6.5a8 8 0 010 11"/></svg><span class="nav-tip">Sound</span></button>
+          <button class="nav-item" data-sub="config" role="tab" aria-selected="false" title="Config files" aria-label="Config files"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 012-2h4l2 2.5h8a2 2 0 012 2V18a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg><span class="nav-tip">Config files</span></button>
+          <button class="nav-item" data-sub="editing" role="tab" aria-selected="false" title="Editing" aria-label="Editing"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 12h14M5 18h14"/><circle cx="9" cy="6" r="2.1"/><circle cx="15" cy="12" r="2.1"/><circle cx="8" cy="18" r="2.1"/></svg><span class="nav-tip">Editing</span></button>
         </div>
-        <div class="nav-name" id="nav-name">Apply</div>
       </div>
 
       <div class="confirm-veil hidden" id="confirm-veil">
@@ -3994,8 +4015,6 @@ function moveNavBlob() {
   const here = live.getBoundingClientRect();
   const frame = bar.getBoundingClientRect();
   blob.style.left = Math.round(here.left - frame.left + here.width / 2 - 27) + "px";
-  const label = $("nav-name");
-  if (label) label.textContent = live.getAttribute("aria-label") || "";
 }
 
 // The bar is flexible, so where the circle belongs changes with the window.
