@@ -490,6 +490,10 @@ def _save_prefs(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         "write_launch", "link_autoexec", "stretch_mode", "patch_video",
         "cfg_folder", "tab", "favourites", "mouse_shape", "kb_layout", "kb_shown",
         "update_auto_download", "update_skip", "rail_width", "pinned_account",
+        # Named setups are written through their own endpoint, but the page
+        # also sends them back with everything else when preferences are
+        # remembered; unlisted, they would be dropped on the next save.
+        "setups", "setup_live",
     )
     changes = {key: body[key] for key in allowed if key in body}
     profiles.remember(prefs, account, changes)
@@ -2151,6 +2155,51 @@ def _updater(state: State):
     return checker
 
 
+def _setups(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Every named setup this account has, and which one it is following."""
+    from . import profiles, setups
+    from .cli import load_prefs
+
+    ui = profiles.ui_for(load_prefs(), _active_account(state))
+    return {"ok": True, **setups.listing(ui)}
+
+
+def _setups_act(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Save, switch to, rename or delete one.
+
+    Switching only writes preferences -- it decides what the next Apply will
+    write, and changes nothing in the game or on disk by itself. That is why
+    it needs no confirmation and no backup.
+    """
+    from . import profiles, setups
+    from .cli import load_prefs, save_prefs
+
+    account = _active_account(state)
+    prefs = load_prefs()
+    ui = profiles.ui_for(prefs, account)
+
+    what = str(body.get("do") or "").strip()
+    name = str(body.get("name") or "")
+    try:
+        if what == "save":
+            changes = setups.save(ui, name)
+        elif what == "use":
+            changes = setups.use(ui, name)
+        elif what == "rename":
+            changes = setups.rename(ui, name, str(body.get("to") or ""))
+        elif what == "delete":
+            changes = setups.remove(ui, name)
+        else:
+            return {"ok": False, "error": f"no such action: {what or '(none)'}"}
+    except setups.SetupError as exc:
+        return {"ok": False, "error": str(exc)}
+
+    profiles.remember(prefs, account, changes)
+    save_prefs(prefs)
+    fresh = profiles.ui_for(prefs, account)
+    return {"ok": True, "ui": fresh, **setups.listing(fresh)}
+
+
 def _setup_export(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     """Write this account's setup to a file the user chooses."""
     from . import picker, portable, profiles
@@ -2403,6 +2452,8 @@ def make_handler(state: State):
         "/api/env": _environment,
         "/api/profile": _profile,
         "/api/profile/use": _profile_use,
+        "/api/setups": _setups,
+        "/api/setups/act": _setups_act,
         "/api/setup/export": _setup_export,
         "/api/setup/inspect": _setup_inspect,
         "/api/setup/import": _setup_import,

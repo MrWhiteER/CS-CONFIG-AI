@@ -594,6 +594,46 @@
     .settings-box.resizing { transition: none; }
   }
 
+  /* The saved setups, as chips. A row of names beats a dropdown here: there
+     are a handful of them and switching is the common act, so it should cost
+     one click rather than two. */
+  .setup-bar { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 11px; }
+  .setup-chip {
+    appearance: none; cursor: pointer; font: inherit;
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 7px 9px 7px 13px; border-radius: 999px;
+    background: var(--chip); border: 1px solid var(--line);
+    color: var(--ink-dim); font-size: 12px; font-weight: 600;
+    transition: color .15s ease, border-color .15s ease, background .15s ease;
+  }
+  .setup-chip:hover { color: var(--ink); border-color: var(--violet); }
+  .setup-chip.live {
+    background: var(--violet); border-color: transparent; color: #0b1017;
+  }
+  /* A dot, not a word: the chip is already the width of its name. */
+  .setup-chip .edited { font-style: normal; font-size: 15px; line-height: 0; opacity: .8; }
+  .setup-chip .drop {
+    font-style: normal; font-size: 14px; line-height: 1; opacity: .45;
+    padding: 0 3px; border-radius: 50%;
+  }
+  .setup-chip .drop:hover { opacity: 1; color: var(--bad); }
+  .setup-chip.live .drop:hover { color: #3a0010; }
+
+  .setup-new { display: flex; gap: 8px; flex-wrap: wrap; }
+  .setup-new input {
+    flex: 1 1 180px; min-width: 0;
+    padding: 7px 11px; border-radius: 9px;
+    background: rgba(0, 0, 0, .3); border: 1px solid var(--line);
+    color: var(--ink); font: inherit; font-size: 12px;
+  }
+  .setup-new input:focus {
+    outline: none; border-color: var(--violet);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--violet) 20%, transparent);
+  }
+  @supports not (color: color-mix(in srgb, red 50%, blue)) {
+    .setup-new input:focus { box-shadow: none; }
+  }
+
   .setup-found {
     margin-top: 11px; padding: 12px 14px; border-radius: 11px;
     background: var(--panel-2); border: 1px solid var(--line);
@@ -3839,6 +3879,19 @@
       </div>
 
       <div class="subpane" data-sub="apply">
+      <!-- Saved answers to "what is this machine for right now". Above Write
+           because it decides what Write is about to do. -->
+      <section class="panel" id="setups-card">
+        <h2>Setups</h2>
+        <p class="sub" style="margin:0 0 10px">
+          Practice, a match and recording want different things. Save what you have
+          chosen under a name and switch between them. A setup only decides what the
+          next Apply will write &mdash; switching changes nothing in the game by itself,
+          and never touches which folder you are working on.
+        </p>
+        <div id="setups-out"></div>
+      </section>
+
       <section class="panel">
         <h2>Write</h2>
         <label class="opt"><input type="checkbox" id="w-video" checked> Picture quality (cs2_video.txt)</label>
@@ -7849,6 +7902,100 @@ function kbPicker() {
     "</div>";
 }
 
+/* Named setups.
+
+   Switching one is only a write of preferences, so it goes through the same
+   applyPrefs the page already uses when they arrive from the server -- there
+   is no second path that could set a control the first one would not.
+*/
+let setupsData = null;
+
+async function loadSetups() {
+  try {
+    setupsData = await api("/api/setups", {});
+  } catch (err) {
+    setupsData = { setups: [], live: "", error: String(err && err.message || err) };
+  }
+  renderSetups();
+}
+
+function renderSetups() {
+  const box = $("setups-out");
+  if (!box) return;
+  const d = setupsData;
+  if (!d) { box.innerHTML = '<p class="sub">Loading&hellip;</p>'; return; }
+  if (d.error) { box.innerHTML = '<p class="sub warn">' + esc(d.error) + "</p>"; return; }
+
+  const chips = (d.setups || []).map(s =>
+    '<button class="setup-chip' + (s.name === d.live ? " live" : "") +
+    '" data-setup-use="' + esc(s.name) + '"' +
+    ' title="Switch to ' + esc(s.name) + '">' +
+      '<span class="nm">' + esc(s.name) + "</span>" +
+      (s.name === d.live && d.changed
+        ? '<i class="edited" title="changed since it was saved">&bull;</i>' : "") +
+      '<i class="drop" data-setup-del="' + esc(s.name) + '" role="button"' +
+      ' title="Delete ' + esc(s.name) + '">&times;</i>' +
+    "</button>").join("");
+
+  box.innerHTML =
+    '<div class="setup-bar">' +
+      (chips || '<span class="sub2">No setups saved yet.</span>') +
+    "</div>" +
+    '<div class="setup-new">' +
+      '<input id="setup-name" placeholder="' +
+      (d.live && d.changed ? esc(d.live) : "Practice") +
+      '" maxlength="40" aria-label="Name for this setup">' +
+      '<button class="btn small" id="setup-keep">' +
+      (d.live && d.changed ? "Update " + esc(d.live) : "Save what I have") +
+      "</button>" +
+    "</div>" +
+    (d.live
+      ? '<p class="sub2" style="margin-top:8px">Following <b>' + esc(d.live) + "</b>" +
+        (d.changed ? " \u2014 with changes since it was saved." : ".") + "</p>"
+      : "");
+}
+
+async function setupsAct(body) {
+  let r;
+  try {
+    r = await api("/api/setups/act", body);
+  } catch (err) {
+    status(String(err && err.message || err), true);
+    return;
+  }
+  if (!r.ok) { status(r.error, true); return; }
+  setupsData = r;
+  if (r.ui) applyPrefs(r.ui);
+  renderSetups();
+  return r;
+}
+
+document.addEventListener("click", async e => {
+  const del = e.target.closest("[data-setup-del]");
+  if (del) {
+    e.stopPropagation();
+    const name = del.dataset.setupDel;
+    if (!confirm("Delete the setup \u201c" + name + "\u201d?\n\nNothing else changes.")) return;
+    await setupsAct({ do: "delete", name });
+    status("Deleted " + name + ".");
+    return;
+  }
+  const use = e.target.closest("[data-setup-use]");
+  if (use) {
+    const name = use.dataset.setupUse;
+    await setupsAct({ do: "use", name });
+    status("Switched to " + name + ". Nothing is written until you apply.");
+    return;
+  }
+  if (e.target.closest("#setup-keep")) {
+    const field = $("setup-name");
+    const name = (field.value || field.placeholder || "").trim();
+    if (!name) { status("Give the setup a name first.", true); return; }
+    const r = await setupsAct({ do: "save", name });
+    if (r) { field.value = ""; status("Saved " + name + "."); }
+  }
+});
+
 /* Saving a setup, and taking one on.
 
    Reading a setup and applying it are two steps on purpose. The file came from
@@ -9296,7 +9443,7 @@ function setTab(name) {
   if (name === "scripts") loadPlugins(false);
   if (name === "keyboard") loadKeyboard(false);
   if (name === "fix") loadFixes(false);
-  if (name === "settings") setSettingsSub(settingsSub, true);
+  if (name === "settings") { setSettingsSub(settingsSub, true); loadSetups(); }
   document.querySelectorAll(".tabs .tab").forEach(b =>
     b.setAttribute("aria-selected", String(b.dataset.tab === name)));
   document.querySelectorAll(".tab-panel").forEach(panel =>
@@ -9469,9 +9616,11 @@ function rememberPrefs() {
 }
 
 document.addEventListener("change", e => {
-  // #p-video by name: it sits in the Settings panel now rather than in a card,
-  // and it is still a launch preference that has to be remembered.
-  if (e.target.closest("#launch-card, .card, #p-video")) rememberPrefs();
+  // Named rather than matched by container: both of these were moved out of
+  // the cards they used to live in -- the target rate to the head of CS2
+  // Settings, the video patch in with the other write options -- and a
+  // preference that stops being saved when it is moved is silent about it.
+  if (e.target.closest("#launch-card, .card, #p-video, .fps")) rememberPrefs();
 });
 
 // --- history --------------------------------------------------------------
