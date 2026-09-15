@@ -167,6 +167,29 @@ def pick_folder(initial: str = "", title: str = "Choose a configuration folder")
     return _run(script)
 
 
+SETUP_FILTER = "Saved setup (*.cs2setup)|*.cs2setup|All files (*.*)|*.*"
+
+
+def save_file(suggested: str = "", title: str = "Save",
+              filter_spec: str = SETUP_FILTER) -> Optional[str]:
+    """Where to write something. Returns a path, or None if nothing was chosen.
+
+    SaveFileDialog does the overwrite question itself, in the words Windows
+    already uses for it, which is better than asking again in ours.
+    """
+    script = (
+        "Add-Type -AssemblyName System.Windows.Forms\n"
+        "$d = New-Object System.Windows.Forms.SaveFileDialog\n"
+        f"$d.Title = {_literal(title)}\n"
+        f"$d.Filter = {_literal(filter_spec)}\n"
+        f"$d.FileName = {_literal(suggested)}\n"
+        "$d.OverwritePrompt = $true\n"
+        "$d.RestoreDirectory = $true\n"
+        "if ($d.ShowDialog() -eq 'OK') { [Console]::Out.Write($d.FileName) }\n"
+    )
+    return _run(script)
+
+
 def pick_file(initial: str = "", title: str = "Choose a configuration file") -> Optional[str]:
     """The Explorer file picker, filtered to configurations.
 

@@ -2151,6 +2151,101 @@ def _updater(state: State):
     return checker
 
 
+def _setup_export(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Write this account's setup to a file the user chooses."""
+    from . import picker, portable, profiles
+    from .cli import load_prefs
+
+    account = _active_account(state)
+    ui = profiles.ui_for(load_prefs(), account)
+
+    where = str(body.get("path") or "").strip()
+    if not where:
+        suggested = f"cs2-setup{portable.SUFFIX}"
+        where = picker.save_file(suggested, "Save this setup") or ""
+    if not where:
+        return {"ok": False, "declined": True, "error": "no file chosen"}
+
+    folder = ui.get("cfg_folder") or ""
+    try:
+        out = portable.write(Path(where), ui,
+                             Path(folder) if folder else None,
+                             str(body.get("note") or ""))
+    except OSError as exc:
+        return {"ok": False, "error": f"could not write it: {exc}"}
+    return {"ok": True, **out}
+
+
+def _setup_inspect(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Say what a setup file holds. Reads only; writes nothing."""
+    from . import picker, portable
+
+    where = str(body.get("path") or "").strip()
+    if not where:
+        where = picker.pick_file("", "Choose a saved setup") or ""
+    if not where:
+        return {"ok": False, "declined": True, "error": "no file chosen"}
+    try:
+        return {"ok": True, **portable.read(Path(where))}
+    except portable.SetupError as exc:
+        return {"ok": False, "error": str(exc)}
+
+
+def _setup_import(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Take a setup on, having been told which parts.
+
+    Split deliberately from inspecting it: the page shows what is in the file
+    and the user says yes to that, rather than to a filename. The config files
+    go in behind a backup, like every other write here.
+    """
+    from . import backup, portable, profiles
+    from .cli import load_prefs, save_prefs
+
+    where = str(body.get("path") or "").strip()
+    if not where:
+        return {"ok": False, "error": "no file given"}
+    try:
+        found = portable.read(Path(where))
+    except portable.SetupError as exc:
+        return {"ok": False, "error": str(exc)}
+
+    account = _active_account(state)
+    prefs = load_prefs()
+    took = []
+
+    if body.get("settings", True) and found["prefs"]:
+        profiles.remember(prefs, account, found["prefs"])
+        save_prefs(prefs)
+        took.append(f"{len(found['prefs'])} setting(s)")
+
+    written = []
+    stamp = ""
+    if body.get("files") and found["files"]:
+        folder = str(body.get("folder") or
+                     profiles.ui_for(prefs, account).get("cfg_folder") or "")
+        if not folder:
+            return {"ok": False, "error": "no configuration folder to put them in"}
+        target = Path(folder)
+        session = backup.BackupSession("import a saved setup")
+        for rel in found["files"]:
+            existing = target / rel
+            if existing.is_file():
+                session.add(existing)
+        # A set with nothing in it was never started, so there is nothing to
+        # name and nothing to roll back to.
+        stamp = "" if session.empty else session.stamp
+        try:
+            out = portable.unpack(Path(where), target)
+        except OSError as exc:
+            return {"ok": False, "error": f"could not unpack: {exc}"}
+        written = out["written"]
+        took.append(f"{len(written)} file(s)")
+        state.cfg_scan = None
+
+    return {"ok": True, "took": took, "written": written, "backup": stamp,
+            "settings": found["prefs"] if body.get("settings", True) else {}}
+
+
 def _update_status(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     """Where the update stands. Polled by the page; does not itself hit GitHub."""
     return {"ok": True, **_updater(state).summary()}
@@ -2308,6 +2403,9 @@ def make_handler(state: State):
         "/api/env": _environment,
         "/api/profile": _profile,
         "/api/profile/use": _profile_use,
+        "/api/setup/export": _setup_export,
+        "/api/setup/inspect": _setup_inspect,
+        "/api/setup/import": _setup_import,
         "/api/update": _update_status,
         "/api/update/check": _update_check,
         "/api/update/download": _update_download,

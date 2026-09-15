@@ -594,6 +594,12 @@
     .settings-box.resizing { transition: none; }
   }
 
+  .setup-found {
+    margin-top: 11px; padding: 12px 14px; border-radius: 11px;
+    background: var(--panel-2); border: 1px solid var(--line);
+  }
+  .setup-found .actions { margin-top: 11px; }
+
   /* Settings is one box: the bar is its header, not a separate thing hovering
      above a separate card. A floating strip over a panel read as two
      unrelated objects that happened to be near each other. */
@@ -3880,6 +3886,21 @@
           <button class="btn primary" id="starter-make">Create it</button>
         </div>
         <div id="starter-out"></div>
+      </section>
+
+      <section class="panel" id="setup-card">
+        <h2>Carry this setup</h2>
+        <p class="sub" style="margin:0 0 11px">
+          Everything this account has chosen, plus a copy of its configuration folder,
+          in one file. Take it to another PC, or keep it as something to come back to.
+          Nothing identifying goes in &mdash; no account, no paths from this machine &mdash;
+          so it can be handed to somebody else as it is.
+        </p>
+        <div class="actions">
+          <button class="btn primary" id="setup-save">Save a copy&hellip;</button>
+          <button class="btn" id="setup-open">Open a saved setup&hellip;</button>
+        </div>
+        <div id="setup-out"></div>
       </section>
 
       <section class="panel" id="cfg-card">
@@ -7827,6 +7848,114 @@ function kbPicker() {
       ? '<p class="kb-hold-note">' + esc(kbOptions.hold_note) + "</p>" : "") +
     "</div>";
 }
+
+/* Saving a setup, and taking one on.
+
+   Reading a setup and applying it are two steps on purpose. The file came from
+   somewhere else -- another machine, or somebody else entirely -- so what is
+   in it gets shown and agreed to, rather than a filename being agreed to.
+*/
+let setupFound = null;
+
+function setupSay(html) {
+  const box = $("setup-out");
+  if (box) box.innerHTML = html;
+}
+
+async function setupSave() {
+  setupSay('<p class="sub"><span class="spin"></span> Waiting for a place to put it&hellip;</p>');
+  let r;
+  try {
+    r = await api("/api/setup/export", {});
+  } catch (err) {
+    setupSay('<p class="sub warn">' + esc(String(err && err.message || err)) + "</p>");
+    return;
+  }
+  if (r.declined) { setupSay(""); return; }
+  if (!r.ok) { setupSay('<p class="sub warn">' + esc(r.error) + "</p>"); return; }
+  setupSay('<p class="sub" style="color:var(--good)">Saved ' + r.files +
+    " file(s) and " + r.settings + " setting(s) \u2014 " + fmtBytes(r.bytes) +
+    '</p><p class="sub2 mono">' + esc(r.path) + "</p>" +
+    (r.skipped && r.skipped.length
+      ? '<p class="sub2">Left out (too large, or unreadable): ' +
+        esc(r.skipped.join(", ")) + "</p>" : ""));
+}
+
+async function setupOpen() {
+  setupSay('<p class="sub"><span class="spin"></span> Reading&hellip;</p>');
+  let r;
+  try {
+    r = await api("/api/setup/inspect", {});
+  } catch (err) {
+    setupSay('<p class="sub warn">' + esc(String(err && err.message || err)) + "</p>");
+    return;
+  }
+  if (r.declined) { setupSay(""); return; }
+  if (!r.ok) { setupSay('<p class="sub warn">' + esc(r.error) + "</p>"); return; }
+
+  setupFound = r;
+  const when = r.written_at ? new Date(r.written_at * 1000).toLocaleString() : "unknown";
+  const names = Object.keys(r.prefs || {});
+  setupSay(
+    '<div class="setup-found">' +
+      '<p class="sub2 mono">' + esc(r.path) + "</p>" +
+      '<div class="row"><span class="k">Written</span><span class="v">' +
+        esc(when) + " by version " + esc(r.written_by) + "</span></div>" +
+      (r.note ? '<div class="row"><span class="k">Note</span><span class="v">' +
+        esc(r.note) + "</span></div>" : "") +
+      '<div class="row"><span class="k">Settings</span><span class="v">' +
+        (names.length ? esc(names.join(", ")) : "none") + "</span></div>" +
+      '<div class="row"><span class="k">Files</span><span class="v">' +
+        r.files.length + " configuration file(s)</span></div>" +
+      '<label class="opt"><input type="checkbox" id="setup-take-settings" checked> ' +
+        "Take its settings</label>" +
+      '<label class="opt"><input type="checkbox" id="setup-take-files"' +
+        (r.files.length ? "" : " disabled") + "> " +
+        "Write its configuration files into my folder" +
+        '<span class="sub2" style="display:block">Anything of the same name is ' +
+        "backed up first, and replaced.</span></label>" +
+      '<div class="actions">' +
+        '<button class="btn primary" id="setup-take">Take it on</button>' +
+        '<button class="btn" id="setup-drop">Cancel</button>' +
+      "</div>" +
+    "</div>");
+}
+
+async function setupTake() {
+  if (!setupFound) return;
+  const wantFiles = !!($("setup-take-files") || {}).checked;
+  const wantSettings = !!($("setup-take-settings") || {}).checked;
+  if (!wantFiles && !wantSettings) { setupSay('<p class="sub">Nothing chosen.</p>'); return; }
+
+  setupSay('<p class="sub"><span class="spin"></span> Taking it on&hellip;</p>');
+  let r;
+  try {
+    r = await api("/api/setup/import",
+                  { path: setupFound.path, settings: wantSettings, files: wantFiles });
+  } catch (err) {
+    setupSay('<p class="sub warn">' + esc(String(err && err.message || err)) + "</p>");
+    return;
+  }
+  if (!r.ok) { setupSay('<p class="sub warn">' + esc(r.error) + "</p>"); return; }
+
+  setupFound = null;
+  setupSay('<p class="sub" style="color:var(--good)">Took on ' +
+    esc(r.took.join(" and ") || "nothing") +
+    (r.backup ? '. <span class="sub2">Replaced files backed up as ' +
+      esc(r.backup) + "</span>" : ".") + "</p>");
+  // The settings it brought are now the saved ones, and the folder may have
+  // changed underneath every view that reads it.
+  try { applyPrefs((await api("/api/prefs")).ui); } catch (e) { /* shown already */ }
+  if (wantFiles) { await reloadForAccount(); }
+  status("Setup taken on.");
+}
+
+document.addEventListener("click", e => {
+  if (e.target.closest("#setup-save")) setupSave();
+  else if (e.target.closest("#setup-open")) setupOpen();
+  else if (e.target.closest("#setup-take")) setupTake();
+  else if (e.target.closest("#setup-drop")) { setupFound = null; setupSay(""); }
+});
 
 async function loadKeyboard(force) {
   const box = $("kb-out");
