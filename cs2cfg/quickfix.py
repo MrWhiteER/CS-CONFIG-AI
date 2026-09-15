@@ -282,45 +282,100 @@ _VK = {"win": 0x5B, "ctrl": 0x11, "shift": 0x10, "b": 0x42}
 _KEYEVENTF_KEYUP = 0x0002
 
 
+# ULONG_PTR: pointer-width, and not the same as a pointer TO a long. Getting
+# this wrong changes the size of every structure below it.
+_ULONG_PTR = wintypes.WPARAM
+
+_INPUT_KEYBOARD = 1
+_ERROR_ACCESS_DENIED = 5
+
+
 class _KeyInput(ctypes.Structure):
     _fields_ = [("wVk", wintypes.WORD), ("wScan", wintypes.WORD),
                 ("dwFlags", wintypes.DWORD), ("time", wintypes.DWORD),
-                ("dwExtraInfo", ctypes.POINTER(ctypes.c_ulong))]
+                ("dwExtraInfo", _ULONG_PTR)]
+
+
+class _MouseInput(ctypes.Structure):
+    """Never sent -- declared because it is the union's largest member.
+
+    SendInput rejects the whole call unless cbSize is exactly sizeof(INPUT),
+    and sizeof(INPUT) is set by the biggest arm of its union, which is this
+    one and not the keyboard arm. Padding the union by hand to a number that
+    happened to be right on one architecture is what broke this before.
+    """
+
+    _fields_ = [("dx", wintypes.LONG), ("dy", wintypes.LONG),
+                ("mouseData", wintypes.DWORD), ("dwFlags", wintypes.DWORD),
+                ("time", wintypes.DWORD), ("dwExtraInfo", _ULONG_PTR)]
+
+
+class _HardwareInput(ctypes.Structure):
+    _fields_ = [("uMsg", wintypes.DWORD), ("wParamL", wintypes.WORD),
+                ("wParamH", wintypes.WORD)]
 
 
 class _InputUnion(ctypes.Union):
-    _fields_ = [("ki", _KeyInput), ("padding", ctypes.c_byte * 24)]
+    _fields_ = [("mi", _MouseInput), ("ki", _KeyInput), ("hi", _HardwareInput)]
 
 
 class _Input(ctypes.Structure):
     _fields_ = [("type", wintypes.DWORD), ("u", _InputUnion)]
 
 
-def _send_keys(sequence) -> bool:
+# What Windows will accept: 40 bytes on x64, 28 on x86. Checked at import so a
+# structure that has drifted is a loud failure here rather than a silent zero
+# from SendInput at the moment somebody needs their screen back.
+INPUT_SIZE = ctypes.sizeof(_Input)
+EXPECTED_INPUT_SIZE = 40 if ctypes.sizeof(ctypes.c_void_p) == 8 else 28
+
+
+def _send_keys(sequence) -> int:
+    """Send the sequence. Returns the Windows error code, or 0 for success."""
     user32 = ctypes.WinDLL("user32", use_last_error=True)
+    user32.SendInput.argtypes = (wintypes.UINT, ctypes.c_void_p, ctypes.c_int)
+    user32.SendInput.restype = wintypes.UINT
+
     events = []
     for code, up in sequence:
-        item = _Input(type=1)
+        item = _Input(type=_INPUT_KEYBOARD)
         item.u.ki = _KeyInput(wVk=code, wScan=0,
                               dwFlags=_KEYEVENTF_KEYUP if up else 0,
-                              time=0, dwExtraInfo=None)
+                              time=0, dwExtraInfo=0)
         events.append(item)
     block = (_Input * len(events))(*events)
-    sent = user32.SendInput(len(events), block, ctypes.sizeof(_Input))
-    return sent == len(events)
+
+    ctypes.set_last_error(0)
+    sent = user32.SendInput(len(events), ctypes.byref(block), INPUT_SIZE)
+    if sent == len(events):
+        return 0
+    return ctypes.get_last_error() or -1
 
 
 def _fix_restart_gpu() -> Dict[str, Any]:
     if sys.platform != "win32":
         return {"ok": False, "error": "this repair is Windows-only"}
+    if INPUT_SIZE != EXPECTED_INPUT_SIZE:
+        return {"ok": False,
+                "error": f"the keyboard structure is {INPUT_SIZE} bytes and "
+                         f"Windows wants {EXPECTED_INPUT_SIZE}; this is a bug"}
     order = ["win", "ctrl", "shift", "b"]
     sequence = [(_VK[k], False) for k in order]
     sequence += [(_VK[k], True) for k in reversed(order)]
     try:
-        if not _send_keys(sequence):
-            return {"ok": False, "error": "Windows did not accept the keystroke"}
+        code = _send_keys(sequence)
     except Exception as exc:
         return {"ok": False, "error": str(exc)}
+    if code == _ERROR_ACCESS_DENIED:
+        # UIPI: a window running as administrator is in front, and input may
+        # not be injected past it from down here.
+        return {"ok": False,
+                "error": "Windows blocked the keystroke because a program "
+                         "running as administrator is in the foreground. "
+                         "Click your desktop first, then try again."}
+    if code:
+        return {"ok": False,
+                "error": f"Windows did not accept the keystroke (error {code})"}
     return {"ok": True, "detail": "Display driver reset. The screen blinks; "
                                   "nothing was closed."}
 

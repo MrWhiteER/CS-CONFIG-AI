@@ -49,7 +49,7 @@ class WhileTheGameIsUp(unittest.TestCase):
         Refusing it while the game is up withholds it exactly when it is
         wanted, and Windows closes nothing when it resets the driver."""
         with mock.patch.object(quickfix, "_game_running", return_value=True), \
-             mock.patch.object(quickfix, "_send_keys", return_value=True) as keys:
+             mock.patch.object(quickfix, "_send_keys", return_value=0) as keys:
             result = quickfix.run("gpu.restart", {})
         self.assertTrue(result["ok"])
         keys.assert_called_once()
@@ -182,6 +182,48 @@ class Plumbing(unittest.TestCase):
         for fix in quickfix.CATALOGUE:
             if fix.id in ("net.flush", "net.restart", "device.restart", "sound.restart"):
                 self.assertTrue(fix.needs_admin, f"{fix.id} prompts without saying so")
+
+    def test_input_struct_is_the_size_windows_demands(self):
+        """SendInput rejects the whole call unless cbSize is exactly
+        sizeof(INPUT) -- it does not round, and it does not tell you why.
+
+        This shipped wrong: the union was padded by hand to 24 bytes, which
+        made INPUT 32 instead of 40 on x64, and every attempt to reset the
+        display driver came back as error 87 the instant it was pressed. The
+        size is set by the union's largest arm, which is MOUSEINPUT, not the
+        keyboard one being used.
+        """
+        import ctypes
+
+        sixty_four = ctypes.sizeof(ctypes.c_void_p) == 8
+        self.assertEqual(quickfix.EXPECTED_INPUT_SIZE, 40 if sixty_four else 28)
+        self.assertEqual(ctypes.sizeof(quickfix._Input),
+                         quickfix.EXPECTED_INPUT_SIZE)
+        # The mouse arm is the one that sets it; if it ever stops being the
+        # largest, the number above stops being right.
+        self.assertGreaterEqual(ctypes.sizeof(quickfix._MouseInput),
+                                ctypes.sizeof(quickfix._KeyInput))
+
+    def test_a_wrong_sized_struct_is_refused_rather_than_sent(self):
+        """Better a clear complaint than a keystroke Windows silently drops."""
+        with mock.patch.object(quickfix, "INPUT_SIZE", 32), \
+             mock.patch.object(quickfix, "sys") as fake_sys, \
+             mock.patch.object(quickfix, "_send_keys") as never:
+            fake_sys.platform = "win32"
+            result = quickfix._fix_restart_gpu()
+        self.assertFalse(result["ok"])
+        self.assertIn("32 bytes", result["error"])
+        never.assert_not_called()
+
+    def test_a_blocked_keystroke_says_what_to_do_about_it(self):
+        """Error 5 here means a window running as administrator is in front,
+        which the user can fix in one click if they are told so."""
+        with mock.patch.object(quickfix, "sys") as fake_sys, \
+             mock.patch.object(quickfix, "_send_keys", return_value=5):
+            fake_sys.platform = "win32"
+            result = quickfix._fix_restart_gpu()
+        self.assertFalse(result["ok"])
+        self.assertIn("administrator", result["error"])
 
 
 if __name__ == "__main__":
