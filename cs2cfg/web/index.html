@@ -667,6 +667,25 @@
     .chg-banner, .chg-bolt, .chg-mark { background: var(--panel-2); }
   }
 
+  /* The scores, small enough to share the title bar with the live chips. */
+  .scorebar { display: flex; gap: 12px; align-items: center; margin-left: auto; }
+  .score { display: flex; align-items: center; gap: 6px; }
+  .score svg { width: 28px; height: 28px; flex: 0 0 auto; }
+  .score-bg { stroke: var(--line); }
+  .score-fg { transition: stroke-dasharray .5s ease; }
+  .score-text b {
+    display: block; font-family: var(--mono); font-size: 12px; font-weight: 600;
+    color: var(--ink); line-height: 1.1;
+  }
+  .score-text i {
+    display: block; font-style: normal; font-size: 9px; letter-spacing: .07em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  /* The title bar is the first thing to run out of room; the scores are the
+     part that can wait for a wider window. */
+  @media (max-width: 860px) { .scorebar { display: none; } }
+  @media (prefers-reduced-motion: reduce) { .score-fg { transition: none; } }
+
   .seg { display: flex; gap: 7px; flex-wrap: wrap; }
   .seg button {
     flex: 1 1 auto; min-width: 100px; padding: 9px 12px; cursor: pointer;
@@ -2563,6 +2582,7 @@
       <span class="chip" id="chip-gpu"><i></i>GPU <b>—</b></span>
       <span class="chip" id="chip-ram"><i></i>RAM <b>—</b></span>
       <span class="spacer"></span>
+      <div class="scorebar" id="scorebar"></div>
     </div>
 
     <div id="status">Detecting hardware&hellip;</div>
@@ -3427,6 +3447,47 @@ function renderHardware(d) {
   $("account-row").classList.toggle("hidden", d.accounts.length < 2);
 }
 
+/* The machine's scores, in the title bar.
+
+   They are a verdict on the hardware rather than something that moves while
+   you read, so they belong beside the other standing figures rather than
+   opening the assessment card with a row of rings repeating the numbers
+   printed directly underneath them.
+
+   Drawn as rings rather than printed, so a glance reads "most of the way
+   round" without reading the figure. Each carries its full meaning on hover,
+   since there is no room for a caption up here.
+*/
+function scoreRing(value, cap, label, detail, tone) {
+  const share = Math.max(0, Math.min(1, value / cap));
+  const r = 13, track = 2 * Math.PI * r;
+  return '<span class="score" title="' + esc(label + " — " + detail) + '">' +
+    '<svg viewBox="0 0 32 32" aria-hidden="true">' +
+      '<circle class="score-bg" cx="16" cy="16" r="' + r + '" fill="none" stroke-width="3.4"/>' +
+      '<circle class="score-fg" cx="16" cy="16" r="' + r + '" fill="none" stroke-width="3.4"' +
+      ' stroke-linecap="round" stroke="' + tone + '"' +
+      ' stroke-dasharray="' + (track * share).toFixed(1) + " " +
+        (track * (1 - share)).toFixed(1) + '"' +
+      ' transform="rotate(-90 16 16)"/>' +
+    "</svg>" +
+    '<span class="score-text"><b>' + Math.round(value) + "</b>" +
+    "<i>" + esc(label) + "</i></span></span>";
+}
+
+function renderScores(p, headroomPct, hue) {
+  const box = $("scorebar");
+  if (!box || !p) return;
+  box.innerHTML =
+    scoreRing(headroomPct, 100, "Headroom",
+              p.headroom + "× of " + p.target_fps + " Hz", hue) +
+    scoreRing(p.cpu_score, 105, "CPU",
+              "score " + p.cpu_score + ", ceiling ~" + p.cpu_ceiling + " fps",
+              "var(--warn)") +
+    scoreRing(p.gpu_score, 135, "GPU",
+              "score " + p.gpu_score + ", ceiling ~" + p.gpu_ceiling + " fps",
+              "var(--accent)");
+}
+
 function renderPlan(p) {
   planned = p;
   $("intent-desc").textContent = p.description;
@@ -3435,12 +3496,13 @@ function renderPlan(p) {
   const changed = p.settings.filter(s => s.changed);
 
   const headroomPct = Math.min(100, (p.headroom / 2) * 100);
+  // The three scores go to the title bar. They are a verdict on the machine
+  // rather than something that changes while you read, so they belong where
+  // the other standing figures are -- and the assessment card stops opening
+  // with a row of rings repeating the numbers printed underneath them.
+  renderScores(p, headroomPct, hue);
+
   let assessment = '<section class="card"><h2>Assessment</h2>' +
-    '<div class="gauges" style="margin-bottom:12px">' +
-    ring(headroomPct, "Headroom", p.headroom + "\u00d7 of " + p.target_fps + " Hz", false) +
-    ring((p.cpu_score / 105) * 100, "CPU score", String(p.cpu_score), false) +
-    ring((p.gpu_score / 135) * 100, "GPU score", String(p.gpu_score), false) +
-    "</div>" +
     '<div class="stats">' +
     '<div class="stat"><b>' + esc(p.tier) + '</b><span>tier</span></div>' +
     '<div class="stat"><b style="color:' + hue + '">~' + p.estimated_fps + '</b><span>est. fps</span></div>' +
