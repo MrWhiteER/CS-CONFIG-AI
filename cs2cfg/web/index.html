@@ -431,7 +431,13 @@
     transition: left .34s cubic-bezier(.4, 1.3, .5, 1), background .3s ease,
                 box-shadow .3s ease;
     pointer-events: none;
+    /* Hidden until it has been measured against a visible bar, so it is never
+       seen at a position worked out from a hidden one. */
+    opacity: 0;
   }
+  .navbar.measured .nav-blob { opacity: 1; }
+  /* The first placement is not a move, so it should not animate like one. */
+  .navbar:not(.measured) .nav-blob { transition: none; }
   /* The soft halo the reference pulses behind the raised circle. */
   .nav-blob::after {
     content: ""; position: absolute; inset: -12px; border-radius: 50%;
@@ -4014,7 +4020,15 @@ function moveNavBlob() {
   if (!live) return;
   const here = live.getBoundingClientRect();
   const frame = bar.getBoundingClientRect();
+  // Nothing to measure yet. setTab picks the category before it unhides the
+  // panel, so the first call lands while everything is display:none and every
+  // rect is zero -- which put the sphere at -27px, off the side of the bar,
+  // with the live icon left dark-on-dark where the sphere should have been.
+  if (!frame.width || !here.width) return;
   blob.style.left = Math.round(here.left - frame.left + here.width / 2 - 27) + "px";
+  // Placed for the first time: show it where it belongs rather than letting it
+  // slide in from wherever it was parked.
+  bar.classList.add("measured");
 }
 
 // The bar is flexible, so where the circle belongs changes with the window.
@@ -7317,6 +7331,8 @@ function setTab(name) {
     b.setAttribute("aria-selected", String(b.dataset.tab === name)));
   document.querySelectorAll(".tab-panel").forEach(panel =>
     panel.classList.toggle("hidden", panel.dataset.panel !== name));
+  // Now that the panel is on screen there is something to measure.
+  if (name === "settings") moveNavBlob();
   window.scrollTo({ top: 0 });
 }
 
