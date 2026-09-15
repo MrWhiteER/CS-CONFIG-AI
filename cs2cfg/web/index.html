@@ -405,18 +405,54 @@
      under the bar instead of beside every icon, which keeps the bar clean
      without leaving anybody guessing what a glyph means; each button also
      carries its name for hover and for a screen reader. */
-  /* The circle rises 20px above the bar, and the panel is the top of a
-     scrolling column -- without room reserved for it, it is simply cut off. */
-  .navwrap { margin: 0 0 18px; padding: 26px 0 30px; }
+  /* Switching category slides rather than cuts.
+
+     The pane comes in from the side it was reached from -- picking a category
+     to the right brings it in from the right -- so the movement agrees with
+     the sphere travelling along the bar rather than fighting it.
+
+     The box's height is animated too. Without that the surround snaps to the
+     new content while the pane is still gliding in, which is the jolt the
+     slide was meant to remove. */
+  @keyframes pane-in-right {
+    from { opacity: 0; transform: translateX(28px); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes pane-in-left {
+    from { opacity: 0; transform: translateX(-28px); }
+    to   { opacity: 1; transform: none; }
+  }
+  .subpane.came-from-left  { animation: pane-in-right .36s cubic-bezier(.22, .9, .26, 1); }
+  .subpane.came-from-right { animation: pane-in-left  .36s cubic-bezier(.22, .9, .26, 1); }
+  .settings-box.resizing { transition: height .36s cubic-bezier(.22, .9, .26, 1); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .subpane.came-from-left, .subpane.came-from-right { animation: none; }
+    .settings-box.resizing { transition: none; }
+  }
+
+  /* Settings is one box: the bar is its header, not a separate thing hovering
+     above a separate card. A floating strip over a panel read as two
+     unrelated objects that happened to be near each other. */
+  .settings-box {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    overflow: hidden;
+  }
+  /* No band and no divider: a tinted strip with a rule under it split the box
+     back into the two objects this was meant to stop being. The bar simply
+     sits at the top of the one surface, and the ring around the sphere is
+     painted in that same surface, so the cut-out still reads without a second
+     colour to cut out of. */
+  .navwrap { margin: 0; padding: 26px 0 22px; background: transparent; }
   .navbar {
     position: relative;
     display: flex; align-items: stretch;
-    width: fit-content; max-width: 100%;
+    width: fit-content; max-width: 100%; margin: 0 auto;
     height: 62px; padding: 0 8px;
-    background: var(--panel);
-    border: 1px solid var(--line);
-    border-radius: 20px;
-    box-shadow: 0 10px 28px rgba(0, 0, 0, .34);
+    background: transparent;
+    border: 0;
   }
 
   .nav-blob {
@@ -499,10 +535,15 @@
     transition-delay: .24s;
   }
 
-  /* The box the settings live in has no edges of its own -- the bar above is
-     the only chrome. Panels inside keep their own cards; this is the container
-     they sit in, not a frame around each one. */
-  .subpane { background: transparent; border: 0; padding: 0; }
+  /* Inside the box, the panels stop being boxes. Cards within a card is the
+     thing that made this read as several objects rather than one. */
+  .subpane { background: transparent; border: 0; padding: 16px 18px 6px; }
+  .subpane .panel,
+  .subpane .card {
+    background: transparent; border: 0; box-shadow: none;
+    padding: 0; margin: 0 0 22px;
+  }
+  .subpane > *:last-child { margin-bottom: 16px; }
 
   @media (prefers-reduced-motion: reduce) {
     .nav-blob, .nav-item { transition: none; }
@@ -2764,16 +2805,6 @@
         </div>
       </div>
 
-      <div class="navwrap">
-        <div class="navbar" id="settings-subtabs" role="tablist">
-          <div class="nav-blob" id="nav-blob"></div>
-          <button class="nav-item" data-sub="apply" role="tab" aria-selected="true" title="Apply" aria-label="Apply"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6.5L9.5 17 4 11.5"/></svg><span class="nav-tip">Apply</span></button>
-          <button class="nav-item" data-sub="sound" role="tab" aria-selected="false" title="Sound" aria-label="Sound"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5L6.5 9H3.5v6h3L11 19z"/><path d="M15.5 9.2a4 4 0 010 5.6"/><path d="M18.2 6.5a8 8 0 010 11"/></svg><span class="nav-tip">Sound</span></button>
-          <button class="nav-item" data-sub="config" role="tab" aria-selected="false" title="Config files" aria-label="Config files"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 012-2h4l2 2.5h8a2 2 0 012 2V18a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg><span class="nav-tip">Config files</span></button>
-          <button class="nav-item" data-sub="editing" role="tab" aria-selected="false" title="Editing" aria-label="Editing"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 12h14M5 18h14"/><circle cx="9" cy="6" r="2.1"/><circle cx="15" cy="12" r="2.1"/><circle cx="8" cy="18" r="2.1"/></svg><span class="nav-tip">Editing</span></button>
-        </div>
-      </div>
-
       <div class="confirm-veil hidden" id="confirm-veil">
         <div class="confirm-box" role="alertdialog" aria-modal="true"
              aria-labelledby="confirm-title">
@@ -2785,6 +2816,17 @@
             <button class="btn primary" id="confirm-keep">Keep</button>
             <button class="btn" id="confirm-undo">Put it back</button>
           </div>
+        </div>
+      </div>
+
+      <div class="settings-box">
+      <div class="navwrap">
+        <div class="navbar" id="settings-subtabs" role="tablist">
+          <div class="nav-blob" id="nav-blob"></div>
+          <button class="nav-item" data-sub="apply" role="tab" aria-selected="true" title="Apply" aria-label="Apply"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6.5L9.5 17 4 11.5"/></svg><span class="nav-tip">Apply</span></button>
+          <button class="nav-item" data-sub="sound" role="tab" aria-selected="false" title="Sound" aria-label="Sound"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5L6.5 9H3.5v6h3L11 19z"/><path d="M15.5 9.2a4 4 0 010 5.6"/><path d="M18.2 6.5a8 8 0 010 11"/></svg><span class="nav-tip">Sound</span></button>
+          <button class="nav-item" data-sub="config" role="tab" aria-selected="false" title="Config files" aria-label="Config files"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 012-2h4l2 2.5h8a2 2 0 012 2V18a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg><span class="nav-tip">Config files</span></button>
+          <button class="nav-item" data-sub="editing" role="tab" aria-selected="false" title="Editing" aria-label="Editing"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 12h14M5 18h14"/><circle cx="9" cy="6" r="2.1"/><circle cx="15" cy="12" r="2.1"/><circle cx="8" cy="18" r="2.1"/></svg><span class="nav-tip">Editing</span></button>
         </div>
       </div>
 
@@ -2922,6 +2964,7 @@
       </section>
       </div>
 
+      </div>
     </div>
 
     </div><!-- /.scroll -->
@@ -4043,13 +4086,44 @@ let settingsSub = "apply";
 let settingsSubChosen = false;
 
 function setSettingsSub(name, restoring) {
+  const was = settingsSub;
   settingsSub = name;
   if (!restoring) settingsSubChosen = true;
   const items = [...document.querySelectorAll("#settings-subtabs .nav-item")];
+  const order = items.map(b => b.dataset.sub);
+  const cameFrom = order.indexOf(name) < order.indexOf(was) ? "right" : "left";
   items.forEach(b => b.setAttribute("aria-selected", String(b.dataset.sub === name)));
   moveNavBlob();
-  document.querySelectorAll('[data-panel="settings"] .subpane').forEach(pane =>
-    pane.classList.toggle("hidden", pane.dataset.sub !== name));
+
+  const panes = [...document.querySelectorAll('[data-panel="settings"] .subpane')];
+  const box = document.querySelector(".settings-box");
+  // Measured before and after the swap so the surround can travel with the
+  // pane instead of snapping to the new content underneath it.
+  const from = box ? box.getBoundingClientRect().height : 0;
+  panes.forEach(pane => {
+    pane.classList.remove("came-from-left", "came-from-right");
+    pane.classList.toggle("hidden", pane.dataset.sub !== name);
+  });
+  const landed = panes.find(pane => pane.dataset.sub === name);
+
+  if (box && landed && !restoring && was !== name) {
+    const to = box.getBoundingClientRect().height;
+    landed.classList.add("came-from-" + cameFrom);
+    if (Math.abs(to - from) > 1) {
+      box.style.height = from + "px";
+      box.classList.add("resizing");
+      void box.offsetHeight;          // commit the start height before moving
+      box.style.height = to + "px";
+      const done = () => {
+        box.classList.remove("resizing");
+        // Let it size itself again: panes load their contents after this and
+        // a fixed height would clip whatever arrives late.
+        box.style.height = "";
+        box.removeEventListener("transitionend", done);
+      };
+      box.addEventListener("transitionend", done);
+    }
+  }
   if (name === "sound") loadAudio(false);
   if (name === "config" || name === "editing") ensureScan(false);
   rememberPrefs();
