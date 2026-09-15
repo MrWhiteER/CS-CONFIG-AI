@@ -473,6 +473,24 @@
     padding: 6px 17px; font-size: 11.5px; font-weight: 600;
   }
 
+  /* What the option does, as against what it is called. Cyan so the eye lands
+     on it -- the name alone never told anyone which one they wanted. */
+  .seg-item .why {
+    font-style: normal; font-weight: 500; margin-left: 7px;
+    color: var(--neon-cyan);
+    text-shadow: 0 0 9px color-mix(in srgb, var(--neon-cyan) 45%, transparent);
+  }
+  /* On the lit thumb that cyan measures 2.8:1 against the violet -- it goes
+     from eye-catching to washed out. The darkest end of the same hue instead,
+     which reads at 4.5:1 and still belongs to the cyan rather than being a
+     neutral black borrowed from the name beside it. */
+  .seg-item[aria-selected="true"] .why {
+    color: #001216; text-shadow: none;
+  }
+  @supports not (color: color-mix(in srgb, red 50%, blue)) {
+    .seg-item .why { text-shadow: none; }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .seg-thumb { transition: none; }
   }
@@ -1205,6 +1223,11 @@
     /* One colour per profile, named once. The dial, the labels and the light
        across the whole window all read from here, so they can never drift
        apart into three slightly different greens. */
+    /* Reserved for text that explains rather than names. Cyan is the one
+       bright hue the window does not already use for a state, so it reads as
+       "this is telling you something" instead of as good/warn/bad. */
+    --neon-cyan:        #22e6ff;
+
     --neon-competitive: #ff9d2e;
     --neon-balanced:    #17e3a1;
     --neon-quality:     #a56bff;
@@ -3202,9 +3225,9 @@
                  aria-label="Launch mode">
               <span class="seg-thumb"></span>
               <button class="seg-item" role="tab" data-mode="borderless"
-                      aria-selected="true">Borderless &middot; instant alt-tab</button>
+                      aria-selected="true">Borderless<i class="why">instant alt-tab</i></button>
               <button class="seg-item" role="tab" data-mode="fullscreen"
-                      aria-selected="false">Fullscreen &middot; CS2 default</button>
+                      aria-selected="false">Fullscreen<i class="why">CS2 default</i></button>
             </div>
             <!-- Empty until Fix stretching has something to report. -->
             <span class="sub" id="fix-hint"></span>
