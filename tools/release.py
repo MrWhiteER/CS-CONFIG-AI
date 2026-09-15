@@ -100,9 +100,26 @@ class Stop(SystemExit):
         super().__init__(f"\n  stopped: {message}\n")
 
 
+def say(text: str) -> None:
+    """Print without letting the console's encoding stop the release.
+
+    Windows consoles still default to cp1252, and release notes are prose --
+    an arrow or a dash somebody typed is enough to raise UnicodeEncodeError.
+    Losing a release halfway through, tagged and pushed but never published,
+    because a character could not be *echoed* is not a trade worth making, so
+    anything unprintable is replaced and the run carries on.
+    """
+    stream = getattr(sys, "stdout", None)
+    encoding = getattr(stream, "encoding", None) or "utf-8"
+    try:
+        print(text)
+    except UnicodeEncodeError:
+        print(text.encode(encoding, "replace").decode(encoding, "replace"))
+
+
 def run(command, capture: bool = False, check: bool = True) -> str:
     printed = command if isinstance(command, str) else " ".join(command)
-    print(f"    $ {printed}")
+    say(f"    $ {printed}")
     result = subprocess.run(
         command, cwd=ROOT, shell=isinstance(command, str),
         capture_output=capture, text=True)
