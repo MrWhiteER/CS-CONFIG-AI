@@ -512,14 +512,37 @@
     transition: color .26s ease;
   }
   .seg-item:hover { color: var(--cat, var(--ink)); }
-  .seg-item[aria-selected="true"] {
+  .segbar.measured .seg-item[aria-selected="true"] {
     /* Dark on the lit thumb: all four category colours are bright enough that
-       ink reads better on them than white would. */
+       ink reads better on them than white would. Only once the thumb has been
+       placed, though -- before that there is nothing lit underneath, and this
+       would be dark text on a dark bar. */
     color: #0b1017;
   }
+  .segbar:not(.measured) .seg-item[aria-selected="true"] { color: var(--ink); }
   .seg-item:focus-visible {
     outline: 2px solid var(--cat, var(--accent)); outline-offset: 3px;
   }
+
+  /* The game's sections. More of them than the settings categories, each with
+     a count, so the items are tighter and the bar is allowed to scroll rather
+     than to wrap into two rows that move the settings down the page. */
+  .cs2-seg {
+    width: 100%; margin: 0 0 12px;
+    overflow-x: auto; scrollbar-width: none;
+  }
+  .cs2-seg::-webkit-scrollbar { display: none; }
+  .cs2-seg .seg-item {
+    padding: 8px 15px; font-size: 12.5px;
+    display: inline-flex; align-items: baseline; gap: 7px;
+  }
+  /* The count rides along rather than taking a line of its own. */
+  .cs2-seg .seg-item .n {
+    font-style: normal; font-family: var(--mono); font-size: 10px;
+    color: var(--faint);
+  }
+  .cs2-seg .seg-item[aria-selected="true"] .n { color: rgba(11, 16, 23, .6); }
+  .cs2-seg .seg-item:hover .n { color: var(--muted); }
 
   /* The same control at the size of the button it stands next to, rather than
      at the size of a tab strip that heads a whole panel. */
@@ -1838,7 +1861,6 @@
   .app.rail-tight .tabs .tab,
   .app.rail-tight .rail-foot .tab { justify-content: center; padding: 9px 0; }
   /* The section list has no symbols to fall back on, so it goes entirely. */
-  .app.rail-tight #cs2-tree { display: none; }
   /* A count still has to be visible when there is no room beside the label. */
   .app.rail-tight .tabs .tab .dirty-badge,
   .app.rail-tight .tabs .tab .count,
@@ -1902,26 +1924,6 @@
   .tabs .tab .count       { background: var(--accent); color: #fff; }
 
   /* The section list, shown only while the CS2 tab is the open one. */
-  #cs2-tree { display: none; }
-  .rail:has(.tab[data-tab="cs2"][aria-selected="true"]) #cs2-tree { display: block; }
-  #cs2-tree .seg { display: flex; flex-direction: column; gap: 1px; padding: 0 8px; }
-  #cs2-tree .seg button {
-    appearance: none; background: none; border: 0; cursor: pointer; width: 100%;
-    display: flex; align-items: baseline; gap: 7px; text-align: left; flex: none;
-    padding: 6px 9px 6px 24px; border-radius: 7px;
-    color: var(--muted); font: inherit; font-size: 12px;
-  }
-  #cs2-tree .seg button strong {
-    display: inline; font-size: 12px; font-weight: 500; color: inherit; letter-spacing: 0;
-  }
-  #cs2-tree .seg button span {
-    display: inline; margin: 0 0 0 auto; font-family: var(--mono);
-    font-size: 9.5px; opacity: .55; text-transform: none; letter-spacing: 0;
-  }
-  #cs2-tree .seg button:hover { background: rgba(255, 255, 255, .05); color: var(--ink-dim); }
-  #cs2-tree .seg button[aria-pressed="true"] {
-    background: rgba(255, 255, 255, .10); color: var(--ink); border-color: transparent;
-  }
 
   .rail-foot {
     margin-top: auto; padding: 10px 8px 0;
@@ -3267,14 +3269,6 @@
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.6M12 18.6v2.6M4.5 12H2M22 12h-2.5M6.2 6.2L4.4 4.4M19.6 19.6l-1.8-1.8M17.8 6.2l1.8-1.8M4.4 19.6l1.8-1.8"/></svg></i><span class="tx">Settings</span></button>
     </div>
 
-    <!-- The section list lives in the rail, the way NGENUITY keeps its device
-         tree there. It is populated by the CS2 settings code and only shown
-         while that tab is open. -->
-    <div id="cs2-tree">
-      <div class="rail-label">Sections</div>
-      <div class="seg" id="cs2-sections"></div>
-    </div>
-
     <!-- The foot carries the two things that are about this copy of the
          launcher rather than about the game: what version it is, and whose
          settings it is showing. Both open upward, because there is no room
@@ -3519,6 +3513,13 @@
         </div>
         <div class="fps-quick" id="fps-quick"></div>
       </section>
+
+      <!-- The game's own sections. In the panel rather than the rail: six of
+           them across a 188px column had to be a stack of small rows, and the
+           same control the settings categories use reads faster and says which
+           one you are in without having to be scanned. -->
+      <div class="segbar cs2-seg" id="cs2-sections" role="tablist"
+           aria-label="Settings sections"></div>
 
       <section class="editor">
         <div class="editor-head">
@@ -5915,13 +5916,20 @@ function renderCs2Sections() {
   if (!cs2Data) return;
   const counts = cs2GroupCounts();
 
-  $("cs2-sections").innerHTML = cs2Data.sections.map(sec => {
-    const total = sec.groups.reduce((n, g) => n + (counts[g.id] || 0), 0);
-    const on = sec.id === cs2Section;
-    return '<button data-section="' + esc(sec.id) + '" aria-pressed="' + on + '">' +
-      "<strong>" + esc(sec.label) + "</strong><span>" + total + " setting" +
-      (total === 1 ? "" : "s") + "</span></button>";
-  }).join("");
+  // The thumb is a sibling of the items and has to survive the rebuild, so it
+  // is written out with them rather than left in the markup.
+  $("cs2-sections").innerHTML = '<span class="seg-thumb"></span>' +
+    cs2Data.sections.map(sec => {
+      const total = sec.groups.reduce((n, g) => n + (counts[g.id] || 0), 0);
+      const on = sec.id === cs2Section;
+      return '<button class="seg-item" role="tab" data-section="' + esc(sec.id) +
+        '" aria-selected="' + on + '"' +
+        ' title="' + esc(sec.label + " \u2014 " + total + " setting" +
+                         (total === 1 ? "" : "s")) + '">' +
+        esc(sec.label) + '<i class="n">' + total + "</i></button>";
+    }).join("");
+  // Next frame: the items were created in this one and have no width yet.
+  requestAnimationFrame(() => moveSegThumb("cs2-sections"));
 
   renderCs2Groups();
 }
@@ -8946,6 +8954,7 @@ function setTab(name) {
     panel.classList.toggle("hidden", panel.dataset.panel !== name));
   // Now that the panel is on screen there is something to measure.
   if (name === "settings") moveSegThumb("settings-subtabs");
+  if (name === "cs2") requestAnimationFrame(() => moveSegThumb("cs2-sections"));
   window.scrollTo({ top: 0 });
 }
 
@@ -9730,7 +9739,7 @@ $("rescan").addEventListener("click", () => scan(true));
     if (which === "scripts") return "scripts";
     if (which === "keyboard") return "keyboard";
     if (which !== "cs2") return which === "settings" ? "tools" : "launcher";
-    const open = document.querySelector('#cs2-sections button[aria-pressed="true"]');
+    const open = document.querySelector('#cs2-sections .seg-item[aria-selected="true"]');
     const id = open ? String(open.dataset.section || "").toLowerCase() : "";
     for (const key of Object.keys(HUES)) {
       if (id.indexOf(key) !== -1) return HUES[key];
@@ -9740,11 +9749,11 @@ $("rescan").addEventListener("click", () => scan(true));
 
   function paint() {
     document.body.dataset.hue = hueFor();
-    const open = document.querySelector('#cs2-sections button[aria-pressed="true"]');
+    const open = document.querySelector('#cs2-sections .seg-item[aria-selected="true"]');
     const group = document.querySelector('#cs2-groups button[aria-pressed="true"]');
     const title = document.getElementById("cs2-etitle");
     if (title) {
-      const section = open ? (open.querySelector("strong") || open).textContent.trim() : "";
+      const section = open ? (open.childNodes[0].textContent || "").trim() : "";
       const cat = group ? group.childNodes[0].textContent.trim() : "";
       const trail = section === cat ? [section] : [section, cat];
       title.textContent = trail.filter(Boolean).join("  ›  ") || "Settings";
@@ -9759,8 +9768,10 @@ $("rescan").addEventListener("click", () => scan(true));
   if (tabs) watch.observe(tabs, { attributes: true, subtree: true, attributeFilter: ["aria-selected"] });
   for (const id of ["cs2-sections", "cs2-groups"]) {
     const host = document.getElementById(id);
+    // Sections moved to aria-selected with the segmented control; groups are
+    // still buttons that press.
     if (host) watch.observe(host, { attributes: true, childList: true, subtree: true,
-                                    attributeFilter: ["aria-pressed"] });
+                                    attributeFilter: ["aria-pressed", "aria-selected"] });
   }
   paint();
 })();
