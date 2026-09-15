@@ -686,45 +686,90 @@
   @media (max-width: 860px) { .scorebar { display: none; } }
   @media (prefers-reduced-motion: reduce) { .score-fg { transition: none; } }
 
-  /* The tier, as a lit sphere in the middle of the bar.
+  /* The tier, as a drop in the middle of the bar.
 
      Centred on the bar rather than balanced between the chips and the scores:
-     the chips change width as the numbers move, and anything centred by the
-     space either side of them would drift about while you watched it.
+     the chips change width as their numbers move, so anything held in place by
+     the space either side of them would drift about while being watched.
 
      It takes the profile colour, so the machine's grade and the profile it is
-     being graded against are lit the same -- amber on competitive, violet on
-     quality -- rather than the grade asserting a colour of its own. */
-  .tierbadge {
-    position: absolute; left: 50%; top: 9px; transform: translateX(-50%);
+     graded against are lit alike rather than the grade asserting a colour of
+     its own that then disagrees with the window around it. */
+  .modebadge {
+    position: absolute; left: 50%; top: 6px; transform: translateX(-50%);
+    width: 40px; height: 40px;
     display: grid; place-items: center;
-    width: 38px; height: 38px; border-radius: 50%;
+  }
+  .modebadge:empty { display: none; }
+
+  /* A falling drop: round at the bottom, drawn to a point at the top.
+
+     Three corners rounded and the fourth left square. The square one is the
+     top-left, which points up and to the left, so turning it a quarter turn
+     clockwise brings it to straight up -- anticlockwise took it to the side,
+     which is why it first came out lying on its edge. */
+  .modedrop {
+    position: absolute; inset: 0;
+    border-radius: 0 50% 50% 50%;
+    transform: rotate(45deg);
     background:
-      radial-gradient(circle at 34% 28%,
-        color-mix(in srgb, var(--mode-neon, var(--accent)) 55%, white) 0%,
-        var(--mode-neon, var(--accent)) 58%,
-        color-mix(in srgb, var(--mode-neon, var(--accent)) 72%, black) 100%);
+      radial-gradient(circle at 38% 64%,
+        color-mix(in srgb, var(--mode-neon, var(--accent)) 50%, white) 0%,
+        var(--mode-neon, var(--accent)) 55%,
+        color-mix(in srgb, var(--mode-neon, var(--accent)) 74%, black) 100%);
     box-shadow:
+      /* a rim, so the shape holds its edge against a light background */
       0 0 0 1px color-mix(in srgb, var(--mode-neon, var(--accent)) 55%, transparent),
-      0 0 16px color-mix(in srgb, var(--mode-neon, var(--accent)) 60%, transparent),
-      0 3px 10px rgba(0, 0, 0, .5);
-    transition: background .3s ease, box-shadow .3s ease;
-    pointer-events: auto;
+      /* the light it throws, in its own colour */
+      0 0 17px color-mix(in srgb, var(--mode-neon, var(--accent)) 60%, transparent),
+      /* and the shadow it casts. Two, because one blur cannot be both the
+         close dark edge that says the drop is a solid thing and the wide soft
+         one that says it is held above the bar rather than painted on it.
+         Offset down and turned back by the rotation so it falls straight
+         down on screen rather than off to the side with the shape. */
+      3px 3px 7px rgba(0, 0, 0, .55),
+      7px 7px 20px rgba(0, 0, 0, .42);
+    transition: background .3s ease, box-shadow .3s ease, transform .3s ease;
   }
-  .tierbadge b {
-    font-size: 19px; font-weight: 800; line-height: 1;
-    /* Ink on the lit sphere: every profile colour is bright enough that dark
-       reads better on it than white. */
+  /* A pool of shade underneath. The drop hangs over the content below it, and
+     without this it reads as a sticker on the bar rather than something in
+     front of it. */
+  .modebadge::after {
+    content: ""; position: absolute; z-index: 0;
+    left: 50%; bottom: -5px; width: 34px; height: 9px;
+    transform: translateX(-50%);
+    border-radius: 50%;
+    background: radial-gradient(ellipse, rgba(0, 0, 0, .5) 0%, transparent 70%);
+    filter: blur(2px);
+    pointer-events: none;
+  }
+
+  /* The mark sits on the drop rather than inside it, so it stays upright while
+     the drop is turned. */
+  .modemark {
+    position: relative; z-index: 1;
+    width: 21px; height: 21px;
+    /* Ink on the lit drop: every profile colour is bright enough that dark
+       reads better on it, and a neon mark on a neon ground is the one
+       combination that does not work at all. */
     color: #0b1017;
-    text-shadow: 0 1px 0 color-mix(in srgb, var(--mode-neon, var(--accent)) 60%, white);
   }
-  .tierbadge:empty { display: none; }
+  /* Drawn as outlines, not filled. SVG fills black by default, which turned
+     the gem into a solid lump with its own facet lines invisible on top of
+     it -- the shape was there and the drawing was not. */
+  .modemark path, .modemark circle {
+    fill: none; stroke: currentColor; stroke-width: 1.8;
+    stroke-linejoin: round; stroke-linecap: round;
+  }
+  /* Except where a mark is meant to be solid, which says so for itself. */
+  .modemark [fill="currentColor"] { fill: currentColor; stroke: none; }
+
   /* The bar runs out of room before anything else. The scores go first, and
      the grade goes with them rather than colliding with the chips. */
-  @media (max-width: 860px) { .tierbadge { display: none; } }
+  @media (max-width: 860px) { .modebadge { display: none; } }
+  @media (prefers-reduced-motion: reduce) { .modedrop { transition: none; } }
   @supports not (color: color-mix(in srgb, red 50%, blue)) {
-    .tierbadge { background: var(--mode-neon, var(--accent)); box-shadow: none; }
-    .tierbadge b { text-shadow: none; }
+    .modedrop { background: var(--mode-neon, var(--accent)); box-shadow: none; }
   }
 
   .seg { display: flex; gap: 7px; flex-wrap: wrap; }
@@ -2624,7 +2669,7 @@
       <span class="chip" id="chip-gpu"><i></i>GPU <b>—</b></span>
       <span class="chip" id="chip-ram"><i></i>RAM <b>—</b></span>
       <span class="spacer"></span>
-      <div class="tierbadge" id="tier-badge"></div>
+      <div class="modebadge" id="mode-badge"></div>
       <div class="scorebar" id="scorebar"></div>
     </div>
 
@@ -3501,6 +3546,48 @@ function renderHardware(d) {
    round" without reading the figure. Each carries its full meaning on hover,
    since there is no room for a caption up here.
 */
+/* The drop shows which profile you picked.
+
+   It already takes the profile's colour, so the emblem says the same thing
+   with a second signal rather than carrying an unrelated fact. The machine's
+   grade is a different question and lives in the assessment, where the numbers
+   that justify it are.
+
+   One emblem each, chosen for what the profile is for rather than for
+   decoration: a crosshair for the one that trades picture for frames, a
+   balance for the one that splits the difference, a cut gem for the one that
+   spends the headroom on how it looks.
+*/
+const MODE_ART = {
+  competitive:
+    '<circle cx="11" cy="11" r="6.4"/>' +
+    '<path d="M11 1.6v3.1M11 17.3v3.1M1.6 11h3.1M17.3 11h3.1"/>' +
+    '<circle cx="11" cy="11" r="1.5" fill="currentColor" stroke="none"/>',
+  balanced:
+    '<path d="M11 3.4v14.2M5.2 17.6h11.6"/>' +
+    '<path d="M3 7.4h16"/>' +
+    '<path d="M3 7.4L1.2 12.2a3.1 3.1 0 006.2 0z"/>' +
+    '<path d="M19 7.4l-1.8 4.8a3.1 3.1 0 006.2 0z" transform="translate(-3.4)"/>',
+  quality:
+    '<path d="M11 2.6l6.9 5.3-2.6 10.6H6.7L4.1 7.9z"/>' +
+    '<path d="M4.1 7.9h13.8M11 2.6L8.4 7.9l2.6 10.6 2.6-10.6z"/>',
+};
+
+const MODE_WORD = {
+  competitive: "Competitive — frames and clarity first",
+  balanced: "Balanced — a comfortable margin over your refresh rate",
+  quality: "Quality — the best picture the hardware can carry",
+};
+
+function paintModeBadge(name) {
+  const badge = $("mode-badge");
+  if (!badge) return;
+  const art = MODE_ART[name] || MODE_ART.balanced;
+  badge.innerHTML = '<span class="modedrop"></span>' +
+    '<svg class="modemark" viewBox="0 0 22 22" aria-hidden="true">' + art + "</svg>";
+  badge.title = MODE_WORD[name] || name;
+}
+
 function scoreRing(value, cap, label, detail, tone) {
   const share = Math.max(0, Math.min(1, value / cap));
   const r = 13, track = 2 * Math.PI * r;
@@ -3520,12 +3607,6 @@ function scoreRing(value, cap, label, detail, tone) {
 function renderScores(p, headroomPct, hue) {
   const box = $("scorebar");
   if (!box || !p) return;
-  const badge = $("tier-badge");
-  if (badge) {
-    badge.innerHTML = "<b>" + esc(p.tier) + "</b>";
-    badge.title = "Tier " + p.tier + " — " + p.estimated_fps +
-                  " fps estimated, limited by " + p.bottleneck;
-  }
   box.innerHTML =
     scoreRing(headroomPct, 100, "Headroom",
               p.headroom + "× of " + p.target_fps + " Hz", hue) +
@@ -3553,6 +3634,7 @@ function renderPlan(p) {
 
   let assessment = '<section class="card"><h2>Assessment</h2>' +
     '<div class="stats">' +
+    '<div class="stat"><b>' + esc(p.tier) + '</b><span>tier</span></div>' +
     '<div class="stat"><b style="color:' + hue + '">~' + p.estimated_fps + '</b><span>est. fps</span></div>' +
     '<div class="stat"><b>' + p.headroom + '×</b><span>of ' + p.target_fps + ' Hz</span></div>' +
     '<div class="stat"><b>' + esc(p.bottleneck) + '</b><span>limited by</span></div>' +
@@ -4000,6 +4082,10 @@ function paintIntent(name, live) {
   dial.dataset.intent = name;
   // The whole window takes the mode's colour, not just the control.
   document.body.dataset.intent = name;
+  // ...and so does the drop in the title bar, which shows the same choice.
+  // Driven from here rather than from the plan so it moves with the dial
+  // instead of waiting for the next preview to come back.
+  paintModeBadge(name);
   // Keep the ambient wash under the ball while it is being dragged, so the
   // glow travels with it instead of snapping at the end.
   dial.style.setProperty("--glow-x", (live === undefined ? pct : live) + "%");
