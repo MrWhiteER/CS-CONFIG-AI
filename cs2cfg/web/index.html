@@ -691,7 +691,7 @@
      graded against are lit alike rather than the grade asserting a colour of
      its own that then disagrees with the window around it. */
   .modebadge {
-    position: absolute; left: 50%; top: 6px; transform: translateX(-50%);
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
     width: 40px; height: 40px;
     display: grid; place-items: center;
   }
@@ -1487,13 +1487,16 @@
 
   /* ------------------------------------------------------------------ stage */
   .stage { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
-  /* Lifted above the content below it. The drop hangs 5px past the bar's own
-     box, and without a stacking order of its own the panels underneath paint
-     straight over the part that overhangs -- the drop looked cut off exactly
-     at the bar's edge. */
+  /* Tall enough to hold what is in it.
+
+     The bar was 41px and the drop is 40, so the drop had to hang out of the
+     bottom of it to be seen at all -- and then the panels below painted over
+     the part that hung out. Giving the bar the height its contents need fixes
+     the cause rather than the symptom; the z-index stays because the bell's
+     list still has to sit above the page. */
   .topbar { position: relative; z-index: 20;
             display: flex; align-items: center; gap: 8px;
-            padding: 11px 16px 0; flex: none; }
+            min-height: 58px; padding: 9px 16px; flex: none; }
   .topbar .spacer { flex: 1; }
   .chip {
     display: inline-flex; align-items: center; gap: 6px;
