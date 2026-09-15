@@ -686,6 +686,47 @@
   @media (max-width: 860px) { .scorebar { display: none; } }
   @media (prefers-reduced-motion: reduce) { .score-fg { transition: none; } }
 
+  /* The tier, as a lit sphere in the middle of the bar.
+
+     Centred on the bar rather than balanced between the chips and the scores:
+     the chips change width as the numbers move, and anything centred by the
+     space either side of them would drift about while you watched it.
+
+     It takes the profile colour, so the machine's grade and the profile it is
+     being graded against are lit the same -- amber on competitive, violet on
+     quality -- rather than the grade asserting a colour of its own. */
+  .tierbadge {
+    position: absolute; left: 50%; top: 9px; transform: translateX(-50%);
+    display: grid; place-items: center;
+    width: 38px; height: 38px; border-radius: 50%;
+    background:
+      radial-gradient(circle at 34% 28%,
+        color-mix(in srgb, var(--mode-neon, var(--accent)) 55%, white) 0%,
+        var(--mode-neon, var(--accent)) 58%,
+        color-mix(in srgb, var(--mode-neon, var(--accent)) 72%, black) 100%);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--mode-neon, var(--accent)) 55%, transparent),
+      0 0 16px color-mix(in srgb, var(--mode-neon, var(--accent)) 60%, transparent),
+      0 3px 10px rgba(0, 0, 0, .5);
+    transition: background .3s ease, box-shadow .3s ease;
+    pointer-events: auto;
+  }
+  .tierbadge b {
+    font-size: 19px; font-weight: 800; line-height: 1;
+    /* Ink on the lit sphere: every profile colour is bright enough that dark
+       reads better on it than white. */
+    color: #0b1017;
+    text-shadow: 0 1px 0 color-mix(in srgb, var(--mode-neon, var(--accent)) 60%, white);
+  }
+  .tierbadge:empty { display: none; }
+  /* The bar runs out of room before anything else. The scores go first, and
+     the grade goes with them rather than colliding with the chips. */
+  @media (max-width: 860px) { .tierbadge { display: none; } }
+  @supports not (color: color-mix(in srgb, red 50%, blue)) {
+    .tierbadge { background: var(--mode-neon, var(--accent)); box-shadow: none; }
+    .tierbadge b { text-shadow: none; }
+  }
+
   .seg { display: flex; gap: 7px; flex-wrap: wrap; }
   .seg button {
     flex: 1 1 auto; min-width: 100px; padding: 9px 12px; cursor: pointer;
@@ -1291,7 +1332,8 @@
 
   /* ------------------------------------------------------------------ stage */
   .stage { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
-  .topbar { display: flex; align-items: center; gap: 8px; padding: 11px 16px 0; flex: none; }
+  .topbar { position: relative; display: flex; align-items: center; gap: 8px;
+            padding: 11px 16px 0; flex: none; }
   .topbar .spacer { flex: 1; }
   .chip {
     display: inline-flex; align-items: center; gap: 6px;
@@ -2582,6 +2624,7 @@
       <span class="chip" id="chip-gpu"><i></i>GPU <b>—</b></span>
       <span class="chip" id="chip-ram"><i></i>RAM <b>—</b></span>
       <span class="spacer"></span>
+      <div class="tierbadge" id="tier-badge"></div>
       <div class="scorebar" id="scorebar"></div>
     </div>
 
@@ -3477,6 +3520,12 @@ function scoreRing(value, cap, label, detail, tone) {
 function renderScores(p, headroomPct, hue) {
   const box = $("scorebar");
   if (!box || !p) return;
+  const badge = $("tier-badge");
+  if (badge) {
+    badge.innerHTML = "<b>" + esc(p.tier) + "</b>";
+    badge.title = "Tier " + p.tier + " — " + p.estimated_fps +
+                  " fps estimated, limited by " + p.bottleneck;
+  }
   box.innerHTML =
     scoreRing(headroomPct, 100, "Headroom",
               p.headroom + "× of " + p.target_fps + " Hz", hue) +
@@ -3504,7 +3553,6 @@ function renderPlan(p) {
 
   let assessment = '<section class="card"><h2>Assessment</h2>' +
     '<div class="stats">' +
-    '<div class="stat"><b>' + esc(p.tier) + '</b><span>tier</span></div>' +
     '<div class="stat"><b style="color:' + hue + '">~' + p.estimated_fps + '</b><span>est. fps</span></div>' +
     '<div class="stat"><b>' + p.headroom + '×</b><span>of ' + p.target_fps + ' Hz</span></div>' +
     '<div class="stat"><b>' + esc(p.bottleneck) + '</b><span>limited by</span></div>' +
