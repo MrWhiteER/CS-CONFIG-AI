@@ -465,6 +465,14 @@
     outline: 2px solid var(--cat, var(--accent)); outline-offset: 3px;
   }
 
+  /* The same control at the size of the button it stands next to, rather than
+     at the size of a tab strip that heads a whole panel. */
+  .segbar.mini { padding: 3px; }
+  .segbar.mini .seg-thumb { top: 3px; left: 3px; height: calc(100% - 6px); }
+  .segbar.mini .seg-item {
+    padding: 5px 13px; font-size: 11.5px; font-weight: 600;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .seg-thumb { transition: none; }
   }
@@ -3186,6 +3194,18 @@
             <button class="btn" id="play-fix" title="Re-apply the stretched resolution and refit the window">
               &#8635; Fix stretching &amp; resolution
             </button>
+            <!-- Launch mode, next to the button that repairs the same thing.
+                 It was a card of its own with a paragraph under it; the
+                 paragraph is now the tooltip, because it explains a choice
+                 that is made once and then left alone. -->
+            <div class="segbar mini" id="launch-modes" role="tablist"
+                 aria-label="Launch mode">
+              <span class="seg-thumb"></span>
+              <button class="seg-item" role="tab" data-mode="borderless"
+                      aria-selected="true">Windowed</button>
+              <button class="seg-item" role="tab" data-mode="fullscreen"
+                      aria-selected="false">Fullscreen</button>
+            </div>
             <span class="sub" id="fix-hint">if the game stops filling the screen mid-match</span>
           </div>
           <div class="stop-row hidden" id="stop-row">
@@ -3229,19 +3249,16 @@
         </div>
       </section>
 
-      <section class="editor" id="launch-card">
+      <!-- Only while something is launching. The mode that used to head this
+           card now sits beside the Play button, which left nothing here worth
+           showing to somebody who is not mid-launch. -->
+      <section class="editor hidden" id="launch-card">
         <div class="editor-head">
-          <span class="etitle">Launch mode</span>
+          <span class="etitle">Launching</span>
           <span class="spacer"></span>
         </div>
         <div class="editor-main">
-          <div class="seg" id="stretch-modes">
-            <button data-mode="borderless" aria-pressed="true"><strong>Windowed - Fullscreen</strong><span>for multiple screen users</span></button>
-            <button data-mode="fullscreen"><strong>Fullscreen</strong><span>standard / original</span></button>
-          </div>
-          <p class="sub" id="stretch-desc" style="margin:9px 0 4px"></p>
-          <label class="opt"><input type="checkbox" id="p-video" checked> Set CS2 to borderless windowed first</label>
-          <div id="launch-log" class="hidden" style="margin-top:9px">
+          <div id="launch-log">
             <div class="row"><span class="k">Status</span><span class="v" id="phase">&mdash;</span></div>
             <pre class="opts" id="log" style="max-height:190px;overflow-y:auto"></pre>
           </div>
@@ -3546,6 +3563,7 @@
       <section class="panel">
         <h2>Write</h2>
         <label class="opt"><input type="checkbox" id="w-video" checked> Picture quality (cs2_video.txt)</label>
+        <label class="opt"><input type="checkbox" id="p-video" checked> Set CS2 to borderless windowed before launching</label>
         <label class="opt"><input type="checkbox" id="w-cfg" checked> Generated .vcfg config</label>
         <label class="opt"><input type="checkbox" id="w-launch" checked> Steam launch options</label>
         <label class="opt"><input type="checkbox" id="w-autoexec"> Add exec line to autoexec.vcfg</label>
@@ -5038,10 +5056,18 @@ document.addEventListener("click", e => {
    take its width from the real thing, and arithmetic would have to restate
    the padding and font rules and would drift from them.
 */
-function moveSegThumb() {
-  const bar = $("settings-subtabs");
-  const thumb = $("seg-thumb");
-  if (!bar || !thumb) return;
+function moveSegThumb(which) {
+  // Two bars use this now -- the settings categories and the launch mode --
+  // so the thumb is found inside whichever bar was asked for rather than by
+  // a fixed id. No argument means both, which is what a resize wants.
+  if (which === undefined) {
+    document.querySelectorAll(".segbar").forEach(moveSegThumb);
+    return;
+  }
+  const bar = typeof which === "string" ? $(which) : which;
+  if (!bar) return;
+  const thumb = bar.querySelector(".seg-thumb");
+  if (!thumb) return;
   const live = bar.querySelector('.seg-item[aria-selected="true"]');
   if (!live) return;
   const here = live.getBoundingClientRect();
@@ -5059,7 +5085,7 @@ function moveSegThumb() {
 }
 
 // The bar is flexible, so where the circle belongs changes with the window.
-window.addEventListener("resize", moveSegThumb);
+window.addEventListener("resize", () => moveSegThumb());
 
 /* Settings sub-tabs. Each category loads what it needs the first time it is
    opened, so switching to Sound does not pay for a config scan. */
@@ -5077,7 +5103,7 @@ function setSettingsSub(name, restoring) {
   const order = items.map(b => b.dataset.sub);
   const cameFrom = order.indexOf(name) < order.indexOf(was) ? "right" : "left";
   items.forEach(b => b.setAttribute("aria-selected", String(b.dataset.sub === name)));
-  moveSegThumb();
+  moveSegThumb("settings-subtabs");
 
   const panes = [...document.querySelectorAll('[data-panel="settings"] .subpane')];
   const box = document.querySelector(".settings-box");
@@ -8724,7 +8750,7 @@ function setTab(name) {
   document.querySelectorAll(".tab-panel").forEach(panel =>
     panel.classList.toggle("hidden", panel.dataset.panel !== name));
   // Now that the panel is on screen there is something to measure.
-  if (name === "settings") moveSegThumb();
+  if (name === "settings") moveSegThumb("settings-subtabs");
   window.scrollTo({ top: 0 });
 }
 
@@ -8877,7 +8903,9 @@ function rememberPrefs() {
 }
 
 document.addEventListener("change", e => {
-  if (e.target.closest("#launch-card, .card")) rememberPrefs();
+  // #p-video by name: it sits in the Settings panel now rather than in a card,
+  // and it is still a launch preference that has to be remembered.
+  if (e.target.closest("#launch-card, .card, #p-video")) rememberPrefs();
 });
 
 // --- history --------------------------------------------------------------
@@ -9304,12 +9332,16 @@ function setStretchMode(mode) {
   stretchMode = mode;
   const sub = document.getElementById("play-sub");
   if (sub && !$("play").disabled) sub.textContent = MODE_SUB[mode] || "through Steam";
-  [...$("stretch-modes").children].forEach(b =>
-    b.setAttribute("aria-pressed", b.dataset.mode === mode));
-  $("stretch-desc").textContent = STRETCH_DESC[mode] || "";
+  const bar = $("launch-modes");
+  if (!bar) return;
+  bar.querySelectorAll(".seg-item").forEach(b =>
+    b.setAttribute("aria-selected", String(b.dataset.mode === mode)));
+  // What the card used to print underneath, now carried by the control.
+  bar.title = STRETCH_DESC[mode] || "";
+  moveSegThumb(bar);
 }
 
-$("stretch-modes").addEventListener("click", e => {
+$("launch-modes").addEventListener("click", e => {
   const btn = e.target.closest("button[data-mode]");
   if (!btn) return;
   setStretchMode(btn.dataset.mode);
@@ -9317,7 +9349,7 @@ $("stretch-modes").addEventListener("click", e => {
 });
 
 function renderLaunch(s) {
-  $("launch-log").classList.remove("hidden");
+  $("launch-card").classList.remove("hidden");
   $("phase").textContent = PHASE_TEXT[s.phase] || s.phase;
   $("phase").style.color = s.phase === "error" ? "var(--bad)"
     : s.phase === "running" ? "var(--good)" : "var(--ink)";
