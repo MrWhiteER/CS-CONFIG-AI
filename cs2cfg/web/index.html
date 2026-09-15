@@ -412,14 +412,25 @@
     border-radius: 999px;
   }
 
+  /* The track carries the live category's colour; each item carries its own,
+     which is what it shows on hover. */
+  .segbar[data-live="apply"]   { --cat: var(--cat-apply); }
+  .segbar[data-live="sound"]   { --cat: var(--cat-sound); }
+  .segbar[data-live="config"]  { --cat: var(--cat-config); }
+  .segbar[data-live="editing"] { --cat: var(--cat-editing); }
+  .seg-item[data-sub="apply"]   { --cat: var(--cat-apply); }
+  .seg-item[data-sub="sound"]   { --cat: var(--cat-sound); }
+  .seg-item[data-sub="config"]  { --cat: var(--cat-config); }
+  .seg-item[data-sub="editing"] { --cat: var(--cat-editing); }
+
   .seg-thumb {
     position: absolute; top: 5px; left: 5px;
     height: calc(100% - 10px); width: 0;
     border-radius: 999px;
-    background: var(--mode-neon, var(--accent));
+    background: var(--cat, var(--accent));
     box-shadow:
       0 2px 10px rgba(0, 0, 0, .45),
-      0 0 18px color-mix(in srgb, var(--mode-neon, var(--accent)) 55%, transparent);
+      0 0 18px color-mix(in srgb, var(--cat, var(--accent)) 55%, transparent);
     transition: left .38s cubic-bezier(.34, 1.1, .38, 1),
                 width .38s cubic-bezier(.34, 1.1, .38, 1),
                 background .3s ease, box-shadow .3s ease;
@@ -439,14 +450,14 @@
     white-space: nowrap; color: var(--muted);
     transition: color .26s ease;
   }
-  .seg-item:hover { color: var(--ink); }
+  .seg-item:hover { color: var(--cat, var(--ink)); }
   .seg-item[aria-selected="true"] {
-    /* Dark on the lit thumb. The thumb carries the profile colour, so this is
-       the one place in the app that reads the other way round. */
-    color: var(--neon-ink, #0b1017);
+    /* Dark on the lit thumb: all four category colours are bright enough that
+       ink reads better on them than white would. */
+    color: #0b1017;
   }
   .seg-item:focus-visible {
-    outline: 2px solid var(--mode-neon, var(--accent)); outline-offset: 3px;
+    outline: 2px solid var(--cat, var(--accent)); outline-offset: 3px;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -801,6 +812,17 @@
     --neon-competitive: #ff9d2e;
     --neon-balanced:    #17e3a1;
     --neon-quality:     #a56bff;
+
+    /* One per settings category. Borrowed from what the app already uses for
+       the same idea rather than picked fresh: sound is the amber the Fix It
+       sound tile carries, editing is the pink of the Scripts rail entry, and
+       apply is the house accent, which everywhere else means go. Config files
+       takes blue because the obvious amber is already sound's, and two warm
+       neighbours would be the two hardest of the four to tell apart. */
+    --cat-apply:   #17e3a1;
+    --cat-sound:   #ff9d2e;
+    --cat-config:  #4d94ff;
+    --cat-editing: #ff2d95;
   }
 
   /* ------------------------------------------------------------- the stage */
@@ -4015,6 +4037,9 @@ function moveSegThumb() {
   if (!frame.width || !here.width) return;
   thumb.style.left = Math.round(here.left - frame.left) + "px";
   thumb.style.width = Math.round(here.width) + "px";
+  // The track takes the live category's colour, so the thumb changes hue as
+  // it travels rather than staying one colour across four categories.
+  bar.dataset.live = live.dataset.sub || "";
   bar.classList.add("measured");
 }
 
