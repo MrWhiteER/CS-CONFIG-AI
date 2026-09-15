@@ -594,12 +594,6 @@
      Quiet the rest of the time on purpose: a panel that looks urgent whether
      or not anything happened teaches people to stop looking at it, which
      defeats the watching. */
-  #ingame-card.alert {
-    border-color: var(--warn);
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--warn) 30%, transparent),
-                0 0 34px color-mix(in srgb, var(--warn) 16%, transparent);
-    animation: chg-wake .5s ease-out;
-  }
   @keyframes chg-wake {
     from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--warn) 55%, transparent); }
     to   { box-shadow: 0 0 0 1px color-mix(in srgb, var(--warn) 30%, transparent),
@@ -663,10 +657,8 @@
   .chg-arrow { color: var(--muted); font-size: 12px; }
 
   @media (prefers-reduced-motion: reduce) {
-    #ingame-card.alert { animation: none; }
   }
   @supports not (color: color-mix(in srgb, red 50%, blue)) {
-    #ingame-card.alert { box-shadow: none; }
     .chg-banner, .chg-bolt, .chg-mark { background: var(--panel-2); }
   }
 
@@ -788,6 +780,66 @@
      from the list above it. */
   .assess { margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--line-soft); }
   .assess .subcat { margin-top: 0; }
+
+  /* What CS2 changed, as a bell rather than a panel.
+
+     It was a card holding a paragraph explaining itself and two buttons, most
+     of the time saying nothing had happened. A bell says the same thing in
+     20px: quiet when there is nothing, marked when there is, and the detail
+     one click away for the moment somebody wants it. */
+  .bell {
+    position: relative; flex: 0 0 auto;
+    appearance: none; border: 1px solid var(--line); cursor: pointer;
+    width: 30px; height: 30px; border-radius: 9px;
+    background: var(--chip); color: var(--muted);
+    display: grid; place-items: center;
+    transition: color .2s ease, border-color .2s ease, background .2s ease;
+  }
+  .bell:hover { color: var(--ink); border-color: var(--violet); }
+  .bell svg {
+    width: 16px; height: 16px; fill: none; stroke: currentColor;
+    stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+  }
+  /* Something to answer for: the bell takes the warning colour and rings once.
+     Once, not continuously -- a thing that moves forever stops being noticed. */
+  .bell.ringing {
+    color: var(--warn); border-color: var(--warn);
+    background: color-mix(in srgb, var(--warn) 14%, var(--chip));
+  }
+  .bell.ringing svg { animation: bell-swing .9s ease-in-out 2; transform-origin: 50% 15%; }
+  @keyframes bell-swing {
+    0%, 100% { transform: rotate(0); }
+    20% { transform: rotate(13deg); }
+    45% { transform: rotate(-10deg); }
+    70% { transform: rotate(6deg); }
+  }
+  .bell .count {
+    position: absolute; top: -5px; right: -5px;
+    min-width: 16px; height: 16px; padding: 0 4px;
+    border-radius: 999px; background: var(--warn); color: #140c02;
+    font-size: 10px; font-weight: 800; line-height: 16px; text-align: center;
+  }
+
+  /* The list, hung under the bell. */
+  .bellpop {
+    position: absolute; top: 40px; right: 0; z-index: 400;
+    width: min(420px, calc(100vw - 32px));
+    max-height: min(60vh, 520px); overflow-y: auto;
+    padding: 14px 15px;
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: var(--r);
+    box-shadow: 0 18px 44px rgba(0, 0, 0, .6);
+  }
+  .bellpop[hidden] { display: none; }
+  .bellwrap { position: relative; flex: 0 0 auto; }
+  .bellpop .actions { margin-top: 12px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bell.ringing svg { animation: none; }
+  }
+  @supports not (color: color-mix(in srgb, red 50%, blue)) {
+    .bell.ringing { background: var(--chip); }
+  }
 
   .seg { display: flex; gap: 7px; flex-wrap: wrap; }
   .seg button {
@@ -2713,6 +2765,21 @@
       <span class="spacer"></span>
       <div class="modebadge" id="mode-badge"></div>
       <div class="scorebar" id="scorebar"></div>
+      <div class="bellwrap">
+        <button class="bell" id="bell" aria-haspopup="true" aria-expanded="false"
+                title="What CS2 changed in its own menus">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M18 9a6 6 0 10-12 0c0 6-2 7-2 7h16s-2-1-2-7z"/>
+            <path d="M13.7 20a2 2 0 01-3.4 0"/>
+          </svg>
+        </button>
+        <div class="bellpop" id="bellpop" hidden>
+          <div id="ingame-out"></div>
+          <div class="actions">
+            <button class="btn" id="ingame-ack" disabled>Mark as seen</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div id="status">Detecting hardware&hellip;</div>
@@ -2850,20 +2917,6 @@
         <div id="net-out"></div>
       </section>
 
-      <section class="panel" id="ingame-card">
-        <h2>Changed in-game</h2>
-        <p class="sub" style="margin:0 0 9px">
-          CS2 writes its settings when it closes, so this compares them against how
-          they looked last time and lists what you changed in the game's own menus.
-          Read-only &mdash; nothing here is written back to CS2.
-        </p>
-        <div id="ingame-out"><span class="sub">Watching. Anything you change in
-          CS2 appears here on its own once you close the game.</span></div>
-        <div class="actions">
-          <button class="btn" id="ingame-check">Check again</button>
-          <button class="btn" id="ingame-ack" disabled>Mark as seen</button>
-        </div>
-      </section>
 
 
     </div>
@@ -5492,23 +5545,57 @@ let ingameSeenAt = 0;
 // The watcher finds changes on its own; the page just has to notice. The count
 // rides the monitor poll that already runs every second, so nothing new is
 // requested until there is actually something to show.
-function noteIngame(summary) {
-  const badge = document.querySelector('.tab[data-tab="launcher"] .count');
-  const count = summary ? summary.count : 0;
+/* The bell's list. Opens on the bell, closes on anything else -- a popover
+   that can only be dismissed by the control that opened it is a trap on a
+   page this size. */
+function toggleBell(force) {
+  const pop = $("bellpop"), bell = $("bell");
+  if (!pop || !bell) return;
+  const open = force !== undefined ? force : pop.hidden;
+  pop.hidden = !open;
+  bell.setAttribute("aria-expanded", String(open));
+  if (open) {
+    // Seen it: it can stop ringing, though the count stays until it is marked.
+    bell.classList.remove("ringing");
+    loadIngame(true);
+  }
+}
 
+document.addEventListener("click", e => {
+  if (e.target.closest("#bell")) { toggleBell(); return; }
+  if (!e.target.closest("#bellpop")) toggleBell(false);
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") toggleBell(false);
+});
+
+/* The number on the bell. Nothing to answer for means no mark at all rather
+   than a nought, which is a count of something. */
+function markBell(count) {
+  const bell = $("bell");
+  if (!bell) return;
+  let mark = bell.querySelector(".count");
   if (!count) {
-    if (badge) badge.remove();
+    if (mark) mark.remove();
+    bell.title = "What CS2 changed in its own menus";
     return;
   }
-  const tab = document.querySelector('.tab[data-tab="launcher"]');
-  if (tab && !badge) {
-    const mark = document.createElement("span");
+  if (!mark) {
+    mark = document.createElement("span");
     mark.className = "count";
-    mark.textContent = count;
-    mark.title = count + " setting(s) changed in CS2";
-    tab.appendChild(mark);
-  } else if (badge) {
-    badge.textContent = count;
+    bell.appendChild(mark);
+  }
+  mark.textContent = count;
+  bell.title = count + " setting" + (count === 1 ? "" : "s") + " changed in CS2";
+}
+
+function noteIngame(summary) {
+  const count = summary ? summary.count : 0;
+  markBell(count);
+  if (!count) {
+    const bell = $("bell");
+    if (bell) bell.classList.remove("ringing");
+    return;
   }
 
   // Pull the detail once per finding rather than on every poll.
@@ -5516,7 +5603,7 @@ function noteIngame(summary) {
     ingameSeenAt = summary.at;
     loadIngame(true);
     status("CS2 saved " + count + " changed setting" + (count === 1 ? "" : "s") +
-           " — see “Changed in-game”.");
+           " — see the bell, top right.");
   }
 }
 
@@ -5548,12 +5635,13 @@ function changeMark(kind) {
 function renderIngame() {
   const box = $("ingame-out");
   const ack = $("ingame-ack");
-  const card = $("ingame-card");
+  const bell = $("bell");
   if (!box) return;
   const d = ingameData;
 
   const calm = note => {
-    if (card) card.classList.remove("alert");
+    if (bell) { bell.classList.remove("ringing"); bell.dataset.count = "0"; }
+    markBell(0);
     box.innerHTML = '<span class="sub">' + note + "</span>";
     if (ack) ack.disabled = true;
   };
@@ -5569,7 +5657,8 @@ function renderIngame() {
     return;
   }
 
-  if (card) card.classList.add("alert");
+  if (bell) bell.classList.add("ringing");
+  markBell(d.count);
 
   let html =
     '<div class="chg-banner">' +
@@ -5626,7 +5715,6 @@ function currentAccount() {
   return select && select.value ? select.value : null;
 }
 
-$("ingame-check").addEventListener("click", () => loadIngame(false));
 $("ingame-ack").addEventListener("click", async () => {
   try {
     ingameData = await api("/api/ingame/ack", { account: currentAccount() });
