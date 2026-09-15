@@ -1699,6 +1699,12 @@
   .updc-opt input[type="checkbox"]:checked::after {
     transform: translateX(11px); background: #fff;
   }
+  .updc-where {
+    margin: 9px 0 0; font-size: 10px; line-height: 1.5; color: var(--faint);
+  }
+  .updc-where a { color: var(--muted); }
+  .updc-where a:hover { color: var(--accent); }
+
   /* Why there is no third switch here. */
   .updc-foot {
     margin: 13px 0 0; padding: 10px 12px; border-radius: 9px;
@@ -1766,7 +1772,6 @@
   .tabs .tab[data-tab="gpu"]      { --sec: #2fd0d6; }
   .tabs .tab[data-tab="fix"]      { --sec: #ff7a45; }
   .tabs .tab[data-tab="settings"] { --sec: #8ea2c0; }
-  .tabs .tab[data-tab="updates"]  { --sec: #5b8cff; }
 
   .tabs .tab .ic, .rail-foot .tab .ic {
     width: 22px; height: 22px; flex: none; font-style: normal;
@@ -3174,8 +3179,6 @@
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a4 4 0 00-5.4 5.4L4 17v3h3l5.3-5.3a4 4 0 005.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg></i><span class="tx">Fix It</span></button>
       <button class="tab" data-tab="settings" role="tab" aria-selected="false">
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.6M12 18.6v2.6M4.5 12H2M22 12h-2.5M6.2 6.2L4.4 4.4M19.6 19.6l-1.8-1.8M17.8 6.2l1.8-1.8M4.4 19.6l1.8-1.8"/></svg></i><span class="tx">Settings</span></button>
-      <button class="tab" data-tab="updates" role="tab" aria-selected="false">
-        <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11M8 10.5l4 3.5 4-3.5"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg></i><span class="tx">Updates</span></button>
     </div>
 
     <!-- The section list lives in the rail, the way NGENUITY keeps its device
@@ -3569,45 +3572,6 @@
       </section>
     </div>
 
-    <div class="tab-panel hidden" data-panel="updates">
-      <div class="hero">
-        <div class="hero-copy">
-          <div class="eyebrow">Update centre</div>
-          <h2>Updates</h2>
-          <p>
-            This copy checks for a new release every five minutes while it is open.
-            Downloading can happen quietly in the background if you want it to.
-            Installing never does &mdash; that stays your call, now or whenever suits.
-          </p>
-        </div>
-      </div>
-
-      <section class="panel" id="upd-card">
-        <p class="sub">Checking&hellip;</p>
-      </section>
-
-      <section class="panel">
-        <h2>How updates behave</h2>
-        <label class="opt">
-          <input type="checkbox" id="upd-auto">
-          Download updates in the background as soon as they appear
-        </label>
-        <p class="sub" style="margin:6px 0 0">
-          With this off, nothing is fetched until you press Download. Either way the
-          new version sits on disk untouched until you choose to install it.
-        </p>
-        <div class="row" style="margin-top:12px">
-          <span class="k">Checked every</span>
-          <span class="v" id="upd-interval">5 minutes</span>
-        </div>
-        <div class="row">
-          <span class="k">Releases</span>
-          <span class="v"><a id="upd-repo" href="#" target="_blank" rel="noopener noreferrer">&mdash;</a></span>
-        </div>
-        <div class="row">
-          <span class="k">This copy</span>
-          <span class="v" id="upd-where">&mdash;</span>
-        </div>
       </section>
     </div>
 
@@ -8052,100 +8016,6 @@ async function pollUpdates() {
   updTimer = setTimeout(pollUpdates, busy ? 900 : 20000);
 }
 
-function updPip(on) {
-  const tab = document.querySelector('.tabs .tab[data-tab="updates"]');
-  if (!tab) return;
-  const existing = tab.querySelector(".upd-pip");
-  if (on && !existing) {
-    const pip = document.createElement("i");
-    pip.className = "upd-pip";
-    tab.appendChild(pip);
-  } else if (!on && existing) {
-    existing.remove();
-  }
-}
-
-function updCard(s) {
-  if (!s) {
-    return '<p class="sub">Could not reach the application server.</p>';
-  }
-  if (!s.configured) {
-    return '<div class="upd-head"><i class="upd-dot"></i><div>' +
-      '<p class="upd-title">Updates are not set up yet</p>' +
-      '<p class="upd-note">No release repository has been configured in this build, ' +
-      'so there is nothing to check against.</p></div></div>';
-  }
-
-  const latest = s.latest || {};
-  const vers = '<p class="upd-vers">You have <b>' + esc(s.current) + '</b>' +
-    (latest.version ? "  \u00b7  latest is <b>" + esc(latest.version) + "</b>" : "") +
-    "  \u00b7  checked " + fmtWhen(s.checked) + "</p>";
-
-  const notes = latest.notes
-    ? '<div class="upd-notes">' + esc(latest.notes) + "</div>" : "";
-
-  if (s.state === "error") {
-    return '<div class="upd-head"><i class="upd-dot bad"></i><div>' +
-      '<p class="upd-title">Could not check for updates</p>' + vers +
-      '<p class="upd-note bad">' + esc(s.error || "unknown problem") + "</p>" +
-      '<div class="upd-actions">' +
-      '<button class="btn small" id="upd-check">Try again</button>' +
-      "</div></div></div>";
-  }
-
-  if (s.state === "downloading") {
-    const pct = s.total ? Math.round((s.done / s.total) * 100) : 0;
-    return '<div class="upd-head"><i class="upd-dot news"></i><div>' +
-      '<p class="upd-title">Downloading ' + esc(latest.version || "") + "</p>" + vers +
-      '<div class="upd-bar"><i style="width:' + pct + '%"></i></div>' +
-      '<p class="upd-note">' + fmtBytes(s.done) + " of " + fmtBytes(s.total) +
-      "  \u00b7  " + pct + "%</p>" + notes + "</div></div>";
-  }
-
-  if (s.state === "ready") {
-    const cannot = !s.frozen;
-    return '<div class="upd-head"><i class="upd-dot news"></i><div>' +
-      '<p class="upd-title">' + esc(latest.version || "") +
-      " is downloaded and ready</p>" + vers +
-      '<p class="upd-note">' +
-      (s.edition === "installed"
-        ? "The installer will run when you say so, keeping this a registered " +
-          "installation. Nothing has changed yet."
-        : "It will be put in place when you say so. Nothing has changed yet.") +
-      "</p>" + notes +
-      '<div class="upd-actions">' +
-      '<button class="btn primary small" id="upd-install"' +
-      (cannot ? " disabled" : "") + ">Install now and restart</button>" +
-      '<button class="btn small" id="upd-later">Later</button>' +
-      (latest.page ? '<a class="btn small" href="' + esc(latest.page) +
-        '" target="_blank" rel="noopener noreferrer">Release page</a>' : "") +
-      "</div>" +
-      (cannot ? '<p class="upd-note">This copy runs from source, so there is no ' +
-        "executable to replace &mdash; pull the new version with git instead.</p>" : "") +
-      "</div></div>";
-  }
-
-  if (s.available) {
-    return '<div class="upd-head"><i class="upd-dot news"></i><div>' +
-      '<p class="upd-title">' + esc(latest.name || latest.version || "A new version") +
-      " is available</p>" + vers +
-      (latest.size ? '<p class="upd-note">Download is ' + fmtBytes(latest.size) +
-        ".</p>" : "") + notes +
-      '<div class="upd-actions">' +
-      '<button class="btn primary small" id="upd-download">Download now</button>' +
-      '<button class="btn small" id="upd-skip">Skip this version</button>' +
-      (latest.page ? '<a class="btn small" href="' + esc(latest.page) +
-        '" target="_blank" rel="noopener noreferrer">Release page</a>' : "") +
-      "</div></div></div>";
-  }
-
-  return '<div class="upd-head"><i class="upd-dot good"></i><div>' +
-    '<p class="upd-title">You are on the latest version</p>' + vers +
-    '<div class="upd-actions">' +
-    '<button class="btn small" id="upd-check">Check now</button>' +
-    "</div></div></div>";
-}
-
 /* The update centre at the head of the rail.
 
    Same state as the Updates tab, said in the space of a rail: a ring, a line,
@@ -8273,6 +8143,9 @@ function renderUpdCentre() {
   const page = latest.page
     ? '<a class="btn small" href="' + esc(latest.page) +
       '" target="_blank" rel="noopener noreferrer">Release page</a>' : "";
+  // Waving a version away used to live on the Updates tab, which is gone.
+  const skip = s.available && s.state !== "ready" && latest.version
+    ? '<button class="btn small" id="updc-skip">Skip this one</button>' : "";
 
   const on = (flag) => flag ? " checked" : "";
   const opts = (s && s.configured)
@@ -8291,11 +8164,12 @@ function renderUpdCentre() {
       '<p class="updc-foot">' + (note ||
         "There is deliberately no switch for installing. Replacing the launcher " +
         "while you are using it always waits to be asked.") +
-      "</p>"
+      "</p>" +
+      updcWhere(s)
     : "";
 
   const popShape = shape + "|" + pct + "|" + !!act + "|" + !!opts + "|" +
-    !!notes + "|" + (note || "");
+    !!notes + "|" + !!skip + "|" + (note || "");
   if (dlg.dataset.shape === popShape) {
     updcSetRing(dlg, share);
     const fill = dlg.querySelector(".updc-prog i");
@@ -8335,7 +8209,8 @@ function renderUpdCentre() {
     "</div>" +
     '<div class="updc-body">' +
       bar + notes +
-      ((act || page) ? '<div class="updc-act">' + act + page + "</div>" : "") +
+      ((act || skip || page)
+        ? '<div class="updc-act">' + act + skip + page + "</div>" : "") +
       opts +
     "</div>";
   dlg.className = "updc-dialog" +
@@ -8343,6 +8218,24 @@ function renderUpdCentre() {
     (tone === "bad" ? " bad" : "") +
     (tone === "busy" ? " busy" : "") +
     (tone === "good" ? " good" : "");
+}
+
+/* The small print the Updates tab used to carry: which copy this is -- which
+   decides what Install actually does -- how often it looks, and where it looks.
+   A line rather than a panel, because it is reference, not news. */
+function updcWhere(s) {
+  const kind =
+    s.edition === "installed" ? "Installed copy \u2014 updates run the installer"
+    : s.edition === "portable" ? "Portable copy \u2014 updates replace the files here"
+    : "Running from source \u2014 update it with git";
+  const every = Math.round((s.interval || 300) / 60);
+  const where = s.repo
+    ? ' \u00b7 <a href="https://github.com/' + esc(s.repo) + '/releases"' +
+      ' target="_blank" rel="noopener noreferrer">' + esc(s.repo) + "</a>"
+    : "";
+  return '<p class="updc-where">' + esc(kind) +
+    " \u00b7 checks every " + every + (every === 1 ? " minute" : " minutes") +
+    where + "</p>";
 }
 
 /* Move a ring without rebuilding it, so the fill animates rather than jumps. */
@@ -8369,32 +8262,10 @@ function toggleUpdCentre(force) {
 }
 
 function renderUpdates() {
-  const s = updState;
-  const card = $("upd-card");
-  if (card) card.innerHTML = updCard(s);
-  updPip(!!(s && s.available));
+  // Everything updates have to say is said by the centre in the rail and, when
+  // there is something new, by the toast. The tab that used to repeat it is
+  // gone -- see updcWhere for the reference detail it carried.
   renderUpdCentre();
-
-  if (s) {
-    const auto = $("upd-auto");
-    if (auto && auto.checked !== !!s.auto_download) auto.checked = !!s.auto_download;
-    const interval = $("upd-interval");
-    if (interval) interval.textContent = Math.round((s.interval || 300) / 60) + " minutes";
-    const repo = $("upd-repo");
-    if (repo) {
-      repo.textContent = s.configured ? s.repo : "not configured";
-      repo.href = s.configured ? "https://github.com/" + s.repo + "/releases" : "#";
-    }
-    const where = $("upd-where");
-    if (where) {
-      // The two editions update by different means, so which one this is
-      // changes what pressing Install actually does.
-      where.textContent =
-        s.edition === "installed" ? "installed copy — updates run the installer"
-        : s.edition === "portable" ? "portable copy — updates replace the files here"
-        : "running from source — update with git";
-    }
-  }
   renderUpdToast();
 }
 
@@ -8499,7 +8370,7 @@ document.addEventListener("click", async e => {
     await updInstall();
     return;
   }
-  if (id === "upd-skip") {
+  if (id === "upd-skip" || id === "updc-skip") {
     const version = ((updState || {}).latest || {}).version || "";
     updState = await api("/api/update/settings", { skip: version }).catch(() => updState);
     renderUpdates();
@@ -8514,14 +8385,14 @@ document.addEventListener("click", async e => {
   if (id === "upd-t-view") {
     updDismissed = ((updState || {}).latest || {}).version || "";
     renderUpdToast();
-    setTab("updates");
+    toggleUpdCentre(true);
     return;
   }
 });
 
 document.addEventListener("change", async e => {
   const id = e.target.id;
-  if (id !== "upd-auto" && id !== "updc-auto-get" && id !== "updc-auto-check") return;
+  if (id !== "updc-auto-get" && id !== "updc-auto-check") return;
   const body = id === "updc-auto-check"
     ? { auto_check: e.target.checked }
     : { auto_download: e.target.checked };
@@ -8917,6 +8788,12 @@ document.addEventListener("click", async e => {
 let activeTab = "launcher";
 
 function setTab(name) {
+  // A name with no panel would hide every panel and leave a blank window. It
+  // happens for real: "updates" was a tab until 1.8.4 and is still sitting in
+  // the saved preferences of anyone who was last looking at it.
+  if (!document.querySelector('.tab-panel[data-panel="' + name + '"]')) {
+    name = "launcher";
+  }
   activeTab = name;
   if (name === "cs2" && !cs2Data) loadCs2Settings();
   if (name === "gpu" && !gpuData) loadGpu();
@@ -8925,7 +8802,6 @@ function setTab(name) {
   if (name === "keyboard") loadKeyboard(false);
   if (name === "fix") loadFixes(false);
   if (name === "settings") setSettingsSub(settingsSub, true);
-  if (name === "updates") renderUpdates();
   document.querySelectorAll(".tabs .tab").forEach(b =>
     b.setAttribute("aria-selected", String(b.dataset.tab === name)));
   document.querySelectorAll(".tab-panel").forEach(panel =>
