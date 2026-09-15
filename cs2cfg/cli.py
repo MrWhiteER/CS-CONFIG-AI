@@ -674,8 +674,8 @@ def cmd_net(ctx: Context) -> int:
     out = ctx.out
     out.header("Connection")
     print(out.dim("  Measuring loss and jitter to your router and out to the internet."))
-    print(out.dim("  This takes about a minute; it cannot be rushed without measuring"))
-    print(out.dim("  noise instead of the connection."))
+    print(out.dim("  Five seconds, spaced rather than fired in one burst: jitter is about"))
+    print(out.dim("  whether a link is steady, which one instant cannot show."))
     print()
 
     found = netcheck.survey(samples=ctx.args.samples)

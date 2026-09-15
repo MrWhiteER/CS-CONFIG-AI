@@ -212,6 +212,45 @@ class VSyncAndTheFileTheGameOwns(unittest.TestCase):
                 steam.write_video_cfg(user, {"setting.mat_vsync": 0}, force=True)
         self.assertNotIn("rewrites", str(caught.exception))
 
+class WatchingItHappen(unittest.TestCase):
+    """The run publishes each reply as it lands, so the page can draw it."""
+
+    def test_replies_count_themselves(self):
+        """received was a field the parser set and the live sweep forgot to,
+        so a watched run reported every reply as lost while holding the
+        timings that proved otherwise -- and then threw the measurement away
+        for the fallback host. Counting the replies cannot drift from them."""
+        probe = netcheck.Probe(host="1.1.1.1", label="x", sent=3)
+        self.assertEqual(probe.received, 0)
+        probe.times.extend([12.0, 13.0])
+        self.assertEqual(probe.received, 2)
+        self.assertTrue(probe.reachable)
+        self.assertAlmostEqual(probe.loss, 33.3, places=1)
+
+    def test_a_miss_is_recorded_where_it_happened(self):
+        """A drawn line needs the gap. Without the index the line closes over
+        a lost packet as though nothing happened there."""
+        probe = netcheck.Probe(host="1.1.1.1", label="x")
+        probe.misses.append(4)
+        self.assertEqual(netcheck._probe_shape(probe)["misses"], [4])
+
+    def test_both_paths_reach_the_same_verdict(self):
+        """survey() and a watched run share _conclude, so there cannot be two
+        opinions about one set of numbers."""
+        clean = netcheck.Probe(host="1.1.1.1", label="The internet", sent=4)
+        clean.times.extend([12.0, 12.0, 12.0, 12.0])
+        near = netcheck.Probe(host="192.168.1.1", label="Your router", sent=4)
+        near.times.extend([1.0, 1.0, 1.0, 1.0])
+        titles = [f.title for f in netcheck._conclude(None, near, clean)]
+        self.assertIn("Nothing wrong with this connection", titles)
+
+    def test_progress_before_anything_starts_is_idle_not_an_error(self):
+        netcheck._run_now = None
+        found = netcheck.progress()
+        self.assertTrue(found["ok"])
+        self.assertFalse(found["running"])
+        self.assertTrue(found.get("idle"))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1459,20 +1459,31 @@ def _audio_pin(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
-def _net(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
-    """Measure loss and jitter. Reads only; takes about a minute.
+def _net_start(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Begin a measurement and return immediately.
 
-    Deliberately not run on a timer or at startup. It is forty seconds of
-    pinging, and a check that runs itself constantly is a check nobody reads
-    and a small amount of traffic on the very link being measured.
+    Deliberately not run on a timer or at startup: it is real traffic on the
+    very link being measured, and a check that runs itself constantly is one
+    nobody reads.
     """
     from . import netcheck
 
     try:
-        samples = max(5, min(60, int(body.get("samples") or netcheck.SAMPLES)))
+        samples = int(body.get("samples") or netcheck.SAMPLES)
     except (TypeError, ValueError):
         samples = netcheck.SAMPLES
-    return netcheck.as_dict(netcheck.survey(samples=samples))
+    return netcheck.start(samples)
+
+
+def _net(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """How far the measurement has got, with every reply so far.
+
+    Polled while it runs so the page can draw the line as it is measured
+    rather than showing a spinner for the length of it.
+    """
+    from . import netcheck
+
+    return netcheck.progress()
 
 
 def _temps_elevate(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
@@ -2260,6 +2271,7 @@ def make_handler(state: State):
         "/api/cfg/starter": _cfg_starter,
         "/api/focus": _focus,
         "/api/net": _net,
+        "/api/net/start": _net_start,
         "/api/audio": _audio,
         "/api/audio/pin": _audio_pin,
         "/api/fix/survey": _fix_survey,

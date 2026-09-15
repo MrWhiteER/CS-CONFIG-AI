@@ -418,10 +418,12 @@
   .segbar[data-live="sound"]   { --cat: var(--cat-sound); }
   .segbar[data-live="config"]  { --cat: var(--cat-config); }
   .segbar[data-live="editing"] { --cat: var(--cat-editing); }
+  .segbar[data-live="logs"]    { --cat: var(--cat-logs); }
   .seg-item[data-sub="apply"]   { --cat: var(--cat-apply); }
   .seg-item[data-sub="sound"]   { --cat: var(--cat-sound); }
   .seg-item[data-sub="config"]  { --cat: var(--cat-config); }
   .seg-item[data-sub="editing"] { --cat: var(--cat-editing); }
+  .seg-item[data-sub="logs"]    { --cat: var(--cat-logs); }
 
   .seg-thumb {
     position: absolute; top: 5px; left: 5px;
@@ -507,6 +509,163 @@
     padding: 0; margin: 0 0 22px;
   }
   .subpane > *:last-child { margin-bottom: 16px; }
+
+  /* The connection, drawn as it is measured. */
+  .netbar {
+    height: 4px; border-radius: 3px; background: var(--line); overflow: hidden;
+  }
+  .netbar-fill {
+    height: 100%; border-radius: 3px;
+    background: linear-gradient(90deg, var(--accent-deep), var(--accent));
+    transition: width .45s ease;
+  }
+
+  .netgrid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+    gap: 12px; margin: 0 0 12px;
+  }
+  .netside {
+    --tone: var(--muted);
+    border: 1px solid var(--line); border-radius: var(--r);
+    background: var(--panel-2); padding: 13px 15px;
+  }
+  .netside.good    { --tone: var(--good); }
+  .netside.warn    { --tone: var(--warn); }
+  .netside.bad     { --tone: var(--bad); }
+  .netside.unknown { --tone: var(--muted); }
+  .netside-head {
+    font-size: 12px; font-weight: 650; color: var(--ink); margin: 0 0 8px;
+  }
+  .netside-head .sub { font-weight: 400; font-size: 11px; }
+  .netside-body { display: flex; gap: 14px; align-items: center; }
+  .netside-right { flex: 1 1 auto; min-width: 0; }
+
+  .pingdial { width: 104px; height: 104px; flex: 0 0 auto; }
+  .pingdial-bg { stroke: var(--line); }
+  .pingdial-fg {
+    stroke: var(--tone);
+    transition: stroke-dasharray .45s ease, stroke .3s ease;
+    filter: drop-shadow(0 0 5px color-mix(in srgb, var(--tone) 55%, transparent));
+  }
+  .pingdial-num {
+    fill: var(--ink); font-family: var(--mono); font-size: 27px; font-weight: 600;
+    dominant-baseline: middle;
+  }
+  .pingdial-unit { fill: var(--muted); font-size: 11px; }
+
+  /* Stretched to the box, so the line keeps its shape whatever width the
+     card ends up. The stroke is drawn unscaled so it does not smear with it. */
+  .netline {
+    width: 100%; height: 62px; display: block;
+    margin: 0 0 8px;
+  }
+  .netline path {
+    stroke: var(--tone); stroke-width: 1.8;
+    stroke-linejoin: round; stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+  }
+  /* Where a packet went missing. A line that closed over the gap would show a
+     lossy link as a smooth one. */
+  .netmiss {
+    stroke: var(--bad); stroke-width: 1.4; stroke-dasharray: 2 3; opacity: .75;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .netstats { display: flex; gap: 14px; flex-wrap: wrap; }
+  .netstats span {
+    font-size: 10.5px; color: var(--muted); letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+  .netstats b {
+    display: block; font-family: var(--mono); font-size: 15px; font-weight: 600;
+    color: var(--ink); letter-spacing: 0; text-transform: none;
+  }
+  .netstats span.bad b { color: var(--bad); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .netbar-fill, .pingdial-fg { transition: none; }
+  }
+
+  /* The card only shouts when something actually moved.
+
+     Quiet the rest of the time on purpose: a panel that looks urgent whether
+     or not anything happened teaches people to stop looking at it, which
+     defeats the watching. */
+  #ingame-card.alert {
+    border-color: var(--warn);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--warn) 30%, transparent),
+                0 0 34px color-mix(in srgb, var(--warn) 16%, transparent);
+    animation: chg-wake .5s ease-out;
+  }
+  @keyframes chg-wake {
+    from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--warn) 55%, transparent); }
+    to   { box-shadow: 0 0 0 1px color-mix(in srgb, var(--warn) 30%, transparent),
+                       0 0 34px color-mix(in srgb, var(--warn) 16%, transparent); }
+  }
+
+  .chg-banner {
+    display: flex; gap: 12px; align-items: center;
+    margin: 0 0 13px; padding: 11px 13px;
+    border-radius: 11px;
+    background: color-mix(in srgb, var(--warn) 10%, var(--panel-2));
+    border: 1px solid color-mix(in srgb, var(--warn) 34%, transparent);
+  }
+  .chg-banner b { color: var(--ink); font-size: 13px; }
+  .chg-bolt {
+    flex: 0 0 auto; width: 38px; height: 38px; border-radius: 11px;
+    display: grid; place-items: center;
+    background: color-mix(in srgb, var(--warn) 20%, transparent);
+    color: var(--warn);
+  }
+  .chg-bolt svg {
+    width: 21px; height: 21px; fill: currentColor; stroke: none;
+    filter: drop-shadow(0 0 6px color-mix(in srgb, var(--warn) 65%, transparent));
+  }
+
+  .chg-rows { display: flex; flex-direction: column; gap: 3px; }
+  .chg-row {
+    --mark: var(--warn);
+    display: flex; align-items: center; gap: 11px;
+    padding: 8px 11px; border-radius: 9px;
+    background: var(--panel-2);
+    border-left: 2px solid var(--mark);
+  }
+  .chg-row.added   { --mark: var(--good); }
+  .chg-row.cleared { --mark: var(--bad); }
+
+  /* The glyph does the work three near-identical columns of text would
+     otherwise: changed, set, cleared are different events. */
+  .chg-mark {
+    flex: 0 0 auto; width: 26px; height: 26px; border-radius: 8px;
+    display: grid; place-items: center;
+    background: color-mix(in srgb, var(--mark) 16%, transparent);
+    color: var(--mark);
+  }
+  .chg-mark svg {
+    width: 15px; height: 15px; fill: none; stroke: currentColor;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+
+  .chg-what { flex: 1 1 auto; min-width: 0; }
+  .chg-what b { display: block; font-size: 12.5px; font-weight: 600; color: var(--ink); }
+  .chg-what .sub2 { font-size: 10.5px; }
+
+  .chg-move { display: flex; align-items: center; gap: 7px; flex: 0 0 auto; }
+  .chg-move code {
+    font-family: var(--mono); font-size: 11.5px;
+    padding: 2px 7px; border-radius: 6px; background: var(--panel);
+  }
+  .chg-move .was { color: var(--muted); text-decoration: line-through; }
+  .chg-move .now { color: var(--mark); }
+  .chg-arrow { color: var(--muted); font-size: 12px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    #ingame-card.alert { animation: none; }
+  }
+  @supports not (color: color-mix(in srgb, red 50%, blue)) {
+    #ingame-card.alert { box-shadow: none; }
+    .chg-banner, .chg-bolt, .chg-mark { background: var(--panel-2); }
+  }
 
   .seg { display: flex; gap: 7px; flex-wrap: wrap; }
   .seg button {
@@ -823,6 +982,9 @@
     --cat-sound:   #ff9d2e;
     --cat-config:  #4d94ff;
     --cat-editing: #ff2d95;
+    /* Logs take the slate the Settings rail entry uses: a record of what
+       happened is the one category here that is not an action. */
+    --cat-logs:    #8ea2c0;
   }
 
   /* ------------------------------------------------------------- the stage */
@@ -2497,6 +2659,7 @@
           <div class="gauges" id="live-gauges"></div>
           <div class="temps" id="live-temps"></div>
           <div class="sub2" id="temps-note" style="margin-top:6px"></div>
+          <div class="stats" id="history-stats"></div>
           <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:12px">
             <div style="flex:1 1 200px;min-width:170px">
               <div class="sub" style="margin-bottom:2px">CPU load</div>
@@ -2523,7 +2686,7 @@
           shot the server never saw &mdash; however clearly it landed on your screen. That is
           what &ldquo;no reg&rdquo; usually is. This measures loss and jitter to your own router and
           out to the internet separately, so you can tell which side the trouble is on.
-          It takes about a minute and changes nothing.
+          It takes five seconds and changes nothing.
         </p>
         <div class="actions">
           <button class="btn primary" id="net-run">Measure my connection</button>
@@ -2548,10 +2711,6 @@
 
       <div id="assessment-out"></div>
 
-      <section class="panel">
-        <h2>Session history</h2>
-        <div id="history"><span class="sub">No sessions recorded yet &mdash; launch once and this fills in.</span></div>
-      </section>
     </div>
 
     <div class="tab-panel hidden" data-panel="cs2">
@@ -2793,6 +2952,7 @@
           <button class="seg-item" data-sub="sound" role="tab" aria-selected="false">Sound</button>
           <button class="seg-item" data-sub="config" role="tab" aria-selected="false">Config files</button>
           <button class="seg-item" data-sub="editing" role="tab" aria-selected="false">Editing</button>
+          <button class="seg-item" data-sub="logs" role="tab" aria-selected="false">Logs</button>
         </div>
       </div>
 
@@ -2878,6 +3038,18 @@
         <div id="cfg-out"></div>
       </section>
 
+      </div>
+
+      <div class="subpane hidden" data-sub="logs">
+        <section class="panel">
+          <h2>Session history</h2>
+          <p class="sub" style="margin:0 0 9px">
+            Every launch this app has watched, with how long it ran and how it behaved.
+            The headline figures sit beside the gauges on the Launcher; this is the log
+            behind them.
+          </p>
+          <div id="history-log"><span class="sub">No sessions recorded yet &mdash; launch once and this fills in.</span></div>
+        </section>
       </div>
 
       <div class="subpane hidden" data-sub="editing">
@@ -3499,55 +3671,190 @@ $("confirm-veil").addEventListener("keydown", e => {
   }
 })();
 
-/* The connection check. Never automatic: it is forty seconds of pinging, and
-   a check that runs itself is one nobody reads. */
-async function runNetCheck() {
-  const button = $("net-run");
+/* ---------------------------------------------------------------------------
+   The connection, drawn while it is measured.
+
+   A speed test shows a needle because a single number arriving after a minute
+   of waiting tells you nothing about how it got there. The same is true here,
+   more so: what matters for sub-tick is not the average, it is whether the
+   line is steady, and a steady 40 ms plays better than a 12 ms that spikes.
+   So the line is drawn as the replies land, with a gap where a packet was
+   lost, and the dial shows the last reply rather than the average.
+   --------------------------------------------------------------------------- */
+let netTimer = null;
+let netData = null;
+
+// Where the dial tops out. A competitive player on a bad route is at 90; past
+// that the needle is pinned and the number is the thing to read.
+const DIAL_MAX = 120;
+
+function netDial(ms, known, tone) {
+  // Three quarters of a circle, opened at the bottom like a speedometer.
+  const r = 52, span = 0.75, gap = 2 * Math.PI * r * (1 - span);
+  const track = 2 * Math.PI * r;
+  // Square root rather than linear. Ping is not evenly interesting across its
+  // range: the difference between 4 ms and 20 ms matters and the difference
+  // between 90 ms and 110 ms does not, and on a linear scale a good connection
+  // draws an arc too small to see, which reads as no reading at all.
+  const share = known
+    ? Math.sqrt(Math.max(0, Math.min(1, ms / DIAL_MAX))) : 0;
+  const lit = track * span * share;
+  return '<svg class="pingdial" viewBox="0 0 130 130">' +
+    '<circle class="pingdial-bg" cx="65" cy="65" r="' + r + '" fill="none"' +
+    ' stroke-width="9" stroke-linecap="round"' +
+    ' stroke-dasharray="' + (track * span).toFixed(1) + " " + gap.toFixed(1) + '"' +
+    ' transform="rotate(135 65 65)"/>' +
+    '<circle class="pingdial-fg ' + tone + '" cx="65" cy="65" r="' + r + '" fill="none"' +
+    ' stroke-width="9" stroke-linecap="round"' +
+    ' stroke-dasharray="' + lit.toFixed(1) + " " + (track - lit).toFixed(1) + '"' +
+    ' transform="rotate(135 65 65)"/>' +
+    '<text class="pingdial-num" x="65" y="62" text-anchor="middle">' +
+      (known ? Math.round(ms) : "—") + "</text>" +
+    '<text class="pingdial-unit" x="65" y="80" text-anchor="middle">ms</text>' +
+    "</svg>";
+}
+
+function netLine(probe) {
+  const times = probe.times || [];
+  const total = probe.sent || times.length || 1;
+  const w = 320, h = 62, pad = 4;
+  if (!times.length) return '<svg class="netline" viewBox="0 0 ' + w + " " + h + '"></svg>';
+
+  const top = Math.max(DIAL_MAX * 0.25, Math.max.apply(null, times) * 1.25);
+  const step = w / Math.max(1, (probe.sent || times.length) - 1);
+  const y = v => h - pad - (v / top) * (h - pad * 2);
+
+  // Replies are indexed by where they landed, not by their order in the list,
+  // so a lost packet leaves a real gap rather than pulling the line across it.
+  const missed = new Set(probe.misses || []);
+  let at = 0;
+  const points = [];
+  for (let i = 0; i < total; i++) {
+    if (missed.has(i)) { points.push(null); continue; }
+    if (at < times.length) points.push([i * step, y(times[at++])]);
+  }
+
+  let path = "", started = false;
+  points.forEach(point => {
+    if (!point) { started = false; return; }
+    path += (started ? "L" : "M") + point[0].toFixed(1) + " " + point[1].toFixed(1) + " ";
+    started = true;
+  });
+
+  const drops = (probe.misses || []).map(i =>
+    '<line class="netmiss" x1="' + (i * step).toFixed(1) + '" y1="' + pad +
+    '" x2="' + (i * step).toFixed(1) + '" y2="' + (h - pad) + '"/>').join("");
+
+  return '<svg class="netline" viewBox="0 0 ' + w + " " + h + '" preserveAspectRatio="none">' +
+    drops + '<path d="' + path.trim() + '" fill="none"/></svg>';
+}
+
+function netTone(probe) {
+  if (!probe || !probe.reachable) return "unknown";
+  if (probe.loss > 1 || probe.jitter >= 15) return "bad";
+  if (probe.loss > 0 || probe.jitter >= 5) return "warn";
+  return "good";
+}
+
+function netSide(probe, sent, total) {
+  if (!probe) return "";
+  const tone = netTone(probe);
+  const times = probe.times || [];
+  const last = times.length ? times[times.length - 1] : 0;
+  return '<div class="netside ' + tone + '">' +
+    '<div class="netside-head">' + esc(probe.label) +
+      (probe.host ? ' <span class="sub mono">' + esc(probe.host) + "</span>" : "") +
+    "</div>" +
+    '<div class="netside-body">' +
+      netDial(last, times.length > 0, tone) +
+      '<div class="netside-right">' +
+        netLine(probe) +
+        '<div class="netstats">' +
+          '<span><b>' + (times.length ? probe.average : "—") + "</b>avg ms</span>" +
+          '<span><b>' + (times.length ? probe.jitter : "—") + "</b>jitter</span>" +
+          '<span class="' + (probe.loss > 0 ? "bad" : "") + '"><b>' +
+            (probe.sent ? probe.loss : "—") + "</b>% loss</span>" +
+          '<span><b>' + (probe.received || 0) + "/" + (probe.sent || 0) + "</b>replies</span>" +
+        "</div>" +
+      "</div>" +
+    "</div></div>";
+}
+
+function renderNet(d) {
   const box = $("net-out");
-  button.disabled = true;
-  const said = button.textContent;
-  button.textContent = "Measuring…";
-  box.innerHTML = '<div class="sub" style="padding:10px"><span class="spin"></span> ' +
-    "Sending probes to your router and out to the internet… about a minute.</div>";
-  try {
-    const r = await api("/api/net", {});
-    if (r.error) throw new Error(r.error);
-    let html = "";
-    if (r.adapter) {
-      html += '<div class="row"><span class="k">Adapter</span><span class="v">' +
-        esc(r.adapter.name) + " " + '<span class="sub">' + esc(r.adapter.speed) + "</span>" +
-        (r.adapter.wireless
-          ? '<span class="flag warn">Wi-Fi</span>'
-          : '<span class="flag">wired</span>') + "</span></div>";
-    }
-    for (const probe of [r.gateway, r.internet]) {
-      if (!probe) continue;
-      if (!probe.reachable) {
-        html += '<div class="row"><span class="k">' + esc(probe.label) + '</span>' +
-          '<span class="v sub">' + esc(probe.error || "no answer") + "</span></div>";
-        continue;
-      }
-      html += '<div class="row"><span class="k">' + esc(probe.label) + "</span>" +
-        '<span class="v mono">' + probe.average + " ms avg &middot; jitter " + probe.jitter +
-        " ms &middot; " +
-        (probe.loss > 0
-          ? '<span style="color:var(--bad)">' + probe.loss + "% loss</span>"
-          : '<span style="color:var(--good)">no loss</span>') +
-        ' <span class="sub">(' + probe.received + "/" + probe.sent + " replied)</span></span></div>";
-    }
-    html += (r.findings || []).map(f => {
+  if (!box) return;
+  if (!d || d.idle) { box.innerHTML = ""; return; }
+  if (d.error) {
+    box.innerHTML = '<span class="sub warn">' + esc(d.error) + "</span>";
+    return;
+  }
+
+  const sent = ((d.gateway && d.gateway.sent) || 0) + ((d.internet && d.internet.sent) || 0);
+  const total = (d.samples || 20) * (d.gateway && d.gateway.host ? 2 : 1);
+  const pct = total ? Math.min(100, Math.round((sent / total) * 100)) : 0;
+
+  let html = "";
+  if (d.running) {
+    html += '<div class="netbar"><div class="netbar-fill" style="width:' + pct + '%"></div></div>' +
+      '<div class="sub" style="margin:6px 0 12px">Measuring&hellip; ' + pct + "%" +
+      "  <span class=\"sub2\">about " + Math.max(0, Math.round(((total - sent) / 2) * 1)) +
+      "s left</span></div>";
+  }
+
+  if (d.adapter) {
+    html += '<div class="sub" style="margin:0 0 12px">' + esc(d.adapter.name) + " " +
+      '<span class="sub2">' + esc(d.adapter.speed) + "</span>" +
+      (d.adapter.wireless
+        ? '<span class="flag warn">Wi-Fi</span>'
+        : '<span class="flag">wired</span>') + "</div>";
+  }
+
+  html += '<div class="netgrid">' + netSide(d.gateway) + netSide(d.internet) + "</div>";
+
+  if (d.done) {
+    html += (d.findings || []).map(f => {
       const colour = f.severity === "bad" ? "var(--bad)"
                    : f.severity === "warn" ? "var(--warn)" : "var(--good)";
       return '<div class="note"><div class="t" style="color:' + colour + '">' +
         esc(f.title) + '</div><div class="d">' + esc(f.detail) + "</div></div>";
     }).join("");
-    box.innerHTML = html;
+  }
+  box.innerHTML = html;
+}
+
+async function pollNet() {
+  try {
+    netData = await api("/api/net", {});
+    renderNet(netData);
+    if (netData.done || !netData.running) {
+      clearInterval(netTimer);
+      netTimer = null;
+      const button = $("net-run");
+      if (button) { button.disabled = false; button.textContent = "Measure again"; }
+    }
   } catch (err) {
-    box.innerHTML = '<span class="sub warn">Could not measure: ' +
-      esc(String(err && err.message || err)) + "</span>";
-  } finally {
+    clearInterval(netTimer);
+    netTimer = null;
+    const button = $("net-run");
+    if (button) { button.disabled = false; button.textContent = "Measure my connection"; }
+  }
+}
+
+async function runNetCheck() {
+  const button = $("net-run");
+  button.disabled = true;
+  button.textContent = "Measuring…";
+  try {
+    netData = await api("/api/net/start", {});
+    renderNet(netData);
+    if (netTimer) clearInterval(netTimer);
+    // Twice a second: the replies land about once a second each, and a poll
+    // that is slower than the thing it is watching draws a stuttering line.
+    netTimer = setInterval(pollNet, 500);
+  } catch (err) {
     button.disabled = false;
-    button.textContent = said;
+    button.textContent = "Measure my connection";
+    status("Could not start the measurement: " + (err && err.message || err), true);
   }
 }
 
@@ -4094,6 +4401,7 @@ function setSettingsSub(name, restoring) {
     }
   }
   if (name === "sound") loadAudio(false);
+  if (name === "logs") loadHistory();
   if (name === "config" || name === "editing") ensureScan(false);
   rememberPrefs();
 }
@@ -4940,50 +5248,93 @@ function noteIngame(summary) {
   }
 }
 
+/* What CS2 changed behind your back, said like it matters.
+
+   This used to be a quiet panel that looked the same whether nothing had
+   happened or the game had rewritten eleven settings. The whole point of
+   watching is the moment something moves, so when something has, the card
+   lights up and says what -- and when nothing has, it stays out of the way.
+
+   Each change carries a symbol for what happened to it, because "changed",
+   "set" and "cleared" are three different events and reading three columns of
+   near-identical text to tell them apart is work the glyph does at a glance.
+*/
+const CHANGE_ART = {
+  changed: '<path d="M4 8h13l-3.5-3.5M20 16H7l3.5 3.5"/>',
+  added:   '<path d="M12 5v14M5 12h14"/>',
+  cleared: '<path d="M5 12h14"/>',
+};
+const CHANGE_WORD = { changed: "changed", added: "set", cleared: "cleared" };
+
+function changeMark(kind) {
+  const art = CHANGE_ART[kind] || CHANGE_ART.changed;
+  return '<span class="chg-mark ' + esc(kind || "changed") + '" title="' +
+    esc(CHANGE_WORD[kind] || "changed") + '">' +
+    '<svg viewBox="0 0 24 24" aria-hidden="true">' + art + "</svg></span>";
+}
+
 function renderIngame() {
   const box = $("ingame-out");
   const ack = $("ingame-ack");
+  const card = $("ingame-card");
   if (!box) return;
   const d = ingameData;
+
+  const calm = note => {
+    if (card) card.classList.remove("alert");
+    box.innerHTML = '<span class="sub">' + note + "</span>";
+    if (ack) ack.disabled = true;
+  };
+
   if (!d) {
-    box.innerHTML = '<span class="sub">Watching. Anything you change in CS2 ' +
-      "appears here on its own once you close the game.</span>";
+    calm("Watching. Anything you change in CS2 appears here on its own once " +
+         "you close the game.");
     return;
   }
-
-  if (d.first_run) {
-    box.innerHTML = '<span class="sub">' + esc(d.note) + "</span>";
-    ack.disabled = true;
-    return;
-  }
+  if (d.first_run) { calm(esc(d.note)); return; }
   if (!d.count) {
-    box.innerHTML = '<span class="sub">Nothing has changed in CS2’s own settings ' +
-      "since the last check.</span>";
-    ack.disabled = true;
+    calm("Nothing has changed in CS2’s own settings since the last check.");
     return;
   }
 
-  let html = '<div class="sub" style="margin-bottom:8px">' +
-    "<strong>" + d.count + " setting" + (d.count === 1 ? "" : "s") +
-    "</strong> changed in the game’s menus" +
-    (d.running ? " — CS2 is running, so the newest changes are not written yet." : "") +
+  if (card) card.classList.add("alert");
+
+  let html =
+    '<div class="chg-banner">' +
+      '<span class="chg-bolt"><svg viewBox="0 0 24 24" aria-hidden="true">' +
+        '<path d="M12 3L4 14h7l-1 7 8-11h-7z"/></svg></span>' +
+      '<div><b>' + d.count + " setting" + (d.count === 1 ? "" : "s") +
+        " changed in the game’s menus</b>" +
+        '<div class="sub2">' +
+          (d.running
+            ? "CS2 is running, so anything from the current session is not written yet."
+            : "Read-only — nothing here is written back to CS2.") +
+        "</div>" +
+      "</div>" +
     "</div>";
-  for (const [source, list] of Object.entries(d.sources)) {
+
+  for (const [source, list] of Object.entries(d.sources || {})) {
     html += '<div class="subcat">' + esc(source) + "</div>";
-    html += list.map(c =>
-      '<div class="row"><span class="k">' + esc(c.label || c.key) + "</span>" +
-      '<span class="v"><code>' + esc(c.was === null ? "—" : c.was) + "</code>" +
-      '<span class="arrow">→</span><code>' +
-      esc(c.now === null ? "—" : c.now) + "</code>" +
-      (c.label ? '<span class="sub2 mono">' + esc(c.key) + "</span>" : "") +
-      "</span></div>").join("");
+    html += '<div class="chg-rows">' + list.map(c =>
+      '<div class="chg-row ' + esc(c.kind || "changed") + '">' +
+        changeMark(c.kind) +
+        '<div class="chg-what"><b>' + esc(c.label || c.key) + "</b>" +
+          (c.label ? '<span class="sub2 mono">' + esc(c.key) + "</span>" : "") +
+        "</div>" +
+        '<div class="chg-move">' +
+          '<code class="was">' + esc(c.was === null ? "—" : c.was) + "</code>" +
+          '<span class="chg-arrow">→</span>' +
+          '<code class="now">' + esc(c.now === null ? "—" : c.now) + "</code>" +
+        "</div>" +
+      "</div>").join("") + "</div>";
   }
+
   if (d.missing && d.missing.length) {
     html += '<div class="sub2" style="margin-top:8px">Could not read: ' +
       esc(d.missing.join(", ")) + "</div>";
   }
   box.innerHTML = html;
-  ack.disabled = false;
+  if (ack) ack.disabled = false;
 }
 
 async function loadIngame(quiet) {
@@ -7534,10 +7885,25 @@ document.addEventListener("change", e => {
 // --- history --------------------------------------------------------------
 function renderHistory(d) {
   const s = d.summary;
+  const log = $("history-log");
+  const head = $("history-stats");
   if (!s || !s.count) {
-    $("history").innerHTML =
+    if (log) log.innerHTML =
       '<span class="sub">No sessions recorded yet — launch once and this fills in.</span>';
+    if (head) head.innerHTML = "";
     return;
+  }
+
+  // The headline figures live beside the gauges they belong with; the log
+  // behind them is a record, and records belong in Settings rather than on the
+  // page somebody opens to launch the game.
+  if (head) {
+    let top = '<div class="stat"><b>' + s.count + '</b><span>sessions</span></div>' +
+      '<div class="stat"><b>' + s.total_hours + '</b><span>hours played</span></div>';
+    if (s.borderless && s.borderless.median_return != null)
+      top += '<div class="stat"><b style="color:var(--good)">' + s.borderless.median_return +
+             's</b><span>alt-tab back</span></div>';
+    head.innerHTML = top;
   }
 
   let html = '<div class="stats">' +
@@ -7576,7 +7942,7 @@ function renderHistory(d) {
       latest.notes.map(n => '<div class="note"><div class="d">' + esc(n) + "</div></div>").join("") +
       "</div>";
   }
-  $("history").innerHTML = html;
+  if (log) log.innerHTML = html;
 }
 
 async function loadHistory() {

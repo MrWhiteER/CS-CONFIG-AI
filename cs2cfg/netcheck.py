@@ -29,7 +29,9 @@ from __future__ import annotations
 import re
 import statistics
 import subprocess
+import threading
 import sys
+import time
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
@@ -39,9 +41,26 @@ from typing import Dict, List, Optional
 ANCHOR = "1.1.1.1"
 ANCHOR_BACKUP = "8.8.8.8"
 
-# Enough samples for a jitter figure to mean something without making the check
-# feel like it has hung. At roughly one a second this is about twenty seconds.
-SAMPLES = 20
+# How long the whole measurement takes, and how many probes fit in it.
+#
+# Five seconds, spaced rather than fired in one burst. The spacing is the part
+# that matters: jitter is about whether a link is steady over time, and twenty
+# packets sent back to back only describe one instant. Sixteen probes three
+# tenths of a second apart still sample across a window rather than a moment.
+#
+# It is a real trade. A longer run is more confident -- loss of one in fifty
+# shows up in sixty probes and can hide in sixteen. Five seconds is the length
+# somebody will actually sit through, and a check that gets run beats a better
+# one that does not, so a clean result here says "nothing obvious" rather than
+# "certainly nothing".
+WINDOW = 5.0
+SAMPLES = 16
+GAP = WINDOW / SAMPLES
+
+# A reply slower than this is counted as lost. Half a second is far beyond
+# playable, so nothing that could be played on is miscounted -- and waiting a
+# full second per lost packet would push a lossy link well past the window.
+PING_WAIT = 500
 
 # What sub-tick will tolerate. These are not ping thresholds -- a 60 ms
 # connection with no loss plays fine, and a 10 ms one with 2% loss does not.
@@ -66,9 +85,23 @@ class Probe:
     host: str
     label: str
     sent: int = 0
-    received: int = 0
     times: List[float] = field(default_factory=list)
+    # Which probes went unanswered, by index. Kept so a drawn line can show a
+    # gap where the loss was instead of closing over it as if nothing happened.
+    misses: List[int] = field(default_factory=list)
     error: str = ""
+
+    @property
+    def received(self) -> int:
+        """Derived rather than tallied.
+
+        It was a field the parser set and the live sweep forgot to, so a run
+        being watched reported every reply as lost while holding the timings
+        that proved otherwise -- and then replaced a perfectly good measurement
+        with the fallback host. Counting the replies themselves cannot drift
+        from the replies.
+        """
+        return len(self.times)
 
     @property
     def reachable(self) -> bool:
@@ -87,6 +120,10 @@ class Probe:
     @property
     def worst(self) -> float:
         return round(max(self.times), 1) if self.times else 0.0
+
+    @property
+    def best(self) -> float:
+        return round(min(self.times), 1) if self.times else 0.0
 
     @property
     def jitter(self) -> float:
@@ -198,7 +235,8 @@ def ping(host: str, label: str, count: int = SAMPLES) -> Probe:
         return found
 
     # -w keeps one dead host from stalling the whole check.
-    out = _run(["ping", "-n", str(count), "-w", "1000", host], count * 2 + 15)
+    out = _run(["ping", "-n", str(count), "-w", str(PING_WAIT), host],
+               int(count * (GAP + 1)) + 15)
     if not out.strip():
         found.error = "ping could not be run"
         found.sent = 0
@@ -208,7 +246,6 @@ def ping(host: str, label: str, count: int = SAMPLES) -> Probe:
         match = _TIME.search(line)
         if match and "ttl" in line.lower():
             found.times.append(float(match.group(1)))
-    found.received = len(found.times)
     if not found.received:
         found.error = f"{host} did not answer"
     return found
@@ -247,6 +284,51 @@ def _judge(probe: Probe, where: str, findings: List[Finding]) -> None:
                                 "to be the whole story on its own."))
 
 
+def _conclude(adapter_found, gateway: Probe, internet: Probe) -> List[Finding]:
+    """What the two measurements mean together.
+
+    Split out of survey() so a run that is watched as it happens reaches the
+    same verdict as one that is waited for -- there should not be two opinions
+    about the same numbers.
+    """
+    findings: List[Finding] = []
+    if adapter_found is not None and adapter_found.wireless:
+        findings.append(Finding(
+            "warn", "This machine is on Wi-Fi",
+            "Wi-Fi loses packets that a cable does not -- from interference, from "
+            "other devices, from the radio retrying. It is the most common cause "
+            "of shots not registering, and the one with the simplest fix. If a "
+            "cable can reach this machine, try one before changing any setting."))
+
+    _judge(gateway, "to your own router", findings)
+    _judge(internet, "out to the internet", findings)
+
+    near, far = gateway, internet
+    if near and far and near.reachable and far.reachable:
+        if near.loss > LOSS_FINE or near.jitter >= JITTER_FINE:
+            findings.append(Finding(
+                "bad", "The trouble starts inside your own network",
+                "Your router is already losing or delaying packets before they "
+                "reach the internet, so nothing beyond this building is to blame. "
+                "Wi-Fi, the cable, or something else on the network saturating the "
+                "line -- a download, a console updating, another PC streaming."))
+        elif far.loss > LOSS_FINE or far.jitter >= JITTER_POOR:
+            findings.append(Finding(
+                "warn", "Your own network is clean; the trouble is past it",
+                "The link to your router is fine and the problem appears beyond "
+                "it. That is your ISP or the route to the server, and no setting "
+                "on this machine will change it. Worth reporting to them with "
+                "these numbers."))
+
+    if not findings:
+        findings.append(Finding(
+            "good", "Nothing wrong with this connection",
+            "No loss and steady timing, on both halves. Shots that do not "
+            "register on a link measuring like this are not being lost on the "
+            "way out of this machine."))
+    return findings
+
+
 def survey(samples: int = SAMPLES) -> Survey:
     """Measure this machine's link and say what is wrong with it, if anything.
 
@@ -260,48 +342,14 @@ def survey(samples: int = SAMPLES) -> Survey:
         return found
 
     found.adapter = adapter()
-    if found.adapter and found.adapter.wireless:
-        found.findings.append(Finding(
-            "warn", "This machine is on Wi-Fi",
-            "Wi-Fi loses packets that a cable does not -- from interference, from "
-            "other devices, from the radio retrying. It is the most common cause "
-            "of shots not registering, and the one with the simplest fix. If a "
-            "cable can reach this machine, try one before changing any setting."))
-
     router = gateway_address()
     found.gateway = ping(router, "Your router", samples) if router else None
     found.internet = ping(ANCHOR, "The internet", samples)
     if found.internet and not found.internet.reachable:
         found.internet = ping(ANCHOR_BACKUP, "The internet", samples)
 
-    _judge(found.gateway, "to your own router", found.findings)
-    _judge(found.internet, "out to the internet", found.findings)
-
-    # Where the trouble starts is the useful part, so say it plainly.
-    near = found.gateway
-    far = found.internet
-    if near and far and near.reachable and far.reachable:
-        if near.loss > LOSS_FINE or near.jitter >= JITTER_FINE:
-            found.findings.append(Finding(
-                "bad", "The trouble starts inside your own network",
-                "Your router is already losing or delaying packets before they "
-                "reach the internet, so nothing beyond this building is to blame. "
-                "Wi-Fi, the cable, or something else on the network saturating the "
-                "line -- a download, a console updating, another PC streaming."))
-        elif far.loss > LOSS_FINE or far.jitter >= JITTER_POOR:
-            found.findings.append(Finding(
-                "warn", "Your own network is clean; the trouble is past it",
-                "The link to your router is fine and the problem appears beyond "
-                "it. That is your ISP or the route to the server, and no setting "
-                "on this machine will change it. Worth reporting to them with "
-                "these numbers."))
-
-    if not found.findings:
-        found.findings.append(Finding(
-            "good", "Nothing wrong with this connection",
-            "No loss and steady timing, on both halves. Shots that do not "
-            "register on a link measuring like this are not being lost on the "
-            "way out of this machine."))
+    # The same verdict the watched run reaches, from the same function.
+    found.findings = _conclude(found.adapter, found.gateway, found.internet)
     return found
 
 
@@ -327,3 +375,170 @@ def as_dict(found: Survey) -> dict:
         "findings": [{"severity": f.severity, "title": f.title, "detail": f.detail}
                      for f in found.findings],
     }
+
+
+# ---------------------------------------------------------------------------
+# A measurement you can watch
+# ---------------------------------------------------------------------------
+#
+# The original ran twenty probes per host in one ping command and returned when
+# both were finished: about forty seconds staring at a spinner, and no way to
+# tell a link that was fine from one that had already started dropping packets
+# ten seconds in.
+#
+# This sends them one at a time and publishes each reply as it lands, so the
+# page can draw the line as it is measured. The pacing is unchanged and
+# deliberate -- roughly a second between probes. A burst of twenty back to back
+# finishes in two seconds and measures nothing useful: jitter is about how
+# steady a link is over time, and twenty packets sent at once only says what
+# one moment looked like.
+#
+# Both hosts are measured at the same time on their own threads, which is what
+# pays for the pacing: the whole run still takes about as long as one host used
+# to, rather than twice as long.
+
+
+
+def _ping_once(host: str) -> "Optional[float]":
+    """One probe. The round trip in milliseconds, or None if nothing came back."""
+    out = _run(["ping", "-n", "1", "-w", str(PING_WAIT), host], 8)
+    for line in out.splitlines():
+        match = _TIME.search(line)
+        if match and "ttl" in line.lower():
+            return float(match.group(1))
+    return None
+
+
+class Run:
+    """One measurement, readable while it is still going."""
+
+    def __init__(self, samples: int = SAMPLES) -> None:
+        self.samples = max(4, min(60, int(samples)))
+        self.adapter: "Optional[Adapter]" = None
+        self.gateway = Probe(host="", label="Your router")
+        self.internet = Probe(host=ANCHOR, label="The internet")
+        self.findings: List[Finding] = []
+        self.error = ""
+        self.done = False
+        self.started = 0.0
+        self._lock = threading.Lock()
+        self._threads: List[threading.Thread] = []
+
+    # -- running ----------------------------------------------------------
+    def begin(self) -> None:
+        if self.started:
+            return
+        self.started = time.time()
+        if sys.platform != "win32":
+            self.error = "this check uses Windows networking tools"
+            self.done = True
+            return
+
+        # Which adapter is in use only decorates the result, so it is fetched
+        # alongside the probing rather than before it. Both of these are
+        # PowerShell starts, and doing them in sequence first spent a second
+        # of a five second budget before a single packet had been sent.
+        def find_adapter() -> None:
+            found = adapter()
+            with self._lock:
+                self.adapter = found
+
+        threading.Thread(target=find_adapter, daemon=True).start()
+
+        router = gateway_address()
+        self.gateway.host = router
+
+        targets = [(self.gateway, router)] if router else []
+        targets.append((self.internet, ANCHOR))
+        for probe, host in targets:
+            probe.sent = 0
+            thread = threading.Thread(target=self._sweep, args=(probe, host),
+                                      daemon=True)
+            thread.start()
+            self._threads.append(thread)
+
+        threading.Thread(target=self._finish, daemon=True).start()
+
+    def _sweep(self, probe: Probe, host: str) -> None:
+        if not host:
+            return
+        for index in range(self.samples):
+            began = time.monotonic()
+            reply = _ping_once(host)
+            with self._lock:
+                probe.sent += 1
+                if reply is not None:
+                    probe.times.append(reply)
+                else:
+                    # Recorded so the drawn line has a gap where the loss was,
+                    # rather than closing over it as though nothing happened.
+                    probe.misses.append(probe.sent - 1)
+            if index < self.samples - 1:
+                # The gap is a cadence, not an addition. Starting a ping costs
+                # about a tenth of a second, and sleeping the full gap on top
+                # of that stretched a five second window to nearly seven.
+                rest = GAP - (time.monotonic() - began)
+                if rest > 0:
+                    time.sleep(rest)
+
+    def _finish(self) -> None:
+        for thread in self._threads:
+            thread.join()
+        if self.internet.sent and not self.internet.received:
+            # The anchor may simply be one that this network will not answer.
+            backup = ping(ANCHOR_BACKUP, "The internet", max(4, self.samples // 2))
+            if backup.received:
+                with self._lock:
+                    self.internet = backup
+        with self._lock:
+            self.findings = _conclude(self.adapter, self.gateway, self.internet)
+            self.done = True
+
+    # -- reading ----------------------------------------------------------
+    def snapshot(self) -> Dict[str, Any]:
+        with self._lock:
+            return {
+                "ok": True,
+                "running": bool(self.started) and not self.done,
+                "done": self.done,
+                "error": self.error,
+                "samples": self.samples,
+                "adapter": ({"name": self.adapter.name,
+                             "description": self.adapter.description,
+                             "speed": self.adapter.speed,
+                             "wireless": self.adapter.wireless}
+                            if self.adapter else None),
+                "gateway": _probe_shape(self.gateway),
+                "internet": _probe_shape(self.internet),
+                "findings": [{"severity": f.severity, "title": f.title,
+                              "detail": f.detail} for f in self.findings],
+            }
+
+
+def _probe_shape(probe: Probe) -> Dict[str, Any]:
+    return {"host": probe.host, "label": probe.label, "sent": probe.sent,
+            "received": probe.received, "loss": probe.loss,
+            "average": probe.average, "worst": probe.worst,
+            "best": probe.best, "jitter": probe.jitter,
+            "times": list(probe.times), "misses": list(probe.misses),
+            "reachable": probe.reachable, "error": probe.error}
+
+
+_run_now: "Optional[Run]" = None
+
+
+def start(samples: int = SAMPLES) -> Dict[str, Any]:
+    """Begin a measurement, replacing any that has finished."""
+    global _run_now
+    if _run_now is not None and not _run_now.done:
+        return _run_now.snapshot()
+    _run_now = Run(samples)
+    _run_now.begin()
+    return _run_now.snapshot()
+
+
+def progress() -> Dict[str, Any]:
+    """Where the current measurement has got to, if there is one."""
+    if _run_now is None:
+        return {"ok": True, "running": False, "done": False, "idle": True}
+    return _run_now.snapshot()
