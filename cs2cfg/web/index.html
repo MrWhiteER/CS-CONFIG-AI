@@ -1510,6 +1510,17 @@
   /* The ring, and the glyph it is drawn around. */
   .updc-face { position: relative; width: 26px; height: 26px; flex: none; }
   .updc-face svg { width: 26px; height: 26px; display: block; }
+  /* The ring, when it is also the button that checks. */
+  .updc-ask {
+    appearance: none; border: 0; background: none; padding: 0; cursor: pointer;
+    border-radius: 50%;
+    transition: transform .18s ease, filter .18s ease;
+  }
+  .updc-ask:hover { transform: scale(1.06); filter: brightness(1.15); }
+  .updc-ask:active { transform: scale(.97); }
+  .updc-ask:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+  .updc-ask:disabled { cursor: default; transform: none; filter: none; }
+
   .updc-dialog .updc-face { width: 62px; height: 62px; }
   .updc-dialog .updc-face svg { width: 62px; height: 62px; }
   .updc-ring-bg { fill: none; stroke: var(--line); stroke-width: 2.6; }
@@ -8213,6 +8224,9 @@ function renderUpdCentre() {
     act = '<button class="btn primary small" id="updc-get">Download</button>';
   } else {
     sub = s.current + "  ·  " + fmtWhen(s.checked);
+    // Up to date as of the last look. Somebody who opened this panel wants to
+    // know about now, and there was nothing here to ask with.
+    act = '<button class="btn small" id="updc-check">Check for updates</button>';
   }
 
   // Shut, it is a rail row like the profile above it: the ring, and one line
@@ -8296,13 +8310,22 @@ function renderUpdCentre() {
     return;
   }
   dlg.dataset.shape = popShape;
+  // The ring is the biggest thing in the panel and it already looks like a
+  // refresh, so pressing it checks -- except while it is checking, when there
+  // is nothing to ask for, and when there is no repository to ask.
+  const ringLive = s && s.configured && tone !== "busy";
+  const ring = ringLive
+    ? '<button class="updc-face updc-ask" id="updc-check-ring"' +
+      ' title="Check for updates now" aria-label="Check for updates now">' +
+      updcRing(share, tone) + "</button>"
+    : '<span class="updc-face">' + updcRing(share, tone) + "</span>";
   dlg.innerHTML =
     '<div class="updc-head">' +
       '<button class="updc-close" id="updc-shut" title="Close" aria-label="Close">' +
         '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></svg>' +
       "</button>" +
       '<div class="updc-top">' +
-        '<span class="updc-face">' + updcRing(share, tone) + "</span>" +
+        ring +
         '<span class="updc-txt">' +
           '<p class="updc-ttl">Update centre</p>' +
           '<p class="updc-say">' + esc(say) + "</p>" +
@@ -8445,11 +8468,25 @@ document.addEventListener("click", async e => {
   const id = e.target.id;
   if (!id || !id.startsWith("upd")) return;
 
-  if (id === "upd-check" || id === "updc-check") {
-    e.target.disabled = true;
-    e.target.textContent = "Checking...";
+  if (id === "upd-check" || id === "updc-check" || id === "updc-check-ring") {
+    // The ring has no label to replace, so it says it is working by going
+    // into the same busy state a timed check does.
+    const button = e.target.closest("button");
+    const label = button ? button.textContent : "";
+    if (button) button.disabled = true;
+    if (id === "updc-check") button.textContent = "Checking...";
+    if (id === "updc-check-ring" && updState) {
+      updState = { ...updState, state: "checking" };
+      renderUpdCentre();
+    }
     updState = await api("/api/update/check", {}).catch(() => updState);
     renderUpdates();
+    // renderUpdates rebuilds the panel, so the button this started on may be
+    // gone; only put it back if it is still there.
+    if (button && button.isConnected) {
+      button.disabled = false;
+      if (label) button.textContent = label;
+    }
     return;
   }
   if (id === "upd-download" || id === "upd-t-get" || id === "updc-get") {
