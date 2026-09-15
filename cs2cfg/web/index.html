@@ -669,8 +669,13 @@
      number about this machine -- so they are dressed alike rather than one
      end sitting in a pill and the other floating on the bar. */
   .score {
-    display: inline-flex; align-items: center; gap: 7px;
-    padding: 2px 11px 2px 3px; border-radius: 999px;
+    display: inline-flex; align-items: center; gap: 9px;
+    /* The ring is round and the pill ends are round, so the two curves close
+       on each other at the ends: clearance that would look ample against a
+       straight edge looks pinched here. Hence the padding is set from the
+       ring's diameter rather than matched to the chips' -- they hold text,
+       which needs far less room to sit in. */
+    padding: 6px 15px 6px 6px; border-radius: 999px;
     background: rgba(0, 0, 0, .38); border: 1px solid var(--line);
     white-space: nowrap;
   }
@@ -799,7 +804,7 @@
   .bell {
     position: relative; flex: 0 0 auto;
     appearance: none; border: 1px solid var(--line); cursor: pointer;
-    width: 32px; height: 32px; border-radius: 999px;
+    width: 38px; height: 38px; border-radius: 999px;
     background: rgba(0, 0, 0, .38); color: var(--muted);
     display: grid; place-items: center;
     transition: color .2s ease, border-color .2s ease, background .2s ease;
@@ -1782,7 +1787,7 @@
      list still has to sit above the page. */
   .topbar { position: relative; z-index: 20;
             display: flex; align-items: center; gap: 8px;
-            min-height: 58px; padding: 9px 16px; flex: none; }
+            min-height: 66px; padding: 9px 16px; flex: none; }
   .topbar .spacer { flex: 1; }
   .chip {
     display: inline-flex; align-items: center; gap: 6px;
