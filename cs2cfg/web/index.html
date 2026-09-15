@@ -775,6 +775,14 @@
     .modedrop { background: var(--mode-neon, var(--accent)); box-shadow: none; }
   }
 
+  /* The offer to read the privileged sensors: the last thing in the system
+     card, set apart from the readings above it. */
+  #temps-note:not(:empty) {
+    margin-top: 14px; padding-top: 12px;
+    border-top: 1px solid var(--line-soft);
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+
   .seg { display: flex; gap: 7px; flex-wrap: wrap; }
   .seg button {
     flex: 1 1 auto; min-width: 100px; padding: 9px 12px; cursor: pointer;
@@ -2794,7 +2802,6 @@
           <h2>System</h2>
           <div class="gauges" id="live-gauges"></div>
           <div class="temps" id="live-temps"></div>
-          <div class="sub2" id="temps-note" style="margin-top:6px"></div>
           <div class="stats" id="history-stats"></div>
           <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:12px">
             <div style="flex:1 1 200px;min-width:170px">
@@ -2807,6 +2814,10 @@
             </div>
           </div>
           <div class="sub" id="live-note" style="margin-top:8px">&nbsp;</div>
+          <!-- Last in the card on purpose. It is an offer, not a reading, and
+               sitting between the thermometers and the figures it interrupted
+               the run of instruments it was offering to add to. -->
+          <div class="sub2" id="temps-note"></div>
         </section>
 
         <section class="panel" id="hw-card">
