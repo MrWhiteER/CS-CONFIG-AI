@@ -1735,6 +1735,92 @@
     .updc-veil, .updc-dialog { animation: none; }
   }
 
+  /* The target frame rate, at the head of the settings it governs.
+
+     Given a box of its own rather than a row in a list because it is the one
+     number on the page that every other setting is chosen to reach: the
+     profile dial decides how to spend the hardware, this says what it is being
+     spent on. */
+  .fps {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: "mark copy set" "quick quick quick";
+    align-items: center; gap: 14px;
+    margin: 0 0 12px; padding: 16px 18px;
+    border-radius: var(--r);
+    background:
+      radial-gradient(120% 160% at 0% 0%,
+        color-mix(in srgb, var(--violet) 20%, transparent), transparent 62%),
+      var(--panel);
+    border: 1px solid var(--line);
+  }
+
+  .fps-mark {
+    grid-area: mark; width: 42px; height: 42px; border-radius: 12px;
+    display: grid; place-items: center; flex: none;
+    background: color-mix(in srgb, var(--violet) 22%, transparent);
+    color: var(--violet-soft);
+  }
+  .fps-mark svg {
+    width: 21px; height: 21px; fill: none; stroke: currentColor;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+
+  .fps-copy { grid-area: copy; min-width: 0; }
+  .fps-copy h3 { margin: 0; font-size: 14px; font-weight: 650; color: var(--ink); }
+  .fps-copy p { margin: 3px 0 0; font-size: 11.5px; color: var(--muted); line-height: 1.45; }
+
+  /* The number itself, sized to be the thing you look at. */
+  .fps-set {
+    grid-area: set; display: flex; align-items: baseline; gap: 7px;
+    padding: 7px 14px; border-radius: 12px;
+    background: rgba(0, 0, 0, .34);
+    border: 1px solid var(--line);
+    transition: border-color .2s ease, box-shadow .2s ease;
+  }
+  .fps-set:focus-within {
+    border-color: var(--violet);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--violet) 22%, transparent);
+  }
+  .fps-set input {
+    appearance: none; -moz-appearance: textfield;
+    border: 0; background: none; padding: 0; margin: 0;
+    width: 4.2ch; text-align: right;
+    font-family: var(--mono); font-size: 25px; font-weight: 600;
+    color: var(--ink);
+  }
+  .fps-set input::-webkit-outer-spin-button,
+  .fps-set input::-webkit-inner-spin-button { appearance: none; margin: 0; }
+  .fps-set input:focus { outline: none; }
+  .fps-set input::placeholder { color: var(--faint); font-size: 19px; }
+  .fps-unit { font-size: 11px; color: var(--faint); letter-spacing: .08em; }
+
+  /* The rates people actually pick, since they are their monitor's, not
+     arbitrary. Filled in from the displays we detected. */
+  .fps-quick { grid-area: quick; display: flex; flex-wrap: wrap; gap: 6px; }
+  .fps-quick:empty { display: none; }
+  .fps-quick button {
+    appearance: none; cursor: pointer; font: inherit;
+    padding: 4px 11px; border-radius: 999px;
+    background: var(--chip); border: 1px solid var(--line);
+    color: var(--ink-dim); font-size: 11px; font-weight: 600;
+    transition: color .15s ease, border-color .15s ease;
+  }
+  .fps-quick button:hover { color: var(--ink); border-color: var(--violet); }
+  .fps-quick button[aria-pressed="true"] {
+    background: var(--violet); border-color: transparent; color: #0b1017;
+  }
+
+  @media (max-width: 620px) {
+    .fps { grid-template-columns: auto minmax(0, 1fr);
+           grid-template-areas: "mark copy" "set set" "quick quick"; }
+    .fps-set { justify-content: center; }
+  }
+  @supports not (color: color-mix(in srgb, red 50%, blue)) {
+    .fps { background: var(--panel); }
+    .fps-mark { background: rgba(139, 92, 246, .2); }
+  }
+
   /* Sections. Still .tabs/.tab because the page's own code drives them. */
   .tabs {
     display: flex; flex-direction: column; gap: 1px; padding: 0 8px;
@@ -3330,17 +3416,6 @@
         </div>
         <p class="sub" id="intent-desc" style="margin:9px 0 0"></p>
 
-        <div class="row" style="margin-top:10px">
-          <span class="k">Target fps</span>
-          <span class="v">
-            <input type="number" id="target" min="30" max="1000" placeholder="auto">
-            <span class="sub">blank = refresh rate</span>
-          </span>
-        </div>
-        <div class="row" id="account-row">
-          <span class="k">Account</span>
-          <span class="v"><select id="account"></select></span>
-        </div>
       </section>
 
       <!-- Only while something is launching. The mode that used to head this
@@ -3423,6 +3498,27 @@
           </p>
         </div>
       </div>
+
+      <!-- The number every other setting is chosen to reach. It belongs above
+           the settings rather than beside the profile dial: the dial picks how
+           to spend the hardware, this says what it is being spent on. -->
+      <section class="fps">
+        <div class="fps-mark">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 17.5L8.5 11l4 3.5L21 6"/><path d="M21 11V6h-5"/>
+          </svg>
+        </div>
+        <div class="fps-copy">
+          <h3>Target frame rate</h3>
+          <p id="fps-say">Left blank, everything is chosen to clear your refresh rate.</p>
+        </div>
+        <div class="fps-set">
+          <input type="number" id="target" min="30" max="1000" placeholder="auto"
+                 aria-label="Target frames per second">
+          <span class="fps-unit">fps</span>
+        </div>
+        <div class="fps-quick" id="fps-quick"></div>
+      </section>
 
       <section class="editor">
         <div class="editor-head">
@@ -4105,10 +4201,6 @@ function renderHardware(d) {
     '<div class="row"><span class="k">' + esc(k) + '</span><span class="v">' + v +
     (sub ? '<br><span class="sub">' + esc(sub) + "</span>" : "") + "</span></div>").join("");
 
-  const sel = $("account");
-  sel.innerHTML = d.accounts.map(a =>
-    '<option value="' + esc(a.id) + '">' + esc(a.label) + "</option>").join("");
-  $("account-row").classList.toggle("hidden", d.accounts.length < 2);
 }
 
 /* The machine's scores, in the title bar.
@@ -4304,10 +4396,16 @@ function renderPlan(p) {
   status("");
 }
 
+// The last detection, kept so more than one view can read it. renderHardware
+// used to be the only consumer, so it was rendered and dropped.
+let lastScan = null;
+
 async function scan(rescan) {
   busy("Detecting hardware…");
   try {
-    renderHardware(await api("/api/scan" + (rescan ? "?rescan=1" : "")));
+    lastScan = await api("/api/scan" + (rescan ? "?rescan=1" : ""));
+    renderHardware(lastScan);
+    renderFps();
     status("Ready.");
   } catch (e) { status("Scan failed: " + esc(e.message), true); }
 }
@@ -4316,7 +4414,7 @@ function requestBody() {
   const t = $("target").value.trim();
   return {
     intent, target_fps: t ? Number(t) : null,
-    account: $("account").value || null,
+    account: currentAccount(),
     write_video: $("w-video").checked, write_cfg: $("w-cfg").checked,
     write_launch: $("w-launch").checked, link_autoexec: $("w-autoexec").checked,
     fix_scaling: $("w-scaling").checked,
@@ -4435,17 +4533,6 @@ $("confirm-veil").addEventListener("keydown", e => {
     });
   }
 
-  const account = $("account");
-  if (account) {
-    let was = account.value;
-    account.addEventListener("change", () => {
-      const before = was;
-      const name = account.options[account.selectedIndex];
-      noteChange("Account → " + (name ? name.textContent.trim() : account.value),
-                 () => { account.value = before; account.dispatchEvent(new Event("change")); });
-      was = account.value;
-    });
-  }
 })();
 
 /* ---------------------------------------------------------------------------
@@ -6243,9 +6330,60 @@ async function loadIngame(quiet) {
   }
 }
 
+/* Whose settings everything on screen belongs to.
+
+   One source, and it is the profile at the foot of the rail. There used to be
+   a second: a dropdown in the Optimise-for box that could disagree with it,
+   which meant the answer depended on which control you had touched last.
+*/
+/* The line under the heading, and the rates worth one click.
+
+   The offers are the refresh rates of the monitors actually attached, plus the
+   nothing-in-particular option, because a target that is not a rate this
+   machine can present is a number with no meaning behind it.
+*/
+function renderFps() {
+  const box = $("fps-quick"), field = $("target"), say = $("fps-say");
+  if (!field) return;
+  const now = field.value.trim();
+
+  if (say) {
+    say.textContent = now
+      ? "Everything is chosen to hold " + now + " fps."
+      : "Left blank, everything is chosen to clear your refresh rate.";
+  }
+  if (!box) return;
+
+  const rates = [];
+  ((lastScan && lastScan.displays) || []).forEach(d => {
+    const hz = Math.round(d.refresh || 0);
+    if (hz >= 30 && !rates.includes(hz)) rates.push(hz);
+  });
+  rates.sort((a, b) => a - b);
+
+  box.innerHTML =
+    '<button data-fps="" aria-pressed="' + (!now) + '">Refresh rate</button>' +
+    rates.map(hz =>
+      '<button data-fps="' + hz + '" aria-pressed="' + (now === String(hz)) + '">' +
+      hz + " fps</button>").join("");
+}
+
+document.addEventListener("click", e => {
+  const pick = e.target.closest("[data-fps]");
+  if (!pick) return;
+  const field = $("target");
+  if (!field) return;
+  field.value = pick.dataset.fps;
+  field.dispatchEvent(new Event("change", { bubbles: true }));
+  renderFps();
+});
+
+document.addEventListener("input", e => {
+  if (e.target.id === "target") renderFps();
+});
+
 function currentAccount() {
-  const select = $("account");
-  return select && select.value ? select.value : null;
+  return (whoData && whoData.account) || null;
 }
 
 $("ingame-ack").addEventListener("click", async () => {
@@ -7971,7 +8109,7 @@ async function loadCs2Settings(force, keepEdits) {
       renderCfg(await api("/api/cfg/scan", { folder }));
       scannedFolder = folder;
     }
-    cs2Data = await api("/api/cfg/settings", { account: $("account").value || null });
+    cs2Data = await api("/api/cfg/settings", { account: currentAccount() });
     if (!keepEdits) cs2Edits.clear();
     if (!cs2Section) cs2Section = (cs2Data.sections[0] || {}).id;
     renderCs2Sections();
@@ -8895,7 +9033,7 @@ function markPending(count) {
 // you have to re-tell every session.
 const PREF_FIELDS = {
   target_fps: () => $("target").value.trim(),
-  account: () => $("account").value || null,
+  account: () => currentAccount(),
   write_video: () => $("w-video").checked,
   write_cfg: () => $("w-cfg").checked,
   write_launch: () => $("w-launch").checked,
@@ -8920,6 +9058,9 @@ function applyPrefs(ui) {
     paintIntent(intent);
   }
   if (ui.target_fps) $("target").value = ui.target_fps;
+  // Preferences arrive after the scan, so the line and the chips were
+  // describing an empty field that has just been filled in.
+  renderFps();
   const set = (id, v) => { if (v !== undefined && v !== null) $(id).checked = !!v; };
   set("w-video", ui.write_video); set("w-cfg", ui.write_cfg);
   set("w-launch", ui.write_launch); set("w-autoexec", ui.link_autoexec);
@@ -8954,8 +9095,7 @@ function applyPrefs(ui) {
   }
   if (ui.tab) setTab(ui.tab);
   if (ui.account) {
-    const opt = [...$("account").options].find(o => o.value === String(ui.account));
-    if (opt) $("account").value = ui.account;
+
   }
 }
 
@@ -9456,7 +9596,7 @@ $("play").addEventListener("click", async () => {
   $("play-sub").textContent = "starting…";
   try {
     await api("/api/play", {
-      account: $("account").value || null,
+      account: currentAccount(),
       stretch_mode: stretchMode,
       patch_video: $("p-video").checked,
     });
