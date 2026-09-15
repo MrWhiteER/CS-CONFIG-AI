@@ -3265,10 +3265,35 @@ const $ = (id) => document.getElementById(id);
 let intent = "balanced";
 let planned = null;
 
+let statusTimer = null;
+
+/* The status line is for things worth saying, and stays out of the way the
+   rest of the time.
+
+   It used to hold whatever was last written to it for the length of the
+   session, so a line announcing that a preview had not written anything sat
+   across the top of the app long after anyone had read it. Now an ordinary
+   message clears itself once it has been seen, and only an error waits for
+   something to replace it -- an error nobody read is the one case where
+   leaving it there is the right answer.
+*/
 function status(text, isError) {
   const el = $("status");
+  if (!el) return;
+  clearTimeout(statusTimer);
+  if (!text) {
+    el.classList.add("hidden");
+    el.innerHTML = "";
+    return;
+  }
   el.className = isError ? "err" : "";
+  el.classList.remove("hidden");
   el.innerHTML = text;
+  // A spinner is not a message; it is replaced by one when the work finishes,
+  // and hiding it mid-flight would look like the work had stopped.
+  if (!isError && text.indexOf("spin") === -1) {
+    statusTimer = setTimeout(() => el.classList.add("hidden"), 6000);
+  }
 }
 function busy(text) { status('<span class="spin">◐</span> ' + text); }
 function esc(s) {
@@ -3744,7 +3769,10 @@ function renderPlan(p) {
   }
   $("apply").disabled = false;
   markPending(p.changed_count);
-  status("Preview only — nothing has been written.");
+  // Clears the "Building plan" spinner. It used to be cleared by a message
+  // saying the preview had written nothing; dropping that line without
+  // putting this in its place left the spinner turning for the session.
+  status("");
 }
 
 async function scan(rescan) {
@@ -8448,7 +8476,7 @@ $("cfg-rename-preview").addEventListener("click", async () => {
       new_name: $("cfg-newname").value.trim(),
       include_family: $("cfg-family").checked,
     }));
-    status("Preview only — nothing written.");
+    status("");
   } catch (e) { status("Rename preview failed: " + esc(e.message), true); }
 });
 
