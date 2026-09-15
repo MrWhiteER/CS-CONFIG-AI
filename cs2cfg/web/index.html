@@ -393,27 +393,69 @@
     .subtab[aria-selected="true"] { background: var(--panel-2); color: var(--ink); }
   }
 
-  /* Settings categories, as a floating bar with the live one lifted out of it.
+  /* Settings categories as a segmented control.
 
-     The raised circle is a real cut-out rather than a disc sitting on top: the
-     ring around it is painted in the bar's own colour, so the bar reads as
-     notched where the circle rises through. That ring is why the blob is a
-     separate element from the button -- one element cannot both lift and leave
-     a hole where it was.
+     One track, one thumb that glides under whichever name is live. The thumb
+     sits behind the labels rather than beside them, so the live name is read
+     off the thumb itself and there is nothing else to look at.
 
-     Icon-only, like the reference. The name of the live category is printed
-     under the bar instead of beside every icon, which keeps the bar clean
-     without leaving anybody guessing what a glyph means; each button also
-     carries its name for hover and for a screen reader. */
-  /* Switching category slides rather than cuts.
+     Names rather than glyphs: there are four categories, "Config files" is
+     two words, and no icon says that without a caption underneath explaining
+     the icon. */
+  .segwrap { padding: 20px 18px 6px; }
+  .segbar {
+    position: relative;
+    display: flex; width: fit-content; max-width: 100%;
+    padding: 5px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+  }
 
-     The pane comes in from the side it was reached from -- picking a category
-     to the right brings it in from the right -- so the movement agrees with
-     the sphere travelling along the bar rather than fighting it.
+  .seg-thumb {
+    position: absolute; top: 5px; left: 5px;
+    height: calc(100% - 10px); width: 0;
+    border-radius: 999px;
+    background: var(--mode-neon, var(--accent));
+    box-shadow:
+      0 2px 10px rgba(0, 0, 0, .45),
+      0 0 18px color-mix(in srgb, var(--mode-neon, var(--accent)) 55%, transparent);
+    transition: left .38s cubic-bezier(.34, 1.1, .38, 1),
+                width .38s cubic-bezier(.34, 1.1, .38, 1),
+                background .3s ease, box-shadow .3s ease;
+    /* Nothing to see until it has been measured against a bar that is on
+       screen; see moveSegThumb. */
+    opacity: 0;
+  }
+  .segbar.measured .seg-thumb { opacity: 1; }
+  /* Arriving is not a journey, so the first placement does not animate. */
+  .segbar:not(.measured) .seg-thumb { transition: none; }
 
-     The box's height is animated too. Without that the surround snaps to the
-     new content while the pane is still gliding in, which is the jolt the
-     slide was meant to remove. */
+  .seg-item {
+    position: relative; z-index: 1;
+    appearance: none; border: 0; background: transparent; cursor: pointer;
+    padding: 9px 22px; border-radius: 999px;
+    font: inherit; font-size: 13px; font-weight: 650; letter-spacing: .1px;
+    white-space: nowrap; color: var(--muted);
+    transition: color .26s ease;
+  }
+  .seg-item:hover { color: var(--ink); }
+  .seg-item[aria-selected="true"] {
+    /* Dark on the lit thumb. The thumb carries the profile colour, so this is
+       the one place in the app that reads the other way round. */
+    color: var(--neon-ink, #0b1017);
+  }
+  .seg-item:focus-visible {
+    outline: 2px solid var(--mode-neon, var(--accent)); outline-offset: 3px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .seg-thumb { transition: none; }
+  }
+  @supports not (color: color-mix(in srgb, red 50%, blue)) {
+    .seg-thumb { box-shadow: 0 2px 10px rgba(0, 0, 0, .45); }
+  }
+
   @keyframes pane-in-right {
     from { opacity: 0; transform: translateX(28px); }
     to   { opacity: 1; transform: none; }
@@ -445,96 +487,6 @@
      sits at the top of the one surface, and the ring around the sphere is
      painted in that same surface, so the cut-out still reads without a second
      colour to cut out of. */
-  .navwrap { margin: 0; padding: 26px 0 22px; background: transparent; }
-  .navbar {
-    position: relative;
-    display: flex; align-items: stretch;
-    width: fit-content; max-width: 100%; margin: 0 auto;
-    height: 62px; padding: 0 8px;
-    background: transparent;
-    border: 0;
-  }
-
-  .nav-blob {
-    position: absolute; top: -20px; left: 0;
-    width: 54px; height: 54px; border-radius: 50%;
-    background: var(--mode-neon, var(--accent));
-    /* The notch. Painted in the bar's colour so the bar appears cut. */
-    box-shadow:
-      0 0 0 7px var(--panel),
-      0 0 18px color-mix(in srgb, var(--mode-neon, var(--accent)) 70%, transparent),
-      0 8px 18px rgba(0, 0, 0, .45);
-    transition: left .34s cubic-bezier(.4, 1.3, .5, 1), background .3s ease,
-                box-shadow .3s ease;
-    pointer-events: none;
-    /* Hidden until it has been measured against a visible bar, so it is never
-       seen at a position worked out from a hidden one. */
-    opacity: 0;
-  }
-  .navbar.measured .nav-blob { opacity: 1; }
-  /* The first placement is not a move, so it should not animate like one. */
-  .navbar:not(.measured) .nav-blob { transition: none; }
-  /* The soft halo the reference pulses behind the raised circle. */
-  .nav-blob::after {
-    content: ""; position: absolute; inset: -12px; border-radius: 50%;
-    background: radial-gradient(circle,
-      color-mix(in srgb, var(--mode-neon, var(--accent)) 26%, transparent) 0%,
-      transparent 68%);
-  }
-
-  .nav-item {
-    position: relative; z-index: 1;
-    /* Sized to the icon rather than stretched across the page: a bar that
-       fills the window puts the four icons a hand's width apart and stops
-       reading as one control. */
-    flex: 0 0 auto; width: 74px;
-    appearance: none; border: 0; background: transparent; cursor: pointer;
-    display: grid; place-items: center;
-    color: var(--muted); padding: 0;
-    transition: color .22s ease, transform .34s cubic-bezier(.4, 1.3, .5, 1);
-  }
-  .nav-item svg {
-    width: 23px; height: 23px;
-    fill: none; stroke: currentColor; stroke-width: 1.8;
-    stroke-linecap: round; stroke-linejoin: round;
-  }
-  .nav-item:hover { color: var(--ink); }
-  .nav-item[aria-selected="true"] {
-    /* Lifts into the circle. The same easing as the blob, so they travel
-       together rather than one chasing the other. */
-    transform: translateY(-20px);
-    color: var(--neon-ink, #0b1017);
-  }
-  .nav-item[aria-selected="true"] svg { stroke-width: 2.1; }
-
-  /* The name belongs to the icon, not to the bar.
-
-     One caption centred under the whole bar meant reading a label that was
-     nowhere near the thing it named. These sit under their own icon: the live
-     one arrives as the sphere lands on it, and hovering any of the others
-     names that one straight away, so the bar can be read without clicking
-     through it. */
-  .nav-tip {
-    position: absolute; top: 55px; left: 50%;
-    width: 140px; margin-left: -70px; text-align: center;
-    font-size: 12px; font-weight: 650; letter-spacing: .2px;
-    white-space: nowrap; pointer-events: none;
-    color: var(--muted);
-    opacity: 0; transform: translateY(-5px);
-    transition: opacity .18s ease, transform .18s ease, color .2s ease;
-  }
-  .nav-item:hover .nav-tip { opacity: 1; transform: translateY(0); color: var(--ink); }
-  /* After hover on purpose: when the live icon is also the hovered one, this
-     is the rule that should win, and both carry the same weight. */
-  .nav-item[aria-selected="true"] .nav-tip {
-    opacity: 1;
-    color: var(--mode-neon, var(--accent));
-    /* The button is lifted 20px into the sphere; hold its name where it was. */
-    transform: translateY(20px);
-    /* Arrives as the sphere settles rather than racing it there. */
-    transition-delay: .24s;
-  }
-
   /* Inside the box, the panels stop being boxes. Cards within a card is the
      thing that made this read as several objects rather than one. */
   .subpane { background: transparent; border: 0; padding: 16px 18px 6px; }
@@ -544,14 +496,6 @@
     padding: 0; margin: 0 0 22px;
   }
   .subpane > *:last-child { margin-bottom: 16px; }
-
-  @media (prefers-reduced-motion: reduce) {
-    .nav-blob, .nav-item { transition: none; }
-  }
-  @supports not (color: color-mix(in srgb, red 50%, blue)) {
-    .nav-blob { box-shadow: 0 0 0 7px var(--panel), 0 8px 18px rgba(0, 0, 0, .45); }
-    .nav-blob::after { display: none; }
-  }
 
   .seg { display: flex; gap: 7px; flex-wrap: wrap; }
   .seg button {
@@ -2820,13 +2764,13 @@
       </div>
 
       <div class="settings-box">
-      <div class="navwrap">
-        <div class="navbar" id="settings-subtabs" role="tablist">
-          <div class="nav-blob" id="nav-blob"></div>
-          <button class="nav-item" data-sub="apply" role="tab" aria-selected="true" title="Apply" aria-label="Apply"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6.5L9.5 17 4 11.5"/></svg><span class="nav-tip">Apply</span></button>
-          <button class="nav-item" data-sub="sound" role="tab" aria-selected="false" title="Sound" aria-label="Sound"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5L6.5 9H3.5v6h3L11 19z"/><path d="M15.5 9.2a4 4 0 010 5.6"/><path d="M18.2 6.5a8 8 0 010 11"/></svg><span class="nav-tip">Sound</span></button>
-          <button class="nav-item" data-sub="config" role="tab" aria-selected="false" title="Config files" aria-label="Config files"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 012-2h4l2 2.5h8a2 2 0 012 2V18a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg><span class="nav-tip">Config files</span></button>
-          <button class="nav-item" data-sub="editing" role="tab" aria-selected="false" title="Editing" aria-label="Editing"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 12h14M5 18h14"/><circle cx="9" cy="6" r="2.1"/><circle cx="15" cy="12" r="2.1"/><circle cx="8" cy="18" r="2.1"/></svg><span class="nav-tip">Editing</span></button>
+      <div class="segwrap">
+        <div class="segbar" id="settings-subtabs" role="tablist">
+          <div class="seg-thumb" id="seg-thumb"></div>
+          <button class="seg-item" data-sub="apply" role="tab" aria-selected="true">Apply</button>
+          <button class="seg-item" data-sub="sound" role="tab" aria-selected="false">Sound</button>
+          <button class="seg-item" data-sub="config" role="tab" aria-selected="false">Config files</button>
+          <button class="seg-item" data-sub="editing" role="tab" aria-selected="false">Editing</button>
         </div>
       </div>
 
@@ -4050,32 +3994,32 @@ document.addEventListener("click", e => {
   if (button) unlockTemps(button);
 });
 
-/* Put the raised circle under whichever item is live.
+/* Put the thumb under whichever name is live.
 
-   Measured from the button rather than computed from an index: the bar is
-   flexible, so the arithmetic would have to repeat the layout rules and would
-   drift from them the first time a category was added. */
-function moveNavBlob() {
+   Measured from the button rather than computed from an index: the items are
+   different widths -- "Config files" against "Sound" -- so the thumb has to
+   take its width from the real thing, and arithmetic would have to restate
+   the padding and font rules and would drift from them.
+*/
+function moveSegThumb() {
   const bar = $("settings-subtabs");
-  const blob = $("nav-blob");
-  if (!bar || !blob) return;
-  const live = bar.querySelector('.nav-item[aria-selected="true"]');
+  const thumb = $("seg-thumb");
+  if (!bar || !thumb) return;
+  const live = bar.querySelector('.seg-item[aria-selected="true"]');
   if (!live) return;
   const here = live.getBoundingClientRect();
   const frame = bar.getBoundingClientRect();
-  // Nothing to measure yet. setTab picks the category before it unhides the
+  // Nothing to measure yet: setTab picks the category before it unhides the
   // panel, so the first call lands while everything is display:none and every
-  // rect is zero -- which put the sphere at -27px, off the side of the bar,
-  // with the live icon left dark-on-dark where the sphere should have been.
+  // rect is zero.
   if (!frame.width || !here.width) return;
-  blob.style.left = Math.round(here.left - frame.left + here.width / 2 - 27) + "px";
-  // Placed for the first time: show it where it belongs rather than letting it
-  // slide in from wherever it was parked.
+  thumb.style.left = Math.round(here.left - frame.left) + "px";
+  thumb.style.width = Math.round(here.width) + "px";
   bar.classList.add("measured");
 }
 
 // The bar is flexible, so where the circle belongs changes with the window.
-window.addEventListener("resize", moveNavBlob);
+window.addEventListener("resize", moveSegThumb);
 
 /* Settings sub-tabs. Each category loads what it needs the first time it is
    opened, so switching to Sound does not pay for a config scan. */
@@ -4089,11 +4033,11 @@ function setSettingsSub(name, restoring) {
   const was = settingsSub;
   settingsSub = name;
   if (!restoring) settingsSubChosen = true;
-  const items = [...document.querySelectorAll("#settings-subtabs .nav-item")];
+  const items = [...document.querySelectorAll("#settings-subtabs .seg-item")];
   const order = items.map(b => b.dataset.sub);
   const cameFrom = order.indexOf(name) < order.indexOf(was) ? "right" : "left";
   items.forEach(b => b.setAttribute("aria-selected", String(b.dataset.sub === name)));
-  moveNavBlob();
+  moveSegThumb();
 
   const panes = [...document.querySelectorAll('[data-panel="settings"] .subpane')];
   const box = document.querySelector(".settings-box");
@@ -4130,7 +4074,7 @@ function setSettingsSub(name, restoring) {
 }
 
 document.addEventListener("click", e => {
-  const button = e.target.closest("#settings-subtabs .nav-item");
+  const button = e.target.closest("#settings-subtabs .seg-item");
   if (button) setSettingsSub(button.dataset.sub);
 });
 
@@ -7406,7 +7350,7 @@ function setTab(name) {
   document.querySelectorAll(".tab-panel").forEach(panel =>
     panel.classList.toggle("hidden", panel.dataset.panel !== name));
   // Now that the panel is on screen there is something to measure.
-  if (name === "settings") moveNavBlob();
+  if (name === "settings") moveSegThumb();
   window.scrollTo({ top: 0 });
 }
 
