@@ -724,47 +724,88 @@
     filter: drop-shadow(0 0 6px color-mix(in srgb, var(--warn) 65%, transparent));
   }
 
-  .chg-rows { display: flex; flex-direction: column; gap: 3px; }
-  .chg-row {
+  /* Rows inside the changes window.
+
+     Scoped to it, because .chg-row is also the preview list's row over in the
+     Apply pane, and that one is a grid. Unscoped, whichever came second in the
+     file won everywhere -- which is why these rows were stacking their value
+     under their name instead of sitting beside it. */
+  .chgwin-body .chg-rows { display: flex; flex-direction: column; gap: 3px; }
+  .chgwin-body .chg-row {
     --mark: var(--warn);
     display: flex; align-items: center; gap: 11px;
     padding: 8px 11px; border-radius: 9px;
     background: var(--panel-2);
     border-left: 2px solid var(--mark);
+    grid-template-columns: none;
   }
-  .chg-row.added   { --mark: var(--good); }
-  .chg-row.cleared { --mark: var(--bad); }
+  .chgwin-body .chg-row.added   { --mark: var(--good); }
+  .chgwin-body .chg-row.cleared { --mark: var(--bad); }
 
   /* The glyph does the work three near-identical columns of text would
      otherwise: changed, set, cleared are different events. */
-  .chg-mark {
+  .chgwin-body .chg-mark {
     flex: 0 0 auto; width: 26px; height: 26px; border-radius: 8px;
     display: grid; place-items: center;
     background: color-mix(in srgb, var(--mark) 16%, transparent);
     color: var(--mark);
   }
-  .chg-mark svg {
+  .chgwin-body .chg-mark svg {
     width: 15px; height: 15px; fill: none; stroke: currentColor;
     stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
   }
 
-  .chg-what { flex: 1 1 auto; min-width: 0; }
-  .chg-what b { display: block; font-size: 12.5px; font-weight: 600; color: var(--ink); }
-  .chg-what .sub2 { font-size: 10.5px; }
+  .chgwin-body .chg-what { flex: 1 1 auto; min-width: 0; }
+  .chgwin-body .chg-what b {
+    display: block; font-size: 12.5px; font-weight: 600; color: var(--ink);
+  }
+  .chgwin-body .chg-what .sub2 { font-size: 10.5px; }
 
-  .chg-move { display: flex; align-items: center; gap: 7px; flex: 0 0 auto; }
-  .chg-move code {
+  .chgwin-body .chg-move {
+    display: flex; align-items: center; gap: 7px; flex: 0 0 auto;
+    justify-self: auto;
+  }
+  .chgwin-body .chg-move code {
     font-family: var(--mono); font-size: 11.5px;
     padding: 2px 7px; border-radius: 6px; background: var(--panel);
   }
-  .chg-move .was { color: var(--muted); text-decoration: line-through; }
-  .chg-move .now { color: var(--mark); }
-  .chg-arrow { color: var(--muted); font-size: 12px; }
+  .chgwin-body .chg-move .was { color: var(--muted); text-decoration: line-through; }
+  .chgwin-body .chg-move .now { color: var(--mark); }
+  .chgwin-body .chg-arrow { color: var(--muted); font-size: 12px; }
 
-  @media (prefers-reduced-motion: reduce) {
+  /* Keep or put back, per change. Two small buttons rather than a switch: the
+     two answers are not on and off, and neither is the default in a way that
+     a switch's resting position would honestly express. */
+  .chg-pick {
+    flex: 0 0 auto; display: flex; gap: 2px; padding: 2px;
+    border-radius: 999px; background: rgba(0, 0, 0, .3);
+    border: 1px solid var(--line);
   }
+  .chg-pick button {
+    appearance: none; border: 0; cursor: pointer; font: inherit;
+    padding: 4px 11px; border-radius: 999px;
+    background: none; color: var(--muted);
+    font-size: 10.5px; font-weight: 600;
+    transition: background .15s ease, color .15s ease;
+  }
+  .chg-pick button:hover { color: var(--ink); }
+  .chg-pick button[data-choice="keep"][aria-pressed="true"] {
+    background: var(--good); color: #05130b;
+  }
+  .chg-pick button[data-choice="back"][aria-pressed="true"] {
+    background: var(--bad); color: #1a0509;
+  }
+
+  /* A row on its way back out, so the choice is visible without reading the
+     buttons on every line. */
+  .chgwin-body .chg-row.undoing {
+    --mark: var(--bad);
+    opacity: .72;
+  }
+  .chgwin-body .chg-row.undoing .chg-what b { text-decoration: line-through; }
+
   @supports not (color: color-mix(in srgb, red 50%, blue)) {
-    .chg-banner, .chg-bolt, .chg-mark { background: var(--panel-2); }
+    .chgwin-body .chg-mark { background: var(--panel-2); }
   }
 
   /* The scores, small enough to share the title bar with the live chips. */
@@ -1132,6 +1173,78 @@
   ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 6px; }
   ::-webkit-scrollbar-thumb:hover { background: #26374a; }
 
+
+  /* The changes window: the only place a change is reported, and the reason
+     it is a window rather than a panel. It covers everything, blurs what is
+     behind it, and has no way out but answering it. */
+  .confirm-veil {
+    position: fixed; inset: 0; z-index: 900;
+    display: grid; place-items: center; padding: 22px;
+    background: rgba(7, 5, 13, .66);
+    backdrop-filter: blur(15px) saturate(.85);
+    -webkit-backdrop-filter: blur(15px) saturate(.85);
+    animation: veil-in .18s ease-out;
+  }
+  .confirm-veil.hidden { display: none; }
+
+  .chgwin {
+    width: min(560px, 100%); max-height: calc(100vh - 44px);
+    display: flex; flex-direction: column;
+    border-radius: 18px; background: var(--panel);
+    border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--line));
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--warn) 14%, transparent),
+      0 30px 80px rgba(0, 0, 0, .7),
+      0 0 60px color-mix(in srgb, var(--warn) 12%, transparent);
+    animation: updc-rise 220ms cubic-bezier(.2, .8, .3, 1);
+  }
+  .chgwin:focus { outline: none; }
+
+  .chgwin-head {
+    display: flex; gap: 15px; align-items: flex-start;
+    padding: 20px 21px 17px;
+    border-bottom: 1px solid var(--line-soft);
+    background: linear-gradient(150deg,
+      color-mix(in srgb, var(--warn) 17%, var(--panel)), var(--panel) 66%);
+    border-radius: 18px 18px 0 0;
+  }
+  .chgwin-mark {
+    flex: none; width: 44px; height: 44px; border-radius: 13px;
+    display: grid; place-items: center;
+    background: color-mix(in srgb, var(--warn) 22%, transparent);
+    color: var(--warn);
+  }
+  .chgwin-mark svg {
+    width: 23px; height: 23px; fill: currentColor; stroke: none;
+    filter: drop-shadow(0 0 7px color-mix(in srgb, var(--warn) 60%, transparent));
+  }
+  .chgwin-lead { min-width: 0; }
+  .chgwin-lead h3 {
+    margin: 0; font-size: 17px; font-weight: 650; color: var(--ink);
+  }
+  .chgwin-lead .sub { margin: 4px 0 0; font-size: 12px; line-height: 1.5; }
+
+  .chgwin-body {
+    padding: 15px 21px; overflow-y: auto; flex: 1 1 auto; min-height: 0;
+  }
+  .chgwin-body .subcat:first-child { margin-top: 0; }
+
+  .chgwin-act {
+    padding: 14px 21px; border-top: 1px solid var(--line-soft);
+    display: flex; gap: 9px; justify-content: flex-end; flex-wrap: wrap;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .confirm-veil, .chgwin { animation: none; }
+  }
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .confirm-veil { background: rgba(7, 5, 13, .9); }
+  }
+  @supports not (color: color-mix(in srgb, red 50%, blue)) {
+    .chgwin { border-color: var(--warn); box-shadow: 0 30px 80px rgba(0, 0, 0, .7); }
+    .chgwin-head { background: var(--panel); }
+    .chgwin-mark { background: rgba(255, 180, 58, .2); }
+  }
 
   /* Unsaved-changes dialog. A real dialog rather than confirm(), because the
      question has three answers and needs to show what actually changed. */
@@ -3242,6 +3355,29 @@
 </head>
 <body>
 <div id="mode-glow"></div>
+
+<!-- Everything that changed, wherever it changed, in one window over
+     everything else. It is the only place changes are shown: a thing reported
+     in three quiet corners is a thing nobody reads. -->
+<div class="confirm-veil hidden" id="confirm-veil">
+  <div class="chgwin" role="alertdialog" aria-modal="true"
+       aria-labelledby="chgwin-title" tabindex="-1">
+    <div class="chgwin-head">
+      <span class="chgwin-mark">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 3L4 14h7l-1 7 8-11h-7z"/>
+        </svg>
+      </span>
+      <div class="chgwin-lead">
+        <h3 id="chgwin-title">Something changed</h3>
+        <p class="sub" id="chgwin-say"></p>
+      </div>
+    </div>
+    <div class="chgwin-body" id="chgwin-body"></div>
+    <div class="chgwin-act" id="chgwin-act"></div>
+  </div>
+</div>
+
 <div class="app">
 
   <div class="rail-grip" id="rail-grip" role="separator" aria-orientation="vertical"
@@ -3323,22 +3459,6 @@
       <span class="spacer"></span>
       <div class="modebadge" id="mode-badge"></div>
       <div class="scorebar" id="scorebar"></div>
-      <div class="bellwrap">
-        <button class="bell" id="bell" aria-haspopup="true" aria-expanded="false"
-                title="What CS2 changed in its own menus">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M18 9a6 6 0 10-12 0c0 6-2 7-2 7h16s-2-1-2-7z"/>
-            <path d="M13.7 20a2 2 0 01-3.4 0"/>
-          </svg>
-        </button>
-        <div class="bellveil" id="bellveil" hidden></div>
-        <div class="bellpop" id="bellpop" hidden>
-          <div id="ingame-out"></div>
-          <div class="actions">
-            <button class="btn" id="ingame-ack" disabled>Mark as seen</button>
-          </div>
-        </div>
-      </div>
     </div>
 
     <div id="status">Detecting hardware&hellip;</div>
@@ -3685,19 +3805,6 @@
         </div>
       </div>
 
-      <div class="confirm-veil hidden" id="confirm-veil">
-        <div class="confirm-box" role="alertdialog" aria-modal="true"
-             aria-labelledby="confirm-title">
-          <h3 id="confirm-title">You changed something</h3>
-          <p class="sub">You left the app with a change still unconfirmed. Keep it, or put
-             it back the way it was.</p>
-          <ul id="confirm-list"></ul>
-          <div class="actions">
-            <button class="btn primary" id="confirm-keep">Keep</button>
-            <button class="btn" id="confirm-undo">Put it back</button>
-          </div>
-        </div>
-      </div>
 
       <div class="settings-box">
       <div class="segwrap">
@@ -4439,18 +4546,29 @@ function requestBody() {
 let pendingChanges = [];
 let confirmOpen = false;
 
+let changeSeq = 0;
+
 function noteChange(label, revert) {
   // The same control moved twice is still one thing to answer for, and the
   // older revert is the one that goes all the way back.
   const already = pendingChanges.find(c => c.label.split("→")[0] === label.split("→")[0]);
   if (already) { already.label = label; return; }
-  pendingChanges.push({ label, revert });
+  pendingChanges.push({ id: "chg" + (++changeSeq), label, revert });
 }
+
+/* What to do with each change, by id. Absent means keep: the window opens
+   proposing to keep what you did, since that is what you were trying to do. */
+let changeChoice = {};
 
 function settleChanges() {
   pendingChanges = [];
+  changeChoice = {};
   closeConfirm();
 }
+
+// Whether the game was up as of the last poll. Read by chaseFocus, which must
+// not take the screen back while somebody is in a round.
+let cs2IsRunning = false;
 
 function undoChanges() {
   // Newest first, so a control moved more than once ends where it started.
@@ -4458,6 +4576,7 @@ function undoChanges() {
     try { change.revert(); } catch (e) { /* a gone control is already back */ }
   }
   pendingChanges = [];
+  changeChoice = {};
   closeConfirm();
   status("Put back.");
 }
@@ -4468,22 +4587,125 @@ function closeConfirm() {
   if (veil) veil.classList.add("hidden");
 }
 
-function openConfirm() {
-  if (confirmOpen || !pendingChanges.length) return;
-  confirmOpen = true;
-  const list = $("confirm-list");
-  if (list) {
-    list.innerHTML = pendingChanges.map(c => "<li>" + esc(c.label) + "</li>").join("");
-  }
-  $("confirm-veil").classList.remove("hidden");
-  const keep = $("confirm-keep");
-  if (keep) keep.focus();
+/* Whether CS2 changes are worth showing: something counted, and not the
+   first run, which is only establishing what "unchanged" looks like. */
+function gameChanged() {
+  const d = ingameData;
+  return !!(d && !d.first_run && d.count);
 }
 
+/* What the window has to say, drawn from both places at once. */
+function changesBody() {
+  const d = ingameData;
+  let html = "";
+
+  if (pendingChanges.length) {
+    html += '<div class="subcat">You changed</div>' +
+      '<div class="chg-rows">' + pendingChanges.map(c => {
+        const half = String(c.label).split("\u2192");
+        const back = changeChoice[c.id] === "back";
+        return '<div class="chg-row' + (back ? " undoing" : "") +
+          '" data-change="' + esc(c.id) + '">' +
+          changeMark("changed") +
+          '<div class="chg-what"><b>' + esc(half[0].trim()) + "</b></div>" +
+          (half.length > 1
+            ? '<div class="chg-move"><code class="now">' +
+              esc(half.slice(1).join("\u2192").trim()) + "</code></div>"
+            : "") +
+          '<div class="chg-pick" role="group" aria-label="What to do with this change">' +
+            '<button data-choice="keep" data-for="' + esc(c.id) + '"' +
+              ' aria-pressed="' + (!back) + '">Keep</button>' +
+            '<button data-choice="back" data-for="' + esc(c.id) + '"' +
+              ' aria-pressed="' + back + '">Put back</button>' +
+          "</div>" +
+          "</div>";
+      }).join("") + "</div>";
+  }
+
+  if (gameChanged()) {
+    for (const [source, list] of Object.entries(d.sources || {})) {
+      html += '<div class="subcat">' + esc(source) + "</div>";
+      html += '<div class="chg-rows">' + list.map(c =>
+        '<div class="chg-row ' + esc(c.kind || "changed") + '">' +
+          changeMark(c.kind) +
+          '<div class="chg-what"><b>' + esc(c.label || c.key) + "</b>" +
+            (c.label ? '<span class="sub2 mono">' + esc(c.key) + "</span>" : "") +
+          "</div>" +
+          '<div class="chg-move">' +
+            '<code class="was">' + esc(c.was === null ? "\u2014" : c.was) + "</code>" +
+            '<span class="chg-arrow">\u2192</span>' +
+            '<code class="now">' + esc(c.now === null ? "\u2014" : c.now) + "</code>" +
+          "</div>" +
+        "</div>").join("") + "</div>";
+    }
+    if (d.missing && d.missing.length) {
+      html += '<p class="sub2" style="margin-top:8px">Could not read: ' +
+        esc(d.missing.join(", ")) + "</p>";
+    }
+  }
+  return html;
+}
+
+function openConfirm() {
+  const mine = pendingChanges.length;
+  const theirs = gameChanged();
+  if (confirmOpen || (!mine && !theirs)) return;
+  confirmOpen = true;
+
+  const body = $("chgwin-body");
+  if (body) body.innerHTML = changesBody();
+
+  const title = $("chgwin-title"), say = $("chgwin-say");
+  if (title) {
+    title.textContent = mine && theirs ? "Two things changed"
+      : mine ? "You changed something"
+      : "CS2 changed its own settings";
+  }
+  if (say) {
+    say.textContent = mine && theirs
+      ? "Changes of yours are still unanswered, and the game has moved some of " +
+        "its own settings. Choose what to keep; the game's are only reported."
+      : mine
+      ? "You left the app with a change still unconfirmed. Keep each one or " +
+        "put it back, then press Done."
+      : "Changed in the game's own menus, not here. Nothing is written back to " +
+        "CS2 \u2014 this is only telling you.";
+  }
+
+  const act = $("chgwin-act");
+  if (act) {
+    act.innerHTML = mine
+      ? '<button class="btn" id="confirm-undo">Put everything back</button>' +
+        '<button class="btn primary" id="confirm-keep">Done</button>'
+      : '<button class="btn primary" id="confirm-keep">Got it</button>';
+  }
+
+  $("confirm-veil").classList.remove("hidden");
+  const first = $("confirm-keep");
+  if (first) first.focus();
+}
+
+/* Show it, and take the screen back so it cannot be ignored.
+
+   Except while CS2 is up. Pulling focus mid-round drops somebody out of a
+   match, which is worse than anything this could be telling them -- so the
+   window is prepared and waits, and the game's own changes are not even read
+   until it has quit, which is when CS2 writes them out anyway.
+*/
 async function chaseFocus() {
-  if (!pendingChanges.length || confirmOpen) return;
+  if (confirmOpen) return;
+  if (!pendingChanges.length && !gameChanged()) return;
   openConfirm();
+  if (cs2IsRunning) return;
   try { await api("/api/focus", {}); } catch (e) { /* browser tab, or refused */ }
+}
+
+/* Called whenever either side might have changed. Opens the window on its own
+   -- that is the whole point of it. */
+function reviewChanges() {
+  if (confirmOpen) return;
+  if (!pendingChanges.length && !gameChanged()) return;
+  chaseFocus();
 }
 
 window.addEventListener("blur", () => { setTimeout(chaseFocus, 120); });
@@ -4491,11 +4713,67 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") setTimeout(chaseFocus, 120);
 });
 
-if ($("confirm-keep")) $("confirm-keep").addEventListener("click", settleChanges);
-if ($("confirm-undo")) $("confirm-undo").addEventListener("click", undoChanges);
+/* Answering it settles both halves at once: whatever was pending is kept or
+   put back, and the game's changes are marked seen so they do not ask again. */
+/* Put back the ones marked to go back, keep the rest.
+
+   Newest first among those chosen, for the same reason undoChanges is: a
+   control moved more than once only ends where it started if its reverts run
+   in the order they were recorded, backwards.
+*/
+function applyChoices() {
+  const back = pendingChanges.filter(c => changeChoice[c.id] === "back");
+  for (const change of [...back].reverse()) {
+    try { change.revert(); } catch (e) { /* a gone control is already back */ }
+  }
+  pendingChanges = [];
+  changeChoice = {};
+  closeConfirm();
+  if (back.length) {
+    status(back.length === 1 ? "Put one change back."
+                             : "Put " + back.length + " changes back.");
+  }
+}
+
+async function answerChanges(how) {
+  const hadGame = gameChanged();
+  if (how === "all-back") {
+    for (const c of pendingChanges) changeChoice[c.id] = "back";
+  }
+  applyChoices();
+  if (hadGame) {
+    try {
+      ingameData = await api("/api/ingame/ack", { account: currentAccount() });
+    } catch (e) { /* it will be offered again on the next pass */ }
+  }
+}
+
+document.addEventListener("click", e => {
+  const pick = e.target.closest("[data-choice]");
+  if (pick) {
+    changeChoice[pick.dataset.for] = pick.dataset.choice;
+    const body = $("chgwin-body");
+    if (body) body.innerHTML = changesBody();
+    return;
+  }
+  if (e.target.closest("#confirm-keep")) answerChanges("chosen");
+  else if (e.target.closest("#confirm-undo")) answerChanges("all-back");
+});
+
 $("confirm-veil").addEventListener("keydown", e => {
   // No escape hatch: the point is that it gets answered.
-  if (e.key === "Escape") e.preventDefault();
+  if (e.key === "Escape") { e.preventDefault(); return; }
+  // And no tabbing out of it either, which is the other way a modal gets
+  // left open behind whatever the focus wandered off to.
+  if (e.key !== "Tab") return;
+  const stops = [...e.currentTarget.querySelectorAll("button, [href], [tabindex]:not([tabindex='-1'])")]
+    .filter(el => !el.disabled && el.offsetParent !== null);
+  if (!stops.length) return;
+  const edge = e.shiftKey ? stops[0] : stops[stops.length - 1];
+  if (document.activeElement === edge) {
+    e.preventDefault();
+    (e.shiftKey ? stops[stops.length - 1] : stops[0]).focus();
+  }
 });
 
 /* Every other control on the Settings tab, wired the same way.
@@ -5799,6 +6077,7 @@ let liveTimer = null;
 async function pollLive() {
   try {
     const d = await api("/api/monitor");
+    cs2IsRunning = !!d.cs2_running;
     noteIngame(d.ingame);
     const gpu = d.gpu || {};
     const ram = d.ram || {};
@@ -6170,82 +6449,12 @@ let ingameSeenAt = 0;
 /* The bell's list. Opens on the bell, closes on anything else -- a popover
    that can only be dismissed by the control that opened it is a trap on a
    page this size. */
-function toggleBell(force) {
-  const pop = $("bellpop"), bell = $("bell");
-  if (!pop || !bell) return;
-  const open = force !== undefined ? force : pop.hidden;
-  pop.hidden = !open;
-  const veil = $("bellveil");
-  if (veil) veil.hidden = !open;
-  bell.setAttribute("aria-expanded", String(open));
-  if (open) {
-    // Seen it: it can stop ringing, though the count stays until it is marked.
-    bell.classList.remove("ringing");
-    loadIngame(true);
-  }
-}
-
-document.addEventListener("click", e => {
-  if (e.target.closest("#bell")) { toggleBell(); return; }
-  if (!e.target.closest("#bellpop")) toggleBell(false);
-});
-document.addEventListener("keydown", e => {
-  if (e.key === "Escape") toggleBell(false);
-});
-
 document.addEventListener("keydown", e => {
   if (e.key === "Escape") toggleUpdCentre(false);
 });
 
-/* The number on the bell. Nothing to answer for means no mark at all rather
-   than a nought, which is a count of something. */
-function markBell(count) {
-  const bell = $("bell");
-  if (!bell) return;
-  let mark = bell.querySelector(".count");
-  if (!count) {
-    if (mark) mark.remove();
-    bell.title = "What CS2 changed in its own menus";
-    return;
-  }
-  if (!mark) {
-    mark = document.createElement("span");
-    mark.className = "count";
-    bell.appendChild(mark);
-  }
-  mark.textContent = count;
-  bell.title = count + " setting" + (count === 1 ? "" : "s") + " changed in CS2";
-}
-
-function noteIngame(summary) {
-  const count = summary ? summary.count : 0;
-  markBell(count);
-  if (!count) {
-    const bell = $("bell");
-    if (bell) bell.classList.remove("ringing");
-    return;
-  }
-
-  // Pull the detail once per finding rather than on every poll.
-  if (summary.at && summary.at !== ingameSeenAt) {
-    ingameSeenAt = summary.at;
-    loadIngame(true);
-    status("CS2 saved " + count + " changed setting" + (count === 1 ? "" : "s") +
-           " — see the bell, top right.");
-  }
-}
-
-/* What CS2 changed behind your back, said like it matters.
-
-   This used to be a quiet panel that looked the same whether nothing had
-   happened or the game had rewritten eleven settings. The whole point of
-   watching is the moment something moves, so when something has, the card
-   lights up and says what -- and when nothing has, it stays out of the way.
-
-   Each change carries a symbol for what happened to it, because "changed",
-   "set" and "cleared" are three different events and reading three columns of
-   near-identical text to tell them apart is work the glyph does at a glance.
-*/
+/* One glyph per kind of change: moved, set for the first time, cleared.
+   Three near-identical lines of text would say the same thing far slower. */
 const CHANGE_ART = {
   changed: '<path d="M4 8h13l-3.5-3.5M20 16H7l3.5 3.5"/>',
   added:   '<path d="M12 5v14M5 12h14"/>',
@@ -6260,81 +6469,36 @@ function changeMark(kind) {
     '<svg viewBox="0 0 24 24" aria-hidden="true">' + art + "</svg></span>";
 }
 
+/* The monitor poll's view of the watcher: how many settings moved, and when.
+
+   Pulls the detail once per finding rather than on every poll, then lets the
+   window decide whether to show itself.
+*/
+function noteIngame(summary) {
+  const count = summary ? summary.count : 0;
+  if (!count) return;
+  if (summary.at && summary.at !== ingameSeenAt) {
+    ingameSeenAt = summary.at;
+    loadIngame(true);
+  }
+}
+
 function renderIngame() {
-  const box = $("ingame-out");
-  const ack = $("ingame-ack");
-  const bell = $("bell");
-  if (!box) return;
-  const d = ingameData;
-
-  const calm = note => {
-    if (bell) { bell.classList.remove("ringing"); bell.dataset.count = "0"; }
-    markBell(0);
-    box.innerHTML = '<span class="sub">' + note + "</span>";
-    if (ack) ack.disabled = true;
-  };
-
-  if (!d) {
-    calm("Watching. Anything you change in CS2 appears here on its own once " +
-         "you close the game.");
-    return;
-  }
-  if (d.first_run) { calm(esc(d.note)); return; }
-  if (!d.count) {
-    calm("Nothing has changed in CS2’s own settings since the last check.");
-    return;
-  }
-
-  if (bell) bell.classList.add("ringing");
-  markBell(d.count);
-
-  let html =
-    '<div class="chg-banner">' +
-      '<span class="chg-bolt"><svg viewBox="0 0 24 24" aria-hidden="true">' +
-        '<path d="M12 3L4 14h7l-1 7 8-11h-7z"/></svg></span>' +
-      '<div><b>' + d.count + " setting" + (d.count === 1 ? "" : "s") +
-        " changed in the game’s menus</b>" +
-        '<div class="sub2">' +
-          (d.running
-            ? "CS2 is running, so anything from the current session is not written yet."
-            : "Read-only — nothing here is written back to CS2.") +
-        "</div>" +
-      "</div>" +
-    "</div>";
-
-  for (const [source, list] of Object.entries(d.sources || {})) {
-    html += '<div class="subcat">' + esc(source) + "</div>";
-    html += '<div class="chg-rows">' + list.map(c =>
-      '<div class="chg-row ' + esc(c.kind || "changed") + '">' +
-        changeMark(c.kind) +
-        '<div class="chg-what"><b>' + esc(c.label || c.key) + "</b>" +
-          (c.label ? '<span class="sub2 mono">' + esc(c.key) + "</span>" : "") +
-        "</div>" +
-        '<div class="chg-move">' +
-          '<code class="was">' + esc(c.was === null ? "—" : c.was) + "</code>" +
-          '<span class="chg-arrow">→</span>' +
-          '<code class="now">' + esc(c.now === null ? "—" : c.now) + "</code>" +
-        "</div>" +
-      "</div>").join("") + "</div>";
-  }
-
-  if (d.missing && d.missing.length) {
-    html += '<div class="sub2" style="margin-top:8px">Could not read: ' +
-      esc(d.missing.join(", ")) + "</div>";
-  }
-  box.innerHTML = html;
-  if (ack) ack.disabled = false;
+  // Nothing of its own to draw any more: what CS2 changed goes in the one
+  // window with everything else. This only decides whether that window has
+  // something to say.
+  reviewChanges();
 }
 
 async function loadIngame(quiet) {
-  const box = $("ingame-out");
-  if (!quiet && box) box.innerHTML = '<span class="sub"><span class="spin"></span> Reading&hellip;</span>';
   try {
     ingameData = await api("/api/ingame", { account: currentAccount() });
     renderIngame();
   } catch (err) {
-    if (box) box.innerHTML = '<span class="sub warn">' +
-      esc(String(err && err.message || err)) + "</span>";
+    // A failed read is not something to interrupt anyone over; the watcher
+    // will say so again on its next pass.
+    if (!quiet) status("Could not read CS2's settings: " +
+                       String(err && err.message || err), true);
   }
 }
 
@@ -6393,16 +6557,6 @@ document.addEventListener("input", e => {
 function currentAccount() {
   return (whoData && whoData.account) || null;
 }
-
-$("ingame-ack").addEventListener("click", async () => {
-  try {
-    ingameData = await api("/api/ingame/ack", { account: currentAccount() });
-    renderIngame();
-    status("Marked the current CS2 settings as seen.");
-  } catch (err) {
-    status("Could not update the baseline: " + (err && err.message || err), true);
-  }
-});
 
 $("play-fix").addEventListener("click", async () => {
   const button = $("play-fix");

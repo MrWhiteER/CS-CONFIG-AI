@@ -10,9 +10,11 @@ from __future__ import annotations
 
 import re
 import subprocess
+import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from . import vdf
 from .backup import BackupSession
@@ -262,6 +264,30 @@ def cs2_running() -> bool:
     except (OSError, subprocess.SubprocessError):
         return False
     return "cs2.exe" in result.stdout.lower()
+
+
+_RUNNING_SEEN: Tuple[float, bool] = (0.0, False)
+_RUNNING_LOCK = threading.Lock()
+
+
+def cs2_running_recent(max_age: float = 4.0) -> bool:
+    """:func:`cs2_running`, but reusing an answer younger than ``max_age``.
+
+    The real check spawns tasklist. That is fine for the once-per-operation
+    guard it was written for and far too expensive for the status poll, which
+    runs every second -- so callers who only want a rough "is the game up"
+    ask here instead.
+    """
+    global _RUNNING_SEEN
+    now = time.time()
+    with _RUNNING_LOCK:
+        when, answer = _RUNNING_SEEN
+        if now - when < max_age:
+            return answer
+    fresh = cs2_running()
+    with _RUNNING_LOCK:
+        _RUNNING_SEEN = (time.time(), fresh)
+    return fresh
 
 
 # ---------------------------------------------------------------------------

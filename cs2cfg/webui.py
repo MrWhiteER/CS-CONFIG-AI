@@ -2414,6 +2414,11 @@ def make_handler(state: State):
                 watcher = _ingame_watcher(state)
                 if watcher is not None:
                     payload["ingame"] = watcher.summary()
+                # Whether the game is up decides whether the page may take the
+                # screen back: doing that mid-match would drop somebody out of
+                # a round, which is worse than anything it could be telling
+                # them. Cached, because this poll runs every second.
+                payload["cs2_running"] = steam.cs2_running_recent(4.0)
                 self._send_json(payload)
                 return
             if path == "/api/gpu":
