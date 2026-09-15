@@ -826,9 +826,12 @@
     width: min(420px, calc(100vw - 32px));
     max-height: min(60vh, 520px); overflow-y: auto;
     padding: 14px 15px;
-    background: var(--panel); border: 1px solid var(--line);
+    /* Opaque, unlike the app's other panels. Those are translucent so the
+       stage shows through them; over a blurred page that just picks the blur
+       up and the list reads as murky as the thing it is sitting on. */
+    background: #140d21; border: 1px solid var(--line);
     border-radius: var(--r);
-    box-shadow: 0 18px 44px rgba(0, 0, 0, .6);
+    box-shadow: 0 18px 44px rgba(0, 0, 0, .66);
   }
   .bellpop[hidden] { display: none; }
   .bellwrap { position: relative; flex: 0 0 auto; }
@@ -839,6 +842,31 @@
   }
   @supports not (color: color-mix(in srgb, red 50%, blue)) {
     .bell.ringing { background: var(--chip); }
+  }
+
+  /* The page goes soft behind the list.
+
+     The list is short and the page behind it is busy -- gauges moving, graphs
+     redrawing -- and reading a handful of settings against that is harder than
+     it needs to be. Blurring what is behind it puts the whole window's
+     attention on the one thing that just asked for it. */
+  .bellveil {
+    position: fixed; inset: 0; z-index: 390;
+    background: rgba(7, 5, 13, .55);
+    backdrop-filter: blur(11px) saturate(.9);
+    -webkit-backdrop-filter: blur(11px) saturate(.9);
+    animation: veil-in .18s ease-out;
+  }
+  .bellveil[hidden] { display: none; }
+  @keyframes veil-in { from { opacity: 0; } to { opacity: 1; } }
+  /* Above the veil, and unblurred: the filter applies to what is behind the
+     veil, so anything stacked over it stays sharp. */
+  .bellpop { z-index: 401; }
+  @media (prefers-reduced-motion: reduce) { .bellveil { animation: none; } }
+  /* Where the browser cannot blur, dim harder instead -- the point is that the
+     page recedes, and a flat darkening does that too. */
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .bellveil { background: rgba(7, 5, 13, .82); }
   }
 
   .seg { display: flex; gap: 7px; flex-wrap: wrap; }
@@ -1459,7 +1487,12 @@
 
   /* ------------------------------------------------------------------ stage */
   .stage { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
-  .topbar { position: relative; display: flex; align-items: center; gap: 8px;
+  /* Lifted above the content below it. The drop hangs 5px past the bar's own
+     box, and without a stacking order of its own the panels underneath paint
+     straight over the part that overhangs -- the drop looked cut off exactly
+     at the bar's edge. */
+  .topbar { position: relative; z-index: 20;
+            display: flex; align-items: center; gap: 8px;
             padding: 11px 16px 0; flex: none; }
   .topbar .spacer { flex: 1; }
   .chip {
@@ -2773,6 +2806,7 @@
             <path d="M13.7 20a2 2 0 01-3.4 0"/>
           </svg>
         </button>
+        <div class="bellveil" id="bellveil" hidden></div>
         <div class="bellpop" id="bellpop" hidden>
           <div id="ingame-out"></div>
           <div class="actions">
@@ -3693,9 +3727,14 @@ const MODE_ART = {
     '<path d="M3 7.4h16"/>' +
     '<path d="M3 7.4L1.2 12.2a3.1 3.1 0 006.2 0z"/>' +
     '<path d="M19 7.4l-1.8 4.8a3.1 3.1 0 006.2 0z" transform="translate(-3.4)"/>',
+  // A brilliant cut: flat table on top, shoulders down to a girdle, and the
+  // pavilion drawn to a point underneath. The first attempt had a flat bottom
+  // and a line across the top, which is not a gem -- it is a rubbish bin, and
+  // that is what it looked like.
   quality:
-    '<path d="M11 2.6l6.9 5.3-2.6 10.6H6.7L4.1 7.9z"/>' +
-    '<path d="M4.1 7.9h13.8M11 2.6L8.4 7.9l2.6 10.6 2.6-10.6z"/>',
+    '<path d="M7.6 3.4h6.8L18 8.6 11 18.9 4 8.6z"/>' +
+    '<path d="M4 8.6h14"/>' +
+    '<path d="M7.6 3.4 11 8.6l3.4-5.2M11 8.6v10.3"/>',
 };
 
 const MODE_WORD = {
@@ -5553,6 +5592,8 @@ function toggleBell(force) {
   if (!pop || !bell) return;
   const open = force !== undefined ? force : pop.hidden;
   pop.hidden = !open;
+  const veil = $("bellveil");
+  if (veil) veil.hidden = !open;
   bell.setAttribute("aria-expanded", String(open));
   if (open) {
     // Seen it: it can stop ringing, though the count stays until it is marked.
