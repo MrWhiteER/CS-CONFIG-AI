@@ -6195,9 +6195,18 @@ function renderCs2Sections() {
   if (!cs2Data) return;
   const counts = cs2GroupCounts();
 
-  // The thumb is a sibling of the items and has to survive the rebuild, so it
-  // is written out with them rather than left in the markup.
-  $("cs2-sections").innerHTML = '<span class="seg-thumb"></span>' +
+  // The thumb is written out with the items rather than left in the markup,
+  // which means every render replaces it -- and a brand new thumb starts at
+  // the bar's left edge with the transition still live, so picking any section
+  // read as a jump to the first one and a slide back. Its geometry is carried
+  // across the rebuild, with the transition suppressed for the one frame that
+  // takes, so it animates from where it actually was.
+  const bar = $("cs2-sections");
+  const worn = bar.querySelector(".seg-thumb");
+  const was = worn && worn.style.width
+    ? { left: worn.style.left, width: worn.style.width } : null;
+
+  bar.innerHTML = '<span class="seg-thumb"></span>' +
     cs2Data.sections.map(sec => {
       const total = sec.groups.reduce((n, g) => n + (counts[g.id] || 0), 0);
       const on = sec.id === cs2Section;
@@ -6207,6 +6216,15 @@ function renderCs2Sections() {
                          (total === 1 ? "" : "s")) + '">' +
         esc(sec.label) + '<i class="n">' + total + "</i></button>";
     }).join("");
+
+  const thumb = bar.querySelector(".seg-thumb");
+  if (was) {
+    thumb.style.transition = "none";
+    thumb.style.left = was.left;
+    thumb.style.width = was.width;
+    thumb.getBoundingClientRect();     // make that take before it can animate
+    thumb.style.transition = "";
+  }
   // Next frame: the items were created in this one and have no width yet.
   requestAnimationFrame(() => moveSegThumb("cs2-sections"));
 
