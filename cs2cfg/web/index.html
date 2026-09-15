@@ -318,6 +318,62 @@
   .fix-tile[data-family="graphics"] { --fam: #2fd0d6; }
   .fix-tile[data-family="devices"]  { --fam: #a970ff; }
   .fix-tile[data-family="sound"]    { --fam: #ff9d2e; }
+  /* The bar a fix runs behind. Takes the tile's own family colour, so the
+     thing that is working is lit in the colour of the thing you pressed. */
+  .fix-prog { margin-top: 10px; }
+  .fix-prog[hidden] { display: none; }
+  .fix-track {
+    height: 5px; border-radius: 999px; overflow: hidden;
+    background: rgba(0, 0, 0, .34);
+    border: 1px solid var(--line-soft);
+  }
+  .fix-track i {
+    display: block; height: 100%; border-radius: 999px;
+    background: var(--fam, var(--accent));
+    box-shadow: 0 0 12px color-mix(in srgb, var(--fam, var(--accent)) 70%, transparent);
+  }
+  /* Sweeping, not filling: see fixProgress -- nothing here knows how far along
+     the work is, and a bar that pretends to is worse than one that does not. */
+  .fix-prog.running .fix-track i {
+    width: 42%; animation: fix-sweep 1.15s ease-in-out infinite;
+  }
+  @keyframes fix-sweep {
+    0%   { transform: translateX(-108%); }
+    100% { transform: translateX(240%); }
+  }
+  /* Finished, one way or another: the bar stops travelling and fills, which is
+     the only moment it is honest for it to be full. */
+  .fix-prog.done .fix-track i,
+  .fix-prog.failed .fix-track i,
+  .fix-prog.stopped .fix-track i {
+    width: 100%; animation: none; transition: width .3s ease;
+  }
+  .fix-prog.done .fix-track i {
+    background: var(--good);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--good) 65%, transparent);
+  }
+  .fix-prog.failed .fix-track i {
+    background: var(--bad); box-shadow: none;
+  }
+  .fix-prog.stopped .fix-track i {
+    background: var(--muted); box-shadow: none;
+  }
+
+  .fix-step {
+    display: flex; justify-content: space-between; gap: 10px;
+    margin: 6px 0 0; font-size: 10.5px; color: var(--muted);
+  }
+  .fix-step .secs { font-family: var(--mono); flex: none; }
+  .fix-prog.done .fix-step { color: var(--good); }
+  .fix-prog.failed .fix-step { color: var(--bad); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .fix-prog.running .fix-track i { animation: none; width: 100%; opacity: .55; }
+  }
+  @supports not (color: color-mix(in srgb, red 50%, blue)) {
+    .fix-track i, .fix-prog.done .fix-track i { box-shadow: none; }
+  }
+
   .fix-tile:hover {
     border-color: color-mix(in srgb, var(--fam) 45%, var(--line));
     transform: translateY(-1px);
@@ -5355,6 +5411,7 @@ function fixIcon(fix) {
 }
 
 function fixSaidId(id) { return "fix-said-" + id.split(".").join("-"); }
+function fixProgId(id) { return "fix-prog-" + id.split(".").join("-"); }
 
 function fixTile(fix, inner) {
   if (!fix) return "";
@@ -5374,6 +5431,10 @@ function fixTile(fix, inner) {
       ? '<p class="fix-danger">' + esc(fix.danger) + "</p>"
       : "") +
     '<div class="fix-body">' + inner + "</div>" +
+    '<div class="fix-prog" id="' + fixProgId(fix.id) + '" hidden>' +
+      '<div class="fix-track"><i></i></div>' +
+      '<p class="fix-step"><span class="what"></span><span class="secs"></span></p>' +
+    "</div>" +
     '<div class="fix-said" id="' + fixSaidId(fix.id) + '"></div></section>';
 }
 
@@ -5470,29 +5531,87 @@ async function runFix(button) {
   button.disabled = true;
   const label = button.textContent;
   button.textContent = "Working…";
-  if (said) {
-    said.innerHTML = '<span class="sub"><span class="spin"></span> ' +
-      (fix.needs_admin ? "Answer the administrator prompt…" : "Working…") + "</span>";
-  }
+  if (said) said.innerHTML = "";
+  const bar = fixProgress(id,
+    fix.needs_admin ? "Waiting for the administrator prompt" : "Working");
   try {
     const r = await api("/api/fix/run", body);
     const good = !!r.ok;
     const text = r.detail || r.error || (good ? "Done." : "Nothing changed.");
+    bar.finish(good ? "done" : r.declined ? "stopped" : "failed", text);
     if (said) {
       said.innerHTML = '<span style="color:' +
         (good ? "var(--good)" : r.declined ? "var(--muted)" : "var(--bad)") + '">' +
         esc(text) + "</span>";
     }
     status(text, !good && !r.declined);
-    if (good && id !== "sound.apps") loadFixes(true);
+    // Re-surveying rebuilds the tiles, which throws away the bar that has just
+    // finished. Let it be read first: the moment it reports success is the one
+    // the bar exists for, and the survey is not urgent.
+    if (good && id !== "sound.apps") setTimeout(() => loadFixes(true), 2700);
   } catch (err) {
     const text = String(err && err.message || err);
+    bar.finish("failed", text);
     if (said) said.innerHTML = '<span style="color:var(--bad)">' + esc(text) + "</span>";
     status("Could not run that: " + text, true);
   } finally {
     button.disabled = false;
     button.textContent = label;
   }
+}
+
+/* The bar inside a tile while its fix runs.
+
+   Deliberately indeterminate. Nothing here knows how long restarting an
+   adapter takes -- the server does the whole job in one call and answers when
+   it is finished -- so a percentage would be an invention, and a bar that
+   creeps to 90% and waits is the thing everyone has learnt to distrust. It
+   sweeps instead, which says "still going" without claiming to know how far.
+
+   What it does know it shows: whether it is waiting on a UAC prompt rather
+   than on the work, and how long it has been going. The seconds are the part
+   that tells you whether to keep waiting.
+*/
+function fixProgress(id, what) {
+  const box = $(fixProgId(id));
+  if (!box) return { finish() {} };
+  const step = box.querySelector(".what");
+  const secs = box.querySelector(".secs");
+  const began = Date.now();
+
+  box.hidden = false;
+  box.className = "fix-prog running";
+  if (step) step.textContent = what + "…";
+  if (secs) secs.textContent = "";
+
+  const tick = setInterval(() => {
+    const gone = Math.round((Date.now() - began) / 1000);
+    if (secs) secs.textContent = gone >= 1 ? gone + "s" : "";
+    // A fix that is still going after this long is usually one where Windows
+    // is taking its time rather than one that has hung, and saying so beats
+    // leaving somebody to wonder.
+    if (gone === 12 && step) step.textContent = what + "… Windows is taking a while";
+  }, 250);
+
+  return {
+    finish(how, text) {
+      clearInterval(tick);
+      const gone = ((Date.now() - began) / 1000).toFixed(1);
+      box.className = "fix-prog " + how;
+      if (step) {
+        step.textContent =
+          how === "done" ? "Finished"
+          : how === "stopped" ? "Stopped" : "Did not finish";
+      }
+      if (secs) secs.textContent = gone + "s";
+      if (text) box.title = text;
+      // The outcome is spelt out underneath, so the bar has said its piece.
+      // It stays a few seconds as a full bar, then gets out of the way.
+      setTimeout(() => {
+        if (box.classList.contains(how)) box.hidden = true;
+      }, how === "done" ? 2600 : 6000);
+    },
+  };
 }
 
 document.addEventListener("click", e => {
