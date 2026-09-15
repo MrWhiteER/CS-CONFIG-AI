@@ -430,6 +430,8 @@ def _profile(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
             "login": info.get("account_name") or "",
             "active": user.account_id == active,
             "signed_in": user.account_id == signed_in,
+            # The URL only, not the bytes: the page asks for it if it shows it.
+            "picture": f"/avatar/{user.account_id}.png" if user.avatar else "",
         })
 
     return {"ok": True, "account": active, "accounts": listed,
@@ -2129,6 +2131,9 @@ def _updater(state: State):
     ui = load_prefs().get("ui", {})
     checker = updates.Checker(
         auto_download=bool(ui.get("update_auto_download")),
+        # On unless turned off: a launcher that silently stops looking is how
+        # people end up six releases behind without knowing it.
+        auto_check=bool(ui.get("update_auto_check", True)),
         skip=str(ui.get("update_skip") or ""),
     )
     checker.start()
@@ -2228,6 +2233,10 @@ def _update_settings(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         wanted = bool(body["auto_download"])
         checker.set_auto_download(wanted)
         prefs["ui"]["update_auto_download"] = wanted
+    if "auto_check" in body:
+        wanted = bool(body["auto_check"])
+        checker.set_auto_check(wanted)
+        prefs["ui"]["update_auto_check"] = wanted
     if body.get("skip"):
         version = str(body["skip"])
         checker.skip_version(version)
@@ -2346,6 +2355,32 @@ def make_handler(state: State):
             path = self.path.split("?", 1)[0]
             if path in ("/", "/index.html"):
                 self._send_file(WEB_ROOT / "index.html")
+                return
+            if path.startswith("/avatar/"):
+                # Steam's cached picture for one account, served as-is.
+                #
+                # A file rather than base64 in /api/profile: the browser then
+                # caches it and six accounts do not cost 100KB of JSON on every
+                # poll. The id is matched against the accounts the scan found
+                # rather than pasted into a path, so nothing outside the
+                # avatar cache can be asked for.
+                wanted = path[len("/avatar/"):].removesuffix(".png")
+                state.refresh()
+                match = next((u for u in state.users
+                              if u.account_id == wanted), None)
+                picture = match.avatar if match is not None else None
+                if picture is None:
+                    self._send_json({"error": "no picture"}, 404)
+                    return
+                data = picture.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "image/png")
+                self.send_header("Content-Length", str(len(data)))
+                # Steam replaces the file when the picture changes, so let the
+                # browser keep it for a session but not beyond one.
+                self.send_header("Cache-Control", "no-cache")
+                self.end_headers()
+                self.wfile.write(data)
                 return
             if path == "/api/play/status":
                 # Deliberately outside state.lock: the page polls this every

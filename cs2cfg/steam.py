@@ -39,6 +39,20 @@ class SteamUser:
         return STEAM_ID64_BASE + int(self.account_id)
 
     @property
+    def avatar(self) -> Optional[Path]:
+        """The picture Steam has cached for this account, if it has one.
+
+        Steam writes it to ``config/avatarcache/<steamid64>.png`` when the
+        account signs in, so it is there for anyone who has actually used this
+        machine -- and absent for an account that has only ever been listed.
+        Read-only: the cache is Steam's, and a missing file means no picture
+        rather than one to go and fetch.
+        """
+        root = self.path.parent.parent          # userdata/<id> -> the install
+        found = root / "config" / "avatarcache" / f"{self.steam_id64}.png"
+        return found if found.is_file() else None
+
+    @property
     def localconfig(self) -> Path:
         return self.path / "config" / "localconfig.vdf"
 

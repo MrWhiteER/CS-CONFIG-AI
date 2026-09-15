@@ -1358,11 +1358,264 @@
     display: flex; align-items: center; gap: 9px; margin: 0 8px;
     padding: 6px 8px; border-radius: 8px; color: var(--ink-dim); font-size: 12px;
   }
+  /* The orb is the frame the Steam picture sits in, and the picture's stand-in
+     when there is not one cached -- an account listed but never signed in here
+     has no file, and so does a fresh install before Steam has fetched one. */
   .rail-profile .orb {
-    width: 13px; height: 13px; border-radius: 50%; flex: none;
+    width: 26px; height: 26px; border-radius: 8px; flex: none; overflow: hidden;
     background: conic-gradient(from 210deg, #7b5cff, #3d8bfd, #35d07f, #7b5cff);
   }
+  .rail-profile .orb img {
+    display: block; width: 100%; height: 100%; object-fit: cover;
+  }
   .rail-profile b { color: var(--ink); font-weight: 600; }
+
+
+  /* ---- the update centre, at the head of the rail -------------------------
+
+     It sits above the profile because it is the one thing in the window that
+     is about the launcher rather than about the game, and because an update
+     nobody notices is an update nobody installs -- the old panel was a tab at
+     the bottom of the rail, which is exactly where people had been six
+     releases behind without knowing.
+
+     The ring carries the state on its own: empty and grey when there is
+     nothing, turning while it asks, filling as it downloads, complete when
+     something is waiting. The words underneath say the same thing for anyone
+     who would rather read it. */
+  /* Closed, it is one line: a ring and what the ring means. Opening it is a
+     click, because the standing choices and the release notes are things you
+     go and look at rather than things you read every time you open a window.
+
+     It opens upward: it lives in the foot, and there is nothing below it. */
+  .updc {
+    appearance: none; border: 0; font: inherit; text-align: left; cursor: pointer;
+    display: flex; align-items: center; gap: 9px;
+    width: calc(100% - 16px); margin: 0 8px 2px;
+    padding: 6px 8px; border-radius: 8px;
+    background: none; color: var(--ink-dim); font-size: 12px;
+    transition: background .15s ease;
+  }
+  .updc:hover { background: rgba(255, 255, 255, .06); }
+  /* Something to do. The ring already carries it; the row picks up a tint so
+     it reads from the corner of the eye without becoming a second alarm. */
+  .updc.news { background: color-mix(in srgb, var(--warn) 11%, transparent); }
+  .updc.news:hover { background: color-mix(in srgb, var(--warn) 17%, transparent); }
+
+  .updc-top {
+    display: flex; align-items: center; gap: 10px; min-width: 0;
+  }
+
+  /* The ring, and the glyph it is drawn around. */
+  .updc-face { position: relative; width: 26px; height: 26px; flex: none; }
+  .updc-face svg { width: 26px; height: 26px; display: block; }
+  .updc-dialog .updc-face { width: 62px; height: 62px; }
+  .updc-dialog .updc-face svg { width: 62px; height: 62px; }
+  .updc-ring-bg { fill: none; stroke: var(--line); stroke-width: 2.6; }
+  .updc-ring-fg {
+    fill: none; stroke: var(--accent); stroke-width: 2.6; stroke-linecap: round;
+    transition: stroke-dasharray .3s ease, stroke .3s ease;
+  }
+  .updc.news .updc-ring-fg { stroke: var(--warn); }
+  .updc.good .updc-ring-fg { stroke: var(--good); }
+  .updc.bad  .updc-ring-fg { stroke: var(--bad); }
+  /* Checking has no figure to show, so the ring turns instead of filling. */
+  .updc.busy .updc-face svg { animation: updc-spin 1.15s linear infinite; }
+  @keyframes updc-spin { to { transform: rotate(360deg); } }
+
+  .updc-mark {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    color: var(--muted);
+  }
+  .updc-dialog .updc-mark svg { width: 26px; height: 26px; stroke-width: 1.7; }
+  .updc-mark svg {
+    width: 12px; height: 12px; animation: none;
+    fill: none; stroke: currentColor; stroke-width: 2;
+    stroke-linecap: round; stroke-linejoin: round;
+  }
+  .updc.news .updc-mark { color: var(--warn); }
+  .updc.good .updc-mark { color: var(--good); }
+  .updc.bad  .updc-mark { color: var(--bad); }
+
+  .updc-txt { min-width: 0; flex: 1 1 auto; }
+  .updc-ttl {
+    font-size: 9.5px; font-weight: 600; color: var(--faint); margin: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .updc-say {
+    font-size: 12px; font-weight: 600; color: var(--ink); margin: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .updc-sub {
+    font-size: 9.5px; color: var(--faint); margin: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .updc-txt { display: grid; }
+  .app.rail-tight .updc { justify-content: center; }
+
+  /* Opened, it is a window of its own in the middle of the screen rather than
+     a panel hanging off the rail: an update is a thing you stop and read, and
+     the rail is too narrow to lay one out in. The page behind it is blurred
+     the way the bell blurs it, so the same gesture reads the same way twice. */
+  .updc-veil {
+    position: fixed; inset: 0; z-index: 500;
+    display: grid; place-items: center; padding: 20px;
+    background: rgba(7, 5, 13, .62);
+    backdrop-filter: blur(14px) saturate(.88);
+    -webkit-backdrop-filter: blur(14px) saturate(.88);
+    animation: veil-in .18s ease-out;
+  }
+  .updc-veil.hidden { display: none; }
+
+  .updc-dialog {
+    width: min(430px, 100%); max-height: calc(100vh - 44px); overflow-y: auto;
+    border-radius: 18px; border: 1px solid var(--line);
+    background: var(--panel);
+    box-shadow: 0 30px 70px rgba(0, 0, 0, .66);
+    animation: updc-rise 200ms cubic-bezier(.2, .8, .3, 1);
+  }
+  @keyframes updc-rise {
+    from { opacity: 0; transform: translateY(12px) scale(.985); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  /* The head carries the state: the ring, big, on a ground lit by whatever
+     the state is. */
+  .updc-head {
+    position: relative; overflow: hidden;
+    padding: 22px 22px 19px;
+    border-bottom: 1px solid var(--line-soft);
+    background: linear-gradient(155deg,
+      color-mix(in srgb, var(--violet) 26%, var(--panel)),
+      var(--panel) 68%);
+  }
+  .updc-dialog.news .updc-head {
+    background: linear-gradient(155deg,
+      color-mix(in srgb, var(--warn) 22%, var(--panel)), var(--panel) 68%);
+  }
+  .updc-dialog.bad .updc-head {
+    background: linear-gradient(155deg,
+      color-mix(in srgb, var(--bad) 20%, var(--panel)), var(--panel) 68%);
+  }
+  .updc-head .updc-top { gap: 16px; }
+  .updc-dialog .updc-ttl {
+    font-size: 9px; font-weight: 700; letter-spacing: .22em;
+    text-transform: uppercase; color: var(--faint); margin: 0 0 4px;
+  }
+  .updc-dialog .updc-say {
+    font-size: 19px; font-weight: 650; white-space: normal; line-height: 1.25;
+  }
+  .updc-dialog .updc-sub { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+  .updc-body { padding: 17px 22px 19px; }
+
+  /* A bar as well as the ring while downloading: the ring says roughly, the
+     bar says exactly, and a download is the one state where exactly matters. */
+  .updc-prog {
+    height: 6px; border-radius: 999px; margin: 0 0 8px;
+    background: var(--chip); overflow: hidden;
+  }
+  .updc-prog i {
+    display: block; height: 100%; border-radius: 999px;
+    background: var(--warn); transition: width .3s ease;
+  }
+  .updc-pct {
+    display: flex; justify-content: space-between;
+    font-size: 11px; color: var(--muted); margin: 0 0 4px;
+  }
+
+  /* Release notes, when the release has any. Capped: some are long, and this
+     is a dialog, not the Updates tab. */
+  .updc-notes {
+    margin: 0 0 15px; padding: 12px 13px; max-height: 190px; overflow-y: auto;
+    border-radius: 11px; background: var(--panel-2);
+    border: 1px solid var(--line-soft);
+    font-size: 11.5px; line-height: 1.55; color: var(--ink-dim);
+    white-space: pre-wrap;
+  }
+  .updc-notes-ttl {
+    font-size: 9px; font-weight: 700; letter-spacing: .2em; margin: 0 0 9px;
+    text-transform: uppercase; color: var(--faint);
+  }
+
+  .updc-close {
+    appearance: none; border: 0; background: none; cursor: pointer;
+    position: absolute; top: 12px; right: 13px; z-index: 2;
+    width: 28px; height: 28px; border-radius: 8px;
+    display: grid; place-items: center; color: var(--muted);
+  }
+  .updc-close:hover { background: rgba(255, 255, 255, .09); color: var(--ink); }
+  .updc-close svg {
+    width: 14px; height: 14px; fill: none; stroke: currentColor;
+    stroke-width: 2; stroke-linecap: round;
+  }
+
+  .updc-act { display: flex; gap: 8px; flex-wrap: wrap; }
+  .updc-act .btn { flex: 1 1 auto; justify-content: center; }
+
+  /* The two standing choices. Installing is deliberately not among them --
+     see the note the panel prints underneath. */
+  .updc-opts {
+    margin-top: 17px; padding-top: 15px;
+    border-top: 1px solid var(--line-soft);
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .updc-opt {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 14px; padding: 9px 11px; border-radius: 10px;
+    font-size: 12px; color: var(--ink); cursor: pointer;
+    transition: background .15s ease;
+  }
+  .updc-opt:hover { background: var(--panel-2); }
+  .updc-opt span { min-width: 0; display: grid; }
+  .updc-opt small {
+    font-size: 10.5px; color: var(--muted); font-weight: 400; margin-top: 2px;
+    white-space: normal; line-height: 1.4;
+  }
+  .updc-opt input[type="checkbox"] {
+    appearance: none; box-sizing: border-box; flex: none; align-self: start;
+    width: 30px; height: 19px; border-radius: 999px;
+    background: rgba(255, 255, 255, .13); border: 1px solid var(--line);
+    position: relative; cursor: pointer; margin: 0; transition: background 150ms ease;
+  }
+  .updc-opt input[type="checkbox"]::after {
+    content: ""; position: absolute; top: 3px; left: 3px;
+    width: 11px; height: 11px; border-radius: 50%; background: var(--ink);
+    transition: transform 150ms ease;
+  }
+  .updc-opt input[type="checkbox"]:checked { background: var(--good); border-color: transparent; }
+  .updc-opt input[type="checkbox"]:checked::after {
+    transform: translateX(11px); background: #fff;
+  }
+  /* Why there is no third switch here. */
+  .updc-foot {
+    margin: 13px 0 0; padding: 10px 12px; border-radius: 9px;
+    background: var(--panel-2);
+    font-size: 11px; line-height: 1.5; color: var(--muted);
+  }
+
+  /* Folded to symbols: the ring alone, which is the part that carries the
+     state anyway. Everything with words goes. */
+  /* Folded to symbols: the ring alone, which is the part that carries the
+     state anyway. The dialog is the same either way -- it is centred on the
+     screen, not hung off the rail. */
+  .app.rail-tight .updc .updc-txt { display: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .updc.busy .updc-face svg { animation: none; }
+  }
+  @supports not (color: color-mix(in srgb, red 50%, blue)) {
+    .updc.news { background: rgba(255, 176, 32, .13); }
+    .updc-head { background: var(--panel); }
+  }
+  /* Where the browser cannot blur, dim harder instead -- the point is that the
+     page recedes, and a flat darkening does that too. */
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .updc-veil { background: rgba(7, 5, 13, .88); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .updc-veil, .updc-dialog { animation: none; }
+  }
 
   /* Sections. Still .tabs/.tab because the page's own code drives them. */
   .tabs {
@@ -1467,7 +1720,31 @@
     background: rgba(255, 255, 255, .10); color: var(--ink); border-color: transparent;
   }
 
-  .rail-foot { margin-top: auto; padding: 10px 8px 0; border-top: 1px solid var(--line-soft); }
+  .rail-foot {
+    margin-top: auto; padding: 10px 8px 0;
+    border-top: 1px solid var(--line-soft);
+    position: relative;   /* both popovers hang off this */
+  }
+
+  /* The last line: the button nobody presses twice, and the version. */
+  .rail-end {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 6px; margin-top: 4px;
+  }
+  .rail-mini {
+    appearance: none; border: 0; background: none; cursor: pointer; font: inherit;
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 6px; border-radius: 7px;
+    color: var(--faint); font-size: 10px;
+  }
+  .rail-mini:hover { color: var(--ink); background: rgba(255, 255, 255, .06); }
+  .rail-mini svg {
+    width: 13px; height: 13px; flex: none;
+    fill: none; stroke: currentColor; stroke-width: 2;
+    stroke-linecap: round; stroke-linejoin: round;
+  }
+  .app.rail-tight .rail-mini .tx { display: none; }
+  .app.rail-tight .rail-end { justify-content: center; }
   /* The footer button is a .tab too, so it has to opt out of the sheet above
      the same way the section list does. */
   .rail-foot .tab {
@@ -2160,12 +2437,18 @@
   .app.rail-tight .rail-profile .nm { display: none; }
   .app.rail-tight .rail-profile { justify-content: center; }
 
+  /* Hung above the profile rather than pushed in below it: the profile now
+     sits at the foot of the rail, so there is nothing underneath to grow
+     into, and six accounts would otherwise shove the whole foot off-screen. */
   .who-menu {
-    margin: 4px 8px 0; padding: 5px; border-radius: 10px;
+    position: absolute; left: 8px; right: 8px; bottom: calc(100% - 4px); z-index: 60;
+    padding: 5px; border-radius: 10px;
     background: rgba(22, 22, 30, .96); border: 1px solid var(--line);
     box-shadow: 0 14px 34px rgba(0, 0, 0, .55);
-    max-height: 300px; overflow-y: auto;
+    max-height: min(300px, calc(100vh - 160px)); overflow-y: auto;
+    animation: updc-rise 180ms cubic-bezier(.2, .8, .3, 1);
   }
+  .app.rail-tight .who-menu { width: 214px; right: auto; }
   .who-row {
     appearance: none; border: 0; cursor: pointer; font: inherit; width: 100%;
     display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px;
@@ -2174,10 +2457,25 @@
   }
   .who-row:hover { background: rgba(255, 255, 255, .07); color: var(--ink); }
   .who-row[aria-current="true"] { background: rgba(61, 139, 253, .16); color: var(--ink); }
-  .who-row .dot {
-    width: 9px; height: 9px; border-radius: 50%; background: var(--line);
+  /* Picture first in the switcher: with six accounts on a machine the faces
+     are what tell them apart faster than the names do. The signed-in mark
+     moves to the corner of the picture rather than taking a column of its
+     own. */
+  .who-row .face {
+    position: relative; width: 28px; height: 28px; border-radius: 8px;
+    overflow: visible; flex: none;
+    background: conic-gradient(from 210deg, #7b5cff, #3d8bfd, #35d07f, #7b5cff);
   }
-  .who-row.live .dot { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  .who-row .face img {
+    display: block; width: 100%; height: 100%; object-fit: cover;
+    border-radius: inherit;
+  }
+  .who-row .dot {
+    position: absolute; right: -2px; bottom: -2px;
+    width: 9px; height: 9px; border-radius: 50%; background: var(--line);
+    border: 2px solid var(--panel);
+  }
+  .who-row.live .dot { background: var(--good); box-shadow: 0 0 8px var(--good); }
   .who-row .who-nm { font-size: 12px; font-weight: 600; }
   .who-row .who-sub {
     font-size: 10px; color: var(--muted); font-family: var(--mono);
@@ -2747,15 +3045,6 @@
   <aside class="rail">
     <div class="brand">CS2<span>Launcher</span></div>
 
-    <div class="rail-label">Profile</div>
-    <button class="rail-profile" id="who" aria-haspopup="true" aria-expanded="false"
-            title="Whose settings are shown">
-      <i class="orb"></i>
-      <span class="nm"><b id="who-name">Looking&hellip;</b>
-        <small id="who-how"></small></span>
-    </button>
-    <div class="who-menu hidden" id="who-menu"></div>
-
     <div class="tabs" role="tablist">
       <button class="tab" data-tab="launcher" role="tab" aria-selected="true">
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg></i><span class="tx">Launcher</span></button>
@@ -2785,12 +3074,50 @@
       <div class="seg" id="cs2-sections"></div>
     </div>
 
+    <!-- The foot carries the two things that are about this copy of the
+         launcher rather than about the game: what version it is, and whose
+         settings it is showing. Both open upward, because there is no room
+         below them. -->
     <div class="rail-foot">
-      <button class="tab" id="rescan" title="Re-read hardware">
-        <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 10-1 5"/><path d="M20 4v6h-6"/></svg></i><span class="tx">Rescan</span></button>
-      <div class="ver">__CS2CFG_VERSION__</div>
+      <button class="updc" id="updc" aria-haspopup="dialog" aria-expanded="false"
+              aria-controls="updc-pop" title="Update centre">
+        <span class="updc-face">
+          <svg viewBox="0 0 36 36" aria-hidden="true">
+            <circle class="updc-ring-bg" cx="18" cy="18" r="15.6"/>
+          </svg>
+        </span>
+        <span class="updc-txt">
+          <p class="updc-say">Update centre</p>
+          <p class="updc-sub">Starting&hellip;</p>
+        </span>
+      </button>
+
+      <div class="who-menu hidden" id="who-menu"></div>
+      <button class="rail-profile" id="who" aria-haspopup="true" aria-expanded="false"
+              title="Whose settings are shown">
+        <i class="orb" id="who-face"></i>
+        <span class="nm"><b id="who-name">Looking&hellip;</b>
+          <small id="who-how"></small></span>
+      </button>
+
+      <!-- Rescan keeps its job but gives up the prominent slot: it is a thing
+           you press once in a while, not a thing you read. -->
+      <div class="rail-end">
+        <button class="rail-mini" id="rescan" title="Re-read hardware">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 10-1 5"/><path d="M20 4v6h-6"/></svg>
+          <span class="tx">Rescan</span>
+        </button>
+        <div class="ver">__CS2CFG_VERSION__</div>
+      </div>
     </div>
   </aside>
+
+  <!-- The update centre, opened from the foot of the rail. Centred on the
+       screen because it is a thing you stop and read. -->
+  <div class="updc-veil hidden" id="updc-pop">
+    <div class="updc-dialog" role="dialog" aria-modal="true"
+         aria-label="Update centre" id="updc-dialog"></div>
+  </div>
 
   <main class="stage">
 
@@ -5613,6 +5940,10 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape") toggleBell(false);
 });
 
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") toggleUpdCentre(false);
+});
+
 /* The number on the bell. Nothing to answer for means no mark at all rather
    than a nought, which is a count of something. */
 function markBell(count) {
@@ -7621,11 +7952,222 @@ function updCard(s) {
     "</div></div></div>";
 }
 
+/* The update centre at the head of the rail.
+
+   Same state as the Updates tab, said in the space of a rail: a ring, a line,
+   and the one button that makes sense right now. The tab keeps the detail --
+   release notes, which edition this is, where it updates from -- because that
+   is reading rather than glancing.
+
+   Install is never among the automatic options. Downloading in the background
+   costs the user nothing they would notice; replacing the program while they
+   are using it is a different kind of act, and it waits to be asked.
+*/
+const UPDC_MARK = {
+  // tick: nothing to do
+  good: '<path d="M4 8.6l3 3 6.5-7"/>',
+  // arrow into a tray: there is something to fetch
+  news: '<path d="M8 2.5v7.5M5 7.6l3 3 3-3"/><path d="M3 11.5v1.6a1 1 0 001 1h8a1 1 0 001-1v-1.6"/>',
+  // a box, sealed and waiting
+  ready: '<path d="M2.6 5.4L8 2.6l5.4 2.8v5.2L8 13.4l-5.4-2.8z"/><path d="M2.6 5.4L8 8.2l5.4-2.8M8 8.2v5.2"/>',
+  // turning arrows: asking now
+  busy: '<path d="M13 8a5 5 0 10-1.6 3.7"/><path d="M13.4 4.6V8h-3.3"/>',
+  bad: '<path d="M8 4.4v4.4M8 11.4v.2"/><circle cx="8" cy="8" r="6"/>',
+};
+
+function updcRing(share, tone) {
+  const r = 15.6, track = 2 * Math.PI * r;
+  const cut = Math.max(0, Math.min(1, share));
+  return '<svg viewBox="0 0 36 36" aria-hidden="true">' +
+    '<circle class="updc-ring-bg" cx="18" cy="18" r="' + r + '"/>' +
+    '<circle class="updc-ring-fg" cx="18" cy="18" r="' + r + '"' +
+    ' stroke-dasharray="' + (track * cut).toFixed(1) + " " +
+      (track * (1 - cut)).toFixed(1) + '"' +
+    ' transform="rotate(-90 18 18)"/>' +
+    "</svg>" +
+    '<span class="updc-mark"><svg viewBox="0 0 16 16" aria-hidden="true">' +
+    (UPDC_MARK[tone] || UPDC_MARK.good) + "</svg></span>";
+}
+
+function renderUpdCentre() {
+  const box = $("updc");
+  if (!box) return;
+  const s = updState;
+
+  // What the ring, the words and the button are in each state. Gathered in
+  // one place so they cannot drift apart as states are added.
+  let tone = "good", share = 1, say = "Up to date", sub = "", act = "", note = "";
+  const latest = (s && s.latest) || {};
+
+  if (!s) {
+    tone = "bad"; share = 1; say = "No connection"; sub = "to the launcher";
+  } else if (!s.configured) {
+    tone = "good"; share = 0; say = "Updates off";
+    sub = "no release source in this build";
+  } else if (s.state === "error") {
+    tone = "bad"; say = "Check failed"; sub = s.error || "unknown problem";
+    act = '<button class="btn small" id="updc-check">Try again</button>';
+  } else if (s.state === "checking") {
+    tone = "busy"; share = 0.28; say = "Checking…"; sub = "asking GitHub";
+  } else if (s.state === "downloading") {
+    tone = "news";
+    share = s.total ? s.done / s.total : 0.05;
+    say = "Downloading " + (latest.version || "");
+    sub = fmtBytes(s.done) + " of " + fmtBytes(s.total);
+  } else if (s.state === "ready") {
+    tone = "ready";
+    say = (latest.version || "New version") + " ready";
+    sub = "waiting for you to install";
+    act = '<button class="btn primary small" id="updc-install"' +
+      (s.frozen ? "" : " disabled") + ">Install &amp; restart</button>";
+    note = s.frozen
+      ? "Nothing has changed yet. Installing restarts the launcher."
+      : "Runs from source — update it with git.";
+  } else if (s.available) {
+    tone = "news"; share = 0;
+    say = (latest.version || "New version") + " available";
+    sub = latest.size ? fmtBytes(latest.size) + " download" : "ready to fetch";
+    act = '<button class="btn primary small" id="updc-get">Download</button>';
+  } else {
+    sub = s.current + "  ·  " + fmtWhen(s.checked);
+  }
+
+  // Shut, it is a rail row like the profile above it: the ring, and one line
+  // under the name saying where things stand.
+  const shape = tone + "|" + say + "|" + sub;
+  if (box.dataset.shape !== shape) {
+    box.dataset.shape = shape;
+    box.innerHTML =
+      '<span class="updc-face">' + updcRing(share, tone) + "</span>" +
+      '<span class="updc-txt">' +
+        '<p class="updc-say">Update centre</p>' +
+        '<p class="updc-sub">' + esc(say) + "</p>" +
+      "</span>";
+  } else {
+    // A download polls every 900ms. Rebuilding that often would restart the
+    // ring's transition on every tick, so it would jump rather than fill.
+    updcSetRing(box, share);
+  }
+  box.classList.toggle("news", tone === "news" || tone === "ready");
+  box.classList.toggle("bad", tone === "bad");
+  box.classList.toggle("busy", tone === "busy");
+  box.classList.toggle("good", tone === "good");
+  box.title = s && s.current ? "Update centre \u2014 you are running " + s.current
+                             : "Update centre";
+
+  // Open: the whole thing, in the middle of the screen. Only built while it is
+  // on screen, so a dialog nobody has opened costs nothing on every poll.
+  const veil = $("updc-pop"), dlg = $("updc-dialog");
+  if (!veil || !dlg || veil.classList.contains("hidden")) return;
+
+  const pct = (s && s.state === "downloading" && s.total)
+    ? Math.round((s.done / s.total) * 100) : -1;
+  const bar = pct >= 0
+    ? '<p class="updc-pct"><span>' + fmtBytes(s.done) + " of " + fmtBytes(s.total) +
+        "</span><span>" + pct + "%</span></p>" +
+      '<div class="updc-prog"><i style="width:' + pct + '%"></i></div>'
+    : "";
+
+  const notes = (latest.notes && (s.available || s.state === "ready"))
+    ? '<p class="updc-notes-ttl">What changed</p>' +
+      '<div class="updc-notes">' + esc(latest.notes) + "</div>"
+    : "";
+
+  const page = latest.page
+    ? '<a class="btn small" href="' + esc(latest.page) +
+      '" target="_blank" rel="noopener noreferrer">Release page</a>' : "";
+
+  const on = (flag) => flag ? " checked" : "";
+  const opts = (s && s.configured)
+    ? '<div class="updc-opts">' +
+        '<label class="updc-opt">' +
+          "<span>Check automatically" +
+          "<small>Ask GitHub on a timer rather than only when you press the button.</small>" +
+          "</span>" +
+          '<input type="checkbox" id="updc-auto-check"' + on(s.auto_check) + "></label>" +
+        '<label class="updc-opt">' +
+          "<span>Download automatically" +
+          "<small>Fetch a new version as soon as one appears, ready for whenever " +
+          "you want it.</small></span>" +
+          '<input type="checkbox" id="updc-auto-get"' + on(s.auto_download) + "></label>" +
+      "</div>" +
+      '<p class="updc-foot">' + (note ||
+        "There is deliberately no switch for installing. Replacing the launcher " +
+        "while you are using it always waits to be asked.") +
+      "</p>"
+    : "";
+
+  const popShape = shape + "|" + pct + "|" + !!act + "|" + !!opts + "|" +
+    !!notes + "|" + (note || "");
+  if (dlg.dataset.shape === popShape) {
+    updcSetRing(dlg, share);
+    const fill = dlg.querySelector(".updc-prog i");
+    if (fill) {
+      fill.style.width = pct + "%";
+      const read = dlg.querySelector(".updc-pct");
+      if (read) {
+        read.innerHTML = "<span>" + fmtBytes(s.done) + " of " + fmtBytes(s.total) +
+          "</span><span>" + pct + "%</span>";
+      }
+    }
+    return;
+  }
+  dlg.dataset.shape = popShape;
+  dlg.innerHTML =
+    '<div class="updc-head">' +
+      '<button class="updc-close" id="updc-shut" title="Close" aria-label="Close">' +
+        '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></svg>' +
+      "</button>" +
+      '<div class="updc-top">' +
+        '<span class="updc-face">' + updcRing(share, tone) + "</span>" +
+        '<span class="updc-txt">' +
+          '<p class="updc-ttl">Update centre</p>' +
+          '<p class="updc-say">' + esc(say) + "</p>" +
+          (sub ? '<p class="updc-sub">' + esc(sub) + "</p>" : "") +
+        "</span>" +
+      "</div>" +
+    "</div>" +
+    '<div class="updc-body">' +
+      bar + notes +
+      ((act || page) ? '<div class="updc-act">' + act + page + "</div>" : "") +
+      opts +
+    "</div>";
+  dlg.className = "updc-dialog" +
+    (tone === "news" || tone === "ready" ? " news" : "") +
+    (tone === "bad" ? " bad" : "") +
+    (tone === "busy" ? " busy" : "") +
+    (tone === "good" ? " good" : "");
+}
+
+/* Move a ring without rebuilding it, so the fill animates rather than jumps. */
+function updcSetRing(root, share) {
+  const ring = root.querySelector(".updc-ring-fg");
+  if (!ring) return;
+  const r = 15.6, track = 2 * Math.PI * r;
+  const cut = Math.max(0, Math.min(1, share));
+  ring.setAttribute("stroke-dasharray",
+    (track * cut).toFixed(1) + " " + (track * (1 - cut)).toFixed(1));
+}
+
+/* Open or shut the dialog. */
+function toggleUpdCentre(force) {
+  const veil = $("updc-pop"), btn = $("updc"), dlg = $("updc-dialog");
+  if (!veil || !btn) return;
+  const open = force === undefined ? veil.classList.contains("hidden") : force;
+  veil.classList.toggle("hidden", !open);
+  btn.setAttribute("aria-expanded", String(open));
+  if (open) {
+    if (dlg) dlg.dataset.shape = "";   // may be stale since it was last shut
+    renderUpdCentre();
+  }
+}
+
 function renderUpdates() {
   const s = updState;
   const card = $("upd-card");
   if (card) card.innerHTML = updCard(s);
   updPip(!!(s && s.available));
+  renderUpdCentre();
 
   if (s) {
     const auto = $("upd-auto");
@@ -7718,22 +8260,22 @@ async function updInstall() {
 
 document.addEventListener("click", async e => {
   const id = e.target.id;
-  if (!id || !id.startsWith("upd-")) return;
+  if (!id || !id.startsWith("upd")) return;
 
-  if (id === "upd-check") {
+  if (id === "upd-check" || id === "updc-check") {
     e.target.disabled = true;
     e.target.textContent = "Checking...";
     updState = await api("/api/update/check", {}).catch(() => updState);
     renderUpdates();
     return;
   }
-  if (id === "upd-download" || id === "upd-t-get") {
+  if (id === "upd-download" || id === "upd-t-get" || id === "updc-get") {
     updState = await api("/api/update/download", {}).catch(() => updState);
     renderUpdates();
     pollUpdates();
     return;
   }
-  if (id === "upd-install" || id === "upd-t-install") {
+  if (id === "upd-install" || id === "upd-t-install" || id === "updc-install") {
     await updInstall();
     return;
   }
@@ -7758,9 +8300,12 @@ document.addEventListener("click", async e => {
 });
 
 document.addEventListener("change", async e => {
-  if (e.target.id !== "upd-auto") return;
-  updState = await api("/api/update/settings",
-                       { auto_download: e.target.checked }).catch(() => updState);
+  const id = e.target.id;
+  if (id !== "upd-auto" && id !== "updc-auto-get" && id !== "updc-auto-check") return;
+  const body = id === "updc-auto-check"
+    ? { auto_check: e.target.checked }
+    : { auto_download: e.target.checked };
+  updState = await api("/api/update/settings", body).catch(() => updState);
   renderUpdates();
 });
 
@@ -7896,6 +8441,23 @@ async function loadWho() {
   renderWho();
 }
 
+/* Steam's cached picture for an account, in the frame given.
+
+   The picture is hung inside the gradient rather than replacing it, so a file
+   that has gone missing since the scan -- Steam clears the cache on a repair,
+   and does not refetch until the account next signs in -- falls back to the
+   ground underneath instead of leaving a hole. */
+function paintFace(frame, account) {
+  if (!frame) return;
+  frame.innerHTML = "";
+  if (!account || !account.picture) return;
+  const img = document.createElement("img");
+  img.alt = "";
+  img.onerror = () => img.remove();
+  img.src = account.picture;
+  frame.appendChild(img);
+}
+
 function renderWho() {
   const name = $("who-name"), how = $("who-how");
   if (!name) return;
@@ -7906,6 +8468,7 @@ function renderWho() {
   }
   const mine = (whoData.accounts || []).find(a => a.active);
   name.textContent = mine ? mine.name : "No account";
+  paintFace($("who-face"), mine);
   if (how) {
     // Pinned is worth saying out loud: it is the state people forget they
     // are in, and the one where the app stops following Steam.
@@ -7921,7 +8484,10 @@ function whoMenu() {
     whoData.accounts.map(a =>
       '<button class="who-row' + (a.signed_in ? " live" : "") +
       '" data-use="' + esc(a.account) + '" aria-current="' + (!!a.active) + '">' +
+      '<span class="face">' +
+      (a.picture ? '<img alt="" src="' + esc(a.picture) + '">' : "") +
       '<i class="dot" title="' + (a.signed_in ? "signed in to Steam" : "") + '"></i>' +
+      "</span>" +
       '<span><span class="who-nm">' + esc(a.name) + "</span><br>" +
       '<span class="who-sub">' + esc(a.login || a.account) + "</span></span>" +
       "</button>").join("") +
@@ -7935,12 +8501,26 @@ function whoMenu() {
 function whoOpen(open) {
   const box = $("who-menu"), button = $("who");
   if (!box || !button) return;
+  if (open) toggleUpdCentre(false);
   if (open) whoMenu();
   box.classList.toggle("hidden", !open);
   button.setAttribute("aria-expanded", String(!!open));
 }
 
 document.addEventListener("click", async e => {
+  if (e.target.closest("#updc")) {
+    whoOpen(false);
+    toggleUpdCentre();
+    return;
+  }
+  // The veil is the whole screen, so a click on it that is not on the card
+  // itself is a click outside the dialog.
+  if (e.target.closest("#updc-shut") ||
+      (e.target.closest("#updc-pop") && !e.target.closest("#updc-dialog"))) {
+    toggleUpdCentre(false);
+    return;
+  }
+
   if (e.target.closest("#who")) {
     whoOpen($("who-menu").classList.contains("hidden"));
     return;

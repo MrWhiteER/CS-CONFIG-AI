@@ -573,7 +573,8 @@ class Checker:
     """
 
     def __init__(self, current: str = "", interval: float = INTERVAL,
-                 auto_download: bool = False, skip: str = "") -> None:
+                 auto_download: bool = False, skip: str = "",
+                 auto_check: bool = True) -> None:
         self.current = current or current_version()
         self.interval = interval
         self._lock = threading.Lock()
@@ -588,6 +589,10 @@ class Checker:
         self._done = 0
         self._total = 0
         self._auto = bool(auto_download)
+        # Whether the timer asks on its own. Off does not stop the user asking:
+        # the button still works, so turning this off means "leave my network
+        # alone until I say", not "never update".
+        self._watch = bool(auto_check)
         self._skip = skip or ""
         self._want = False
         self._rate = Rate()
@@ -608,6 +613,7 @@ class Checker:
                 "checked": self._checked,
                 "interval": self.interval,
                 "auto_download": self._auto,
+                "auto_check": self._watch,
                 "skipped": self._skip,
                 "repo": repo(),
                 "configured": configured(),
@@ -641,6 +647,18 @@ class Checker:
     def set_auto_download(self, on: bool) -> None:
         with self._lock:
             self._auto = bool(on)
+        if on:
+            self._wake.set()
+
+    def set_auto_check(self, on: bool) -> None:
+        """Turn the timer's own checks on or off.
+
+        The thread stays up either way: it is one sleeping thread, and keeping
+        it means turning checks back on takes effect at once instead of at
+        whatever the next start would have been.
+        """
+        with self._lock:
+            self._watch = bool(on)
         if on:
             self._wake.set()
 
@@ -759,11 +777,21 @@ class Checker:
         # closes it a minute later still finds out. Then on the interval.
         delay = 5.0
         while not self._stop.is_set():
-            self._wake.wait(delay)
+            # wait() says how it woke: True for somebody setting the event,
+            # False for the delay running out. Reading the flag again
+            # afterwards would miss one set between the two.
+            asked_by_hand = self._wake.wait(delay)
             if self._stop.is_set():
                 return
             self._wake.clear()
             delay = self._delay()
+
+            with self._lock:
+                watching = self._watch
+            # Asleep by choice: skip the check, but keep the timer turning so
+            # switching it back on does not need a restart.
+            if not watching and not asked_by_hand:
+                continue
 
             self.check_once()
             with self._lock:
