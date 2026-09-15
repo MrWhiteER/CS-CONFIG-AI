@@ -364,6 +364,35 @@
     .fix-tile, .fix-tile:hover { transition: none; transform: none; }
   }
 
+  /* Settings, split by category.
+
+     One column holding apply toggles, sound devices, a folder picker and two
+     editors is four unrelated jobs in a scroll. These are sub-tabs rather than
+     rail entries because they are all still Settings -- promoting them would
+     make the rail nine entries of unequal weight. */
+  .subtabs {
+    display: flex; gap: 4px; flex-wrap: wrap;
+    margin: 0 0 14px; padding: 4px;
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 11px;
+  }
+  .subtab {
+    appearance: none; border: 0; cursor: pointer;
+    padding: 8px 15px; border-radius: 8px;
+    background: transparent; color: var(--muted);
+    font: inherit; font-size: 12.5px; font-weight: 600;
+    transition: background .18s ease, color .18s ease;
+  }
+  .subtab:hover { color: var(--ink); background: var(--panel-2); }
+  .subtab[aria-selected="true"] {
+    background: color-mix(in srgb, var(--mode-neon, var(--accent)) 18%, var(--panel-2));
+    color: var(--ink);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mode-neon, var(--accent)) 40%, transparent);
+  }
+  @supports not (color: color-mix(in srgb, red 50%, blue)) {
+    .subtab[aria-selected="true"] { background: var(--panel-2); color: var(--ink); }
+  }
+
   .seg { display: flex; gap: 7px; flex-wrap: wrap; }
   .seg button {
     flex: 1 1 auto; min-width: 100px; padding: 9px 12px; cursor: pointer;
@@ -2616,6 +2645,28 @@
         </div>
       </div>
 
+      <div class="subtabs" id="settings-subtabs" role="tablist">
+        <button class="subtab" data-sub="apply" role="tab" aria-selected="true">Apply</button>
+        <button class="subtab" data-sub="sound" role="tab" aria-selected="false">Sound</button>
+        <button class="subtab" data-sub="config" role="tab" aria-selected="false">Config files</button>
+        <button class="subtab" data-sub="editing" role="tab" aria-selected="false">Editing</button>
+      </div>
+
+      <div class="confirm-veil hidden" id="confirm-veil">
+        <div class="confirm-box" role="alertdialog" aria-modal="true"
+             aria-labelledby="confirm-title">
+          <h3 id="confirm-title">You changed something</h3>
+          <p class="sub">You left the app with a change still unconfirmed. Keep it, or put
+             it back the way it was.</p>
+          <ul id="confirm-list"></ul>
+          <div class="actions">
+            <button class="btn primary" id="confirm-keep">Keep</button>
+            <button class="btn" id="confirm-undo">Put it back</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="subpane" data-sub="apply">
       <section class="panel">
         <h2>Write</h2>
         <label class="opt"><input type="checkbox" id="w-video" checked> Picture quality (cs2_video.txt)</label>
@@ -2632,20 +2683,23 @@
 
       <div id="results"></div>
 
-      <div class="confirm-veil hidden" id="confirm-veil">
-        <div class="confirm-box" role="alertdialog" aria-modal="true"
-             aria-labelledby="confirm-title">
-          <h3 id="confirm-title">You changed something</h3>
-          <p class="sub">You left the app with a change still unconfirmed. Keep it, or put
-             it back the way it was.</p>
-          <ul id="confirm-list"></ul>
-          <div class="actions">
-            <button class="btn primary" id="confirm-keep">Keep</button>
-            <button class="btn" id="confirm-undo">Put it back</button>
-          </div>
-        </div>
       </div>
 
+      <div class="subpane hidden" data-sub="sound">
+      <section class="panel" id="audio-card">
+        <h2>Sound devices</h2>
+        <p class="sub" style="margin:0 0 9px">
+          With more than one headset, or a mixer, Windows moves the default on its own
+          &mdash; a driver update, a device waking, a USB interface re-enumerating &mdash; and
+          you find out in the first round. Choose them here and the app puts them back
+          whenever that happens.
+        </p>
+        <div id="audio-out"><span class="sub"><span class="spin"></span> Reading&hellip;</span></div>
+      </section>
+
+      </div>
+
+      <div class="subpane hidden" data-sub="config">
       <section class="panel hidden" id="starter-card">
         <h2>Start a config</h2>
         <p class="sub" style="margin:0 0 9px">
@@ -2694,6 +2748,9 @@
         <div id="cfg-out"></div>
       </section>
 
+      </div>
+
+      <div class="subpane hidden" data-sub="editing">
       <section class="panel hidden" id="cfg-settings-card">
         <h2>Common settings</h2>
         <p class="sub" style="margin:0 0 4px">
@@ -2741,6 +2798,8 @@
         </div>
         <div id="cfg-edit-out"></div>
       </section>
+      </div>
+
     </div>
 
     </div><!-- /.scroll -->
@@ -3824,6 +3883,151 @@ async function unlockTemps(button) {
 document.addEventListener("click", e => {
   const button = e.target.closest("#temps-unlock");
   if (button) unlockTemps(button);
+});
+
+/* Settings sub-tabs. Each category loads what it needs the first time it is
+   opened, so switching to Sound does not pay for a config scan. */
+let settingsSub = "apply";
+// Whether somebody has picked one this session. Preferences arrive from the
+// server after the page is usable, and a late arrival must not pull the view
+// out from under a click that already happened.
+let settingsSubChosen = false;
+
+function setSettingsSub(name, restoring) {
+  settingsSub = name;
+  if (!restoring) settingsSubChosen = true;
+  document.querySelectorAll("#settings-subtabs .subtab").forEach(b =>
+    b.setAttribute("aria-selected", String(b.dataset.sub === name)));
+  document.querySelectorAll('[data-panel="settings"] .subpane').forEach(pane =>
+    pane.classList.toggle("hidden", pane.dataset.sub !== name));
+  if (name === "sound") loadAudio(false);
+  if (name === "config" || name === "editing") ensureScan(false);
+  rememberPrefs();
+}
+
+document.addEventListener("click", e => {
+  const button = e.target.closest("#settings-subtabs .subtab");
+  if (button) setSettingsSub(button.dataset.sub);
+});
+
+/* ---------------------------------------------------------------------------
+   Sound devices, pinned.
+
+   One headset and this page is pointless. A headset, speakers, a mixer and two
+   microphones and it is the difference between playing and finding out in the
+   first round that Windows moved you to the monitor's HDMI output.
+
+   The choice is saved before it is applied: a device that is switched off
+   cannot be made the default today, but it is still what the player wants
+   tomorrow, and dropping the setting because the headset is off would be the
+   opposite of the point.
+   --------------------------------------------------------------------------- */
+let audioData = null;
+
+async function loadAudio(force) {
+  const box = $("audio-out");
+  if (audioData && !force) { renderAudio(); return; }
+  if (box) box.innerHTML = '<span class="sub"><span class="spin"></span> Reading&hellip;</span>';
+  try {
+    audioData = await api("/api/audio", {});
+    renderAudio();
+  } catch (err) {
+    if (box) box.innerHTML = '<span class="sub warn">Could not read the sound devices: ' +
+      esc(String(err && err.message || err)) + "</span>";
+  }
+}
+
+function audioOptions(list, pinned) {
+  return '<option value="">Leave it to Windows</option>' +
+    (list || []).map(d =>
+      '<option value="' + esc(d.id) + '"' + (d.id === pinned ? " selected" : "") + ">" +
+      esc(d.name) + (d.default ? "  — currently default" : "") + "</option>").join("");
+}
+
+function renderAudio() {
+  const box = $("audio-out");
+  if (!box || !audioData) return;
+  const d = audioData;
+
+  let head = "";
+  if (d.enforcing) {
+    head = '<p class="sub" style="margin:0 0 10px;color:var(--good)">' +
+      "Holding these in place. If Windows moves them — a driver update, a device " +
+      "waking up — they go straight back." +
+      (d.corrections
+        ? "  Put back " + d.corrections + " time" + (d.corrections === 1 ? "" : "s") +
+          (d.last ? ", last at " + esc(d.last) : "") + "."
+        : "") +
+      "</p>";
+  } else if (d.pinned_output || d.pinned_input) {
+    head = '<p class="sub" style="margin:0 0 10px">' +
+      "Chosen, but not being held. Windows is free to move them." + "</p>";
+  }
+
+  const missing = [];
+  if (d.output_missing) missing.push("output");
+  if (d.input_missing) missing.push("input");
+  if (missing.length) {
+    head += '<p class="sub2" style="margin:0 0 10px;color:var(--warn)">' +
+      "The pinned " + missing.join(" and ") + " is not plugged in at the moment. " +
+      "The choice is kept, and goes back the moment it reappears." + "</p>";
+  }
+
+  box.innerHTML = head +
+    '<div class="row"><span class="k">Output</span><span class="v">' +
+      '<select id="audio-output">' + audioOptions(d.output, d.pinned_output) + "</select>" +
+    "</span></div>" +
+    '<div class="row"><span class="k">Input</span><span class="v">' +
+      '<select id="audio-input">' + audioOptions(d.input, d.pinned_input) + "</select>" +
+    "</span></div>" +
+    '<label class="opt"><input type="checkbox" id="audio-enforce"' +
+      (d.enforce !== false ? " checked" : "") + "> " +
+      "Put them back whenever Windows changes them</label>" +
+    '<div class="actions"><button class="btn primary" id="audio-save">Use these</button>' +
+      '<button class="btn" id="audio-refresh">Re-read devices</button></div>' +
+    '<div class="sub2" id="audio-said" style="margin-top:8px"></div>';
+
+  // The selects are rebuilt on every render, so the pinned value has to be put
+  // back from the data rather than left to the markup.
+  const out = $("audio-output"); if (out) out.value = d.pinned_output || "";
+  const inp = $("audio-input"); if (inp) inp.value = d.pinned_input || "";
+}
+
+async function saveAudio(button) {
+  const said = $("audio-said");
+  button.disabled = true;
+  const label = button.textContent;
+  button.textContent = "Setting…";
+  try {
+    const r = await api("/api/audio/pin", {
+      output: $("audio-output") ? $("audio-output").value : "",
+      input: $("audio-input") ? $("audio-input").value : "",
+      enforce: $("audio-enforce") ? $("audio-enforce").checked : true,
+    });
+    audioData = r;
+    const trouble = (r.steps || []).filter(s => !s.ok);
+    renderAudio();
+    if (said) {
+      said.innerHTML = trouble.length
+        ? '<span style="color:var(--warn)">' +
+          esc(trouble.map(s => s.kind + ": " + (s.error || "not set")).join("  ")) + "</span>"
+        : '<span style="color:var(--good)">Set, and being held.</span>';
+    }
+    status(trouble.length ? "Some devices could not be set." : "Sound devices set.",
+           !!trouble.length);
+  } catch (err) {
+    const text = String(err && err.message || err);
+    if (said) said.innerHTML = '<span style="color:var(--bad)">' + esc(text) + "</span>";
+    status("Could not set the sound devices: " + text, true);
+  } finally {
+    button.disabled = false;
+    button.textContent = label;
+  }
+}
+
+document.addEventListener("click", e => {
+  if (e.target.closest("#audio-save")) saveAudio(e.target.closest("#audio-save"));
+  if (e.target.closest("#audio-refresh")) loadAudio(true);
 });
 
 /* ---------------------------------------------------------------------------
@@ -6971,6 +7175,7 @@ function setTab(name) {
   if (name === "scripts") loadPlugins(false);
   if (name === "keyboard") loadKeyboard(false);
   if (name === "fix") loadFixes(false);
+  if (name === "settings") setSettingsSub(settingsSub, true);
   if (name === "updates") renderUpdates();
   document.querySelectorAll(".tabs .tab").forEach(b =>
     b.setAttribute("aria-selected", String(b.dataset.tab === name)));
@@ -7071,6 +7276,7 @@ const PREF_FIELDS = {
   fix_scaling: () => $("w-scaling").checked,
   stretch_mode: () => stretchMode,
   cfg_folder: () => $("cfg-folder").value.trim(),
+  settings_sub: () => settingsSub,
   tab: () => activeTab,
   patch_video: () => $("p-video").checked,
 };
@@ -7092,6 +7298,7 @@ function applyPrefs(ui) {
     { window: "borderless", desktop: "borderless", none: "fullscreen" }[ui.stretch_mode]
     || ui.stretch_mode);
   if (ui.cfg_folder) $("cfg-folder").value = ui.cfg_folder;
+  if (ui.settings_sub && !settingsSubChosen) settingsSub = ui.settings_sub;
   loadFavourites(ui);
   if (ui.mouse_shape === "two" || ui.mouse_shape === "four") {
     mouseShape = ui.mouse_shape;

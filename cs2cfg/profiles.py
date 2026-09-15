@@ -35,6 +35,13 @@ MACHINE_KEYS = frozenset({
     "kb_shown",         # whether each model is drawn
     "update_auto_download",
     "update_skip",
+    # Which sound devices to hold on to. Machine-wide rather than per-account:
+    # the endpoints belong to the hardware in front of you, and signing into a
+    # second Steam account does not change which headset is plugged in.
+    "audio_output",
+    "audio_input",
+    "audio_enforce",
+    "settings_sub",   # which settings category was open
 })
 
 # The account whose settings are shown, which is itself machine-wide: it is a

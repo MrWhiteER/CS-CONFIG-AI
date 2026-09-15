@@ -1396,6 +1396,69 @@ def _fix_run(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     return quickfix.run(fix_id, body)
 
 
+def _audio_pin_from_prefs() -> "Any":
+    """The saved choice, as the keeper wants it."""
+    from . import audio
+    from .cli import load_prefs
+
+    ui = (load_prefs().get("ui") or {})
+    return audio.Pin(output=str(ui.get("audio_output") or ""),
+                     input=str(ui.get("audio_input") or ""),
+                     enforce=ui.get("audio_enforce", True) is not False)
+
+
+def _audio(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Which endpoints exist, which are pinned, and whether it is holding."""
+    from . import audio
+
+    keeper = audio.shared()
+    if not keeper.pin.anything:
+        # First read of the session: adopt whatever was saved, so the pin is
+        # enforced from the moment the app is open rather than from the first
+        # time somebody happens to look at this page.
+        keeper.set_pin(_audio_pin_from_prefs())
+    return audio.summary()
+
+
+def _audio_pin(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Save the choice, apply it now, and keep it there.
+
+    Saved before it is applied. A device that is unplugged cannot be made the
+    default today, but the choice is still what the player wants tomorrow --
+    dropping it because the headset is off would be the opposite of the point.
+    """
+    from . import audio
+    from .cli import load_prefs, save_prefs
+
+    pin = audio.Pin(
+        output=str(body.get("output") or ""),
+        input=str(body.get("input") or ""),
+        enforce=bool(body.get("enforce", True)),
+    )
+
+    prefs = load_prefs()
+    ui = prefs.setdefault("ui", {})
+    ui["audio_output"] = pin.output
+    ui["audio_input"] = pin.input
+    ui["audio_enforce"] = pin.enforce
+    save_prefs(prefs)
+
+    keeper = audio.shared()
+    keeper.set_pin(pin)
+
+    steps = []
+    for kind in (audio.OUTPUT, audio.INPUT):
+        wanted = pin.wanted(kind)
+        if not wanted:
+            continue
+        result = audio.apply(wanted, kind)
+        steps.append({"kind": kind, **result})
+
+    out = audio.summary()
+    out["steps"] = steps
+    return out
+
+
 def _net(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     """Measure loss and jitter. Reads only; takes about a minute.
 
@@ -2197,6 +2260,8 @@ def make_handler(state: State):
         "/api/cfg/starter": _cfg_starter,
         "/api/focus": _focus,
         "/api/net": _net,
+        "/api/audio": _audio,
+        "/api/audio/pin": _audio_pin,
         "/api/fix/survey": _fix_survey,
         "/api/fix/run": _fix_run,
         "/api/temps/elevate": _temps_elevate,
@@ -2378,6 +2443,18 @@ def make_handler(state: State):
 def serve(port: int = 8765, cfg_folder: str = "mrwhiteer",
           cfg_name: str = "autoperf.vcfg") -> Tuple[ThreadingHTTPServer, State]:
     state = State(cfg_folder, cfg_name)
+
+    # Pick the sound pin up now rather than when somebody first opens the page.
+    # The whole promise is that the devices stay put; a keeper that only starts
+    # once the settings tab has been visited would miss exactly the case it is
+    # for -- the machine that reset its audio while the app sat in the tray.
+    try:
+        from . import audio
+
+        audio.shared().set_pin(_audio_pin_from_prefs())
+    except Exception:
+        pass                    # never let a sound preference stop the app
+
     server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(state))
     server.daemon_threads = True
     return server, state
