@@ -61,6 +61,32 @@ EXCLUSIVE_VIDEO = {
     "setting.nowindowborder": 0,
 }
 
+def current_mode(user) -> str:
+    """Which of our two modes CS2 is set to right now, or "" if it cannot tell.
+
+    Read-only, and the honest answer to "what should the launcher start on for
+    somebody who has never used it": whatever they were already playing in.
+    Guessing wrong is not harmless here -- it is the setting that decides
+    whether their next launch changes their display mode.
+
+    CS2 has three states to our two. Plain windowed is grouped with borderless
+    because the distinction we are drawing is whether the game owns the display
+    mode, and a plain window does not.
+    """
+    from . import steam
+
+    try:
+        cfg = steam.read_video_cfg(user)
+    except Exception:
+        return ""
+    if not cfg:
+        return ""
+    seen = cfg.get("setting.fullscreen")
+    if seen is None:
+        return ""
+    return "fullscreen" if str(seen).strip() == "1" else "borderless"
+
+
 EXCLUSIVE_REASONS = {
     "setting.fullscreen": "exclusive fullscreen, the standard way CS2 runs",
     "setting.nowindowborder": "not borderless; the game owns the display mode",

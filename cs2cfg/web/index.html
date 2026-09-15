@@ -3224,10 +3224,10 @@
             <div class="segbar mini" id="launch-modes" role="tablist"
                  aria-label="Launch mode">
               <span class="seg-thumb"></span>
-              <button class="seg-item" role="tab" data-mode="borderless"
-                      aria-selected="true">Borderless<i class="why">instant alt-tab</i></button>
               <button class="seg-item" role="tab" data-mode="fullscreen"
-                      aria-selected="false">Fullscreen<i class="why">CS2 default</i></button>
+                      aria-selected="true">Fullscreen<i class="why">CS2 default</i></button>
+              <button class="seg-item" role="tab" data-mode="borderless"
+                      aria-selected="false">Borderless<i class="why">instant alt-tab</i></button>
             </div>
             <!-- Empty until Fix stretching has something to report. -->
             <span class="sub" id="fix-hint"></span>
@@ -8614,6 +8614,7 @@ async function reloadForAccount() {
   try {
     const prefs = await api("/api/prefs");
     const ui = prefs.ui || {};
+    prefsCs2Mode = prefs.cs2_mode || "";
     // Emptied first. applyPrefs only sets fields it has values for, which is
     // right at startup and wrong here: an account with no folder of its own
     // would otherwise keep showing the previous account's.
@@ -8875,6 +8876,10 @@ const PREF_FIELDS = {
   patch_video: () => $("p-video").checked,
 };
 let prefsReady = false;
+// What CS2 is set to, as the server last reported it. Only consulted when
+// there is no stored choice for this account -- once somebody has picked, the
+// pick wins, even if they have since changed CS2's own setting by hand.
+let prefsCs2Mode = "";
 
 function applyPrefs(ui) {
   if (!ui) return;
@@ -8888,9 +8893,16 @@ function applyPrefs(ui) {
   set("w-launch", ui.write_launch); set("w-autoexec", ui.link_autoexec);
   set("w-scaling", ui.fix_scaling);
   set("p-video", ui.patch_video);
-  if (ui.stretch_mode) setStretchMode(
-    { window: "borderless", desktop: "borderless", none: "fullscreen" }[ui.stretch_mode]
-    || ui.stretch_mode);
+  if (ui.stretch_mode) {
+    setStretchMode(
+      { window: "borderless", desktop: "borderless", none: "fullscreen" }[ui.stretch_mode]
+      || ui.stretch_mode);
+  } else if (prefsCs2Mode) {
+    // Never used this window before. Rather than assert a default at somebody,
+    // start on whatever CS2 is already set to, so the first thing they see is
+    // a true description of their own machine.
+    setStretchMode(prefsCs2Mode);
+  }
   if (ui.cfg_folder) $("cfg-folder").value = ui.cfg_folder;
   if (ui.settings_sub && !settingsSubChosen) settingsSub = ui.settings_sub;
   loadFavourites(ui);
@@ -9332,7 +9344,11 @@ const PHASE_TEXT = {
   error: "failed",
 };
 let pollTimer = null;
-let stretchMode = "borderless";
+// Fullscreen until something says otherwise: it is how CS2 runs out of the
+// box, so it is the mode a first run has not changed anything away from.
+// applyPrefs replaces this with the stored choice, or with whatever CS2 is
+// actually set to if there is no stored choice yet.
+let stretchMode = "fullscreen";
 
 const STRETCH_DESC = {
   borderless: "Borderless windowed, with the display switched to CS2's resolution and "
@@ -9447,9 +9463,13 @@ $("rescan").addEventListener("click", () => scan(true));
 // A launch outlives the page, so reattach to one already in flight after a
 // refresh rather than pretending nothing is happening.
 (async () => {
-  setStretchMode("borderless");
+  setStretchMode(stretchMode);
   await scan(false);
-  try { applyPrefs((await api("/api/prefs")).ui); } catch (e) { /* first run */ }
+  try {
+    const prefs = await api("/api/prefs");
+    prefsCs2Mode = prefs.cs2_mode || "";
+    applyPrefs(prefs.ui);
+  } catch (e) { /* first run */ }
   prefsReady = true;
   $("preview").click();
   loadHistory();

@@ -373,6 +373,16 @@ def _play_stop(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     return {"ok": True, "closed": state.launch.stop(close_game=close_game, force=force)}
 
 
+def _cs2_mode(state: State, account: Optional[str]) -> str:
+    """How CS2 is set to run at the moment. Read-only; "" if unreadable."""
+    from . import launcher
+
+    try:
+        return launcher.current_mode(state.user_for(account))
+    except Exception:
+        return ""
+
+
 def _active_account(state: State) -> Optional[str]:
     """Which account this window is showing.
 
@@ -2426,7 +2436,10 @@ def make_handler(state: State):
                 if profiles.migrate(prefs, account):
                     save_prefs(prefs)
                 self._send_json({"ok": True,
-                                 "ui": profiles.ui_for(prefs, account)})
+                                 "ui": profiles.ui_for(prefs, account),
+                                 # What CS2 itself is set to, for a first run
+                                 # that has no stored choice to restore.
+                                 "cs2_mode": _cs2_mode(state, account)})
                 return
             if path == "/api/scan":
                 try:
