@@ -783,6 +783,12 @@
     display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   }
 
+  /* The assessment, now the last thing in the Detected card rather than a
+     card of its own. Set off by a rule so it reads as a conclusion drawn
+     from the list above it. */
+  .assess { margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--line-soft); }
+  .assess .subcat { margin-top: 0; }
+
   .seg { display: flex; gap: 7px; flex-wrap: wrap; }
   .seg button {
     flex: 1 1 auto; min-width: 100px; padding: 9px 12px; cursor: pointer;
@@ -2823,6 +2829,9 @@
         <section class="panel" id="hw-card">
           <h2>Detected</h2>
           <div id="hw"><span class="sub">&hellip;</span></div>
+          <!-- The verdict belongs under the hardware it is a verdict on,
+               rather than in a card of its own further down the page. -->
+          <div id="assessment-out"></div>
         </section>
       </div>
 
@@ -2856,7 +2865,6 @@
         </div>
       </section>
 
-      <div id="assessment-out"></div>
 
     </div>
 
@@ -3696,7 +3704,8 @@ function renderPlan(p) {
   // with a row of rings repeating the numbers printed underneath them.
   renderScores(p, headroomPct, hue);
 
-  let assessment = '<section class="card"><h2>Assessment</h2>' +
+  let assessment = '<div class="assess">' +
+    '<div class="subcat">Assessment</div>' +
     '<div class="stats">' +
     '<div class="stat"><b>' + esc(p.tier) + '</b><span>tier</span></div>' +
     '<div class="stat"><b style="color:' + hue + '">~' + p.estimated_fps + '</b><span>est. fps</span></div>' +
@@ -3709,7 +3718,7 @@ function renderPlan(p) {
     '<div class="row"><span class="k">GPU</span><span class="v">score ' +
       p.gpu_score + (p.gpu_exact ? "" : ' <span class="sub">(' + esc(p.gpu_note) + ")</span>") +
       ' · ceiling ~' + p.gpu_ceiling + ' fps</span></div>' +
-    "</section>";
+    "</div>";
   $("assessment-out").innerHTML = assessment;
 
   // A change you cannot see is a change you cannot check. Anything moving gets
