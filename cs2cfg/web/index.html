@@ -2050,6 +2050,12 @@
 
   /* The rates people actually pick, since they are their monitor's, not
      arbitrary. Filled in from the displays we detected. */
+  /* The consequence of the number, beside the number. */
+  .fps-effect {
+    display: inline-block; margin-left: 2px; font-weight: 600;
+    color: var(--violet-soft);
+  }
+
   .fps-quick { grid-area: quick; display: flex; flex-wrap: wrap; gap: 6px; }
   .fps-quick:empty { display: none; }
   .fps-quick button {
@@ -4641,6 +4647,12 @@ function renderPlan(p) {
   planned = p;
   // The profile's description used to print under the band. The band and the
   // three names say the same thing, so the sentence was reading it back.
+
+  // What the target actually cost, said where the target is typed.
+  const level = (p.settings || []).find(x => /gpu level|overall quality/i.test(x.name || ""));
+  fpsEffect = "Tier " + esc(p.tier) + " · " + p.headroom + "× headroom" +
+    (level && level.after ? " · picture " + esc(String(level.after)) : "");
+  renderFps();
   setBandFigures(p);
 
   const hue = p.headroom >= 1.15 ? "var(--good)" : p.headroom >= 0.85 ? "var(--warn)" : "var(--bad)";
@@ -6923,15 +6935,23 @@ async function loadIngame(quiet) {
    nothing-in-particular option, because a target that is not a rate this
    machine can present is a number with no meaning behind it.
 */
+/* What the last plan made of the target. The estimate cannot show this: it is
+   the machine's ceiling for the chosen profile and does not depend on the
+   target at all, so it reads the same at 144 and at 1000 -- which makes typing
+   a number look like it did nothing, though it may have moved the whole plan
+   from Very High to Low. */
+let fpsEffect = "";
+
 function renderFps() {
   const box = $("fps-quick"), field = $("target"), say = $("fps-say");
   if (!field) return;
   const now = field.value.trim();
 
   if (say) {
-    say.textContent = now
-      ? "Everything is chosen to hold " + now + " fps."
-      : "Left blank, everything is chosen to clear your refresh rate.";
+    say.innerHTML = (now
+      ? "Everything is chosen to hold " + esc(now) + " fps."
+      : "Left blank, everything is chosen to clear your refresh rate.") +
+      (fpsEffect ? ' <b class="fps-effect">' + fpsEffect + "</b>" : "");
   }
   if (!box) return;
 
