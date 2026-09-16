@@ -156,65 +156,71 @@
     pointer-events: none;
   }
 
-  .dial-track {
-    position: relative; height: 26px; margin: 0 13px;
-    display: flex; align-items: center;
-  }
-  /* A recessed groove rather than a flat line: the inset highlight is what
-     stops it reading as a plain div with a background colour. */
-  .dial-track::before {
-    content: ""; position: absolute; left: 0; right: 0; height: 7px;
-    border-radius: 4px;
-    background: linear-gradient(180deg, #080d14, #131c27);
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, .9),
-                inset 0 -1px 0 rgba(255, 255, 255, .04);
-  }
-  .dial-fill {
-    position: absolute; left: 50%; width: 0; height: 7px; border-radius: 4px;
-    background: linear-gradient(180deg,
-                color-mix(in srgb, var(--neon) 85%, white 15%), var(--neon));
-    box-shadow: 0 0 10px var(--neon),
-                0 0 22px color-mix(in srgb, var(--neon) 55%, transparent);
-    transition: left .2s cubic-bezier(.2, .9, .3, 1),
-                width .2s cubic-bezier(.2, .9, .3, 1),
-                background .28s ease, box-shadow .28s ease;
-  }
-  .dial.dragging .dial-fill, .dial.dragging .dial-ball { transition: none; }
+  /* The band. Two things being traded, drawn as one shape.
 
+     The total is fixed -- it is the same hardware whichever way you go -- so
+     all the control does is move the line between them. Cyan above it is the
+     frames you are keeping; violet below is the picture you are buying.
+
+     The colour dissolving away from that line, rather than filling to a hard
+     rectangle, is done by using the line itself as the mask: stroked wide and
+     blurred, so opacity falls off at right angles to it. That matters because
+     the line is a curve -- a top-to-bottom gradient would cut straight across
+     it and leave a hard edge exactly where the shape bends most. */
+  .dial-track {
+    position: relative; height: 96px; margin: 0 4px;
+  }
+  .band-svg {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    pointer-events: none;
+  }
+  .dial.dragging .dial-ball { transition: none; }
+
+  /* The two figures the assessment already works out, printed where you are
+     standing. Pinned to the top and bottom of the band rather than to the
+     line: following the line piles them onto the bead at the ends. */
+  .band-read {
+    position: absolute; transform: translateX(-50%);
+    font-family: var(--mono); font-size: 12.5px; font-weight: 700;
+    line-height: 1.1; white-space: nowrap; pointer-events: none;
+    transition: left .2s cubic-bezier(.2, .9, .3, 1), color .28s ease;
+  }
+  .band-read span {
+    display: block; font-family: inherit; font-size: 8px; font-weight: 600;
+    letter-spacing: .13em; opacity: .7;
+  }
+  .band-read.top { top: -1px; color: var(--neon-frames, #22e6ff); }
+  .band-read.bot { bottom: -1px; color: var(--neon); }
+  /* Near the ends they would run off the panel, so they tuck inward. */
+  .band-read.at-start { transform: translateX(-8%); }
+  .band-read.at-end { transform: translateX(-92%); }
+
+  /* A third of the band each, so the whole control is the target rather than
+     a dot. Invisible on purpose: the band already says where the stops are. */
   .dial-stop {
-    position: absolute; width: 11px; height: 11px; margin-left: -5px; padding: 0;
-    border-radius: 50%; border: 0;
-    background: #1b2635;
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .07);
-    cursor: pointer;
-    transition: background .2s ease, box-shadow .2s ease;
+    position: absolute; top: 0; bottom: 0; width: 33.34%; padding: 0;
+    border: 0; background: none; cursor: pointer;
   }
   .dial-stop:nth-of-type(1) { left: 0; }
-  .dial-stop:nth-of-type(2) { left: 50%; }
-  .dial-stop:nth-of-type(3) { left: 100%; }
-  .dial-stop[aria-pressed="true"] {
-    background: var(--neon);
-    box-shadow: 0 0 10px var(--neon);
-  }
+  .dial-stop:nth-of-type(2) { left: 33.33%; }
+  .dial-stop:nth-of-type(3) { left: 66.66%; }
 
+  /* The bead sits on the dividing line, so it is white-cored with the mode's
+     colour as its ring -- a filled sphere here would compete with the line it
+     is meant to be riding. Its top is set from the curve, not from CSS. */
   .dial-ball {
-    position: absolute; left: 50%; width: 26px; height: 26px; margin-left: -13px;
-    border-radius: 50%;
-    /* Lit from above, so it reads as a sphere rather than a filled circle. */
-    background:
-      radial-gradient(circle at 34% 28%,
-        #ffffff 0%,
-        color-mix(in srgb, var(--neon) 55%, white) 26%,
-        var(--neon) 62%,
-        color-mix(in srgb, var(--neon) 72%, black) 100%);
+    position: absolute; left: 50%; top: 50%; width: 17px; height: 17px;
+    margin: -8.5px 0 0 -8.5px;
+    border-radius: 50%; background: #fff; padding: 0; border: 0;
     box-shadow:
-      0 0 0 1px color-mix(in srgb, var(--neon) 60%, transparent),
-      0 0 12px var(--neon),
-      0 0 28px color-mix(in srgb, var(--neon) 70%, transparent),
-      0 4px 12px rgba(0, 0, 0, .55);
+      0 0 0 3px var(--neon),
+      0 0 16px var(--neon),
+      0 0 34px color-mix(in srgb, var(--neon) 70%, transparent),
+      0 3px 10px rgba(0, 0, 0, .55);
     cursor: grab; touch-action: none;
     transition: left .2s cubic-bezier(.2, .9, .3, 1),
-                background .28s ease, box-shadow .28s ease, transform .12s ease;
+                top .2s cubic-bezier(.2, .9, .3, 1),
+                box-shadow .28s ease, transform .12s ease;
   }
   .dial-ball:hover { transform: scale(1.06); }
   .dial.dragging .dial-ball { cursor: grabbing; transform: scale(1.16); }
@@ -222,7 +228,7 @@
     outline: 2px solid var(--neon); outline-offset: 4px;
   }
 
-  .dial-labels { display: flex; justify-content: space-between; margin: 9px 0 0; }
+  .dial-labels { display: flex; justify-content: space-between; margin: 11px 0 0; }
   .dial-labels > span {
     flex: 1; text-align: center; cursor: pointer;
     color: var(--muted);
@@ -1502,6 +1508,9 @@
        bright hue the window does not already use for a state, so it reads as
        "this is telling you something" instead of as good/warn/bad. */
     --neon-cyan:        #22e6ff;
+    /* The band's upper half: the frames you keep. Named apart from --neon-cyan
+       so the band can be retuned without moving every explanation in the app. */
+    --neon-frames:      var(--neon-cyan);
 
     --neon-competitive: #ff9d2e;
     --neon-balanced:    #17e3a1;
@@ -3615,8 +3624,11 @@
         <div class="dial" id="intents" role="slider" tabindex="0"
              aria-label="Optimise for" aria-valuemin="0" aria-valuemax="2" aria-valuenow="1"
              aria-valuetext="Balanced">
-          <div class="dial-track">
-            <div class="dial-fill" id="dial-fill"></div>
+          <div class="dial-track" id="band-stage">
+            <!-- The band is drawn once by paintBand; only the bead and the two
+                 figures move afterwards. -->
+            <span class="band-read top" id="band-fps" aria-hidden="true"></span>
+            <span class="band-read bot" id="band-pic" aria-hidden="true"></span>
             <button class="dial-stop" data-intent="competitive" type="button" tabindex="-1"></button>
             <button class="dial-stop" data-intent="balanced" type="button" tabindex="-1"></button>
             <button class="dial-stop" data-intent="quality" type="button" tabindex="-1"></button>
@@ -4578,6 +4590,7 @@ function renderScores(p, headroomPct, hue) {
 function renderPlan(p) {
   planned = p;
   $("intent-desc").textContent = p.description;
+  setBandFigures(p);
 
   const hue = p.headroom >= 1.15 ? "var(--good)" : p.headroom >= 0.85 ? "var(--warn)" : "var(--bad)";
   const changed = p.settings.filter(s => s.changed);
@@ -5191,18 +5204,122 @@ if ($("net-run")) $("net-run").addEventListener("click", runNetCheck);
 */
 const INTENTS = ["competitive", "balanced", "quality"];
 
-function paintIntent(name, live) {
-  const at = Math.max(0, INTENTS.indexOf(name));
-  const pct = at * 50;
-  if (live === undefined) {
-    $("dial-ball").style.left = pct + "%";
-    $("dial-fill").style.left = Math.min(50, pct) + "%";
-    $("dial-fill").style.width = Math.abs(pct - 50) + "%";
-  } else {
-    $("dial-ball").style.left = live + "%";
-    $("dial-fill").style.left = Math.min(50, live) + "%";
-    $("dial-fill").style.width = Math.abs(live - 50) + "%";
+/* The band behind the Optimise-for control.
+
+   Drawn once. The boundary is a smoothstep from low-left to high-right, which
+   is the only honest shape for it: the trade is gradual, not stepped, and the
+   ends flatten because there is nothing beyond them to trade for.
+*/
+const BAND_W = 620, BAND_H = 96;
+const BAND_SPREAD = 56, BAND_BLUR = 13;          // the G1 falloff
+// Where each profile sits across the band. Inset from the edges because the
+// ends fade out: a bead at 0% or 100% hangs half off the panel, over nothing.
+const BAND_STOPS = [8, 50, 92];
+
+function bandBoundary() {
+  const pts = [];
+  for (let x = 0; x <= BAND_W; x += 2) {
+    const p = x / BAND_W;
+    const e = p * p * (3 - 2 * p);
+    pts.push([x, (BAND_H - 10) - e * (BAND_H - 20)]);
   }
+  return pts;
+}
+const BAND_PTS = bandBoundary();
+const BAND_D = BAND_PTS.map((q, i) =>
+  (i ? "L" : "M") + q[0] + " " + q[1].toFixed(1)).join("");
+
+/* Where the line is, as a percentage of the band's height, at a percentage
+   across. The bead reads this so it rides the curve rather than a straight
+   line through the middle. */
+function bandY(pct) {
+  const x = Math.min(BAND_W, Math.max(0, (pct / 100) * BAND_W));
+  return (BAND_PTS[Math.round(x / 2)][1] / BAND_H) * 100;
+}
+
+function paintBand() {
+  const stage = $("band-stage");
+  if (!stage || stage.querySelector(".band-svg")) return;
+  const svg =
+    '<svg class="band-svg" viewBox="0 0 ' + BAND_W + " " + BAND_H +
+      '" preserveAspectRatio="none" aria-hidden="true">' +
+      "<defs>" +
+        '<linearGradient id="band-up" x1="0" y1="0" x2="0" y2="1">' +
+          '<stop offset="0" stop-color="var(--neon-frames, #22e6ff)" stop-opacity=".95"/>' +
+          '<stop offset="1" stop-color="var(--neon-frames, #22e6ff)" stop-opacity=".45"/>' +
+        "</linearGradient>" +
+        '<linearGradient id="band-down" x1="0" y1="1" x2="0" y2="0">' +
+          '<stop offset="0" stop-color="var(--neon)" stop-opacity=".95"/>' +
+          '<stop offset="1" stop-color="var(--neon)" stop-opacity=".45"/>' +
+        "</linearGradient>" +
+        // The mask IS the line, stroked wide and blurred: opacity falls away
+        // at right angles to it, which follows the curve.
+        '<filter id="band-soft" x="-20%" y="-60%" width="140%" height="220%">' +
+          '<feGaussianBlur stdDeviation="' + BAND_BLUR + '"/></filter>' +
+        '<mask id="band-near"><path d="' + BAND_D + '" fill="none" stroke="#fff"' +
+          ' stroke-width="' + BAND_SPREAD + '" filter="url(#band-soft)"/></mask>' +
+        // ...and the ends go, so it reads as a section of something longer.
+        '<linearGradient id="band-ends-g" x1="0" x2="1">' +
+          '<stop offset="0" stop-color="#000"/><stop offset=".17" stop-color="#fff"/>' +
+          '<stop offset=".83" stop-color="#fff"/><stop offset="1" stop-color="#000"/>' +
+        "</linearGradient>" +
+        '<mask id="band-ends"><rect width="' + BAND_W + '" height="' + BAND_H +
+          '" fill="url(#band-ends-g)"/></mask>' +
+      "</defs>" +
+      '<g mask="url(#band-ends)">' +
+        '<g mask="url(#band-near)">' +
+          '<path d="' + BAND_D + "L" + BAND_W + ' 0L0 0Z" fill="url(#band-up)"/>' +
+          '<path d="' + BAND_D + "L" + BAND_W + " " + BAND_H + "L0 " + BAND_H +
+            'Z" fill="url(#band-down)"/>' +
+        "</g>" +
+        '<path class="band-line" d="' + BAND_D + '" fill="none" stroke="#fff"' +
+          ' stroke-opacity=".9" stroke-width="1.5"/>' +
+      "</g></svg>";
+  stage.insertAdjacentHTML("afterbegin", svg);
+}
+
+/* The two figures, from the plan the preview already worked out. Blank until
+   there is one: inventing a number here would be worse than showing none. */
+let bandFps = "", bandPic = "";
+
+function setBandFigures(plan) {
+  bandFps = plan && plan.estimated_fps ? "~" + plan.estimated_fps : "";
+  // The picture level the profile actually asks for, taken from the plan
+  // rather than assumed from the profile's name.
+  let level = "";
+  if (plan && plan.settings) {
+    // The plan calls them name/after. It was label/to on the first attempt,
+    // which matched nothing and left the figure blank.
+    const row = plan.settings.find(x => /gpu level|overall quality/i.test(x.name || ""));
+    if (row) level = String(row.after || "");
+  }
+  bandPic = level ? level.toUpperCase() : "";
+  paintBandFigures();
+}
+
+function paintBandFigures() {
+  const at = Math.max(0, INTENTS.indexOf(intent));
+  const pct = BAND_STOPS[at];
+  const fps = $("band-fps"), pic = $("band-pic");
+  if (!fps || !pic) return;
+  fps.innerHTML = bandFps ? esc(bandFps) + "<span>EST. FPS</span>" : "";
+  pic.innerHTML = bandPic ? esc(bandPic) + "<span>PICTURE</span>" : "";
+  [fps, pic].forEach(el => {
+    el.style.left = pct + "%";
+    el.classList.toggle("at-start", pct < 12);
+    el.classList.toggle("at-end", pct > 88);
+  });
+}
+
+function paintIntent(name, live) {
+  paintBand();
+  const at = Math.max(0, INTENTS.indexOf(name));
+  const pct = BAND_STOPS[at];
+  const where = live === undefined ? pct : live;
+  const ball = $("dial-ball");
+  ball.style.left = where + "%";
+  // On the line, not through the middle of the box.
+  ball.style.top = bandY(where) + "%";
   const dial = $("intents");
   // What drives the colour. Set here rather than in each caller so a drag, a
   // click, a key and a restored preference all light the same way.
@@ -5222,6 +5339,7 @@ function paintIntent(name, live) {
     el.setAttribute("aria-pressed", el.dataset.for === name));
   dial.querySelectorAll(".dial-stop").forEach(el =>
     el.setAttribute("aria-pressed", el.dataset.intent === name));
+  if (live === undefined) paintBandFigures();
 }
 
 function chooseIntent(name, quiet) {
@@ -5240,11 +5358,17 @@ function chooseIntent(name, quiet) {
 
 (function wireDial() {
   const dial = $("intents");
-  const track = dial.querySelector(".dial-track");
+  const track = $("band-stage");
   const ball = $("dial-ball");
   let dragging = false;
 
-  const nearest = pct => INTENTS[Math.min(2, Math.max(0, Math.round(pct / 50)))];
+  const nearest = pct => {
+    let best = 0;
+    BAND_STOPS.forEach((at, i) => {
+      if (Math.abs(pct - at) < Math.abs(pct - BAND_STOPS[best])) best = i;
+    });
+    return INTENTS[best];
+  };
   const pctFor = event => {
     const box = track.getBoundingClientRect();
     if (!box.width) return 50;
