@@ -167,12 +167,26 @@
      blurred, so opacity falls off at right angles to it. That matters because
      the line is a curve -- a top-to-bottom gradient would cut straight across
      it and leave a hard edge exactly where the shape bends most. */
+  /* The band runs wider than the panel that holds it, and its light is not
+     allowed to stop at the panel's edge. An SVG clips to its own box by
+     default, which is what was cutting the glow off square; and the band used
+     to end 25px inside the panel, so the colour visibly stopped rather than
+     carrying on past the frame. */
   .dial-track {
-    position: relative; height: 96px; margin: 0 4px;
+    position: relative; height: 96px;
+    margin: 0 calc(-1 * var(--panel-pad, 17px) - 14px);
   }
   .band-svg {
     position: absolute; inset: 0; width: 100%; height: 100%;
+    overflow: visible;          /* let the blur and the glow leave the box */
     pointer-events: none;
+    /* The light the band throws, beyond the band itself. */
+    filter:
+      drop-shadow(0 0 18px color-mix(in srgb, var(--neon) 34%, transparent))
+      drop-shadow(0 0 42px color-mix(in srgb, var(--neon) 20%, transparent));
+  }
+  @supports not (color: color-mix(in srgb, red 50%, blue)) {
+    .band-svg { filter: none; }
   }
   .dial.dragging .dial-ball { transition: none; }
 
@@ -228,7 +242,7 @@
     outline: 2px solid var(--neon); outline-offset: 4px;
   }
 
-  .dial-labels { display: flex; justify-content: space-between; margin: 11px 0 0; }
+  .dial-labels { display: flex; justify-content: space-between; margin: 11px 4px 0; }
   .dial-labels > span {
     flex: 1; text-align: center; cursor: pointer;
     color: var(--muted);
