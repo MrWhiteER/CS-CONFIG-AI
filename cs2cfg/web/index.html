@@ -3663,7 +3663,6 @@
             <span data-for="quality"><strong>Quality</strong><span>best picture</span></span>
           </div>
         </div>
-        <p class="sub" id="intent-desc" style="margin:9px 0 0"></p>
 
       </section>
 
@@ -4612,7 +4611,8 @@ function renderScores(p, headroomPct, hue) {
 
 function renderPlan(p) {
   planned = p;
-  $("intent-desc").textContent = p.description;
+  // The profile's description used to print under the band. The band and the
+  // three names say the same thing, so the sentence was reading it back.
   setBandFigures(p);
 
   const hue = p.headroom >= 1.15 ? "var(--good)" : p.headroom >= 0.85 ? "var(--warn)" : "var(--bad)";
