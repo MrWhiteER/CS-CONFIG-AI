@@ -5229,6 +5229,11 @@ const BAND_SPREAD = 56, BAND_BLUR = 13;          // the G1 falloff
 // Where each profile sits across the band. Inset from the edges because the
 // ends fade out: a bead at 0% or 100% hangs half off the panel, over nothing.
 const BAND_STOPS = [8, 50, 92];
+// How far past the band's own box the light is allowed to go. The falloff
+// from the line reaches about 54px at full spread, so anything less than that
+// cuts it off square -- which is what left a hard horizontal edge along the
+// top and bottom of the colour.
+const BAND_PAD = 70;
 
 function bandBoundary() {
   const pts = [];
@@ -5268,23 +5273,36 @@ function paintBand() {
         "</linearGradient>" +
         // The mask IS the line, stroked wide and blurred: opacity falls away
         // at right angles to it, which follows the curve.
-        '<filter id="band-soft" x="-20%" y="-60%" width="140%" height="220%">' +
+        // Every region here is spelled out in user space. Left to their
+        // defaults, a filter is clipped to 110% of its input and a mask to
+        // 120% of the object -- both of which cut the falloff off flat.
+        '<filter id="band-soft" filterUnits="userSpaceOnUse"' +
+          ' x="-60" y="' + (-BAND_PAD - 20) + '" width="' + (BAND_W + 120) +
+          '" height="' + (BAND_H + 2 * BAND_PAD + 40) + '">' +
           '<feGaussianBlur stdDeviation="' + BAND_BLUR + '"/></filter>' +
-        '<mask id="band-near"><path d="' + BAND_D + '" fill="none" stroke="#fff"' +
+        '<mask id="band-near" maskUnits="userSpaceOnUse"' +
+          ' x="-60" y="' + (-BAND_PAD) + '" width="' + (BAND_W + 120) +
+          '" height="' + (BAND_H + 2 * BAND_PAD) + '">' +
+          '<path d="' + BAND_D + '" fill="none" stroke="#fff"' +
           ' stroke-width="' + BAND_SPREAD + '" filter="url(#band-soft)"/></mask>' +
         // ...and the ends go, so it reads as a section of something longer.
         '<linearGradient id="band-ends-g" x1="0" x2="1">' +
           '<stop offset="0" stop-color="#000"/><stop offset=".17" stop-color="#fff"/>' +
           '<stop offset=".83" stop-color="#fff"/><stop offset="1" stop-color="#000"/>' +
         "</linearGradient>" +
-        '<mask id="band-ends"><rect width="' + BAND_W + '" height="' + BAND_H +
+        '<mask id="band-ends" maskUnits="userSpaceOnUse"' +
+          ' x="0" y="' + (-BAND_PAD) + '" width="' + BAND_W +
+          '" height="' + (BAND_H + 2 * BAND_PAD) + '">' +
+          '<rect y="' + (-BAND_PAD) + '" width="' + BAND_W +
+          '" height="' + (BAND_H + 2 * BAND_PAD) +
           '" fill="url(#band-ends-g)"/></mask>' +
       "</defs>" +
       '<g mask="url(#band-ends)">' +
         '<g mask="url(#band-near)">' +
-          '<path d="' + BAND_D + "L" + BAND_W + ' 0L0 0Z" fill="url(#band-up)"/>' +
-          '<path d="' + BAND_D + "L" + BAND_W + " " + BAND_H + "L0 " + BAND_H +
-            'Z" fill="url(#band-down)"/>' +
+          '<path d="' + BAND_D + "L" + BAND_W + " " + (-BAND_PAD) + "L0 " +
+            (-BAND_PAD) + 'Z" fill="url(#band-up)"/>' +
+          '<path d="' + BAND_D + "L" + BAND_W + " " + (BAND_H + BAND_PAD) +
+            "L0 " + (BAND_H + BAND_PAD) + 'Z" fill="url(#band-down)"/>' +
         "</g>" +
         '<path class="band-line" d="' + BAND_D + '" fill="none" stroke="#fff"' +
           ' stroke-opacity=".9" stroke-width="1.5"/>' +
