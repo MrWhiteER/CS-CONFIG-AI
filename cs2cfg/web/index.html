@@ -264,8 +264,11 @@
      the pointer. */
   .band-tip {
     position: absolute; z-index: 2; pointer-events: none;
-    transform: translate(-50%, -100%);
-    margin-top: -34px;          /* clear of the sphere's own radius */
+    /* Under the sphere. The figure itself does not move -- it stays in the
+       middle of the bead; only its unit sits below. 27 is the sphere's radius,
+       plus a little air. */
+    transform: translate(-50%, 0);
+    margin-top: 33px;
     text-align: center; white-space: nowrap;
     transition: left .46s cubic-bezier(.22, 1.28, .36, 1),
                 top .46s cubic-bezier(.22, 1.28, .36, 1),
@@ -5414,9 +5417,12 @@ function paintBandFigures() {
   }
   if (pic) {
     pic.innerHTML = bandPic ? esc(bandPic) + "<span>PICTURE</span>" : "";
-    pic.style.left = pct + "%";
-    pic.classList.toggle("at-start", pct < 12);
-    pic.classList.toggle("at-end", pct > 88);
+    // Parked on the far side of the bead. It is a readout, not a pointer, so
+    // where it sits carries no meaning -- and with the unit now under the
+    // sphere the two collided outright at Balanced, where the bead is
+    // mid-band and its label reaches the bottom edge this one is pinned to.
+    pic.style.left = (pct < 50 ? 82 : 18) + "%";
+    pic.classList.remove("at-start", "at-end");
   }
 }
 
