@@ -5366,22 +5366,32 @@ function paintIntent(name, live) {
   ball.style.left = where + "%";
   // On the line, not through the middle of the box.
   ball.style.top = bandY(where) + "%";
+
   const dial = $("intents");
-  // What drives the colour. Set here rather than in each caller so a drag, a
-  // click, a key and a restored preference all light the same way.
-  dial.dataset.intent = name;
-  // The whole window takes the mode's colour, not just the control.
-  document.body.dataset.intent = name;
-  // ...and so does the drop in the title bar, which shows the same choice.
-  // Driven from here rather than from the plan so it moves with the dial
-  // instead of waiting for the next preview to come back.
-  paintModeBadge(name);
-  dial.setAttribute("aria-valuenow", String(at));
-  dial.setAttribute("aria-valuetext", name);
-  dial.querySelectorAll(".dial-labels > span").forEach(el =>
-    el.setAttribute("aria-pressed", el.dataset.for === name));
-  dial.querySelectorAll(".dial-stop").forEach(el =>
-    el.setAttribute("aria-pressed", el.dataset.intent === name));
+  // Everything below describes which profile is lit, and a drag fires a
+  // pointermove per frame while crossing only two boundaries. Doing this work
+  // every frame is what made the window judder: #mode-glow is a fixed,
+  // full-viewport element under a 58px blur with a 0.65s colour transition,
+  // and setting its trigger again each frame restarted that transition on a
+  // full-screen blurred layer ~60 times a second. Rebuilding the title bar's
+  // notch -- an SVG with two masks, three gradients and two drop-shadows --
+  // was being redone just as often. So it happens when the answer changes,
+  // and not otherwise.
+  if (dial.dataset.intent !== name) {
+    dial.dataset.intent = name;
+    // The whole window takes the mode's colour, not just the control.
+    document.body.dataset.intent = name;
+    // ...and so does the drop in the title bar, which shows the same choice.
+    // Driven from here rather than from the plan so it moves with the dial
+    // instead of waiting for the next preview to come back.
+    paintModeBadge(name);
+    dial.setAttribute("aria-valuenow", String(at));
+    dial.setAttribute("aria-valuetext", name);
+    dial.querySelectorAll(".dial-labels > span").forEach(el =>
+      el.setAttribute("aria-pressed", el.dataset.for === name));
+    dial.querySelectorAll(".dial-stop").forEach(el =>
+      el.setAttribute("aria-pressed", el.dataset.intent === name));
+  }
   if (live === undefined) paintBandFigures();
 }
 
