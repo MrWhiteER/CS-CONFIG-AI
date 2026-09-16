@@ -2198,7 +2198,11 @@
   }
 
   /* ------------------------------------------------------------------ stage */
-  .stage { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .stage {
+    min-width: 0; min-height: 0; display: flex; flex-direction: column;
+    overflow: hidden;
+    position: relative;        /* the status note hangs off this */
+  }
   /* Tall enough to hold what is in it.
 
      The bar was 41px and the drop is 40, so the drop had to hang out of the
@@ -2226,10 +2230,34 @@
     padding: 12px 16px 18px;
   }
 
+  /* A note that floats over the page rather than sitting in it.
+
+     It used to be a block above the scrolling area, so every message pushed
+     the whole window down and every message clearing lifted it back up. That
+     is the jolt you get on releasing the band: letting go commits the choice,
+     which runs a preview, which says "Building plan" and then stops saying it.
+
+     Floating it costs nothing -- it was already a bordered chip on its own
+     background, so it reads the same. It just no longer moves the page. */
   #status {
-    margin: 10px 16px 0; padding: 8px 12px; border-radius: 9px; flex: none;
-    background: rgba(0, 0, 0, .34); border: 1px solid var(--line);
+    position: absolute; z-index: 30; left: 16px; bottom: 14px;
+    max-width: calc(100% - 32px);
+    padding: 9px 14px; border-radius: 10px;
+    background: rgba(10, 6, 20, .92);
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    border: 1px solid var(--line);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .55);
     color: var(--ink-dim); font-size: 12px; min-height: 0;
+    animation: status-in .22s cubic-bezier(.2, .8, .3, 1);
+  }
+  #status.err { border-color: color-mix(in srgb, var(--bad) 55%, transparent); }
+  @keyframes status-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { #status { animation: none; } }
+  @supports not (color: color-mix(in srgb, red 50%, blue)) {
+    #status.err { border-color: var(--bad); }
   }
 
   ::-webkit-scrollbar { width: 9px; height: 9px; }
