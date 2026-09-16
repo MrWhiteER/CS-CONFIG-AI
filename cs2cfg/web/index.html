@@ -257,8 +257,11 @@
     color: var(--muted);
     transition: color .22s ease, text-shadow .22s ease;
   }
-  .dial-labels > span:first-child { text-align: left; }
-  .dial-labels > span:last-child { text-align: right; }
+  /* All three centred, including the outer two.
+     The sphere stops at the centre of each label's column, so a label pushed
+     to the edge of its column sits to one side of where the sphere lands --
+     which is what made the outer two look unrelated to it. Centred, the text
+     is directly under the stop. */
   .dial-labels strong {
     display: block; font-size: 13px; font-weight: 700; letter-spacing: .2px;
     color: inherit;
