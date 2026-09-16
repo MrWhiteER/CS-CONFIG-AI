@@ -196,7 +196,7 @@
     letter-spacing: .13em; opacity: .7;
   }
   .band-read.top { top: -1px; color: var(--neon-frames, #22e6ff); }
-  .band-read.bot { bottom: -1px; color: var(--neon); }
+  .band-read.bot { bottom: -5px; color: var(--neon); }
   /* Near the ends they would run off the panel, so they tuck inward. */
   .band-read.at-start { transform: translateX(-8%); }
   .band-read.at-end { transform: translateX(-92%); }
@@ -211,22 +211,39 @@
   .dial-stop:nth-of-type(2) { left: 33.33%; }
   .dial-stop:nth-of-type(3) { left: 66.66%; }
 
-  /* The bead sits on the dividing line, so it is white-cored with the mode's
-     colour as its ring -- a filled sphere here would compete with the line it
-     is meant to be riding. Its top is set from the curve, not from CSS. */
+  /* The bead carries the number it is selecting, so the figure travels with
+     the thing that sets it rather than hovering near it. Sized to the digits
+     and lit in the mode's colour, dark ink on it because every profile colour
+     is bright enough that ink reads better than white would. */
   .dial-ball {
-    position: absolute; left: 50%; top: 50%; width: 17px; height: 17px;
-    margin: -8.5px 0 0 -8.5px;
-    border-radius: 50%; background: #fff; padding: 0; border: 0;
+    position: absolute; left: 50%; top: 50%;
+    width: 52px; height: 52px; margin: -26px 0 0 -26px;
+    border-radius: 50%; padding: 0; border: 0;
+    display: grid; place-items: center; line-height: 1;
+    background:
+      radial-gradient(circle at 42% 32%,
+        color-mix(in srgb, var(--neon) 30%, white) 0%,
+        var(--neon) 58%,
+        color-mix(in srgb, var(--neon) 78%, black) 100%);
+    color: #0b1017;
+    font-family: var(--mono); font-size: 15px; font-weight: 700;
     box-shadow:
-      0 0 0 3px var(--neon),
-      0 0 16px var(--neon),
-      0 0 34px color-mix(in srgb, var(--neon) 70%, transparent),
-      0 3px 10px rgba(0, 0, 0, .55);
+      0 0 0 1px color-mix(in srgb, var(--neon) 60%, transparent),
+      0 0 20px var(--neon),
+      0 0 44px color-mix(in srgb, var(--neon) 60%, transparent),
+      0 4px 14px rgba(0, 0, 0, .55);
     cursor: grab; touch-action: none;
     transition: left .2s cubic-bezier(.2, .9, .3, 1),
                 top .2s cubic-bezier(.2, .9, .3, 1),
-                box-shadow .28s ease, transform .12s ease;
+                background .28s ease, box-shadow .28s ease, transform .12s ease;
+  }
+  .dial-ball b { font: inherit; display: block; }
+  .dial-ball span {
+    display: block; font-family: var(--mono); font-size: 7px; font-weight: 600;
+    letter-spacing: .1em; opacity: .62; margin-top: 1px;
+  }
+  @supports not (color: color-mix(in srgb, red 50%, blue)) {
+    .dial-ball { background: var(--neon); }
   }
   .dial-ball:hover { transform: scale(1.06); }
   .dial.dragging .dial-ball { cursor: grabbing; transform: scale(1.16); }
@@ -3632,7 +3649,6 @@
           <div class="dial-track" id="band-stage">
             <!-- The band is drawn once by paintBand; only the bead and the two
                  figures move afterwards. -->
-            <span class="band-read top" id="band-fps" aria-hidden="true"></span>
             <span class="band-read bot" id="band-pic" aria-hidden="true"></span>
             <button class="dial-stop" data-intent="competitive" type="button" tabindex="-1"></button>
             <button class="dial-stop" data-intent="balanced" type="button" tabindex="-1"></button>
@@ -5217,13 +5233,8 @@ const INTENTS = ["competitive", "balanced", "quality"];
 */
 const BAND_W = 620, BAND_H = 96;
 const BAND_SPREAD = 56, BAND_BLUR = 13;          // the G1 falloff
-// Where each profile sits across the band. Inset from the edges because the
-// ends fade out: a bead at 0% or 100% hangs half off the panel, over nothing.
-const BAND_STOPS = [8, 50, 92];
 // How far past the band's own box the light is allowed to go. The falloff
-// from the line reaches about 54px at full spread, so anything less than that
-// cuts it off square -- which is what left a hard horizontal edge along the
-// top and bottom of the colour.
+// from the line reaches about 54px, so anything less cuts it off square.
 const BAND_PAD = 70;
 
 function bandBoundary() {
@@ -5240,11 +5251,33 @@ const BAND_D = BAND_PTS.map((q, i) =>
   (i ? "L" : "M") + q[0] + " " + q[1].toFixed(1)).join("");
 
 /* Where the line is, as a percentage of the band's height, at a percentage
-   across. The bead reads this so it rides the curve rather than a straight
-   line through the middle. */
+   across -- so the bead rides the curve rather than a straight line. */
 function bandY(pct) {
   const x = Math.min(BAND_W, Math.max(0, (pct / 100) * BAND_W));
   return (BAND_PTS[Math.round(x / 2)][1] / BAND_H) * 100;
+}
+
+/* Where each profile sits across the band.
+
+   Over the middle of its own label, measured from the labels themselves. Two
+   earlier answers were both wrong in the same way -- they were fractions of
+   the band, and the band is deliberately wider than the panel so its light can
+   run past the frame. A fixed 8% put the bead outside the panel; matching the
+   panel's content edge was worse again, because the outer labels are aligned
+   to those edges and the travel stretched the full width.
+
+   Anchoring to the labels makes the rule obvious instead: the bead stands on
+   the thing it has selected, and the travel is however far apart those are.
+*/
+function bandStops() {
+  const stage = $("band-stage");
+  const labels = document.querySelectorAll(".dial-labels > span");
+  const box = stage ? stage.getBoundingClientRect() : null;
+  if (!box || !box.width || labels.length !== 3) return [19, 50, 81];
+  return [...labels].map(el => {
+    const r = el.getBoundingClientRect();
+    return ((r.left + r.width / 2) - box.left) / box.width * 100;
+  });
 }
 
 function paintBand() {
@@ -5306,7 +5339,7 @@ function paintBand() {
 let bandFps = "", bandPic = "";
 
 function setBandFigures(plan) {
-  bandFps = plan && plan.estimated_fps ? "~" + plan.estimated_fps : "";
+  bandFps = plan && plan.estimated_fps ? String(plan.estimated_fps) : "";
   // The picture level the profile actually asks for, taken from the plan
   // rather than assumed from the profile's name.
   let level = "";
@@ -5322,22 +5355,28 @@ function setBandFigures(plan) {
 
 function paintBandFigures() {
   const at = Math.max(0, INTENTS.indexOf(intent));
-  const pct = BAND_STOPS[at];
-  const fps = $("band-fps"), pic = $("band-pic");
-  if (!fps || !pic) return;
-  fps.innerHTML = bandFps ? esc(bandFps) + "<span>EST. FPS</span>" : "";
-  pic.innerHTML = bandPic ? esc(bandPic) + "<span>PICTURE</span>" : "";
-  [fps, pic].forEach(el => {
-    el.style.left = pct + "%";
-    el.classList.toggle("at-start", pct < 12);
-    el.classList.toggle("at-end", pct > 88);
-  });
+  const pct = bandStops()[at];
+  const ball = $("dial-ball"), pic = $("band-pic");
+  if (ball) {
+    // Inside the bead: the figure the choice produces, on the thing that
+    // chooses it. Empty until a preview has run -- a number invented to fill
+    // the circle would be worse than an empty circle.
+    ball.innerHTML = bandFps
+      ? "<b>" + esc(bandFps) + "</b><span>FPS</span>" : "";
+    ball.title = bandFps ? "Estimated " + bandFps + " fps" : "";
+  }
+  if (pic) {
+    pic.innerHTML = bandPic ? esc(bandPic) + "<span>PICTURE</span>" : "";
+    pic.style.left = pct + "%";
+    pic.classList.toggle("at-start", pct < 12);
+    pic.classList.toggle("at-end", pct > 88);
+  }
 }
 
 function paintIntent(name, live) {
   paintBand();
   const at = Math.max(0, INTENTS.indexOf(name));
-  const pct = BAND_STOPS[at];
+  const pct = bandStops()[at];
   const where = live === undefined ? pct : live;
   const ball = $("dial-ball");
   ball.style.left = where + "%";
@@ -5383,16 +5422,22 @@ function chooseIntent(name, quiet) {
   let dragging = false;
 
   const nearest = pct => {
+    const stops = bandStops();
     let best = 0;
-    BAND_STOPS.forEach((at, i) => {
-      if (Math.abs(pct - at) < Math.abs(pct - BAND_STOPS[best])) best = i;
+    stops.forEach((at, i) => {
+      if (Math.abs(pct - at) < Math.abs(pct - stops[best])) best = i;
     });
     return INTENTS[best];
   };
+  // Clamped to the outer stops, not to the track. The track runs wider than
+  // the panel and its ends are faded out, so 0% and 100% are off the edge of
+  // the control -- the bead would leave the box and sit over nothing.
   const pctFor = event => {
     const box = track.getBoundingClientRect();
-    if (!box.width) return 50;
-    return Math.min(100, Math.max(0, ((event.clientX - box.left) / box.width) * 100));
+    const stops = bandStops();
+    if (!box.width) return stops[1];
+    const raw = ((event.clientX - box.left) / box.width) * 100;
+    return Math.min(stops[2], Math.max(stops[0], raw));
   };
 
   ball.addEventListener("pointerdown", e => {
@@ -5826,7 +5871,11 @@ function moveSegThumb(which) {
 }
 
 // The bar is flexible, so where the circle belongs changes with the window.
-window.addEventListener("resize", () => moveSegThumb());
+window.addEventListener("resize", () => {
+  moveSegThumb();
+  // The band's stops are a share of its measured width, which just changed.
+  if (typeof paintIntent === "function" && typeof intent === "string") paintIntent(intent);
+});
 
 /* Settings sub-tabs. Each category loads what it needs the first time it is
    opened, so switching to Sound does not pay for a config scan. */
