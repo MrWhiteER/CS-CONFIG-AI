@@ -897,58 +897,57 @@
      graded against are lit alike rather than the grade asserting a colour of
      its own that then disagrees with the window around it. */
   .modebadge {
-    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-    width: 40px; height: 40px;
+    position: absolute; left: 50%; top: 0; transform: translateX(-50%);
+    width: 116px; height: 48px;
     display: grid; place-items: center;
   }
   .modebadge:empty { display: none; }
 
-  /* A falling drop: round at the bottom, drawn to a point at the top.
+  /* The bar dipping into a pod, rather than a drop hanging off it.
 
-     Three corners rounded and the fourth left square. The square one is the
-     top-left, which points up and to the left, so turning it a quarter turn
-     clockwise brings it to straight up -- anticlockwise took it to the side,
-     which is why it first came out lying on its edge. */
-  .modedrop {
-    position: absolute; inset: 0;
-    border-radius: 0 50% 50% 50%;
-    transform: rotate(45deg);
-    background:
-      radial-gradient(circle at 38% 64%,
-        color-mix(in srgb, var(--mode-neon, var(--accent)) 50%, white) 0%,
-        var(--mode-neon, var(--accent)) 55%,
-        color-mix(in srgb, var(--mode-neon, var(--accent)) 74%, black) 100%);
-    box-shadow:
-      /* a rim, so the shape holds its edge against a light background */
-      0 0 0 1px color-mix(in srgb, var(--mode-neon, var(--accent)) 55%, transparent),
-      /* the light it throws, in its own colour */
-      0 0 17px color-mix(in srgb, var(--mode-neon, var(--accent)) 60%, transparent),
-      /* and the shadow it casts. Two, because one blur cannot be both the
-         close dark edge that says the drop is a solid thing and the wide soft
-         one that says it is held above the bar rather than painted on it.
-         Offset down and turned back by the rotation so it falls straight
-         down on screen rather than off to the side with the shape. */
-      3px 3px 7px rgba(0, 0, 0, .55),
-      7px 7px 20px rgba(0, 0, 0, .42);
-    transition: background .3s ease, box-shadow .3s ease, transform .3s ease;
+     The whole thing is one path because the corners where the lip meets the
+     pod are concave -- the edge curves away from the shape -- and nothing made
+     of boxes and border-radius can do that. A quadratic whose control point
+     sits in the corner leaves horizontal and arrives vertical, which is
+     exactly the fillet, and the two of them mirror. */
+  .modenotch {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    overflow: visible;
+    /* The gradient's stops read these. Named here rather than written into the
+       stops because a stop cannot hold a color-mix() directly. */
+    --notch-hi: color-mix(in srgb, var(--mode-neon, var(--accent)) 46%, white);
+    --notch-lo: color-mix(in srgb, var(--mode-neon, var(--accent)) 72%, black);
+    filter:
+      drop-shadow(0 3px 7px rgba(0, 0, 0, .55))
+      drop-shadow(0 8px 20px rgba(0, 0, 0, .42))
+      drop-shadow(0 0 14px color-mix(in srgb, var(--mode-neon, var(--accent)) 55%, transparent));
+    transition: filter .3s ease;
   }
-  /* A pool of shade underneath. The drop hangs over the content below it, and
-     without this it reads as a sticker on the bar rather than something in
-     front of it. */
-  .modebadge::after {
-    content: ""; position: absolute; z-index: 0;
-    left: 50%; bottom: -5px; width: 34px; height: 9px;
-    transform: translateX(-50%);
-    border-radius: 50%;
-    background: radial-gradient(ellipse, rgba(0, 0, 0, .5) 0%, transparent 70%);
-    filter: blur(2px);
-    pointer-events: none;
+  .modenotch .fill {
+    fill: url(#notch-lit);
+    stroke: color-mix(in srgb, var(--mode-neon, var(--accent)) 60%, transparent);
+    stroke-width: 1;
   }
+  /* A lip either side, a shade darker, so the pod reads as standing forward of
+     the bar it grew out of rather than as one flat tab. */
+  .modenotch .lip { fill: color-mix(in srgb, var(--mode-neon, var(--accent)) 72%, black); }
 
-  /* The mark sits on the drop rather than inside it, so it stays upright while
-     the drop is turned. */
+  @supports not (color: color-mix(in srgb, red 50%, blue)) {
+    .modenotch {
+      --notch-hi: var(--mode-neon, var(--accent));
+      --notch-lo: var(--mode-neon, var(--accent));
+      filter: drop-shadow(0 3px 7px rgba(0, 0, 0, .55));
+    }
+    .modenotch .fill { stroke: none; }
+    .modenotch .lip { fill: var(--mode-neon, var(--accent)); }
+  }
+  @media (prefers-reduced-motion: reduce) { .modenotch { transition: none; } }
+
+  /* The mark rides in the pod. Nudged down, because the pod's own middle is
+     lower than the badge's -- the lips take the top of the box. */
   .modemark {
     position: relative; z-index: 1;
+    margin-top: 8px;
     width: 21px; height: 21px;
     /* Ink on the lit drop: every profile colour is bright enough that dark
        reads better on it, and a neon mark on a neon ground is the one
@@ -4453,11 +4452,47 @@ const MODE_WORD = {
   quality: "Quality — the best picture the hardware can carry",
 };
 
+/* The notch, as one path.
+
+   86 wide and 50 deep. A 14px lip at each end, a 14px concave fillet turning
+   the lip down into the pod wall, and a pod 58 across with its bottom corners
+   rounded by 18. Written out rather than computed: the numbers only mean
+   anything together, and a generator for one fixed shape is harder to read
+   than the shape.
+*/
+const NOTCH_PATH =
+  "M0 0" +
+  "L22 0" +              // a flat run of bar, which is what makes it read as
+  "Q34 0 34 12" +        // a bar at all before the fillet turns it down
+  "L34 28" +
+  "Q34 46 52 46" +       // bottom-left corner of the pod
+  "L64 46" +
+  "Q82 46 82 28" +       // bottom-right
+  "L82 12" +
+  "Q82 0 94 0" +         // the mirrored fillet, back up to the bar
+  "L116 0" +
+  "Z";
+
+// The flat runs either side, a shade darker over the fill, so the pod reads as
+// standing forward of the bar rather than the whole thing being one tab.
+const NOTCH_LIPS =
+  "M0 0L22 0Q34 0 34 12L34 7Q34 5 29 5L0 5Z" +
+  "M116 0L94 0Q82 0 82 12L82 7Q82 5 87 5L116 5Z";
+
 function paintModeBadge(name) {
   const badge = $("mode-badge");
   if (!badge) return;
   const art = MODE_ART[name] || MODE_ART.balanced;
-  badge.innerHTML = '<span class="modedrop"></span>' +
+  badge.innerHTML =
+    '<svg class="modenotch" viewBox="0 0 116 48" aria-hidden="true">' +
+      "<defs><radialGradient id=\"notch-lit\" cx=\"38%\" cy=\"78%\" r=\"78%\">" +
+        '<stop offset="0%" stop-color="var(--notch-hi)"/>' +
+        '<stop offset="58%" stop-color="var(--mode-neon, var(--accent))"/>' +
+        '<stop offset="100%" stop-color="var(--notch-lo)"/>' +
+      "</radialGradient></defs>" +
+      '<path class="fill" d="' + NOTCH_PATH + '"/>' +
+      '<path class="lip" d="' + NOTCH_LIPS + '"/>' +
+    "</svg>" +
     '<svg class="modemark" viewBox="0 0 22 22" aria-hidden="true">' + art + "</svg>";
   badge.title = MODE_WORD[name] || name;
 }
