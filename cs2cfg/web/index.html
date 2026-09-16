@@ -898,7 +898,7 @@
      its own that then disagrees with the window around it. */
   .modebadge {
     position: absolute; left: 50%; top: 0; transform: translateX(-50%);
-    width: 150px; height: 52px;
+    width: 240px; height: 58px;
     display: grid; place-items: center;
   }
   .modebadge:empty { display: none; }
@@ -932,7 +932,7 @@
   }
   .modenotch .fill {
     fill: url(#notch-lit);
-    stroke: color-mix(in srgb, var(--mode-neon, var(--accent)) 60%, transparent);
+    stroke: color-mix(in srgb, var(--mode-neon, var(--accent)) 55%, transparent);
     stroke-width: 1;
   }
 
@@ -950,7 +950,7 @@
      lower than the badge's -- the lips take the top of the box. */
   .modemark {
     position: relative; z-index: 1;
-    margin-top: 10px;
+    margin-top: 9px;
     width: 21px; height: 21px;
     /* Ink on the lit drop: every profile colour is bright enough that dark
        reads better on it, and a neon mark on a neon ground is the one
@@ -4465,13 +4465,15 @@ const MODE_WORD = {
 */
 const NOTCH_PATH =
   "M0 0" +
-  "L28 0" +
-  "C40 0 50 4 50 24" +      // out of the bar: horizontal at 28, vertical at 50
-  "C50 42 56 52 72 52" +    // down the wall and round, vertical in, flat out
-  "L78 52" +
-  "C94 52 100 42 100 24" +  // and back up the other side
-  "C100 4 110 0 122 0" +
-  "L150 0" +
+  "H240" +                      // the bar itself, with height, so the runs
+  "V14" +                       // either side of the pod are something to see
+  "H171" +                      // rather than a line tapering to nothing
+  "C159 14 151 20 151 36" +     // horizontal in, vertical out: the fillet
+  "C151 50 143 58 129 58" +     // down the wall and round
+  "L111 58" +
+  "C97 58 89 50 89 36" +        // and back up the other side
+  "C89 20 81 14 69 14" +
+  "H0" +
   "Z";
 
 function paintModeBadge(name) {
@@ -4479,13 +4481,29 @@ function paintModeBadge(name) {
   if (!badge) return;
   const art = MODE_ART[name] || MODE_ART.balanced;
   badge.innerHTML =
-    '<svg class="modenotch" viewBox="0 0 150 52" aria-hidden="true">' +
-      "<defs><radialGradient id=\"notch-lit\" cx=\"50%\" cy=\"96%\" r=\"92%\">" +
-        '<stop offset="0%" stop-color="var(--notch-hi)"/>' +
-        '<stop offset="58%" stop-color="var(--mode-neon, var(--accent))"/>' +
-        '<stop offset="100%" stop-color="var(--notch-lo)"/>' +
-      "</radialGradient></defs>" +
-      '<path class="fill" d="' + NOTCH_PATH + '"/>' +
+    '<svg class="modenotch" viewBox="0 0 240 58" aria-hidden="true">' +
+      "<defs>" +
+        "<radialGradient id=\"notch-lit\" cx=\"50%\" cy=\"96%\" r=\"92%\">" +
+          '<stop offset="0%" stop-color="var(--notch-hi)"/>' +
+          '<stop offset="58%" stop-color="var(--mode-neon, var(--accent))"/>' +
+          '<stop offset="100%" stop-color="var(--notch-lo)"/>' +
+        "</radialGradient>" +
+        // The bar does not reach the ends of the window, so it has to stop --
+        // and a stop is a cut edge. It fades out instead, which reads as the
+        // bar carrying on past what is lit rather than as a tab sitting there.
+        "<linearGradient id=\"notch-fade\" x1=\"0\" x2=\"1\">" +
+          '<stop offset="0" stop-color="#000"/>' +
+          '<stop offset="0.30" stop-color="#fff"/>' +
+          '<stop offset="0.70" stop-color="#fff"/>' +
+          '<stop offset="1" stop-color="#000"/>' +
+        "</linearGradient>" +
+        '<mask id="notch-ends">' +
+          '<rect x="0" y="0" width="240" height="58" fill="url(#notch-fade)"/>' +
+        "</mask>" +
+      "</defs>" +
+      '<g mask="url(#notch-ends)">' +
+        '<path class="fill" d="' + NOTCH_PATH + '"/>' +
+      "</g>" +
     "</svg>" +
     '<svg class="modemark" viewBox="0 0 22 22" aria-hidden="true">' + art + "</svg>";
   badge.title = MODE_WORD[name] || name;
