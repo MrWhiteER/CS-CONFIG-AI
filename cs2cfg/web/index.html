@@ -142,19 +142,11 @@
   .dial[data-intent="balanced"]    { --neon: var(--neon-balanced); }
   .dial[data-intent="quality"]     { --neon: var(--neon-quality); }
 
-  /* Ambient wash, so the panel itself carries the mode. Sits behind
-     everything and never eats a pointer event. */
-  .dial::before {
-    content: "";
-    position: absolute; inset: -14px -18px;
-    border-radius: 16px;
-    background: radial-gradient(60% 120% at var(--glow-x, 50%) 42%,
-                                color-mix(in srgb, var(--neon) 22%, transparent) 0%,
-                                transparent 70%);
-    opacity: .9;
-    transition: background .28s ease;
-    pointer-events: none;
-  }
+  /* There used to be an ambient wash here -- a radial gradient on a box of
+     its own, sized 120% tall so it still had colour where its box ended. A
+     gradient cut off by its own edge is a rectangle, and that rectangle sat
+     right across the band, which is what made the colours look boxed in.
+     The band throws far more light than the wash ever did, so it goes. */
 
   /* The band. Two things being traded, drawn as one shape.
 
@@ -267,7 +259,6 @@
      simply renders flat instead of glowing -- the control still works, and the
      position and lit label still say which mode is selected. */
   @supports not (color: color-mix(in srgb, red 50%, blue)) {
-    .dial::before { display: none; }
     .dial-ball { background: var(--neon); }
   }
 
@@ -5362,9 +5353,6 @@ function paintIntent(name, live) {
   // Driven from here rather than from the plan so it moves with the dial
   // instead of waiting for the next preview to come back.
   paintModeBadge(name);
-  // Keep the ambient wash under the ball while it is being dragged, so the
-  // glow travels with it instead of snapping at the end.
-  dial.style.setProperty("--glow-x", (live === undefined ? pct : live) + "%");
   dial.setAttribute("aria-valuenow", String(at));
   dial.setAttribute("aria-valuetext", name);
   dial.querySelectorAll(".dial-labels > span").forEach(el =>
