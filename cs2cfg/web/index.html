@@ -898,9 +898,15 @@
      its own that then disagrees with the window around it. */
   .modebadge {
     position: absolute; left: 50%; top: 0; transform: translateX(-50%);
-    width: 240px; height: 58px;
+    width: 360px; height: 58px;
     display: grid; place-items: center;
   }
+  /* The bar has the chips at one end of the title bar and the scores at the
+     other. When the window is not wide enough to keep clear of both, the runs
+     shorten rather than the whole thing shrinking -- the pod is the part that
+     has to stay readable. */
+  @media (max-width: 1280px) { .modebadge { width: 250px; } }
+  @media (max-width: 1100px) { .modebadge { width: 150px; } }
   .modebadge:empty { display: none; }
 
   /* The bar dipping into a pod, rather than a drop hanging off it.
@@ -4465,14 +4471,14 @@ const MODE_WORD = {
 */
 const NOTCH_PATH =
   "M0 0" +
-  "H240" +                      // the bar itself, with height, so the runs
+  "H360" +                      // the bar itself, with height, so the runs
   "V14" +                       // either side of the pod are something to see
-  "H171" +                      // rather than a line tapering to nothing
-  "C159 14 151 20 151 36" +     // horizontal in, vertical out: the fillet
-  "C151 50 143 58 129 58" +     // down the wall and round
-  "L111 58" +
-  "C97 58 89 50 89 36" +        // and back up the other side
-  "C89 20 81 14 69 14" +
+  "H231" +                      // rather than a line tapering to nothing
+  "C219 14 211 20 211 36" +     // horizontal in, vertical out: the fillet
+  "C211 50 203 58 189 58" +     // down the wall and round
+  "L171 58" +
+  "C157 58 149 50 149 36" +     // and back up the other side
+  "C149 20 141 14 129 14" +
   "H0" +
   "Z";
 
@@ -4481,7 +4487,8 @@ function paintModeBadge(name) {
   if (!badge) return;
   const art = MODE_ART[name] || MODE_ART.balanced;
   badge.innerHTML =
-    '<svg class="modenotch" viewBox="0 0 240 58" aria-hidden="true">' +
+    '<svg class="modenotch" viewBox="0 0 360 58" preserveAspectRatio="xMidYMid slice"' +
+    ' aria-hidden="true">' +
       "<defs>" +
         "<radialGradient id=\"notch-lit\" cx=\"50%\" cy=\"96%\" r=\"92%\">" +
           '<stop offset="0%" stop-color="var(--notch-hi)"/>' +
@@ -4493,12 +4500,12 @@ function paintModeBadge(name) {
         // bar carrying on past what is lit rather than as a tab sitting there.
         "<linearGradient id=\"notch-fade\" x1=\"0\" x2=\"1\">" +
           '<stop offset="0" stop-color="#000"/>' +
-          '<stop offset="0.30" stop-color="#fff"/>' +
-          '<stop offset="0.70" stop-color="#fff"/>' +
+          '<stop offset="0.20" stop-color="#fff"/>' +
+          '<stop offset="0.80" stop-color="#fff"/>' +
           '<stop offset="1" stop-color="#000"/>' +
         "</linearGradient>" +
         '<mask id="notch-ends">' +
-          '<rect x="0" y="0" width="240" height="58" fill="url(#notch-fade)"/>' +
+          '<rect x="0" y="0" width="360" height="58" fill="url(#notch-fade)"/>' +
         "</mask>" +
       "</defs>" +
       '<g mask="url(#notch-ends)">' +
