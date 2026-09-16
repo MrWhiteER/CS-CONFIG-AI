@@ -182,25 +182,6 @@
   }
   .dial.dragging .dial-ball { transition: none; }
 
-  /* The two figures the assessment already works out, printed where you are
-     standing. Pinned to the top and bottom of the band rather than to the
-     line: following the line piles them onto the bead at the ends. */
-  .band-read {
-    position: absolute; transform: translateX(-50%);
-    font-family: var(--mono); font-size: 12.5px; font-weight: 700;
-    line-height: 1.1; white-space: nowrap; pointer-events: none;
-    transition: left .2s cubic-bezier(.2, .9, .3, 1), color .28s ease;
-  }
-  .band-read span {
-    display: block; font-family: inherit; font-size: 8px; font-weight: 600;
-    letter-spacing: .13em; opacity: .7;
-  }
-  .band-read.top { top: -1px; color: var(--neon-frames, #22e6ff); }
-  .band-read.bot { bottom: -5px; color: var(--neon); }
-  /* Near the ends they would run off the panel, so they tuck inward. */
-  .band-read.at-start { transform: translateX(-8%); }
-  .band-read.at-end { transform: translateX(-92%); }
-
   /* A third of the band each, so the whole control is the target rather than
      a dot. Invisible on purpose: the band already says where the stops are. */
   .dial-stop {
@@ -219,9 +200,10 @@
      colour instead. Its top comes from the curve, not from CSS. */
   .dial-ball {
     position: absolute; left: 50%; top: 50%;
-    width: 54px; height: 54px; margin: -27px 0 0 -27px;
+    width: 58px; height: 58px; margin: -29px 0 0 -29px;
     border-radius: 50%; padding: 0; border: 0;
     display: grid; place-items: center; line-height: 1;
+    isolation: isolate;
     background:
       radial-gradient(circle at 42% 32%,
         color-mix(in srgb, var(--neon) 34%, #16102b) 0%,
@@ -243,7 +225,23 @@
                 top .2s cubic-bezier(.2, .9, .3, 1),
                 background .28s ease, box-shadow .28s ease, transform .12s ease;
   }
+  /* The figure stays dead centre of the sphere; the unit hangs under it,
+     inside, positioned rather than stacked so it cannot push the number off
+     the middle. */
+  .dial-ball b { grid-area: 1 / 1; font: inherit; }
+  /* 70% clears the digits: the number is 19px on a 54px sphere, so centred it
+     reaches ~36px down, and 63% put the unit straight through its feet. */
+  .dial-ball i {
+    position: absolute; left: 50%; top: 70%; transform: translateX(-50%);
+    font-style: normal; font-family: var(--mono);
+    font-size: 7.5px; font-weight: 700; letter-spacing: .18em; text-indent: .18em;
+    color: color-mix(in srgb, var(--neon) 75%, #fff);
+    text-shadow: 0 0 8px color-mix(in srgb, var(--neon) 70%, transparent);
+  }
   .dial-ball:empty { width: 19px; height: 19px; margin: -9.5px 0 0 -9.5px; }
+  @supports not (color: color-mix(in srgb, red 50%, blue)) {
+    .dial-ball i { color: var(--neon); text-shadow: none; }
+  }
   @supports not (color: color-mix(in srgb, red 50%, blue)) {
     .dial-ball {
       background: #16102b;
@@ -251,50 +249,6 @@
                   0 5px 16px rgba(0, 0, 0, .6);
       text-shadow: 0 0 14px var(--neon);
     }
-  }
-
-  /* The figure, riding above the bead.
-
-     It follows rather than moves with it: a longer, overshooting curve than
-     the bead's own, so it trails a little on the way and settles after the
-     bead has arrived. That lag is the whole effect -- two things moving on
-     identical timings read as one rigid object, and the point here is that the
-     number belongs to the bead rather than being welded to it. It keeps its
-     easing during a drag, where the bead has none, so it swings along behind
-     the pointer. */
-  .band-tip {
-    position: absolute; z-index: 2; pointer-events: none;
-    /* Under the sphere. The figure itself does not move -- it stays in the
-       middle of the bead; only its unit sits below. 27 is the sphere's radius,
-       plus a little air. */
-    transform: translate(-50%, 0);
-    margin-top: 33px;
-    text-align: center; white-space: nowrap;
-    transition: left .46s cubic-bezier(.22, 1.28, .36, 1),
-                top .46s cubic-bezier(.22, 1.28, .36, 1),
-                background .3s ease, border-color .3s ease, box-shadow .3s ease,
-                opacity .25s ease;
-  }
-  .band-tip:empty { opacity: 0; }
-  /* Only the unit up here now; the figure itself is in the sphere. */
-  .band-tip span {
-    display: block; font-family: var(--mono); font-size: 9px; font-weight: 700;
-    letter-spacing: .28em; text-indent: .28em; color: var(--neon);
-    text-shadow: 0 0 10px color-mix(in srgb, var(--neon) 70%, transparent);
-  }
-  @supports not (color: color-mix(in srgb, red 50%, blue)) {
-    .band-tip span { text-shadow: none; }
-  }
-  @supports not (color: color-mix(in srgb, red 50%, blue)) {
-    .band-tip { box-shadow: none; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .band-tip { transition: opacity .25s ease; }
-  }
-  .dial-ball:hover { transform: scale(1.06); }
-  .dial.dragging .dial-ball { cursor: grabbing; transform: scale(1.16); }
-  .dial:focus-visible .dial-ball {
-    outline: 2px solid var(--neon); outline-offset: 4px;
   }
 
   .dial-labels { display: flex; justify-content: space-between; margin: 11px 4px 0; }
@@ -3695,8 +3649,6 @@
           <div class="dial-track" id="band-stage">
             <!-- The band is drawn once by paintBand; only the bead and the two
                  figures move afterwards. -->
-            <span class="band-tip" id="band-tip" aria-hidden="true"></span>
-            <span class="band-read bot" id="band-pic" aria-hidden="true"></span>
             <button class="dial-stop" data-intent="competitive" type="button" tabindex="-1"></button>
             <button class="dial-stop" data-intent="balanced" type="button" tabindex="-1"></button>
             <button class="dial-stop" data-intent="quality" type="button" tabindex="-1"></button>
@@ -5381,49 +5333,25 @@ function paintBand() {
   stage.insertAdjacentHTML("afterbegin", svg);
 }
 
-/* The two figures, from the plan the preview already worked out. Blank until
-   there is one: inventing a number here would be worse than showing none. */
-let bandFps = "", bandPic = "";
+/* The figure, from the plan the preview already worked out. Blank until there
+   is one: inventing a number here would be worse than showing none. */
+let bandFps = "";
 
 function setBandFigures(plan) {
   bandFps = plan && plan.estimated_fps ? String(plan.estimated_fps) : "";
-  // The picture level the profile actually asks for, taken from the plan
-  // rather than assumed from the profile's name.
-  let level = "";
-  if (plan && plan.settings) {
-    // The plan calls them name/after. It was label/to on the first attempt,
-    // which matched nothing and left the figure blank.
-    const row = plan.settings.find(x => /gpu level|overall quality/i.test(x.name || ""));
-    if (row) level = String(row.after || "");
-  }
-  bandPic = level ? level.toUpperCase() : "";
   paintBandFigures();
 }
 
 function paintBandFigures() {
   const at = Math.max(0, INTENTS.indexOf(intent));
   const pct = bandStops()[at];
-  const tip = $("band-tip"), ball = $("dial-ball"), pic = $("band-pic");
+  const ball = $("dial-ball");
+  if (!ball) return;
   // Empty until a preview has run: a number invented to fill the sphere would
   // be worse than an empty one, and the sphere shrinks back to a plain bead.
-  if (ball) {
-    ball.textContent = bandFps || "";
-    ball.title = bandFps ? "Estimated " + bandFps + " fps at this profile" : "";
-  }
-  if (tip) {
-    tip.innerHTML = bandFps ? "<span>FPS</span>" : "";
-    tip.style.left = pct + "%";
-    tip.style.top = bandY(pct) + "%";
-  }
-  if (pic) {
-    pic.innerHTML = bandPic ? esc(bandPic) + "<span>PICTURE</span>" : "";
-    // Parked on the far side of the bead. It is a readout, not a pointer, so
-    // where it sits carries no meaning -- and with the unit now under the
-    // sphere the two collided outright at Balanced, where the bead is
-    // mid-band and its label reaches the bottom edge this one is pinned to.
-    pic.style.left = (pct < 50 ? 82 : 18) + "%";
-    pic.classList.remove("at-start", "at-end");
-  }
+  ball.innerHTML = bandFps
+    ? "<b>" + esc(bandFps) + "</b><i>FPS</i>" : "";
+  ball.title = bandFps ? "Estimated " + bandFps + " fps at this profile" : "";
 }
 
 function paintIntent(name, live) {
@@ -5435,10 +5363,6 @@ function paintIntent(name, live) {
   ball.style.left = where + "%";
   // On the line, not through the middle of the box.
   ball.style.top = bandY(where) + "%";
-  // The figure follows the bead even mid-drag, which is where the trailing
-  // reads best.
-  const tip = $("band-tip");
-  if (tip) { tip.style.left = where + "%"; tip.style.top = bandY(where) + "%"; }
   const dial = $("intents");
   // What drives the colour. Set here rather than in each caller so a drag, a
   // click, a key and a restored preference all light the same way.
