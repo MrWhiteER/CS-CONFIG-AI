@@ -2495,14 +2495,30 @@ def _demo_page(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     found = demos.match_id(str(body.get("link") or ""))
     if not found:
         return {"ok": False, "error": "no match given"}
-    url = demos.MATCH_PAGE.format(match_id=found)
+
+    # The demo itself when it can be resolved, because the browser is signed
+    # in to FACEIT and the file simply downloads. The match room is the
+    # fallback for when FACEIT will not say where the demo is -- then the
+    # download button on the page is the way in.
+    direct = ""
+    try:
+        candidate = demos.resolve(found).get("url") or ""
+        # Only if it leads anywhere. The published address is regularly a host
+        # with no DNS record, and sending a browser there just looks broken.
+        if candidate and demos.reachable(candidate):
+            direct = candidate
+    except demos.DemoError:
+        pass
+
+    url = direct or demos.MATCH_PAGE.format(match_id=found)
     try:
         import webbrowser
 
         webbrowser.open(url)
     except Exception as exc:
         return {"ok": False, "error": f"could not open the browser: {exc}", "url": url}
-    return {"ok": True, "url": url}
+    return {"ok": True, "url": url, "direct": bool(direct),
+            "page": demos.MATCH_PAGE.format(match_id=found)}
 
 
 def _demo_cancel(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:

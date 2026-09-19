@@ -60,6 +60,9 @@ DEMO_URL = re.compile(
 # The demo folder CS2 reads, relative to the game's csgo directory.
 REPLAY_DIR = "replays"
 
+# What a browser calls a download it has not finished yet.
+PARTIAL = (".crdownload", ".part", ".download", ".tmp")
+
 TIMEOUT = 30
 BLOCK = 1024 * 256
 
@@ -550,6 +553,27 @@ def download(
     return target
 
 
+def reachable(url: str) -> bool:
+    """Whether the host in a URL exists at all.
+
+    Worth asking before handing a link to somebody's browser. FACEIT's match
+    API publishes demo addresses on hosts that have no DNS record -- the same
+    dead host for matches that definitely downloaded through the site -- so
+    the field cannot be trusted to point anywhere. Opening a browser on a
+    address that cannot resolve looks like the application is broken.
+    """
+    import socket
+
+    host = urllib.parse.urlsplit(str(url or "")).hostname
+    if not host:
+        return False
+    try:
+        socket.getaddrinfo(host, 443)
+        return True
+    except OSError:
+        return False
+
+
 def downloads_dir() -> Path:
     """Where the browser puts things."""
     return Path.home() / "Downloads"
@@ -589,6 +613,18 @@ def waiting(found: str, folders: Optional[List[Path]] = None) -> Optional[Dict[s
             low = item.name.lower()
             if ".dem" not in low:
                 continue
+            # Still arriving. Chrome writes .crdownload and Firefox .part
+            # until the transfer finishes; saying so beats saying nothing
+            # while a few hundred megabytes come down.
+            if low.endswith(PARTIAL):
+                try:
+                    size = item.stat().st_size
+                except OSError:
+                    size = 0
+                if best is None or best.get("pending"):
+                    best = {"rank": 9, "pending": True, "path": str(item),
+                            "name": item.name, "size": size}
+                continue
             rank = 0 if low.endswith(".dem") else 1
             try:
                 size = item.stat().st_size
@@ -597,8 +633,8 @@ def waiting(found: str, folders: Optional[List[Path]] = None) -> Optional[Dict[s
             if size <= 0:
                 continue
             if best is None or rank < best["rank"]:
-                best = {"rank": rank, "path": str(item), "name": item.name,
-                        "size": size}
+                best = {"rank": rank, "pending": False, "path": str(item),
+                        "name": item.name, "size": size}
     if best:
         best.pop("rank")
     return best

@@ -8812,21 +8812,32 @@ function paintGetRow() {
   // Nothing downloaded yet. If the browser already fetched one it is a local
   // move; otherwise the browser is where the download has to happen, because
   // FACEIT's CDN challenges anything that is not one.
-  if (statsWaiting && statsWaiting.match_id === statsShown.match_id &&
-      statsWaiting.waiting) {
+  const here = (statsWaiting && statsWaiting.match_id === statsShown.match_id)
+    ? statsWaiting.waiting : null;
+
+  // Still coming down in the browser. Shown rather than left blank, because
+  // a few hundred megabytes is long enough to wonder whether it is working.
+  if (here && here.pending) {
+    row.innerHTML =
+      '<span class="ring spin"><i></i><b></b></span>' +
+      '<span class="say"><b>Your browser is downloading it</b><span>' +
+      bytes(here.size) + " so far &mdash; this takes over the moment it lands." +
+      "</span></span>";
+    return;
+  }
+  if (here) {
     row.innerHTML =
       '<span class="say"><b>Found in your Downloads</b><span>' +
-      esc(statsWaiting.waiting.name) + " &mdash; " +
-      bytes(statsWaiting.waiting.size) + ". Import puts it in the replay folder." +
-      "</span></span>" +
+      esc(here.name) + " &mdash; " + bytes(here.size) +
+      ". Import puts it in the replay folder.</span></span>" +
       '<span class="actions"><button class="btn" data-getdemo="1">Import</button></span>';
     return;
   }
   row.innerHTML =
-    '<span class="say"><b>Demo not downloaded</b><span>FACEIT serves demos ' +
-    "only to a browser, so <b>Get it</b> opens the match page &mdash; press " +
-    "their download button and this picks the file up on its own." +
-    "</span></span>" +
+    '<span class="say"><b>Demo not downloaded</b><span>FACEIT only hands demos ' +
+    "to a signed-in browser, so <b>Get it</b> opens the download in yours. " +
+    "Save it anywhere &mdash; this watches your Downloads folder and takes it " +
+    "from there.</span></span>" +
     '<span class="actions">' +
       '<button class="btn small" data-getdemo="1">Try direct</button>' +
       '<button class="btn" id="demo-openpage">Get it</button>' +
@@ -8843,7 +8854,8 @@ async function checkWaiting(andImport) {
   try {
     statsWaiting = await api("/api/demos/waiting", { link: statsShown.match_id });
   } catch (err) { return; }
-  if (statsWaiting && statsWaiting.waiting && andImport) {
+  if (statsWaiting && statsWaiting.waiting && !statsWaiting.waiting.pending
+      && andImport) {
     stopWaitingWatch();
     try {
       const r = await api("/api/demos/get", { link: statsShown.match_id });
@@ -8855,9 +8867,9 @@ async function checkWaiting(andImport) {
 
 function startWaitingWatch() {
   stopWaitingWatch();
-  // Two minutes is long enough for a few hundred megabytes on most lines, and
-  // short enough that a forgotten window stops asking.
-  let left = 60;
+  // Five minutes: a demo is a few hundred megabytes and a slow line takes
+   // its time. Short enough that a window left open stops asking eventually.
+  let left = 150;
   waitTimer = setInterval(() => {
     if (--left <= 0 || !statsShown) { stopWaitingWatch(); return; }
     checkWaiting(true);
@@ -9014,10 +9026,12 @@ document.addEventListener("click", async e => {
       const r = await api("/api/demos/page", { link: statsShown.match_id });
       $("mstat-get").innerHTML =
         '<span class="ring spin"><i></i><b></b></span>' +
-        '<span class="say"><b>Waiting for your download</b><span>The match page ' +
-        "is open &mdash; press FACEIT&rsquo;s download button. This is watching " +
-        esc(statsWaiting && statsWaiting.downloads || "your Downloads folder") +
-        " and will take it from there.</span></span>";
+        '<span class="say"><b>Waiting for your download</b><span>' +
+        (r.direct ? "The demo is downloading in your browser."
+                  : "The match room is open &mdash; press FACEIT&rsquo;s " +
+                    "download button.") +
+        " Watching " + esc(statsWaiting && statsWaiting.downloads || "Downloads") +
+        ".</span></span>";
       startWaitingWatch();
     } catch (err) {
       status(esc(err.message), true);

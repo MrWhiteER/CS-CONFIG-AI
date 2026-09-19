@@ -519,6 +519,25 @@ class TakingOverFromTheBrowser(unittest.TestCase):
         self._drop(f"{MATCH}-1-1.dem")
         self.assertTrue(demos.waiting(MATCH, [self.downloads])["name"].endswith(".dem"))
 
+    def test_a_browser_download_in_flight_is_reported_not_adopted(self):
+        """Chrome writes .crdownload until it is done. Importing that would
+        put half a demo in the replay folder and call it ready."""
+        self._drop(f"{MATCH}-1-1.dem.crdownload", b"half a demo")
+        found = demos.waiting(MATCH, [self.downloads])
+        self.assertIsNotNone(found)
+        self.assertTrue(found["pending"])
+
+    def test_a_finished_file_wins_over_one_still_arriving(self):
+        self._drop(f"{MATCH}-1-1.dem.crdownload", b"half")
+        self._drop(f"{MATCH}-1-1.dem")
+        found = demos.waiting(MATCH, [self.downloads])
+        self.assertFalse(found["pending"])
+        self.assertTrue(found["name"].endswith(".dem"))
+
+    def test_firefox_part_files_count_as_in_flight_too(self):
+        self._drop(f"{MATCH}-1-1.dem.part", b"half")
+        self.assertTrue(demos.waiting(MATCH, [self.downloads])["pending"])
+
     def test_an_empty_file_does_not_count_as_arrived(self):
         """A download still in flight is a zero-byte file for a moment."""
         (self.downloads / f"{MATCH}-1-1.dem").write_bytes(b"")
@@ -595,3 +614,20 @@ class Playing(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NotSendingPeopleNowhere(unittest.TestCase):
+    """FACEIT publishes demo addresses on hosts that do not exist -- the same
+    dead host for matches that definitely downloaded through their site. So
+    the address is checked before a browser is pointed at it."""
+
+    def test_a_host_that_does_not_exist_is_not_reachable(self):
+        self.assertFalse(demos.reachable(
+            "https://demos-europe-central.backblaze.faceit-cdn.net/cs2/x.dem.zst"))
+
+    def test_a_host_that_does_exist_is(self):
+        self.assertTrue(demos.reachable("https://www.faceit.com/whatever"))
+
+    def test_nonsense_is_not_reachable(self):
+        for bad in ["", None, "not a url", "/just/a/path"]:
+            self.assertFalse(demos.reachable(bad), bad)
