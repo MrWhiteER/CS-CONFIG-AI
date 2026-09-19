@@ -212,6 +212,8 @@ def ensure_exec_line(
     autoexec: Path,
     exec_target: str,
     session: Optional[BackupSession] = None,
+    title: str = "Auto-tuned performance settings (cs2-autoconfig)",
+    shout: str = "AUTO-TUNED PERFORMANCE Settings",
 ) -> str:
     """Add an ``exec`` for the generated config to an existing autoexec.
 
@@ -234,11 +236,11 @@ def ensure_exec_line(
     block = ending.join([
         "",
         "// ---------------------------------------------",
-        "// Auto-tuned performance settings (cs2-autoconfig)",
+        f"// {title}",
         "ECHO",
-        'ECHO "Loading AUTO-TUNED PERFORMANCE Settings"',
+        f'ECHO "Loading {shout}"',
         f'exec "{exec_target}"',
-        'ECHO "AUTO-TUNED PERFORMANCE Settings Loaded Successfully"',
+        f'ECHO "{shout} Loaded Successfully"',
         "ECHO",
         "// ---------------------------------------------",
         "",
@@ -257,7 +259,9 @@ def strip_generated_block(autoexec: Path, session: Optional[BackupSession] = Non
         return False
     text = autoexec.read_text(encoding="utf-8", errors="replace")
     pattern = re.compile(
-        r"\r?\n// -+\r?\n// Auto-tuned performance settings \(cs2-autoconfig\).*?// -+\r?\n",
+        # Any block this tool wrote, not only the performance one: the heading
+        # varies now, so the "(cs2-autoconfig)" suffix is what marks it ours.
+        r"\r?\n// -+\r?\n// [^\r\n]*\(cs2-autoconfig\).*?// -+\r?\n",
         re.DOTALL,
     )
     new_text, count = pattern.subn("\n", text)

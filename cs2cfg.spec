@@ -41,6 +41,9 @@ hiddenimports = [
     # The native desktop window. Imported lazily inside desktop.py so the CLI
     # never pays for it, which also means the analyser cannot see it.
     "webview", "webview.platforms.edgechromium", "clr_loader", "pythonnet",
+    # Decompresses FACEIT demos, which are zstd. Imported lazily inside
+    # demos.py behind a try, so the analyser cannot see it either.
+    "zstandard",
 ] + collect_submodules("cs2cfg") + collect_submodules("webview")
 
 a = Analysis(

@@ -19,6 +19,7 @@ import json
 import mimetypes
 import secrets
 import threading
+import time
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -30,6 +31,10 @@ from .kb import KnowledgeBase
 from .profile import build_profile, plan_launch_options
 
 from .paths import bundle_root
+
+# The config holding the demo key bind. Its own file, like the crosshair one,
+# so picking a demo never rewrites anything that was applied deliberately.
+DEMO_CFG = "demo.vcfg"
 
 WEB_ROOT = bundle_root() / "web"
 ALLOWED_HOSTS = ("127.0.0.1", "localhost", "[::1]")
@@ -56,6 +61,8 @@ class State:
         self.ingame: Optional[Any] = None   # gamewatch.Watcher, started on demand
         self.cfg_scan: Optional[Any] = None  # cfgscan.ScanResult of the last scan
         self.updates: Optional[Any] = None   # updates.Checker, started on demand
+        self.demo: Optional[Any] = None      # _DemoJob, while one is downloading
+        self.faceit: Optional[Dict[str, Any]] = None  # cached profile + history
 
     def refresh(self, rescan: bool = False) -> None:
         if self.machine is None or rescan:
@@ -123,6 +130,7 @@ def _plan_payload(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         intent=body.get("intent", "balanced"),
         target_fps=int(target) if target else None,
         current_video=current_video,
+        hide_crosshair=bool(body.get("hide_crosshair")),
     )
     launch = plan_launch_options(
         current_launch, state.machine, kb,
@@ -236,6 +244,7 @@ def _apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         intent=body.get("intent", "balanced"),
         target_fps=int(target) if target else None,
         current_video=steam.read_video_cfg(user),
+        hide_crosshair=bool(body.get("hide_crosshair")),
     )
     launch = plan_launch_options(
         steam.read_launch_options(user), state.machine, kb,
@@ -346,14 +355,94 @@ def _play(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
             return {"ok": False, "error":
                     f"{exc}. Create the mode with Custom Resolution Utility, or choose native aspect."}
 
+    # Watch now: start the game already playing a demo. Only for this launch,
+    # and only for a demo that is actually in the replay folder -- the name
+    # comes from the page and ends up on a command line.
+    extra = ""
+    watch = str(body.get("watch_demo") or "")
+    if watch:
+        from . import demos
+
+        folder = _replays(state)
+        known = {d["name"] for d in demos.installed(folder)} if folder else set()
+        if watch not in known:
+            return {"ok": False, "error": f"there is no demo called {watch!r}"}
+        extra = "+" + demos.play_command(watch).replace('"', "")
+
+    # The crosshair, settled before the game starts rather than after: CS2
+    # reads its configs once at startup, so a file written later is a file the
+    # session never sees.
+    crosshair = _settle_crosshair(state, body)
+
     state.launch = LaunchSession(user, width, height, refresh, stretch_mode,
-                                 patch_video=bool(body.get("patch_video", True)))
+                                 patch_video=bool(body.get("patch_video", True)),
+                                 extra_args=extra)
     try:
         state.launch.start()
     except LaunchError as exc:
         return {"ok": False, "error": str(exc)}
+
+    # The overlay, if it was asked for and is not already up. After the game
+    # has been told to start, and never allowed to stop it: somebody who wants
+    # a crosshair overlay still wants to play if the overlay will not come.
+    overlay = ""
+    if body.get("crosshairx_launch"):
+        try:
+            from . import crosshairx
+
+            if not crosshairx.running():
+                overlay = crosshairx.start().get("detail", "")
+        except Exception as exc:
+            overlay = f"could not start Crosshair X: {exc}"
+
     return {"ok": True, "width": width, "height": height, "refresh": refresh,
-            "stretch_mode": stretch_mode}
+            "stretch_mode": stretch_mode, "overlay": overlay,
+            "crosshair": crosshair}
+
+
+def _settle_crosshair(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Point the game's crosshair at whatever the Crosshair X switch says.
+
+    Runs on every launch, in both directions: switch on and the game stops
+    drawing one, switch back off and it starts again. Without the second half
+    somebody would turn the overlay off and spend a round wondering where
+    their crosshair went.
+
+    Never fatal. This is a convenience beside the launch, and a crosshair that
+    could not be written is not a reason to refuse to start the game.
+    """
+    from . import crosshairx
+
+    try:
+        hide = bool(body.get("hide_crosshair"))
+        starting = bool(body.get("crosshairx_launch"))
+
+        found = None
+        if state.steam_root is not None:
+            found = crosshairx.find(steam.find_libraries(state.steam_root))
+        installed = bool(found)
+        up = crosshairx.running() if installed else False
+
+        choice = crosshairx.decide(hide, installed, up, starting and installed)
+
+        if not state.cs2_install:
+            return {**choice, "written": "", "error": "CS2's install was not found"}
+
+        root = steam.cfg_dir(state.cs2_install)
+        target = root / state.cfg_folder / crosshairx.CFG_NAME
+        session = backup.BackupSession(note="play: crosshair")
+        emit.write_text_file(
+            target, crosshairx.render_cfg(choice["value"], choice["why"]), session)
+        linked = emit.ensure_exec_line(
+            root / state.cfg_folder / "autoexec.vcfg",
+            f"{state.cfg_folder}/{crosshairx.CFG_NAME}", session,
+            title="Crosshair, from the Crosshair X switch (cs2-autoconfig)",
+            shout="CROSSHAIR Setting",
+        )
+        return {**choice, "written": str(target), "linked": linked, "error": ""}
+    except Exception as exc:
+        return {"hidden": False, "value": "", "warning": "", "written": "",
+                "error": f"could not set the crosshair for this launch: {exc}"}
 
 
 def _play_stop(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -494,6 +583,13 @@ def _save_prefs(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         # also sends them back with everything else when preferences are
         # remembered; unlisted, they would be dropped on the next save.
         "setups", "setup_live",
+        # Whether Crosshair X draws the crosshair instead of the game. Per
+        # account, because it changes what the generated config writes.
+        "hide_crosshair", "crosshairx_launch",
+        # Which demo is on the key, and which key it is on.
+        "demo_pick", "demo_key",
+        # The FACEIT account whose matches are being followed.
+        "faceit_nick", "faceit_id",
     )
     changes = {key: body[key] for key in allowed if key in body}
     profiles.remember(prefs, account, changes)
@@ -2155,6 +2251,334 @@ def _updater(state: State):
     return checker
 
 
+class _DemoJob:
+    """One demo download, running where it cannot hold up the page.
+
+    A demo is a few hundred megabytes, so this is a background thread with a
+    progress figure the page polls, in the same shape as the launch watcher
+    and the updater. One at a time: two of these would race for the same
+    replay folder and neither would be the one you asked for.
+    """
+
+    def __init__(self, found: Dict[str, Any], target: "Path",
+                 source: Optional["Path"] = None) -> None:
+        self.found = found
+        self.target = target
+        # When set, the demo is already on disk -- downloaded by the browser --
+        # and this is a decompress-and-move rather than a network fetch.
+        self.source = source
+        self.done = False
+        self.error = ""
+        self.seen = 0
+        self.total = 0
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, daemon=True,
+                                        name="cs2cfg-demo")
+
+    def start(self) -> None:
+        self._thread.start()
+
+    def cancel(self) -> None:
+        self._stop.set()
+
+    @property
+    def active(self) -> bool:
+        return self._thread.is_alive()
+
+    def _run(self) -> None:
+        from . import demos
+
+        try:
+            if self.source is not None:
+                demos.adopt(self.source, self.found["match_id"], self.target.parent,
+                            self.found, progress=self._progress)
+            else:
+                demos.download(self.found["url"], self.target,
+                               progress=self._progress,
+                               cancelled=self._stop.is_set)
+        except demos.Cancelled:
+            self.error = "cancelled"
+        except Exception as exc:
+            self.error = str(exc)
+        finally:
+            self.done = True
+
+    def _progress(self, seen: int, total: int) -> None:
+        self.seen, self.total = seen, total
+
+    def as_dict(self) -> Dict[str, Any]:
+        return {"active": self.active, "done": self.done, "error": self.error,
+                "seen": self.seen, "total": self.total,
+                "name": self.target.name, "match": self.found.get("match_id", ""),
+                "map": self.found.get("map", ""),
+                "importing": self.source is not None}
+
+
+def _replays(state: State) -> Optional["Path"]:
+    """The game's replay folder, or None if CS2 has not been found."""
+    from . import demos
+
+    state.refresh()
+    if not state.cs2_install:
+        return None
+    return demos.replay_dir(state.cs2_install)
+
+
+def _demos(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """What is on disk, and what a download in flight is doing. Read-only."""
+    from . import demos
+    from .cli import load_prefs
+
+    folder = _replays(state)
+    # Through ui_for, not prefs["ui"]: preferences are split into a machine
+    # half and a per-account half, and these live in the account's.
+    ui = profiles.ui_for(load_prefs(), _active_account(state))
+    return {
+        "ok": True,
+        "folder": str(folder) if folder else "",
+        "demos": demos.installed(folder) if folder else [],
+        "picked": str(ui.get("demo_pick") or ""),
+        "key": str(ui.get("demo_key") or "F9"),
+        "job": state.demo.as_dict() if state.demo else None,
+    }
+
+
+def _demo_resolve(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Look up a pasted match link. Fetches nothing but the match details."""
+    from . import demos
+
+    try:
+        found = demos.resolve(str(body.get("link") or ""))
+    except demos.DemoError as exc:
+        return {"ok": False, "error": str(exc)}
+    return {"ok": True, **found, "name": demos.local_name(found["match_id"], found)}
+
+
+def _faceit(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Who you are on FACEIT, and your recent matches.
+
+    Kept warm rather than fetched on every ask. The page polls this while it
+    is open so a match finished mid-session turns up on its own, and a cache
+    is what keeps that from becoming a request every second to somebody
+    else's server. A refresh can still be forced when you want one now.
+    """
+    from . import demos
+    from .cli import load_prefs, save_prefs
+
+    account = _active_account(state)
+    prefs = load_prefs()
+    ui = profiles.ui_for(prefs, account)
+
+    # A nickname sent with the request is a new one being set.
+    asked = str(body.get("nickname") or "").strip()
+    if asked and asked != ui.get("faceit_nick"):
+        profiles.remember(prefs, account, {"faceit_nick": asked, "faceit_id": ""})
+        save_prefs(prefs)
+        ui = profiles.ui_for(prefs, account)
+        state.faceit = None
+
+    nickname = str(ui.get("faceit_nick") or "")
+    if not nickname:
+        return {"ok": True, "linked": False}
+
+    fresh = time.time()
+    cached = state.faceit
+    if cached and not body.get("force") and fresh - cached["when"] < 90:
+        return {"ok": True, "linked": True, "cached": True, **cached["data"]}
+
+    try:
+        known = str(ui.get("faceit_id") or "")
+        me = demos.player(nickname)
+        if me["player_id"] != known:
+            profiles.remember(prefs, account, {"faceit_id": me["player_id"]})
+            save_prefs(prefs)
+        matches = demos.history(me["player_id"], int(body.get("size") or 20))
+    except demos.DemoError as exc:
+        # Keep showing the last good answer rather than blanking the list
+        # because one poll failed.
+        if cached:
+            return {"ok": True, "linked": True, "stale": True,
+                    "error": str(exc), **cached["data"]}
+        return {"ok": False, "linked": True, "error": str(exc)}
+
+    data = {"player": me, "matches": matches}
+    state.faceit = {"when": fresh, "data": data}
+    return {"ok": True, "linked": True, "cached": False, **data}
+
+
+def _faceit_forget(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Stop following an account."""
+    from .cli import load_prefs, save_prefs
+
+    prefs = load_prefs()
+    profiles.remember(prefs, _active_account(state),
+                      {"faceit_nick": "", "faceit_id": ""})
+    save_prefs(prefs)
+    state.faceit = None
+    return {"ok": True, "linked": False}
+
+
+def _demo_stats(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """The scoreboard for a pasted match. Independent of the demo.
+
+    Stats outlive the demo file, so this answers even when the download does
+    not -- which is the common case for anything more than a few weeks old.
+    """
+    from . import demos
+
+    try:
+        return {"ok": True, **demos.stats(str(body.get("link") or ""))}
+    except demos.DemoError as exc:
+        return {"ok": False, "error": str(exc)}
+
+
+def _demo_get(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Start downloading the demo for a pasted match link."""
+    from . import demos
+
+    if state.demo is not None and state.demo.active:
+        return {"ok": False, "error": "a demo is already downloading"}
+
+    folder = _replays(state)
+    if folder is None:
+        return {"ok": False, "error": "CS2's install was not found, so there is "
+                                      "nowhere to put a demo"}
+    try:
+        found = demos.resolve(str(body.get("link") or ""))
+    except demos.DemoError as exc:
+        return {"ok": False, "error": str(exc)}
+
+    target = folder / demos.local_name(found["match_id"], found)
+    if target.exists() and not body.get("again"):
+        return {"ok": True, "already": True, "name": target.name,
+                "detail": "that match is already downloaded"}
+
+    # A copy the browser already fetched beats fetching it again: it is local,
+    # it is instant next to a 200 MB transfer, and FACEIT's CDN sits behind a
+    # bot challenge that a plain HTTP client is not meant to get through.
+    here = demos.waiting(found["match_id"])
+    if here:
+        state.demo = _DemoJob(found, target, source=Path(here["path"]))
+        state.demo.start()
+        return {"ok": True, "already": False, "importing": True,
+                "source": here["name"], "job": state.demo.as_dict()}
+
+    state.demo = _DemoJob(found, target)
+    state.demo.start()
+    return {"ok": True, "already": False, "job": state.demo.as_dict()}
+
+
+def _demo_waiting(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Whether a demo for this match is sitting in Downloads. Read-only."""
+    from . import demos
+
+    found = demos.match_id(str(body.get("link") or ""))
+    if not found:
+        return {"ok": False, "error": "no match given"}
+    folder = _replays(state)
+    here = demos.waiting(found)
+    return {"ok": True, "match_id": found, "waiting": here,
+            "downloads": str(demos.downloads_dir()),
+            "installed": bool(folder and (folder /
+                              demos.local_name(found)).exists())}
+
+
+def _demo_page(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Open the match's own download page in the real browser.
+
+    The CDN answers a browser and challenges everything else, so the download
+    itself belongs to the browser. This application's job starts again once
+    the file has landed.
+    """
+    from . import demos
+
+    found = demos.match_id(str(body.get("link") or ""))
+    if not found:
+        return {"ok": False, "error": "no match given"}
+    url = demos.MATCH_PAGE.format(match_id=found)
+    try:
+        import webbrowser
+
+        webbrowser.open(url)
+    except Exception as exc:
+        return {"ok": False, "error": f"could not open the browser: {exc}", "url": url}
+    return {"ok": True, "url": url}
+
+
+def _demo_cancel(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    if state.demo is None or not state.demo.active:
+        return {"ok": False, "error": "nothing is downloading"}
+    state.demo.cancel()
+    return {"ok": True}
+
+
+def _demo_pick(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Put a demo on a key, and remember it as the one to launch into.
+
+    The name is checked against what is actually in the replay folder rather
+    than trusted: it arrives from the page, and it ends up in a config file.
+    """
+    from . import demos
+    from .cli import load_prefs, save_prefs
+
+    folder = _replays(state)
+    if folder is None:
+        return {"ok": False, "error": "CS2's install was not found"}
+
+    wanted = str(body.get("name") or "")
+    known = {d["name"] for d in demos.installed(folder)}
+    if wanted and wanted not in known:
+        return {"ok": False, "error": f"there is no demo called {wanted!r}"}
+
+    key = str(body.get("key") or "F9").strip() or "F9"
+    prefs = load_prefs()
+    profiles.remember(prefs, _active_account(state),
+                      {"demo_pick": wanted, "demo_key": key})
+    save_prefs(prefs)
+
+    root = steam.cfg_dir(state.cs2_install)
+    target = root / state.cfg_folder / DEMO_CFG
+    session = backup.BackupSession(note="demo: bind")
+    if not wanted:
+        # Nothing picked: the bind file becomes a no-op rather than a stale
+        # key that plays whatever you were watching last week.
+        emit.write_text_file(target, emit.GENERATED_MARKER +
+                             "\n// No demo picked.\n", session)
+        return {"ok": True, "cleared": True}
+
+    emit.write_text_file(target, demos.render_cfg(wanted, key), session)
+    linked = emit.ensure_exec_line(
+        root / state.cfg_folder / "autoexec.vcfg",
+        f"{state.cfg_folder}/{DEMO_CFG}", session,
+        title="Demo on a key (cs2-autoconfig)", shout="DEMO Key")
+    return {"ok": True, "name": wanted, "key": key, "linked": linked,
+            "command": demos.play_command(wanted)}
+
+
+def _crosshairx(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Whether Crosshair X is installed, and whether it is up. Read-only."""
+    from . import crosshairx, steam
+
+    state.refresh()
+    if state.steam_root is None:
+        return {"ok": True, "installed": False, "running": False,
+                "app_id": crosshairx.APP_ID, "name": crosshairx.APP_NAME}
+    libs = steam.find_libraries(state.steam_root)
+    return {"ok": True, **crosshairx.summary(libs)}
+
+
+def _crosshairx_start(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Start Crosshair X, having been asked to."""
+    from . import crosshairx, steam
+
+    state.refresh()
+    if state.steam_root is None:
+        return {"ok": False, "error": "Steam was not found"}
+    if not crosshairx.find(steam.find_libraries(state.steam_root)):
+        return {"ok": False, "error": f"{crosshairx.APP_NAME} is not installed"}
+    return crosshairx.start()
+
+
 def _setups(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     """Every named setup this account has, and which one it is following."""
     from . import profiles, setups
@@ -2452,6 +2876,18 @@ def make_handler(state: State):
         "/api/env": _environment,
         "/api/profile": _profile,
         "/api/profile/use": _profile_use,
+        "/api/demos": _demos,
+        "/api/demos/resolve": _demo_resolve,
+        "/api/demos/stats": _demo_stats,
+        "/api/faceit": _faceit,
+        "/api/faceit/forget": _faceit_forget,
+        "/api/demos/get": _demo_get,
+        "/api/demos/cancel": _demo_cancel,
+        "/api/demos/waiting": _demo_waiting,
+        "/api/demos/page": _demo_page,
+        "/api/demos/pick": _demo_pick,
+        "/api/crosshairx": _crosshairx,
+        "/api/crosshairx/start": _crosshairx_start,
         "/api/setups": _setups,
         "/api/setups/act": _setups_act,
         "/api/setup/export": _setup_export,

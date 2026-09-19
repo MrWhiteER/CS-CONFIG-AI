@@ -265,6 +265,7 @@ def build_profile(
     target_fps: Optional[int] = None,
     resolution: Optional[Tuple[int, int]] = None,
     current_video: Optional[Dict[str, str]] = None,
+    hide_crosshair: bool = False,
 ) -> Profile:
     """Score the machine and produce a complete settings plan."""
     if intent not in INTENTS:
@@ -332,6 +333,15 @@ def build_profile(
         ("engine_no_focus_sleep", "0", "keeps the frame rate up when the window loses focus"),
         ("rate", "786432", "CS2's own default and maximum; old configs carry a CS:GO-era 128000 downgrade"),
     ]
+
+    # An overlay is drawing the crosshair, so the game should stop drawing its
+    # own -- two of them a pixel apart is worse than either. Written only when
+    # asked for: a config that silently turns somebody's crosshair off is a
+    # config that gets blamed for a bad session.
+    if hide_crosshair:
+        from .crosshairx import CONVAR, OFF, REASON
+
+        convars.append((CONVAR, OFF, REASON))
 
     advisories.extend(_build_advisories(machine, current_video, kb))
 

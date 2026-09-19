@@ -654,6 +654,305 @@
     .settings-box.resizing { transition: none; }
   }
 
+  /* The followed FACEIT account, and its recent matches. */
+  .fc-me {
+    display: flex; align-items: center; gap: 12px;
+    margin-top: 14px; padding: 11px 13px; border-radius: 11px;
+    background: var(--panel-2); border: 1px solid var(--line);
+  }
+  .fc-av {
+    width: 38px; height: 38px; border-radius: 11px; flex: none;
+    object-fit: cover; background: var(--chip);
+    border: 1px solid color-mix(in srgb, var(--neon-cyan) 35%, transparent);
+  }
+  .fc-me .who { flex: 1 1 auto; min-width: 0; }
+  .fc-me .who b { display: block; font-size: 13px; }
+  .fc-me .who span { font-size: 10.5px; color: var(--muted); }
+  .fc-lvl {
+    flex: none; display: inline-grid; place-items: center;
+    width: 26px; height: 26px; border-radius: 8px; font-size: 11px;
+    font-weight: 700; color: #08110c; background: var(--good);
+  }
+
+  .fc-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 9px 12px; margin-top: 6px; border-radius: 10px;
+    background: var(--panel-2); border-left: 3px solid var(--faint);
+  }
+  .fc-row.won { border-left-color: var(--good); }
+  .fc-row.lost { border-left-color: var(--bad); }
+  .fc-row .map { flex: 0 0 116px; font-size: 12.5px; font-weight: 500; }
+  .fc-row .sc {
+    flex: 0 0 74px; font-variant-numeric: tabular-nums; font-size: 12.5px;
+  }
+  .fc-row .line {
+    flex: 1 1 auto; min-width: 0; font-size: 11px; color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .fc-row .delta {
+    flex: 0 0 52px; text-align: right; font-size: 11.5px; font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .fc-row .delta.up { color: var(--good); }
+  .fc-row .delta.down { color: var(--bad); }
+  .fc-row .actions { margin: 0; flex: none; }
+  .fc-have {
+    font-size: 9px; font-weight: 700; letter-spacing: .06em; padding: 1px 6px;
+    border-radius: 5px; color: var(--neon-cyan);
+    border: 1px solid color-mix(in srgb, var(--neon-cyan) 45%, transparent);
+  }
+
+  /* The download, as a ring that fills. A ring rather than a bar because it
+     sits inside the scoreboard window next to a button, where a full-width
+     bar has nowhere to go. One colour throughout -- it is a measurement, and
+     a measurement that changes hue while you watch is harder to read, not
+     easier. */
+  .ring { position: relative; width: 44px; height: 44px; flex: none; }
+  .ring i {
+    position: absolute; inset: 0; border-radius: 50%;
+    background: conic-gradient(var(--neon-cyan) calc(var(--p, 0) * 1%),
+                               var(--chip) 0);
+    -webkit-mask: radial-gradient(farthest-side, transparent 66%, #000 68%);
+            mask: radial-gradient(farthest-side, transparent 66%, #000 68%);
+    transition: background .3s linear;
+  }
+  .ring b {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    font-size: 10.5px; font-weight: 700; color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  /* Nothing to measure yet: one arc, turning. Still one colour. */
+  .ring.spin i {
+    background: conic-gradient(transparent 0 62%, var(--neon-cyan) 62% 100%);
+    animation: ring-spin 1s linear infinite;
+    transition: none;
+  }
+  @keyframes ring-spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) {
+    .ring.spin i { animation-duration: 3s; }
+  }
+
+  .mstat-get {
+    display: flex; align-items: center; gap: 14px; margin: 16px 0 2px;
+    padding: 12px 14px; border-radius: 12px;
+    background: var(--panel-2); border: 1px solid var(--line);
+  }
+  .mstat-get .say { flex: 1 1 auto; min-width: 0; }
+  .mstat-get .say b { display: block; font-size: 13px; }
+  .mstat-get .say span { font-size: 11px; color: var(--muted); }
+  @supports not (color: color-mix(in srgb, red 50%, blue)) {
+    .fc-av, .fc-have { border-color: var(--neon-cyan); }
+  }
+
+  /* The match scoreboard window. Laid out the way a scoreboard is read: one
+     block per team, best player at the top, numbers in columns that line up.
+     Tabular figures throughout -- a column of proportional digits does not
+     line up, and lining up is the entire job of a table like this. */
+  .mstat {
+    width: min(1120px, 94vw); max-height: 88vh; display: flex;
+    flex-direction: column; border-radius: 16px; overflow: hidden;
+    background: var(--panel); border: 1px solid var(--line);
+    box-shadow: 0 30px 90px rgba(0, 0, 0, .6);
+  }
+  .mstat-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; padding: 16px 20px; border-bottom: 1px solid var(--line);
+    background: var(--panel-2);
+  }
+  .mstat-head h3 { margin: 2px 0 0; font-size: 19px; }
+  .mstat-actions { display: flex; gap: 8px; flex: none; }
+  .mstat-body { overflow: auto; padding: 6px 20px 20px; }
+
+  .mstat-team {
+    display: flex; align-items: baseline; gap: 12px;
+    margin: 18px 0 8px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--line);
+  }
+  .mstat-team .score {
+    font-size: 26px; font-weight: 700; line-height: 1;
+    font-variant-numeric: tabular-nums; color: var(--muted);
+  }
+  .mstat-team.won .score { color: var(--good); }
+  .mstat-team.lost .score { color: var(--bad); }
+  .mstat-team b { font-size: 15px; font-weight: 600; }
+  .mstat-team .halves { margin-left: auto; font-size: 11px; color: var(--muted); }
+
+  table.mstat-grid { width: 100%; border-collapse: collapse; font-size: 12px; }
+  table.mstat-grid th {
+    text-align: right; padding: 6px 7px; font-size: 9.5px; font-weight: 700;
+    letter-spacing: .07em; text-transform: uppercase; color: var(--faint);
+    border-bottom: 1px solid var(--line); white-space: nowrap;
+  }
+  table.mstat-grid th:first-child, table.mstat-grid td:first-child {
+    text-align: left; padding-left: 2px;
+  }
+  table.mstat-grid td {
+    padding: 7px; text-align: right; color: var(--ink);
+    font-variant-numeric: tabular-nums;
+    border-bottom: 1px solid color-mix(in srgb, var(--line) 45%, transparent);
+  }
+  table.mstat-grid tbody tr:hover td { background: var(--panel-2); }
+  table.mstat-grid td.dim { color: var(--muted); }
+  /* Nobody scans a table of zeroes. The multi-kill columns are mostly zero,
+     so the zeroes recede and only what happened stands out. */
+  table.mstat-grid td.zero { color: var(--faint); }
+  .mstat-who { display: flex; align-items: center; gap: 8px; }
+  .mstat-who b { font-weight: 500; }
+  .mstat-you {
+    font-size: 9px; font-weight: 700; letter-spacing: .06em; padding: 1px 5px;
+    border-radius: 5px; color: var(--neon-cyan);
+    border: 1px solid color-mix(in srgb, var(--neon-cyan) 45%, transparent);
+  }
+  /* K/D carries the most meaning per pixel here, so it is the one coloured. */
+  td.kd-good { color: var(--good); font-weight: 600; }
+  td.kd-bad { color: var(--bad); }
+  .mstat-note { margin: 16px 0 0; font-size: 10.5px; color: var(--muted); }
+  @media (max-width: 760px) {
+    table.mstat-grid .opt-col { display: none; }
+    .mstat-body { padding: 6px 12px 16px; }
+  }
+  @supports not (color: color-mix(in srgb, red 50%, blue)) {
+    table.mstat-grid td { border-bottom-color: var(--line); }
+    .mstat-you { border-color: var(--neon-cyan); }
+  }
+
+  /* Match demos. A paste field, a progress bar and a list of what is on
+     disk -- the three things the job actually consists of. */
+  .demo-get { display: flex; gap: 8px; align-items: center; }
+  .demo-get input {
+    flex: 1 1 auto; min-width: 0; padding: 9px 12px;
+    background: var(--panel-2); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 9px;
+    font: inherit; font-size: 12.5px;
+  }
+  .demo-get input:focus {
+    outline: none; border-color: var(--neon-cyan);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--neon-cyan) 18%, transparent);
+  }
+
+  .demo-prog {
+    display: flex; align-items: center; gap: 11px; margin-top: 12px;
+  }
+  .demo-bar {
+    flex: 1 1 auto; height: 7px; border-radius: 999px;
+    background: var(--chip); overflow: hidden;
+  }
+  .demo-bar i {
+    display: block; height: 100%; width: 0;
+    border-radius: 999px; background: var(--neon-cyan);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--neon-cyan) 70%, transparent);
+    transition: width .25s ease;
+  }
+  /* A download whose length the server did not declare. Rather than a bar
+     that sits at zero looking broken, it sweeps. */
+  .demo-bar.unknown i {
+    width: 34%; animation: demo-sweep 1.3s ease-in-out infinite;
+    box-shadow: none;
+  }
+  @keyframes demo-sweep {
+    0% { margin-left: -34%; } 100% { margin-left: 100%; }
+  }
+
+  .demo-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 9px 12px; margin-top: 7px; border-radius: 10px;
+    background: var(--panel-2); border: 1px solid transparent;
+  }
+  .demo-row.picked {
+    border-color: color-mix(in srgb, var(--neon-cyan) 45%, transparent);
+    background: color-mix(in srgb, var(--neon-cyan) 8%, var(--panel-2));
+  }
+  .demo-row .who { flex: 1 1 auto; min-width: 0; }
+  .demo-row .who b {
+    display: block; font-weight: 500; font-size: 12.5px; color: var(--ink);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .demo-row .who span { font-size: 10.5px; color: var(--muted); }
+  .demo-row .actions { margin: 0; flex: none; }
+  .demo-key {
+    font: inherit; font-size: 10px; font-weight: 700; letter-spacing: .06em;
+    padding: 2px 7px; border-radius: 6px; color: var(--neon-cyan);
+    background: color-mix(in srgb, var(--neon-cyan) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--neon-cyan) 40%, transparent);
+  }
+  @supports not (color: color-mix(in srgb, red 50%, blue)) {
+    .demo-row.picked { border-color: var(--neon-cyan); background: var(--panel-2); }
+    .demo-key { background: none; border-color: var(--neon-cyan); }
+    .demo-get input:focus { box-shadow: none; }
+  }
+
+  /* Crosshair X, as its own thing rather than another row of checkboxes.
+
+     The mark is drawn here rather than lifted from the application: a
+     crosshair is the obvious shape for it and nobody owns a circle with four
+     ticks, but their actual logo is theirs. A ring, a gap at each quarter,
+     a centre dot -- and it is cyan, which in this window already means "this
+     is telling you something" rather than a state of the game. */
+  .xh-head {
+    display: flex; align-items: center; gap: 14px; margin-bottom: 4px;
+  }
+  .xh-mark {
+    flex: none; width: 48px; height: 48px; border-radius: 14px;
+    display: grid; place-items: center;
+    background:
+      radial-gradient(120% 120% at 30% 20%,
+        color-mix(in srgb, var(--neon-cyan) 26%, transparent), transparent 62%),
+      linear-gradient(160deg, #16203a, #0b1020);
+    border: 1px solid color-mix(in srgb, var(--neon-cyan) 40%, transparent);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06),
+                0 0 18px color-mix(in srgb, var(--neon-cyan) 22%, transparent);
+    color: var(--neon-cyan);
+  }
+  .xh-mark svg {
+    width: 26px; height: 26px; fill: none; stroke: currentColor;
+    stroke-width: 1.7; stroke-linecap: round;
+    filter: drop-shadow(0 0 5px color-mix(in srgb, var(--neon-cyan) 65%, transparent));
+  }
+  .xh-name { min-width: 0; }
+  .xh-name h3 {
+    margin: 0; font-size: 15px; font-weight: 650; color: var(--ink);
+    display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+  }
+  .xh-name p { margin: 3px 0 0; font-size: 11.5px; color: var(--muted); }
+
+  /* .opt lays its children out in a nowrap flex row, so the name and its
+     explanation go in one item together rather than becoming two columns. */
+  .xh-opt { display: block; min-width: 0; }
+  .xh-opt b { font-weight: 500; color: var(--ink); }
+  .xh-opt .sub2 { display: block; margin-top: 3px; line-height: 1.45; }
+
+  /* Whether it is up, said as a state rather than a sentence. */
+  .xh-live {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 2px 9px 2px 7px; border-radius: 999px;
+    font-size: 10px; font-weight: 700; letter-spacing: .08em;
+    background: var(--chip); border: 1px solid var(--line); color: var(--muted);
+  }
+  .xh-live i {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--faint);
+  }
+  .xh-live.up {
+    color: var(--good);
+    border-color: color-mix(in srgb, var(--good) 45%, transparent);
+    background: color-mix(in srgb, var(--good) 12%, transparent);
+  }
+  .xh-live.up i { background: var(--good); box-shadow: 0 0 7px var(--good); }
+
+  /* The rules note. Bordered rather than buried, because it is the one thing
+     on the card this application cannot answer for somebody. */
+  .xh-rules {
+    margin: 12px 0 0; padding: 9px 12px; border-radius: 9px;
+    background: var(--panel-2);
+    border-left: 2px solid color-mix(in srgb, var(--warn) 55%, transparent);
+    font-size: 10.5px; line-height: 1.5; color: var(--muted);
+  }
+  @supports not (color: color-mix(in srgb, red 50%, blue)) {
+    .xh-mark { background: #16203a; border-color: var(--neon-cyan); box-shadow: none; }
+    .xh-mark svg { filter: none; }
+    .xh-live.up { background: none; border-color: var(--good); }
+    .xh-rules { border-left-color: var(--warn); }
+  }
+
   /* The saved setups, as chips. A row of names beats a dropdown here: there
      are a handful of them and switching is the common act, so it should cost
      one click rather than two. */
@@ -3700,6 +3999,32 @@
 
       </section>
 
+      <!-- Match demos. In the launcher rather than a tab of its own: the
+           whole point is that watching one is part of starting the game. -->
+      <section class="panel" id="demo-card">
+        <h2>Match demos</h2>
+        <p class="sub" style="margin:0 0 12px">
+          Paste a FACEIT match link and it downloads the demo into the game&rsquo;s
+          replay folder. Then <b>Watch</b> starts CS2 already playing it, or put it
+          on a key and press that whenever you like.
+        </p>
+        <div class="demo-get">
+          <input id="demo-link" type="text" spellcheck="false"
+                 placeholder="https://www.faceit.com/en/cs2/room/1-&hellip;">
+          <button class="btn" id="demo-fetch">Get demo</button>
+        </div>
+        <div id="demo-note"></div>
+        <!-- The followed account and its recent matches. Filled by loadFaceit;
+             hidden entirely until an account is linked. -->
+        <div id="fc-wrap"></div>
+        <div class="demo-prog hidden" id="demo-prog">
+          <div class="demo-bar"><i id="demo-bar-fill"></i></div>
+          <span class="sub2" id="demo-prog-say">starting&hellip;</span>
+          <button class="btn small" id="demo-cancel">Cancel</button>
+        </div>
+        <div id="demo-list"></div>
+      </section>
+
       <!-- Only while something is launching. The mode that used to head this
            card now sits beside the Play button, which left nothing here worth
            showing to somebody who is not mid-launch. -->
@@ -3997,6 +4322,12 @@
         <div id="setups-out"></div>
       </section>
 
+      <!-- Only drawn when Crosshair X is actually installed. Advertising an
+           integration for software somebody does not have is noise. -->
+      <section class="panel hidden" id="xhair-card">
+        <div id="xhair-out"></div>
+      </section>
+
       <section class="panel">
         <h2>Write</h2>
         <label class="opt"><input type="checkbox" id="w-video" checked> Picture quality (cs2_video.txt)</label>
@@ -4163,6 +4494,25 @@
 
     </div><!-- /.scroll -->
   </main>
+</div>
+
+<!-- The match scoreboard, as its own window over everything else. Built from
+     FACEIT's own stats endpoint, and shown whether or not the demo is
+     downloadable: the numbers outlive the file. -->
+<div class="modal-back hidden" id="mstat-back">
+  <div class="mstat" role="dialog" aria-modal="true" aria-labelledby="mstat-title">
+    <header class="mstat-head">
+      <div>
+        <div class="eyebrow" id="mstat-when">Match</div>
+        <h3 id="mstat-title">Scoreboard</h3>
+      </div>
+      <div class="mstat-actions">
+        <a class="btn small" id="mstat-page" target="_blank" rel="noopener noreferrer">Match page</a>
+        <button class="btn small" id="mstat-close">Close</button>
+      </div>
+    </header>
+    <div class="mstat-body" id="mstat-body"></div>
+  </div>
 </div>
 
 <div class="modal-back hidden" id="chg-modal">
@@ -4775,6 +5125,8 @@ function requestBody() {
   return {
     intent, target_fps: t ? Number(t) : null,
     account: currentAccount(),
+    hide_crosshair: !!(prefsNow && prefsNow.hide_crosshair),
+    crosshairx_launch: !!(prefsNow && prefsNow.crosshairx_launch),
     write_video: $("w-video").checked, write_cfg: $("w-cfg").checked,
     write_launch: $("w-launch").checked, link_autoexec: $("w-autoexec").checked,
     fix_scaling: $("w-scaling").checked,
@@ -8220,6 +8572,675 @@ function kbPicker() {
     "</div>";
 }
 
+/* Match demos.
+
+   Paste a FACEIT match link, the demo lands in the game's replay folder, and
+   from there it is either a launch away or a keypress away. The download runs
+   on the server and is polled, because a demo is a few hundred megabytes and
+   nothing about that fits in one request.
+*/
+let demoData = null;
+let demoPoll = null;
+let statsShown = null;   // the match whose scoreboard window is open
+let watchNext = "";   // a demo to start the next launch already playing
+
+function bytes(n) {
+  if (!n) return "";
+  const mb = n / 1048576;
+  return mb >= 1024 ? (mb / 1024).toFixed(1) + " GB" : Math.round(mb) + " MB";
+}
+
+function ago(seconds) {
+  const mins = Math.round((Date.now() / 1000 - seconds) / 60);
+  if (mins < 60) return mins + "m ago";
+  if (mins < 1440) return Math.round(mins / 60) + "h ago";
+  return Math.round(mins / 1440) + "d ago";
+}
+
+/* Following a FACEIT account.
+
+   Polled while the launcher is on screen, so a match finished a minute ago
+   turns up without anyone pasting anything. The server keeps the answer warm
+   for ninety seconds; this asks every sixty, which means at most one request
+   to FACEIT a minute however many times the page asks. */
+let fcData = null;
+let fcTimer = null;
+let fcSeen = "";   // the newest match id already shown, to notice arrivals
+
+async function loadFaceit(opts) {
+  const body = Object.assign({}, opts || {});
+  try {
+    fcData = await api("/api/faceit", body);
+  } catch (err) {
+    fcData = { ok: false, error: String(err && err.message || err) };
+  }
+  renderFaceit();
+  if (fcData && fcData.matches && fcData.matches.length) {
+    const newest = fcData.matches[0].match_id;
+    if (fcSeen && newest !== fcSeen) {
+      status("New match: " + esc(fcData.matches[0].map) + " — " +
+             (fcData.matches[0].won ? "win" : "loss"));
+    }
+    fcSeen = newest;
+  }
+}
+
+function startFaceitWatch() {
+  if (fcTimer) return;
+  fcTimer = setInterval(() => {
+    // Only while the launcher is actually on screen. Polling a tab nobody is
+    // looking at is just someone else's bandwidth.
+    const pane = document.querySelector('.tab-panel[data-panel="launcher"]');
+    if (pane && !pane.classList.contains("hidden")) loadFaceit();
+  }, 60000);
+}
+
+function renderFaceit() {
+  const wrap = $("fc-wrap");
+  if (!wrap) return;
+  if (!fcData || fcData.linked === false) {
+    // A poll landing mid-typing must not replace the box and throw away the
+    // half-typed nickname, so an existing form is left exactly as it is.
+    if ($("fc-nick")) return;
+    wrap.innerHTML =
+      '<div class="fc-me"><span class="who"><b>Follow your FACEIT matches</b>' +
+      "<span>Your recent games appear here on their own, with stats and a " +
+      "one-click demo.</span></span>" +
+      '<span class="actions"><input id="fc-nick" type="text" spellcheck="false" ' +
+      'placeholder="FACEIT nickname" style="width:170px">' +
+      '<button class="btn small" id="fc-link">Follow</button></span></div>';
+    return;
+  }
+  if (fcData.ok === false || (!fcData.player && fcData.error)) {
+    wrap.innerHTML = '<p class="sub2" style="margin:12px 0 0;color:var(--bad)">' +
+      esc(fcData.error || "could not read that account") +
+      '</p><div class="actions"><button class="btn small" id="fc-forget">Use another name</button></div>';
+    return;
+  }
+
+  const p = fcData.player || {};
+  const have = new Set((demoData && demoData.demos || []).map(d => d.name));
+  const head =
+    '<div class="fc-me">' +
+      (p.avatar ? '<img class="fc-av" src="' + esc(p.avatar) + '" alt="">'
+                : '<span class="fc-av"></span>') +
+      '<span class="who"><b>' + esc(p.nickname || "") + "</b><span>" +
+        (p.elo ? p.elo + " elo" : "") +
+        (fcData.stale ? " &middot; showing the last good read" : "") +
+      "</span></span>" +
+      (p.level ? '<span class="fc-lvl">' + p.level + "</span>" : "") +
+      '<span class="actions">' +
+        '<button class="btn small" id="fc-refresh">Refresh</button>' +
+        '<button class="btn small" id="fc-forget">Unfollow</button>' +
+      "</span>" +
+    "</div>";
+
+  const rows = (fcData.matches || []).map(m => {
+    const got = have.has(demoNameFor(m));
+    return '<div class="fc-row ' + (m.won ? "won" : "lost") + '">' +
+      '<span class="map">' + esc(m.map || "?") + "</span>" +
+      '<span class="sc">' + esc(m.score) + "</span>" +
+      '<span class="line">' + m.kills + "/" + m.deaths + "/" + m.assists +
+        " &middot; " + m.adr.toFixed(1) + " adr &middot; " + ago(m.played_at) +
+        (got ? ' &middot; <span class="fc-have">DOWNLOADED</span>' : "") +
+      "</span>" +
+      '<span class="delta ' + (m.elo_delta >= 0 ? "up" : "down") + '">' +
+        (m.elo_delta >= 0 ? "+" : "") + m.elo_delta + "</span>" +
+      '<span class="actions"><button class="btn small" data-match="' +
+        esc(m.match_id) + '">Stats</button></span>' +
+    "</div>";
+  }).join("");
+
+  wrap.innerHTML = head + (rows ||
+    '<p class="sub2" style="margin:10px 0 0">No CS2 matches on that account yet.</p>');
+}
+
+/* What a match's demo is called once downloaded. Mirrors the server's naming
+   so the list can say "downloaded" without asking. */
+function demoNameFor(m) {
+  const id = String(m.match_id || "");
+  const slug = String(m.map || "").replace(/[^A-Za-z0-9]/g, "").slice(0, 24);
+  return "faceit_" + id.slice(2, 10) + (slug ? "_" + slug : "") + ".dem";
+}
+
+/* The scoreboard window.
+
+   Shown whenever a match link is looked up, and deliberately not tied to the
+   download: FACEIT keeps the numbers long after it has thrown the demo away,
+   so a match too old to rewatch can still be read. */
+function showStats(s) {
+  const back = $("mstat-back");
+  if (!back || !s) return;
+  const when = s.played_at ? new Date(s.played_at * 1000).toLocaleString() : "";
+  $("mstat-title").textContent = (s.map || "Match") + "  " + (s.score || "");
+  $("mstat-when").textContent =
+    [s.mode, s.region, s.rounds ? s.rounds + " rounds" : "", when]
+      .filter(Boolean).join(" · ");
+  const page = $("mstat-page");
+  if (page) page.href = s.page || "#";
+
+  const cols = [
+    ["K", "kills"], ["D", "deaths"], ["A", "assists"],
+    ["ADR", "adr"], ["K/D", "kd"], ["K/R", "kr"],
+    ["HS", "headshots"], ["HS%", "hs_percent"],
+    ["5K", "penta"], ["4K", "quadro"], ["3K", "triple"], ["2K", "double"],
+    ["MVP", "mvps"],
+  ];
+  const optional = new Set(["headshots", "penta", "quadro", "triple", "double"]);
+  // Which row is yours. The Steam persona and the FACEIT nickname are not the
+  // same string -- "MrWhiteER" against "MrWhiteE_R" -- so both are reduced to
+  // letters and digits before comparing. A wrong match only mislabels a row,
+  // and no match just leaves the badge off.
+  const plain = t => String(t || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const mine = (whoData && whoData.accounts || []).find(a => a.active);
+  const me = plain(mine && mine.name);
+
+  $("mstat-body").innerHTML = s.teams.map(t => {
+    const head =
+      '<div class="mstat-team ' + (t.won ? "won" : "lost") + '">' +
+        '<span class="score">' + t.score + "</span><b>" + esc(t.name) + "</b>" +
+        '<span class="halves">first half ' + t.first_half +
+        " &middot; second half " + t.second_half + "</span></div>";
+    const header = "<tr><th>Player</th>" + cols.map(([label, key]) =>
+      '<th class="' + (optional.has(key) ? "opt-col" : "") + '">' + label + "</th>").join("") + "</tr>";
+    const rows = t.players.map(p => {
+      const you = me && plain(p.nickname) === me
+        ? ' <span class="mstat-you">YOU</span>' : "";
+      return "<tr><td><span class=\"mstat-who\"><b>" + esc(p.nickname) + "</b>" + you + "</span></td>" +
+        cols.map(([, key]) => {
+          const v = p[key];
+          let cls = optional.has(key) ? "opt-col" : "";
+          if (key === "kd") cls += v >= 1 ? " kd-good" : " kd-bad";
+          if (!v && key !== "kd") cls += " zero";
+          // Ratios keep their decimals; counts do not grow any by having them.
+          const shown = (key === "kd" || key === "kr") ? v.toFixed(2)
+            : key === "adr" ? v.toFixed(1)
+            : key === "hs_percent" ? Math.round(v) + "%"
+            : String(Math.round(v));
+          return '<td class="' + cls.trim() + '">' + shown + "</td>";
+        }).join("") + "</tr>";
+    }).join("");
+    return head + '<table class="mstat-grid"><thead>' + header +
+           "</thead><tbody>" + rows + "</tbody></table>";
+  }).join("") +
+  '<div class="mstat-get" id="mstat-get"></div>' +
+  '<p class="mstat-note">Numbers are FACEIT&rsquo;s own, from the match&rsquo;s ' +
+  "scoreboard. Damage per round differs by about a point from the figure on " +
+  "their newer stats tab &mdash; both are theirs, and they disagree.</p>";
+
+  statsShown = s;
+  statsWaiting = null;
+  paintGetRow();
+  checkWaiting(false);      // a copy may already be sitting in Downloads
+  back.classList.remove("hidden");
+}
+
+/* The download strip at the foot of the scoreboard: one of three states, and
+   never more than one. Not downloaded, downloading, or ready to watch. */
+function paintGetRow() {
+  const row = $("mstat-get");
+  if (!row || !statsShown) return;
+  const name = demoNameFor({ match_id: statsShown.match_id, map: statsShown.map });
+  const have = (demoData && demoData.demos || []).some(d => d.name === name);
+  const job = demoData && demoData.job;
+  const mine = job && job.match === statsShown.match_id && job.active;
+
+  if (mine) {
+    const pct = job.total ? Math.round(job.seen / job.total * 100) : 0;
+    row.innerHTML =
+      '<span class="ring' + (job.total ? "" : " spin") + '" style="--p:' + pct + '">' +
+        "<i></i><b>" + (job.total ? pct + "%" : "") + "</b></span>" +
+      '<span class="say"><b>' +
+        (job.importing ? "Unpacking it into the replay folder"
+                       : "Downloading the demo") + "</b><span>" +
+        (job.total ? bytes(job.seen) + " of " + bytes(job.total)
+                   : bytes(job.seen) + " so far") + "</span></span>" +
+      (job.importing ? "" :
+        '<span class="actions"><button class="btn small" id="demo-cancel">Cancel</button></span>');
+    return;
+  }
+  if (have) {
+    row.innerHTML =
+      '<span class="say"><b>Demo ready</b><span>' + esc(name) +
+      " &mdash; Watch starts CS2 already playing it.</span></span>" +
+      '<span class="actions">' +
+        '<button class="btn small" data-pick="' + esc(name) + '">Put on a key</button>' +
+        '<button class="btn" data-watch="' + esc(name) + '">Watch</button>' +
+      "</span>";
+    return;
+  }
+  // Nothing downloaded yet. If the browser already fetched one it is a local
+  // move; otherwise the browser is where the download has to happen, because
+  // FACEIT's CDN challenges anything that is not one.
+  if (statsWaiting && statsWaiting.match_id === statsShown.match_id &&
+      statsWaiting.waiting) {
+    row.innerHTML =
+      '<span class="say"><b>Found in your Downloads</b><span>' +
+      esc(statsWaiting.waiting.name) + " &mdash; " +
+      bytes(statsWaiting.waiting.size) + ". Import puts it in the replay folder." +
+      "</span></span>" +
+      '<span class="actions"><button class="btn" data-getdemo="1">Import</button></span>';
+    return;
+  }
+  row.innerHTML =
+    '<span class="say"><b>Demo not downloaded</b><span>FACEIT serves demos ' +
+    "only to a browser, so <b>Get it</b> opens the match page &mdash; press " +
+    "their download button and this picks the file up on its own." +
+    "</span></span>" +
+    '<span class="actions">' +
+      '<button class="btn small" data-getdemo="1">Try direct</button>' +
+      '<button class="btn" id="demo-openpage">Get it</button>' +
+    "</span>";
+}
+
+/* Polls Downloads for the match on screen while the browser fetches it, so
+   the file is picked up the moment it lands rather than on a button press. */
+let statsWaiting = null;
+let waitTimer = null;
+
+async function checkWaiting(andImport) {
+  if (!statsShown) return;
+  try {
+    statsWaiting = await api("/api/demos/waiting", { link: statsShown.match_id });
+  } catch (err) { return; }
+  if (statsWaiting && statsWaiting.waiting && andImport) {
+    stopWaitingWatch();
+    try {
+      const r = await api("/api/demos/get", { link: statsShown.match_id });
+      if (r.job) { demoData = demoData || {}; demoData.job = r.job; watchDemoJob(); }
+    } catch (err) { /* shown by paintGetRow below */ }
+  }
+  paintGetRow();
+}
+
+function startWaitingWatch() {
+  stopWaitingWatch();
+  // Two minutes is long enough for a few hundred megabytes on most lines, and
+  // short enough that a forgotten window stops asking.
+  let left = 60;
+  waitTimer = setInterval(() => {
+    if (--left <= 0 || !statsShown) { stopWaitingWatch(); return; }
+    checkWaiting(true);
+  }, 2000);
+}
+
+function stopWaitingWatch() {
+  if (waitTimer) clearInterval(waitTimer);
+  waitTimer = null;
+}
+
+function hideStats() {
+  const back = $("mstat-back");
+  if (back) back.classList.add("hidden");
+  stopWaitingWatch();
+  statsShown = null;
+}
+
+document.addEventListener("click", e => {
+  if (e.target.closest("#mstat-close")) { hideStats(); return; }
+  // Clicking the backdrop, but not the window itself.
+  const back = $("mstat-back");
+  if (back && e.target === back) hideStats();
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") hideStats();
+});
+
+async function loadDemos() {
+  try {
+    demoData = await api("/api/demos", {});
+  } catch (err) {
+    demoData = null;
+    return;
+  }
+  renderDemos();
+  // A download already in flight -- after a page reload, say -- is picked
+  // back up rather than left running invisibly.
+  if (demoData.job && demoData.job.active) watchDemoJob();
+}
+
+function renderDemos() {
+  const list = $("demo-list");
+  if (!list || !demoData) return;
+  const picked = demoData.picked || "";
+  const key = demoData.key || "F9";
+  if (!demoData.demos.length) {
+    list.innerHTML = '<p class="sub2" style="margin:12px 0 0">' +
+      (demoData.folder ? "No demos in the replay folder yet."
+                       : "CS2's install was not found, so there is nowhere to put one.") +
+      "</p>";
+    return;
+  }
+  list.innerHTML = demoData.demos.map(d =>
+    '<div class="demo-row' + (d.name === picked ? " picked" : "") + '">' +
+      '<span class="who"><b>' + esc(d.name) + "</b><span>" +
+        bytes(d.size) + " &middot; " + ago(d.when) +
+        (d.name === picked ? ' &middot; <span class="demo-key">' + esc(key) + "</span>" : "") +
+      "</span></span>" +
+      '<span class="actions">' +
+        '<button class="btn small" data-watch="' + esc(d.name) + '">Watch</button>' +
+        '<button class="btn small" data-pick="' + esc(d.name) + '">' +
+        (d.name === picked ? "On " + esc(key) : "Put on " + esc(key)) + "</button>" +
+      "</span>" +
+    "</div>").join("");
+}
+
+function showDemoJob(job) {
+  const wrap = $("demo-prog"), fill = $("demo-bar-fill"), say = $("demo-prog-say");
+  if (!wrap) return;
+  if (!job || !job.active) { wrap.classList.add("hidden"); return; }
+  wrap.classList.remove("hidden");
+  const bar = wrap.querySelector(".demo-bar");
+  if (job.total) {
+    bar.classList.remove("unknown");
+    fill.style.width = Math.round(job.seen / job.total * 100) + "%";
+    say.textContent = bytes(job.seen) + " of " + bytes(job.total);
+  } else {
+    // No Content-Length: sweep rather than sit at zero looking stuck.
+    bar.classList.add("unknown");
+    say.textContent = bytes(job.seen) + " so far";
+  }
+}
+
+function watchDemoJob() {
+  if (demoPoll) clearInterval(demoPoll);
+  demoPoll = setInterval(async () => {
+    let d;
+    try { d = await api("/api/demos", {}); } catch (err) { return; }
+    demoData = d;
+    showDemoJob(d.job);
+    paintGetRow();          // the ring in the scoreboard window, if it is open
+    if (!d.job || !d.job.active) {
+      clearInterval(demoPoll); demoPoll = null;
+      showDemoJob(null);
+      renderDemos();
+      renderFaceit();       // a match that now says DOWNLOADED
+      paintGetRow();
+      if (d.job && d.job.error && d.job.error !== "cancelled") {
+        status("Demo download failed: " + esc(d.job.error), true);
+      } else if (d.job && !d.job.error) {
+        status("Demo ready: " + esc(d.job.name));
+      }
+    }
+  }, 900);
+}
+
+/* Following an account, and opening a match from the list. */
+document.addEventListener("click", async e => {
+  const link = e.target.closest("#fc-link");
+  const forget = e.target.closest("#fc-forget");
+  const refresh = e.target.closest("#fc-refresh");
+  const openMatch = e.target.closest("[data-match]");
+  const getDemo = e.target.closest("[data-getdemo]");
+  const openPage = e.target.closest("#demo-openpage");
+  if (!link && !forget && !refresh && !openMatch && !getDemo && !openPage) return;
+
+  if (link) {
+    const nick = ($("fc-nick").value || "").trim();
+    if (!nick) return;
+    link.disabled = true;
+    await loadFaceit({ nickname: nick, force: true });
+    startFaceitWatch();
+    return;
+  }
+  if (forget) {
+    try { await api("/api/faceit/forget", {}); } catch (err) {}
+    fcData = null; fcSeen = "";
+    await loadFaceit();
+    return;
+  }
+  if (refresh) {
+    refresh.disabled = true;
+    refresh.textContent = "Refreshing…";
+    await loadFaceit({ force: true });
+    return;
+  }
+  if (openMatch) {
+    const id = openMatch.dataset.match;
+    openMatch.disabled = true;
+    try {
+      if (!whoData) await loadWho();
+      showStats(await api("/api/demos/stats", { link: id }));
+    } catch (err) {
+      status("Could not read that match: " + esc(err.message), true);
+    }
+    openMatch.disabled = false;
+    return;
+  }
+  if (e.target.closest("#demo-openpage")) {
+    const btn = e.target.closest("#demo-openpage");
+    btn.disabled = true;
+    try {
+      const r = await api("/api/demos/page", { link: statsShown.match_id });
+      $("mstat-get").innerHTML =
+        '<span class="ring spin"><i></i><b></b></span>' +
+        '<span class="say"><b>Waiting for your download</b><span>The match page ' +
+        "is open &mdash; press FACEIT&rsquo;s download button. This is watching " +
+        esc(statsWaiting && statsWaiting.downloads || "your Downloads folder") +
+        " and will take it from there.</span></span>";
+      startWaitingWatch();
+    } catch (err) {
+      status(esc(err.message), true);
+      btn.disabled = false;
+    }
+    return;
+  }
+  if (getDemo) {
+    // Straight from the open scoreboard, using the match already on screen.
+    getDemo.disabled = true;
+    try {
+      const r = await api("/api/demos/get", { link: statsShown.match_id });
+      if (r.already) { await loadDemos(); paintGetRow(); }
+      else { demoData = demoData || {}; demoData.job = r.job; paintGetRow(); watchDemoJob(); }
+    } catch (err) {
+      $("mstat-get").innerHTML =
+        '<span class="say"><b>Could not download it</b><span style="color:var(--bad)">' +
+        esc(err.message) + "</span></span>";
+    }
+  }
+});
+
+document.addEventListener("click", async e => {
+  const fetchBtn = e.target.closest("#demo-fetch");
+  const cancel = e.target.closest("#demo-cancel");
+  const pick = e.target.closest("[data-pick]");
+  const watch = e.target.closest("[data-watch]");
+  if (!fetchBtn && !cancel && !pick && !watch) return;
+
+  if (cancel) { try { await api("/api/demos/cancel", {}); } catch (err) {} return; }
+
+  if (fetchBtn) {
+    const link = ($("demo-link").value || "").trim();
+    const note = $("demo-note");
+    if (!link) { note.innerHTML = '<p class="sub2">Paste a match link first.</p>'; return; }
+    fetchBtn.disabled = true;
+    note.innerHTML = '<p class="sub2" style="margin:10px 0 0">Looking it up&hellip;</p>';
+
+    // The scoreboard first, and on its own: it answers even for matches whose
+    // demo FACEIT has already deleted, so it must not be lost when the
+    // download is refused.
+    try {
+      // Who you are decides which row gets marked, and the profile loads late
+      // in startup -- late enough to lose the race against a quick paste.
+      if (!whoData) await loadWho();
+      showStats(await api("/api/demos/stats", { link }));
+    } catch (err) { /* the download below reports what went wrong */ }
+
+    try {
+      const r = await api("/api/demos/get", { link });
+      if (r.already) {
+        note.innerHTML = '<p class="sub2" style="margin:10px 0 0">' +
+          "Already downloaded as <b>" + esc(r.name) + "</b>.</p>";
+      } else {
+        const j = r.job || {};
+        note.innerHTML = '<p class="sub2" style="margin:10px 0 0">Downloading <b>' +
+          esc(j.map || "the match") + "</b> &mdash; " + esc(j.name || "") + "</p>";
+        showDemoJob(j);
+        watchDemoJob();
+      }
+      $("demo-link").value = "";
+    } catch (err) {
+      note.innerHTML = '<p class="sub2" style="margin:10px 0 0;color:var(--bad)">' +
+        esc(err.message) + "</p>";
+    }
+    fetchBtn.disabled = false;
+    return;
+  }
+
+  if (pick) {
+    const name = pick.dataset.pick;
+    // Pressing the button on the demo already bound clears it, so the key
+    // does not keep a demo alive after you have moved on.
+    const wanted = (demoData && demoData.picked === name) ? "" : name;
+    try {
+      const r = await api("/api/demos/pick", { name: wanted, key: (demoData && demoData.key) || "F9" });
+      await loadDemos();
+      noteChange("Demo on " + ((demoData && demoData.key) || "F9") + " → " +
+                 (wanted || "none"),
+                 () => api("/api/demos/pick", { name: wanted ? "" : name }).then(loadDemos));
+      status(wanted ? "Press " + esc(r.key) + " in game to watch it." : "Key cleared.");
+    } catch (err) { status(esc(err.message), true); }
+    return;
+  }
+
+  if (watch) {
+    watchNext = watch.dataset.watch;
+    hideStats();   // the game is about to take the screen anyway
+    status("Starting CS2 on " + esc(watchNext) + "…");
+    $("play").click();
+  }
+});
+
+/* Crosshair X.
+
+   An overlay that draws its own crosshair over whatever is on screen. People
+   who run one want the game's gone -- two a pixel apart is worse than either
+   -- so switching this on adds `crosshair 0` to the generated config, and
+   switching it off takes it out again.
+
+   What this deliberately does not say is whether it is allowed. An external
+   overlay is against the rules of some leagues and fine in others; that is
+   not a question this application can answer for somebody, so the card says
+   so plainly and leaves the decision where it belongs.
+*/
+let xhairData = null;
+
+async function loadCrosshairX() {
+  try {
+    xhairData = await api("/api/crosshairx", {});
+  } catch (err) {
+    xhairData = { installed: false, error: String(err && err.message || err) };
+  }
+  renderCrosshairX();
+}
+
+function renderCrosshairX() {
+  const card = $("xhair-card"), box = $("xhair-out");
+  if (!card || !box) return;
+  const d = xhairData;
+  // Nothing to offer if it is not there.
+  card.classList.toggle("hidden", !(d && d.installed));
+  if (!d || !d.installed) return;
+
+  const hide = !!(prefsNow && prefsNow.hide_crosshair);
+  const withGame = !!(prefsNow && prefsNow.crosshairx_launch);
+
+  // Drawn, not borrowed: a ring with a gap at each quarter and a dot in the
+  // middle. The shape a crosshair application would obviously use, without
+  // reproducing the one that belongs to them.
+  const mark =
+    '<span class="xh-mark"><svg viewBox="0 0 26 26" aria-hidden="true">' +
+      // r 8.2 -> circumference 51.52, so a quarter is 12.88. A dash of 8.6
+      // leaves a 4.28 gap, and the offset puts half a gap at the path start,
+      // which lands all four gaps on the four ticks rather than near them.
+      '<circle cx="13" cy="13" r="8.2" stroke-dasharray="8.6 4.2805"' +
+      ' stroke-dashoffset="10.74"/>' +
+      '<path d="M13 1.1V7M13 19v5.9M1.1 13H7M19 13h5.9"/>' +
+      '<circle cx="13" cy="13" r="1.5" fill="currentColor" stroke="none"/>' +
+    "</svg></span>";
+
+  box.innerHTML =
+    '<div class="xh-head">' + mark +
+      '<span class="xh-name"><h3>Crosshair X' +
+        '<span class="xh-live' + (d.running ? " up" : "") + '"><i></i>' +
+        (d.running ? "RUNNING" : "NOT RUNNING") + "</span></h3>" +
+        "<p>Draws its own crosshair over the game, so the game should stop " +
+        "drawing one.</p></span>" +
+    "</div>" +
+    '<label class="opt"><input type="checkbox" id="xhair-hide"' +
+      (hide ? " checked" : "") + '><span class="xh-opt">' +
+      "<b>Turn off CS2&rsquo;s own crosshair</b>" +
+      '<span class="sub2">Set on every launch, both ways &mdash; untick it and the ' +
+      "game draws its crosshair again. If Crosshair X is not running when you " +
+      "press Play, the game keeps its crosshair rather than leaving you with none." +
+      "</span></span></label>" +
+    '<label class="opt"><input type="checkbox" id="xhair-launch"' +
+      (withGame ? " checked" : "") + '><span class="xh-opt">' +
+      "<b>Start it with CS2</b>" +
+      '<span class="sub2">Through Steam, after the game. If it will not start, ' +
+      "the game still launches.</span></span></label>" +
+    '<div class="actions">' +
+      '<button class="btn small" id="xhair-open"' + (d.running ? " disabled" : "") + ">" +
+      (d.running ? "Already running" : "Start it now") + "</button>" +
+      '<a class="btn small" href="' + esc(d.store || "") +
+      '" target="_blank" rel="noopener noreferrer">Store page</a>' +
+    "</div>" +
+    '<p class="xh-rules">' +
+      "<b>Whether an external crosshair is allowed is a matter for the rules of " +
+      "whatever you are playing in.</b> Some leagues forbid overlays outright. " +
+      "This application does not know your event&rsquo;s rules and makes no claim " +
+      "about them." +
+    "</p>";
+}
+
+/* What the launch did about the crosshair.
+
+   Only worth a message when it is not what the switch asked for. A launch
+   that quietly did the right thing needs no announcement; a launch that
+   refused to turn the crosshair off, because nothing else was going to draw
+   one, very much does -- otherwise it looks like the switch is broken. */
+function sayCrosshair(outcome) {
+  if (!outcome) return;
+  if (outcome.error) { status(esc(outcome.error), true); return; }
+  if (outcome.warning) { status(esc(outcome.warning), true); return; }
+  if (outcome.hidden) status("CS2's crosshair is off for this launch — Crosshair X is drawing it.");
+}
+
+document.addEventListener("change", async e => {
+  const hide = e.target.id === "xhair-hide";
+  const go = e.target.id === "xhair-launch";
+  if (!hide && !go) return;
+  const body = hide ? { hide_crosshair: e.target.checked }
+                    : { crosshairx_launch: e.target.checked };
+  if (prefsNow) Object.assign(prefsNow, body);
+  try { await api("/api/prefs", body); } catch (err) { /* reported below */ }
+  if (hide) {
+    // The config this would generate just changed, so the preview is stale.
+    noteChange("CS2 crosshair \u2192 " + (e.target.checked ? "off (Crosshair X)" : "on"),
+               () => { const el = $("xhair-hide"); if (el) { el.checked = !e.target.checked;
+                       el.dispatchEvent(new Event("change", { bubbles: true })); } });
+    $("preview").click();
+  }
+});
+
+document.addEventListener("click", async e => {
+  if (!e.target.closest("#xhair-open")) return;
+  const btn = e.target.closest("#xhair-open");
+  btn.disabled = true;
+  const said = btn.textContent;
+  btn.textContent = "Starting\u2026";
+  try {
+    const r = await api("/api/crosshairx/start", {});
+    status(r.ok ? (r.detail || "Started.") : r.error, !r.ok);
+  } catch (err) {
+    status(String(err && err.message || err), true);
+  }
+  // It takes a moment to appear, so the card is re-read rather than guessed at.
+  setTimeout(() => { loadCrosshairX(); }, 2500);
+  btn.textContent = said;
+  btn.disabled = false;
+});
+
 /* Named setups.
 
    Switching one is only a write of preferences, so it goes through the same
@@ -9758,10 +10779,13 @@ function setTab(name) {
   if (name === "cs2" && !cs2Data) loadCs2Settings();
   if (name === "gpu" && !gpuData) loadGpu();
   if (name === "files") loadTree(false);
+  if (name === "launcher") loadDemos().then(loadFaceit);
   if (name === "scripts") loadPlugins(false);
   if (name === "keyboard") loadKeyboard(false);
   if (name === "fix") loadFixes(false);
-  if (name === "settings") { setSettingsSub(settingsSub, true); loadSetups(); }
+  if (name === "settings") {
+    setSettingsSub(settingsSub, true); loadSetups(); loadCrosshairX();
+  }
   document.querySelectorAll(".tabs .tab").forEach(b =>
     b.setAttribute("aria-selected", String(b.dataset.tab === name)));
   document.querySelectorAll(".tab-panel").forEach(panel =>
@@ -9869,6 +10893,12 @@ const PREF_FIELDS = {
   patch_video: () => $("p-video").checked,
 };
 let prefsReady = false;
+/* The preferences as the server last had them.
+
+   applyPrefs used to push each value into its control and drop the object,
+   which works only while every setting has a control. Crosshair X's two do
+   not exist until the card is drawn, so the values are kept here as well. */
+let prefsNow = {};
 // What CS2 is set to, as the server last reported it. Only consulted when
 // there is no stored choice for this account -- once somebody has picked, the
 // pick wins, even if they have since changed CS2's own setting by hand.
@@ -9876,6 +10906,7 @@ let prefsCs2Mode = "";
 
 function applyPrefs(ui) {
   if (!ui) return;
+  prefsNow = Object.assign({}, ui);
   if (ui.intent) {
     intent = ui.intent;
     paintIntent(intent);
@@ -10419,12 +11450,22 @@ $("play").addEventListener("click", async () => {
   busy("Launching through Steam…");
   $("play").disabled = true;
   $("play-sub").textContent = "starting…";
+  const watching = watchNext;
+  watchNext = "";
   try {
-    await api("/api/play", {
+    const launched = await api("/api/play", {
       account: currentAccount(),
       stretch_mode: stretchMode,
       patch_video: $("p-video").checked,
+      // The Crosshair X switches. Read at launch so the game starts with the
+      // crosshair the switch asks for, in whichever direction it was moved.
+      hide_crosshair: !!(prefsNow && prefsNow.hide_crosshair),
+      crosshairx_launch: !!(prefsNow && prefsNow.crosshairx_launch),
+      // Set only by the Watch button, and taken before the request so a
+      // launch that fails does not leave it armed for the next one.
+      watch_demo: watching,
     });
+    sayCrosshair(launched && launched.crosshair);
     if (pollTimer) clearInterval(pollTimer);
     pollTimer = setInterval(pollLaunch, 1000);
     pollLaunch();
@@ -10469,6 +11510,7 @@ $("rescan").addEventListener("click", () => scan(true));
   } catch (e) { /* first run */ }
   prefsReady = true;
   $("preview").click();
+  loadDemos().then(() => { loadFaceit(); startFaceitWatch(); });
   loadHistory();
   refreshCfgSuggestions();
   // A fresh install has no config anywhere. Offer to lay one out -- and where

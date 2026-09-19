@@ -35,6 +35,7 @@ import os
 import subprocess
 import threading
 import time
+import urllib.parse
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Tuple
 
@@ -230,7 +231,20 @@ def steam_is_installed() -> bool:
         return False
 
 
-def launch_via_steam() -> None:
+def run_url(extra: str = "") -> str:
+    """The steam:// URL that starts the game, with arguments if there are any.
+
+    Steam takes command-line arguments after a second slash. They are added to
+    the launch options rather than replacing them, which is what makes this
+    usable for a one-off -- launching straight into a demo, say -- without
+    disturbing the options stored against the app.
+    """
+    if not extra.strip():
+        return STEAM_RUN_URL
+    return f"{STEAM_RUN_URL}//{urllib.parse.quote(extra.strip())}"
+
+
+def launch_via_steam(extra_args: str = "") -> None:
     """Ask Steam to run CS2.
 
     The URL protocol is the right entry point rather than running the exe
@@ -238,19 +252,20 @@ def launch_via_steam() -> None:
     stored against the app, and keeps the game properly parented to Steam for
     overlay and cloud sync.
     """
+    url = run_url(extra_args)
     try:
-        os.startfile(STEAM_RUN_URL)  # noqa: S606 - a protocol handler, not a shell command
+        os.startfile(url)  # noqa: S606 - a protocol handler, not a shell command
         return
     except (AttributeError, OSError):
         pass
 
     try:
         subprocess.Popen(
-            ["cmd", "/c", "start", "", STEAM_RUN_URL],
+            ["cmd", "/c", "start", "", url],
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
     except OSError as exc:
-        raise LaunchError(f"could not hand {STEAM_RUN_URL} to Steam: {exc}") from exc
+        raise LaunchError(f"could not hand {url} to Steam: {exc}") from exc
 
 
 def wait_for_window(
@@ -344,6 +359,7 @@ def play(
     stretch_mode: str = "borderless",
     patch_video: bool = True,
     wait: bool = True,
+    extra_args: str = "",
     session: Optional[BackupSession] = None,
     say: Optional[Callable[[str, str], None]] = None,
     should_stop: Optional[Callable[[], bool]] = None,
@@ -424,7 +440,7 @@ def play(
     try:
         mark("launching")
         report("  launching through Steam...", "")
-        launch_via_steam()
+        launch_via_steam(extra_args)
 
         if not wait:
             report("  launched; not waiting (desktop mode will not be restored automatically)", "warn")
@@ -577,13 +593,16 @@ class LaunchSession:
 
     def __init__(self, user: steam.SteamUser, width: int, height: int,
                  refresh: int = 0, stretch_mode: str = "borderless",
-                 patch_video: bool = True) -> None:
+                 patch_video: bool = True, extra_args: str = "") -> None:
         self.user = user
         self.width = width
         self.height = height
         self.refresh = refresh
         self.stretch_mode = stretch_mode
         self.patch_video = patch_video
+        # Passed to Steam for this launch only -- "+playdemo ..." for the
+        # watch-now button. Never written into the stored launch options.
+        self.extra_args = extra_args
 
         self._lock = threading.Lock()
         self._thread: Optional[threading.Thread] = None
@@ -654,6 +673,7 @@ class LaunchSession:
             play(
                 self.user, self.width, self.height, self.refresh,
                 stretch_mode=self.stretch_mode, patch_video=self.patch_video, wait=True,
+                extra_args=self.extra_args,
                 session=session, say=self._say,
                 should_stop=self._stop.is_set, phase=self._phase,
             )
