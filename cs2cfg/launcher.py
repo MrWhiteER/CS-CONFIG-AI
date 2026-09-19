@@ -32,8 +32,9 @@ do what its name says.
 from __future__ import annotations
 
 import os
-import subprocess
 import shlex
+import subprocess
+import sys
 import threading
 import time
 import urllib.parse
@@ -290,6 +291,40 @@ def launch_via_steam(extra_args: str = "") -> None:
         )
     except OSError as exc:
         raise LaunchError(f"could not hand {url} to Steam: {exc}") from exc
+
+
+def game_started_at() -> Optional[float]:
+    """When the running CS2 session started, as a unix time. None if it is
+    not running, or if the answer cannot be had.
+
+    Needed because a config only takes effect in a session that read it at
+    startup. Writing a bind while the game is already up leaves a file that
+    is correct, a key that does nothing, and no way to tell the two apart
+    without this.
+    """
+    if sys.platform != "win32":
+        return None
+    try:
+        done = subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command",
+             "(Get-Process cs2 -ErrorAction SilentlyContinue |"
+             " Select-Object -First 1).StartTime.ToUniversalTime()"
+             ".ToString('o')"],
+            capture_output=True, text=True, timeout=20,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+    stamp = (done.stdout or "").strip()
+    if not stamp:
+        return None
+    try:
+        from datetime import datetime
+
+        return datetime.fromisoformat(stamp.replace("Z", "+00:00")).timestamp()
+    except (ValueError, OverflowError):
+        return None
 
 
 def steam_exe() -> Optional["Path"]:

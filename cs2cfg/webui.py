@@ -2610,12 +2610,11 @@ def _demo_pick(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     mine = root / state.cfg_folder
     session = backup.BackupSession(note="demo: bind")
 
-    # Two files, on purpose. The bind is fixed at the moment CS2 reads it, so
-    # binding straight to a demo means the key is stuck with whatever was
-    # chosen at startup. Pointing the key at an exec instead, and rewriting
-    # what it execs, makes choosing a demo work with the game already
-    # running -- which is the whole point of it being a key and not a launch
-    # option.
+    # Two files, on purpose, because they change at different times. The hook
+    # in the autoexec is written once; the file it execs is rewritten every
+    # time a demo is chosen. So a launch plays the current choice with nothing
+    # pressed, and the same file can be re-run from the console to switch
+    # demos without restarting.
     emit.write_text_file(mine / DEMO_NOW, demos.render_now(wanted), session)
 
     if not wanted:
@@ -2623,17 +2622,37 @@ def _demo_pick(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
 
     emit.write_text_file(
         mine / DEMO_CFG,
-        demos.render_bind(key, f"{state.cfg_folder}/{DEMO_NOW}"), session)
+        demos.render_hook(f"{state.cfg_folder}/{DEMO_NOW}"), session)
     linked = emit.ensure_exec_line(
         mine / "autoexec.vcfg", f"{state.cfg_folder}/{DEMO_CFG}", session,
-        title="Demo on a key (cs2-autoconfig)", shout="DEMO Key")
+        title="Demo playback (cs2-autoconfig)", shout="DEMO")
 
-    # Whether the key will work right now. The bind only exists in a session
-    # that read the config at startup; a game already running when the bind
-    # was first written has not seen it and needs one restart.
+    # Whether the key will work in the session that is up. A config only takes
+    # effect in a game that read it at startup, so a bind written after the
+    # game started is a correct file bound to nothing -- which looks exactly
+    # like the feature being broken. Comparing the two timestamps is the only
+    # way to tell, and it is worth the second it costs.
+    from . import launcher
+
     live = steam.cs2_running_recent(4.0)
+    # Whether this session will pick it up on its own. It will not: the hook
+    # runs at startup, so a demo chosen afterwards needs the console line or
+    # another launch.
+    key_works = False
+    if live:
+        started = launcher.game_started_at()
+        try:
+            written = (mine / DEMO_NOW).stat().st_mtime
+        except OSError:
+            written = 0
+        key_works = bool(started and written and started > written)
+
     return {"ok": True, "name": wanted, "key": key, "linked": linked,
-            "running": live, "command": demos.play_command(wanted)}
+            "running": live, "key_works": key_works,
+            # What to type in the console when the key cannot work yet. The
+            # same file, run by hand.
+            "console": f"exec {state.cfg_folder}/{DEMO_NOW}",
+            "command": demos.play_command(wanted)}
 
 
 def _crosshairx(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:

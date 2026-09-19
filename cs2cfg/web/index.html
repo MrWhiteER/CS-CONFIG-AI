@@ -4004,9 +4004,9 @@
       <section class="panel" id="demo-card">
         <h2>Match demos</h2>
         <p class="sub" style="margin:0 0 12px">
-          Paste a FACEIT match link and it downloads the demo into the game&rsquo;s
-          replay folder. Then <b>Watch</b> starts CS2 already playing it, or put it
-          on a key and press that whenever you like.
+          Your recent matches are below. Open one for the full scoreboard, get its
+          demo, and <b>Watch</b> starts CS2 with the demo playing on its own &mdash;
+          no console, no filenames. You can also paste any match link.
         </p>
         <div class="demo-get">
           <input id="demo-link" type="text" spellcheck="false"
@@ -8800,25 +8800,23 @@ function paintGetRow() {
     return;
   }
   if (have) {
-    const key = (demoData && demoData.key) || "F9";
-    // With the game up there is nothing to launch, so the button loads it
-    // into the session already running instead: the key execs a file, and
-    // that file is rewritten to point at this demo.
+    // The game plays whatever is chosen at startup on its own. With CS2
+    // already up that has happened, so choosing now is either a console line
+    // or the next launch -- and the button says which rather than pretending.
     if (cs2IsRunning) {
       row.innerHTML =
         '<span class="say"><b>Demo ready &mdash; CS2 is running</b><span>' +
-        esc(name) + ". <b>Load in game</b> puts it on " + esc(key) +
-        "; press that in CS2 and it plays. No restart.</span></span>" +
+        esc(name) + ". Choosing it now takes one console line, or it plays " +
+        "by itself next time you launch.</span></span>" +
         '<span class="actions">' +
-          '<button class="btn" data-live="' + esc(name) + '">Load in game</button>' +
+          '<button class="btn" data-live="' + esc(name) + '">Choose it</button>' +
         "</span>";
       return;
     }
     row.innerHTML =
       '<span class="say"><b>Demo ready</b><span>' + esc(name) +
-      " &mdash; Watch starts CS2 already playing it.</span></span>" +
+      " &mdash; Watch starts CS2 and the demo plays on its own.</span></span>" +
       '<span class="actions">' +
-        '<button class="btn small" data-pick="' + esc(name) + '">Put on a key</button>' +
         '<button class="btn" data-watch="' + esc(name) + '">Watch</button>' +
       "</span>";
     return;
@@ -8929,7 +8927,6 @@ function renderDemos() {
   const list = $("demo-list");
   if (!list || !demoData) return;
   const picked = demoData.picked || "";
-  const key = demoData.key || "F9";
   if (!demoData.demos.length) {
     list.innerHTML = '<p class="sub2" style="margin:12px 0 0">' +
       (demoData.folder ? "No demos in the replay folder yet."
@@ -8941,12 +8938,12 @@ function renderDemos() {
     '<div class="demo-row' + (d.name === picked ? " picked" : "") + '">' +
       '<span class="who"><b>' + esc(d.name) + "</b><span>" +
         bytes(d.size) + " &middot; " + ago(d.when) +
-        (d.name === picked ? ' &middot; <span class="demo-key">' + esc(key) + "</span>" : "") +
+        (d.name === picked ? ' &middot; <span class="demo-key">NEXT LAUNCH</span>' : "") +
       "</span></span>" +
       '<span class="actions">' +
         '<button class="btn small" data-watch="' + esc(d.name) + '">Watch</button>' +
         '<button class="btn small" data-pick="' + esc(d.name) + '">' +
-        (d.name === picked ? "On " + esc(key) : "Put on " + esc(key)) + "</button>" +
+        (d.name === picked ? "Chosen" : "Choose") + "</button>" +
       "</span>" +
     "</div>").join("");
 }
@@ -9080,16 +9077,18 @@ document.addEventListener("click", async e => {
   // is sent to the game -- the file its key execs is rewritten, and the next
   // press picks up this demo.
   if (live) {
-    const key = (demoData && demoData.key) || "F9";
     live.disabled = true;
     try {
       const r = await api("/api/demos/pick",
-                          { name: live.dataset.live, key, once: true });
-      hideStats();
-      status("Ready — press " + esc(r.key || key) + " in CS2 to play it." +
-             (r.linked && r.linked.indexOf("appended") === 0
-                ? " (First time: this session has not read the key yet, so it " +
-                  "takes effect next launch.)" : ""));
+                          { name: live.dataset.live, once: true });
+      // The game runs the chosen demo at startup, and this session is past
+      // that. Saying "it will play" would be untrue, so the console line that
+      // runs the same file is offered instead.
+      $("mstat-get").innerHTML =
+        '<span class="say"><b>Chosen</b><span>It plays on its own the next ' +
+        "time CS2 starts. To watch it in this session, press <b>~</b> and run:" +
+        '<br><code style="display:inline-block;margin-top:5px">' +
+        esc(r.console || "") + "</code></span></span>";
     } catch (err) {
       status(esc(err.message), true);
       live.disabled = false;
@@ -9143,12 +9142,13 @@ document.addEventListener("click", async e => {
     // does not keep a demo alive after you have moved on.
     const wanted = (demoData && demoData.picked === name) ? "" : name;
     try {
-      const r = await api("/api/demos/pick", { name: wanted, key: (demoData && demoData.key) || "F9" });
+      const r = await api("/api/demos/pick", { name: wanted });
       await loadDemos();
-      noteChange("Demo on " + ((demoData && demoData.key) || "F9") + " → " +
-                 (wanted || "none"),
+      noteChange("Demo to play on launch → " + (wanted || "none"),
                  () => api("/api/demos/pick", { name: wanted ? "" : name }).then(loadDemos));
-      status(wanted ? "Press " + esc(r.key) + " in game to watch it." : "Key cleared.");
+      status(wanted
+        ? "It will play on its own the next time CS2 starts."
+        : "Cleared — nothing will play on launch.");
     } catch (err) { status(esc(err.message), true); }
     return;
   }
@@ -9156,17 +9156,14 @@ document.addEventListener("click", async e => {
   if (watch) {
     watchNext = watch.dataset.watch;
     // Also put it on the key. +playdemo runs while the game is still coming
-    // up and does not always take; the bind waits for you, so a launch that
-    // lands in the menu is one keypress from the demo rather than a dead end.
-    const key = (demoData && demoData.key) || "F9";
-    // once: this bind is for this launch only. The next launch that is not a
-    // watch clears it, so a key cannot quietly load last week's match.
-    try { await api("/api/demos/pick", { name: watchNext, key, once: true }); }
+    // up and does not always take. The autoexec hook runs after the game is
+    // properly started, so between the two the demo gets played either way.
+    // once: for this launch only -- the next ordinary launch empties it, so a
+    // demo cannot quietly play itself a week later.
+    try { await api("/api/demos/pick", { name: watchNext, once: true }); }
     catch (err) {}
     hideStats();   // the game is about to take the screen anyway
-    status("Starting CS2 on " + esc(watchNext) +
-           " — if it opens on the menu, press " + esc(key) +
-           " (this launch only).");
+    status("Starting CS2 on " + esc(watchNext) + " (this launch only).");
     $("play").click();
   }
 });

@@ -59,14 +59,14 @@ class Picking(unittest.TestCase):
         """The file the key execs -- where the chosen demo actually lives."""
         return (self.cfg / webui.DEMO_NOW).read_text(encoding="utf-8")
 
-    def test_the_key_execs_the_file_holding_the_choice(self):
-        """Two files on purpose: a bind is fixed when CS2 reads it, so binding
-        straight to a demo would stick the key to whatever was chosen at
-        startup. This way the choice can change with the game running."""
-        out = self._pick({"name": "faceit_0e4d6c2a_demirage.dem", "key": "F9"})
+    def test_the_hook_execs_the_file_holding_the_choice(self):
+        """Two files on purpose, because they change at different times: the
+        hook is written once, the choice is rewritten every pick. Nothing is
+        bound to a key -- the demo plays on launch by itself."""
+        out = self._pick({"name": "faceit_0e4d6c2a_demirage.dem"})
         self.assertTrue(out["ok"])
-        self.assertIn('bind "F9" "exec mrwhiteer/' + webui.DEMO_NOW + '"',
-                      self._keyfile())
+        self.assertIn('exec "mrwhiteer/' + webui.DEMO_NOW + '"', self._keyfile())
+        self.assertNotIn("bind", self._keyfile())
         self.assertIn("replays/faceit_0e4d6c2a_demirage", self._written())
 
     def test_choosing_another_demo_rewrites_only_the_payload(self):

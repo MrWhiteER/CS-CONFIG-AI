@@ -758,22 +758,28 @@ def render_now(demo_name: str) -> str:
     ])
 
 
-def render_bind(key: str = "F9", payload: str = "") -> str:
-    """The key, bound once to exec whatever is currently chosen.
+def render_hook(payload: str) -> str:
+    """The line the autoexec runs: play whatever is currently chosen.
 
-    Bound to an exec rather than straight to ``playdemo`` because a bind is
-    fixed at the moment the config is read. Pointing it at a file instead
-    means picking a different demo mid-session takes effect without the game
-    being restarted.
+    An exec rather than the ``playdemo`` itself, and rather than a key. Two
+    files because they change at different times -- this one is written once
+    and never again, while the file it points at is rewritten every time a
+    demo is chosen. So the game plays the current choice at startup without
+    anything being pressed, and the same file can be re-run from the console
+    to switch demos in a session that is already up.
+
+    When nothing is chosen the file it execs holds no command, so this runs
+    and does nothing.
     """
     from .emit import GENERATED_MARKER
 
     return "\n".join([
         GENERATED_MARKER,
-        "// The demo key. It execs the file holding the current choice, so",
-        "// choosing another demo while the game runs needs no restart.",
+        "// Plays the demo chosen in cs2-autoconfig, if there is one.",
+        "// The choice lives in the file below, which is rewritten each time;",
+        "// re-run that file from the console to switch without restarting.",
         "",
-        f'bind "{key}" "exec {payload}"',
+        f'exec "{payload}"',
         "",
     ])
 
