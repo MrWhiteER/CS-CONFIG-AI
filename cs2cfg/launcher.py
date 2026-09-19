@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import shlex
 import threading
 import time
 import urllib.parse
@@ -42,7 +43,8 @@ from typing import Callable, Dict, List, Optional, Tuple
 from . import steam, telemetry, window
 from .backup import BackupSession
 
-STEAM_RUN_URL = "steam://rungameid/730"
+APP_ID = "730"
+STEAM_RUN_URL = f"steam://rungameid/{APP_ID}"
 GAME_PROCESS = "cs2.exe"
 
 # Settings the launcher overrides so CS2 cooperates with borderless. These are
@@ -247,12 +249,34 @@ def run_url(extra: str = "") -> str:
 def launch_via_steam(extra_args: str = "") -> None:
     """Ask Steam to run CS2.
 
-    The URL protocol is the right entry point rather than running the exe
-    directly: it starts Steam if it is closed, applies the launch options
-    stored against the app, and keeps the game properly parented to Steam for
-    overlay and cloud sync.
+    Through Steam rather than by running the exe directly: it starts Steam if
+    it is closed, applies the launch options stored against the app, and keeps
+    the game properly parented to Steam for overlay and cloud sync.
+
+    Which of Steam's two entry points depends on whether there is anything to
+    pass. ``steam://rungameid`` cannot carry arguments -- Steam accepts the
+    URL and drops everything after the app id, which is why launching "into" a
+    demo this way started the game and then sat in the menu. ``steam.exe
+    -applaunch`` is the documented way to hand a game a command line, so that
+    is used whenever there is one, and the URL is kept for the plain case
+    because it does not need Steam's own path.
     """
-    url = run_url(extra_args)
+    extra = extra_args.strip()
+    if extra:
+        exe = steam_exe()
+        if exe is not None:
+            try:
+                subprocess.Popen(
+                    [str(exe), "-applaunch", APP_ID] + shlex.split(extra),
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                )
+                return
+            except (OSError, ValueError):
+                # Fall through to the URL: starting without the demo beats not
+                # starting at all.
+                pass
+
+    url = run_url("")
     try:
         os.startfile(url)  # noqa: S606 - a protocol handler, not a shell command
         return
@@ -266,6 +290,18 @@ def launch_via_steam(extra_args: str = "") -> None:
         )
     except OSError as exc:
         raise LaunchError(f"could not hand {url} to Steam: {exc}") from exc
+
+
+def steam_exe() -> Optional["Path"]:
+    """Steam's own executable, or None if it cannot be found."""
+    from pathlib import Path
+
+    try:
+        root = steam.find_steam_root()
+    except steam.SteamError:
+        return None
+    found = Path(root) / "steam.exe"
+    return found if found.is_file() else None
 
 
 def wait_for_window(

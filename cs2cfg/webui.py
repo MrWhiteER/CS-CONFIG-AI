@@ -35,6 +35,9 @@ from .paths import bundle_root
 # The config holding the demo key bind. Its own file, like the crosshair one,
 # so picking a demo never rewrites anything that was applied deliberately.
 DEMO_CFG = "demo.vcfg"
+# What that key execs. Rewritten whenever a demo is chosen, so the choice
+# takes effect in a session that is already running.
+DEMO_NOW = "demo_now.vcfg"
 
 WEB_ROOT = bundle_root() / "web"
 ALLOWED_HOSTS = ("127.0.0.1", "localhost", "[::1]")
@@ -369,6 +372,10 @@ def _play(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
             return {"ok": False, "error": f"there is no demo called {watch!r}"}
         extra = "+" + demos.play_command(watch).replace('"', "")
 
+    # Anything Watch left behind, cleared before this launch rather than
+    # after the last one: the game had to still be able to use it.
+    _settle_demo(state, bool(watch))
+
     # The crosshair, settled before the game starts rather than after: CS2
     # reads its configs once at startup, so a file written later is a file the
     # session never sees.
@@ -398,6 +405,48 @@ def _play(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     return {"ok": True, "width": width, "height": height, "refresh": refresh,
             "stretch_mode": stretch_mode, "overlay": overlay,
             "crosshair": crosshair}
+
+
+def _settle_demo(state: State, watching: bool) -> bool:
+    """Drop a one-shot demo bind once the launch it was for is over.
+
+    Watch binds the demo to a key as a fallback, because +playdemo runs while
+    the game is still starting and does not always take. That bind is for one
+    launch only -- a key that silently loads last week's match three sessions
+    later is worse than no key at all -- so the next launch that is not a
+    watch clears it. A bind asked for with "Put on a key" is deliberate and is
+    left alone.
+
+    Never fatal: this is tidying up beside a launch, not part of it.
+    """
+    from .cli import load_prefs, save_prefs
+
+    if watching:
+        return False
+    try:
+        account = _active_account(state)
+        prefs = load_prefs()
+        if not profiles.ui_for(prefs, account).get("demo_once"):
+            return False
+
+        profiles.remember(prefs, account,
+                          {"demo_pick": "", "demo_once": False})
+        save_prefs(prefs)
+
+        if state.cs2_install:
+            # The payload, not the bind. Once its file says nothing the bind
+            # is harmless, and rewriting the bind would only take effect after
+            # another restart anyway.
+            from . import demos
+
+            target = steam.cfg_dir(state.cs2_install) / state.cfg_folder / DEMO_NOW
+            if target.exists():
+                emit.write_text_file(
+                    target, demos.render_now(""),
+                    backup.BackupSession(note="play: clear one-shot demo"))
+        return True
+    except Exception:
+        return False
 
 
 def _settle_crosshair(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -587,7 +636,7 @@ def _save_prefs(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         # account, because it changes what the generated config writes.
         "hide_crosshair", "crosshairx_launch",
         # Which demo is on the key, and which key it is on.
-        "demo_pick", "demo_key",
+        "demo_pick", "demo_key", "demo_once",
         # The FACEIT account whose matches are being followed.
         "faceit_nick", "faceit_id",
     )
@@ -2547,28 +2596,44 @@ def _demo_pick(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         return {"ok": False, "error": f"there is no demo called {wanted!r}"}
 
     key = str(body.get("key") or "F9").strip() or "F9"
+    # A bind put there by Watch is for that one launch; one asked for by the
+    # button is meant to stay. The difference is remembered so the next launch
+    # knows which of the two it is looking at.
+    just_once = bool(body.get("once"))
     prefs = load_prefs()
     profiles.remember(prefs, _active_account(state),
-                      {"demo_pick": wanted, "demo_key": key})
+                      {"demo_pick": wanted, "demo_key": key,
+                       "demo_once": just_once and bool(wanted)})
     save_prefs(prefs)
 
     root = steam.cfg_dir(state.cs2_install)
-    target = root / state.cfg_folder / DEMO_CFG
+    mine = root / state.cfg_folder
     session = backup.BackupSession(note="demo: bind")
-    if not wanted:
-        # Nothing picked: the bind file becomes a no-op rather than a stale
-        # key that plays whatever you were watching last week.
-        emit.write_text_file(target, emit.GENERATED_MARKER +
-                             "\n// No demo picked.\n", session)
-        return {"ok": True, "cleared": True}
 
-    emit.write_text_file(target, demos.render_cfg(wanted, key), session)
+    # Two files, on purpose. The bind is fixed at the moment CS2 reads it, so
+    # binding straight to a demo means the key is stuck with whatever was
+    # chosen at startup. Pointing the key at an exec instead, and rewriting
+    # what it execs, makes choosing a demo work with the game already
+    # running -- which is the whole point of it being a key and not a launch
+    # option.
+    emit.write_text_file(mine / DEMO_NOW, demos.render_now(wanted), session)
+
+    if not wanted:
+        return {"ok": True, "cleared": True, "live": True}
+
+    emit.write_text_file(
+        mine / DEMO_CFG,
+        demos.render_bind(key, f"{state.cfg_folder}/{DEMO_NOW}"), session)
     linked = emit.ensure_exec_line(
-        root / state.cfg_folder / "autoexec.vcfg",
-        f"{state.cfg_folder}/{DEMO_CFG}", session,
+        mine / "autoexec.vcfg", f"{state.cfg_folder}/{DEMO_CFG}", session,
         title="Demo on a key (cs2-autoconfig)", shout="DEMO Key")
+
+    # Whether the key will work right now. The bind only exists in a session
+    # that read the config at startup; a game already running when the bind
+    # was first written has not seen it and needs one restart.
+    live = steam.cs2_running_recent(4.0)
     return {"ok": True, "name": wanted, "key": key, "linked": linked,
-            "command": demos.play_command(wanted)}
+            "running": live, "command": demos.play_command(wanted)}
 
 
 def _crosshairx(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:

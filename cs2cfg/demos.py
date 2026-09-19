@@ -712,12 +712,70 @@ def installed(replays: Path) -> List[Dict[str, Any]]:
     return out
 
 
-def play_command(demo_name: str) -> str:
-    """The console command that plays a demo sitting in the replay folder."""
+def demo_path(demo_name: str) -> str:
+    """A demo's path as CS2 wants it typed: relative, forward slashes, no
+    extension. Reduced to a bare name first, so whatever is passed the result
+    stays inside the replay folder."""
     stem = Path(str(demo_name)).name
     if stem.lower().endswith(".dem"):
         stem = stem[:-4]
-    return f'playdemo "{REPLAY_DIR}/{stem}"'
+    return f"{REPLAY_DIR}/{stem}"
+
+
+def play_command(demo_name: str, quoted: bool = True) -> str:
+    """The console command that plays a demo in the replay folder.
+
+    ``quoted`` because the two places this goes have opposite needs. Typed at
+    the console the path wants quoting; inside a ``bind``, which is itself a
+    quoted string, a second pair of quotes closes the bind early and the key
+    is left doing nothing. Demo names here cannot contain spaces -- local_name
+    strips everything but letters and digits -- so the unquoted form is safe.
+    """
+    path = demo_path(demo_name)
+    return f'playdemo "{path}"' if quoted else f"playdemo {path}"
+
+
+def render_now(demo_name: str) -> str:
+    """The file the key execs: whichever demo is currently chosen.
+
+    Separate from the bind so the two can change independently. The bind is
+    written once and never moves; this is rewritten every time a demo is
+    picked, including while the game is running -- CS2 reads an exec'd file
+    at the moment it is exec'd, so the key always plays the current choice
+    rather than whatever was chosen at startup.
+    """
+    from .emit import GENERATED_MARKER
+
+    stem = Path(str(demo_name)).name
+    if not stem:
+        return GENERATED_MARKER + "\n// No demo chosen.\n"
+    return "\n".join([
+        GENERATED_MARKER,
+        f"// {stem}",
+        "",
+        play_command(stem, quoted=False),
+        "",
+    ])
+
+
+def render_bind(key: str = "F9", payload: str = "") -> str:
+    """The key, bound once to exec whatever is currently chosen.
+
+    Bound to an exec rather than straight to ``playdemo`` because a bind is
+    fixed at the moment the config is read. Pointing it at a file instead
+    means picking a different demo mid-session takes effect without the game
+    being restarted.
+    """
+    from .emit import GENERATED_MARKER
+
+    return "\n".join([
+        GENERATED_MARKER,
+        "// The demo key. It execs the file holding the current choice, so",
+        "// choosing another demo while the game runs needs no restart.",
+        "",
+        f'bind "{key}" "exec {payload}"',
+        "",
+    ])
 
 
 def render_cfg(demo_name: str, key: str = "F9") -> str:
@@ -736,7 +794,7 @@ def render_cfg(demo_name: str, key: str = "F9") -> str:
         "// The demo picked in cs2-autoconfig, on a key.",
         f"// {stem}",
         "",
-        f'bind "{key}" "{play_command(stem)}"',
+        f'bind "{key}" "{play_command(stem, quoted=False)}"',
         f'echo "Press {key} to watch {stem}"',
         "",
     ])

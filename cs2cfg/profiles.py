@@ -78,6 +78,12 @@ def ui_for(prefs: Dict[str, Any], account_id: Optional[str]) -> Dict[str, Any]:
         if isinstance(mine, dict):
             out.update(mine)
         out[ACTIVE_KEY] = str(account_id)
+    else:
+        # No account to file them under, so remember() put the per-account
+        # settings in the machine half. Reading only the machine keys back
+        # would make them write-only: saved, and never seen again. An account
+        # is normally there; this is the machine where Steam was not found.
+        out.update(machine)
     return out
 
 

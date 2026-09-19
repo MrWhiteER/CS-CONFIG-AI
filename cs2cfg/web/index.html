@@ -8800,6 +8800,20 @@ function paintGetRow() {
     return;
   }
   if (have) {
+    const key = (demoData && demoData.key) || "F9";
+    // With the game up there is nothing to launch, so the button loads it
+    // into the session already running instead: the key execs a file, and
+    // that file is rewritten to point at this demo.
+    if (cs2IsRunning) {
+      row.innerHTML =
+        '<span class="say"><b>Demo ready &mdash; CS2 is running</b><span>' +
+        esc(name) + ". <b>Load in game</b> puts it on " + esc(key) +
+        "; press that in CS2 and it plays. No restart.</span></span>" +
+        '<span class="actions">' +
+          '<button class="btn" data-live="' + esc(name) + '">Load in game</button>' +
+        "</span>";
+      return;
+    }
     row.innerHTML =
       '<span class="say"><b>Demo ready</b><span>' + esc(name) +
       " &mdash; Watch starts CS2 already playing it.</span></span>" +
@@ -9059,7 +9073,29 @@ document.addEventListener("click", async e => {
   const cancel = e.target.closest("#demo-cancel");
   const pick = e.target.closest("[data-pick]");
   const watch = e.target.closest("[data-watch]");
-  if (!fetchBtn && !cancel && !pick && !watch) return;
+  const live = e.target.closest("[data-live]");
+  if (!fetchBtn && !cancel && !pick && !watch && !live) return;
+
+  // Into the session that is already running. Nothing is launched and nothing
+  // is sent to the game -- the file its key execs is rewritten, and the next
+  // press picks up this demo.
+  if (live) {
+    const key = (demoData && demoData.key) || "F9";
+    live.disabled = true;
+    try {
+      const r = await api("/api/demos/pick",
+                          { name: live.dataset.live, key, once: true });
+      hideStats();
+      status("Ready — press " + esc(r.key || key) + " in CS2 to play it." +
+             (r.linked && r.linked.indexOf("appended") === 0
+                ? " (First time: this session has not read the key yet, so it " +
+                  "takes effect next launch.)" : ""));
+    } catch (err) {
+      status(esc(err.message), true);
+      live.disabled = false;
+    }
+    return;
+  }
 
   if (cancel) { try { await api("/api/demos/cancel", {}); } catch (err) {} return; }
 
@@ -9119,8 +9155,18 @@ document.addEventListener("click", async e => {
 
   if (watch) {
     watchNext = watch.dataset.watch;
+    // Also put it on the key. +playdemo runs while the game is still coming
+    // up and does not always take; the bind waits for you, so a launch that
+    // lands in the menu is one keypress from the demo rather than a dead end.
+    const key = (demoData && demoData.key) || "F9";
+    // once: this bind is for this launch only. The next launch that is not a
+    // watch clears it, so a key cannot quietly load last week's match.
+    try { await api("/api/demos/pick", { name: watchNext, key, once: true }); }
+    catch (err) {}
     hideStats();   // the game is about to take the screen anyway
-    status("Starting CS2 on " + esc(watchNext) + "…");
+    status("Starting CS2 on " + esc(watchNext) +
+           " — if it opens on the menu, press " + esc(key) +
+           " (this launch only).");
     $("play").click();
   }
 });

@@ -631,3 +631,30 @@ class NotSendingPeopleNowhere(unittest.TestCase):
     def test_nonsense_is_not_reachable(self):
         for bad in ["", None, "not a url", "/just/a/path"]:
             self.assertFalse(demos.reachable(bad), bad)
+
+
+class TheBindMustParse(unittest.TestCase):
+    """A bind is itself a quoted string. A second pair of quotes inside it
+    closes the bind early and the key silently does nothing -- which is
+    exactly what shipped before this test existed."""
+
+    def test_the_bind_line_has_balanced_quotes(self):
+        line = next(l for l in demos.render_cfg("faceit_abc_demirage.dem", "F9")
+                    .splitlines() if l.startswith("bind"))
+        self.assertEqual(line.count('"') % 2, 0)
+        self.assertEqual(line.count('"'), 4, f"nested quotes in: {line}")
+
+    def test_the_bind_is_exactly_what_cs2_expects(self):
+        line = next(l for l in demos.render_cfg("faceit_abc_demirage.dem", "F9")
+                    .splitlines() if l.startswith("bind"))
+        self.assertEqual(line, 'bind "F9" "playdemo replays/faceit_abc_demirage"')
+
+    def test_the_console_form_keeps_its_quotes(self):
+        """Typed at the console the path is quoted; only the bind drops them."""
+        self.assertEqual(demos.play_command("x.dem"), 'playdemo "replays/x"')
+        self.assertEqual(demos.play_command("x.dem", quoted=False),
+                         "playdemo replays/x")
+
+    def test_both_forms_name_the_same_demo(self):
+        for name in ["a.dem", "a", "/tmp/a.dem"]:
+            self.assertEqual(demos.demo_path(name), "replays/a")
