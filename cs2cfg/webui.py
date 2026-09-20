@@ -134,6 +134,7 @@ def _plan_payload(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         target_fps=int(target) if target else None,
         current_video=current_video,
         hide_crosshair=bool(body.get("hide_crosshair")),
+        load_bias=str(body.get("load_bias") or "auto"),
     )
     launch = plan_launch_options(
         current_launch, state.machine, kb,
@@ -248,6 +249,7 @@ def _apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         target_fps=int(target) if target else None,
         current_video=steam.read_video_cfg(user),
         hide_crosshair=bool(body.get("hide_crosshair")),
+        load_bias=str(body.get("load_bias") or "auto"),
     )
     launch = plan_launch_options(
         steam.read_launch_options(user), state.machine, kb,
@@ -381,6 +383,11 @@ def _play(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     # session never sees.
     crosshair = _settle_crosshair(state, body)
 
+    # Windows' own per-application graphics settings, if that switch is on.
+    # Before the game starts, because Windows reads them when the process is
+    # created. Never allowed to stop the launch.
+    win_graphics = _settle_win_graphics(state, bool(body.get("win_graphics_auto")))
+
     state.launch = LaunchSession(user, width, height, refresh, stretch_mode,
                                  patch_video=bool(body.get("patch_video", True)),
                                  extra_args=extra)
@@ -404,7 +411,7 @@ def _play(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
 
     return {"ok": True, "width": width, "height": height, "refresh": refresh,
             "stretch_mode": stretch_mode, "overlay": overlay,
-            "crosshair": crosshair}
+            "crosshair": crosshair, "win_graphics": win_graphics}
 
 
 def _settle_demo(state: State, watching: bool) -> bool:
@@ -635,6 +642,11 @@ def _save_prefs(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         # Whether Crosshair X draws the crosshair instead of the game. Per
         # account, because it changes what the generated config writes.
         "hide_crosshair", "crosshairx_launch",
+        # Which half of the machine the detail budget is spent on.
+        "load_bias",
+        # Whether Windows' own per-application graphics settings are kept in
+        # step with each launch.
+        "win_graphics_auto",
         # Which demo is on the key, and which key it is on.
         "demo_pick", "demo_key", "demo_once",
         # The FACEIT account whose matches are being followed.
@@ -2703,6 +2715,46 @@ def _crosshairx_start(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     return crosshairx.start()
 
 
+def _win_graphics(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """What Windows currently has for CS2. Reads only."""
+    from . import wingraphics
+
+    state.refresh()
+    many = len(getattr(state.machine, "gpus", []) or []) > 1 if state.machine else False
+    return {"ok": True, **wingraphics.describe(state.cs2_install, multi_gpu=many)}
+
+
+def _win_graphics_apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Set them, or put them back. Only ever because somebody pressed it."""
+    from . import wingraphics
+
+    state.refresh()
+    if body.get("clear"):
+        return wingraphics.clear(state.cs2_install)
+    return wingraphics.apply(state.cs2_install)
+
+
+def _settle_win_graphics(state: State, wanted: bool) -> Dict[str, Any]:
+    """Keep Windows in step with the switch, on the way into a launch.
+
+    Only when the switch is on, and only when something would actually
+    change: a launch that rewrites a registry value to the value it already
+    holds is a launch that touched the registry for nothing.
+    """
+    from . import wingraphics
+
+    if not wanted:
+        return {}
+    try:
+        state.refresh()
+        now = wingraphics.describe(state.cs2_install)
+        if not now.get("supported") or now.get("done"):
+            return {}
+        return wingraphics.apply(state.cs2_install)
+    except Exception as exc:          # never stop a launch over this
+        return {"ok": False, "error": str(exc)}
+
+
 def _setups(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     """Every named setup this account has, and which one it is following."""
     from . import profiles, setups
@@ -3010,6 +3062,8 @@ def make_handler(state: State):
         "/api/demos/waiting": _demo_waiting,
         "/api/demos/page": _demo_page,
         "/api/demos/pick": _demo_pick,
+        "/api/wingraphics": _win_graphics,
+        "/api/wingraphics/apply": _win_graphics_apply,
         "/api/crosshairx": _crosshairx,
         "/api/crosshairx/start": _crosshairx_start,
         "/api/setups": _setups,

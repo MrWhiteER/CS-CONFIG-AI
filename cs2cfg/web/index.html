@@ -938,6 +938,26 @@
   }
   .xh-live.up i { background: var(--good); box-shadow: 0 0 7px var(--good); }
 
+  .bias { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0 4px; }
+  .bias button {
+    flex: 1 1 130px; min-width: 0; padding: 9px 10px; text-align: left;
+    border: 1px solid var(--line); border-radius: 9px; cursor: pointer;
+    background: none; color: var(--muted); font: inherit; font-size: 12px;
+    transition: border-color .15s, color .15s, background .15s;
+  }
+  .bias button b { display: block; font-weight: 500; color: var(--ink); font-size: 12.5px; }
+  .bias button span { display: block; margin-top: 3px; line-height: 1.4; font-size: 11px; }
+  .bias button:hover { border-color: var(--muted); }
+  .bias button[aria-pressed="true"] {
+    border-color: var(--neon-cyan); color: var(--ink);
+    background: color-mix(in srgb, var(--neon-cyan) 8%, transparent);
+  }
+  .wg-row {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 10px 0 0; margin-top: 12px; border-top: 1px solid var(--line);
+  }
+  .wg-row .sub2 { flex: 1 1 220px; min-width: 0; margin: 0; line-height: 1.45; }
+
   /* The rules note. Bordered rather than buried, because it is the one thing
      on the card this application cannot answer for somebody. */
   .xh-rules {
@@ -4328,6 +4348,13 @@
         <div id="xhair-out"></div>
       </section>
 
+      <!-- Which half of the machine is asked to do less, and what Windows
+           itself has been told about the game. -->
+      <section class="panel" id="machine-card">
+        <h2>Machine</h2>
+        <div id="machine-out"></div>
+      </section>
+
       <section class="panel">
         <h2>Write</h2>
         <label class="opt"><input type="checkbox" id="w-video" checked> Picture quality (cs2_video.txt)</label>
@@ -5127,6 +5154,7 @@ function requestBody() {
     account: currentAccount(),
     hide_crosshair: !!(prefsNow && prefsNow.hide_crosshair),
     crosshairx_launch: !!(prefsNow && prefsNow.crosshairx_launch),
+    load_bias: (prefsNow && prefsNow.load_bias) || "auto",
     write_video: $("w-video").checked, write_cfg: $("w-cfg").checked,
     write_launch: $("w-launch").checked, link_autoexec: $("w-autoexec").checked,
     fix_scaling: $("w-scaling").checked,
@@ -9299,6 +9327,106 @@ function startCrosshairWatch() {
   }, 5000);
 }
 
+/* The Machine card: which half of the machine is asked to do less, and what
+   Windows itself has been told about the game.
+
+   The three choices are detail dials, not a scheduler. Nothing here moves
+   work from the processor to the graphics card; it decides which of the two
+   is asked to draw less when the machine cannot have everything. The card
+   says that rather than implying something cleverer than it is. */
+let wgData = null;
+
+const BIAS = [
+  ["auto", "Automatic",
+   "Reads the machine and spares whichever part is actually the slower half."],
+  ["gpu", "Lean on the graphics card",
+   "Keeps graphics detail up. For a machine whose card is the stronger half — which is most of them, because CS2 leans on the processor."],
+  ["cpu", "Lean on the processor",
+   "Gives the graphics card less to draw. For a weaker card next to a processor that can carry it."],
+];
+
+async function loadMachine() {
+  try { wgData = await api("/api/wingraphics", {}); }
+  catch (err) { wgData = { supported: false, reason: String(err && err.message || err) }; }
+  renderMachine();
+}
+
+function renderMachine() {
+  const box = $("machine-out");
+  if (!box) return;
+  const now = (prefsNow && prefsNow.load_bias) || "auto";
+  const keep = !!(prefsNow && prefsNow.win_graphics_auto);
+
+  let html =
+    '<p class="sub">Where the detail budget goes when the machine cannot have ' +
+    "everything. These are picture settings, not a scheduler — nothing here " +
+    "moves work between the two parts, it decides which one is asked to draw " +
+    'less.</p><div class="bias">' +
+    BIAS.map(([id, name, why]) =>
+      '<button type="button" data-bias="' + id + '" aria-pressed="' +
+      (now === id) + '"><b>' + esc(name) + "</b><span>" + esc(why) +
+      "</span></button>").join("") +
+    "</div>";
+
+  if (wgData && wgData.supported) {
+    const set = wgData.high_performance && wgData.windowed_optimised;
+    html +=
+      '<div class="wg-row"><span class="sub2"><b>Windows graphics settings</b><br>' +
+      "Windows keeps its own per-game settings: which card to render on, and " +
+      "whether a windowed game gets the low-latency presentation path. CS2 is " +
+      "currently <b>" + (set ? "set for performance" : "on Windows&rsquo; defaults") +
+      "</b>." +
+      (wgData.gpu_choice_matters ? "" :
+        " This machine has one graphics adapter, so the card choice changes " +
+        "nothing here; the windowed optimisation still does.") +
+      "</span>" +
+      '<button class="btn small" id="wg-apply"' + (set ? " disabled" : "") + ">" +
+      (set ? "Already set" : "Set for performance") + "</button></div>" +
+      '<label class="opt"><input type="checkbox" id="wg-auto"' +
+      (keep ? " checked" : "") + '><span class="xh-opt">' +
+      "<b>Keep it set on every launch</b>" +
+      '<span class="sub2">Checked before the game starts, and only written when ' +
+      "Windows does not already agree. Other applications&rsquo; settings in the " +
+      "same place are left alone.</span></span></label>";
+  } else if (wgData && wgData.reason) {
+    html += '<p class="wg-row"><span class="sub2">Windows graphics settings are ' +
+            "unavailable: " + esc(wgData.reason) + "</span></p>";
+  }
+  box.innerHTML = html;
+}
+
+document.addEventListener("click", async e => {
+  const pick = e.target.closest("#machine-out [data-bias]");
+  if (pick) {
+    const want = pick.dataset.bias;
+    if (prefsNow) prefsNow.load_bias = want;
+    renderMachine();
+    try { await api("/api/prefs", { load_bias: want }); } catch (err) { /* below */ }
+    // The generated config just changed, so the preview is stale.
+    $("preview").click();
+    return;
+  }
+  const go = e.target.closest("#wg-apply");
+  if (!go) return;
+  go.disabled = true;
+  const said = go.textContent;
+  go.textContent = "Setting…";
+  try {
+    const r = await api("/api/wingraphics/apply", {});
+    status(r.ok ? (r.detail || "Set.") : r.error, !r.ok);
+  } catch (err) { status(String(err && err.message || err), true); }
+  go.textContent = said;
+  go.disabled = false;
+  loadMachine();
+});
+
+document.addEventListener("change", async e => {
+  if (e.target.id !== "wg-auto") return;
+  const on = e.target.checked;
+  if (prefsNow) prefsNow.win_graphics_auto = on;
+  try { await api("/api/prefs", { win_graphics_auto: on }); } catch (err) { /* below */ }
+});
+
 /* What the launch did about the crosshair.
 
    Only worth a message when it is not what the switch asked for. A launch
@@ -10892,6 +11020,7 @@ function setTab(name) {
   if (name === "fix") loadFixes(false);
   if (name === "settings") {
     setSettingsSub(settingsSub, true); loadSetups(); loadCrosshairX();
+    loadMachine();
   }
   document.querySelectorAll(".tabs .tab").forEach(b =>
     b.setAttribute("aria-selected", String(b.dataset.tab === name)));
@@ -11058,6 +11187,7 @@ function applyPrefs(ui) {
   // was drawn before this arrived it is showing them both off regardless of
   // what is saved. Redraw it now there is something true to draw.
   if (xhairData) renderCrosshairX();
+  if (wgData) renderMachine();
   if (ui.tab) setTab(ui.tab);
   if (ui.account) {
 
@@ -11572,6 +11702,8 @@ $("play").addEventListener("click", async () => {
       // crosshair the switch asks for, in whichever direction it was moved.
       hide_crosshair: !!(prefsNow && prefsNow.hide_crosshair),
       crosshairx_launch: !!(prefsNow && prefsNow.crosshairx_launch),
+      load_bias: (prefsNow && prefsNow.load_bias) || "auto",
+      win_graphics_auto: !!(prefsNow && prefsNow.win_graphics_auto),
       // Set only by the Watch button, and taken before the request so a
       // launch that fails does not leave it armed for the next one.
       watch_demo: watching,
