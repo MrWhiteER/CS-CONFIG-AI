@@ -379,6 +379,51 @@ class TestProfile(unittest.TestCase):
         with self.assertRaises(ValueError):
             build_profile(self.machine, self.kb, intent="ultra")
 
+    def test_a_graphics_card_that_keeps_up_is_not_held_below_the_processor(self):
+        """Reported from a real machine: a 3090 Ti next to a 12900K was handed
+        gpu_level Medium while cpu_level was High, and CS2's own detection had
+        put the same card at Very High. Cutting the graphics dials below the
+        processor's only buys frames when the card is the slower half."""
+        payload = dict(PROBE)
+        payload["gpus"] = [{"name": "NVIDIA GeForce RTX 3090 Ti",
+                            "vram_bytes": 24 * 1024 ** 3, "vendor_id": 4318}]
+        for intent in ("competitive", "balanced", "quality"):
+            got = build_profile(detect(payload), self.kb, intent=intent)
+            self.assertGreaterEqual(
+                got.video["setting.gpu_level"], got.video["setting.cpu_level"],
+                f"gpu_level held below cpu_level in {intent}")
+            self.assertGreaterEqual(
+                got.video["setting.gpu_mem_level"], got.video["setting.cpu_level"],
+                f"gpu_mem_level held below cpu_level in {intent}")
+
+    def test_asking_for_a_better_picture_does_not_argue_itself_down(self):
+        """The intent's cost lands on the graphics ceiling alone, so reading
+        the bottleneck off the chosen intent lets "quality" make the card look
+        slow, which then reads as a reason to cut graphics detail. The dials
+        are measured against the hardware's own standing instead, so the same
+        machine does not lose graphics detail for having asked for more."""
+        payload = dict(PROBE)
+        payload["gpus"] = [{"name": "NVIDIA GeForce RTX 3090 Ti",
+                            "vram_bytes": 24 * 1024 ** 3, "vendor_id": 4318}]
+        machine = detect(payload)
+        gaps = {intent: build_profile(machine, self.kb, intent=intent).video["setting.cpu_level"]
+                        - build_profile(machine, self.kb, intent=intent).video["setting.gpu_level"]
+                for intent in ("competitive", "balanced", "quality")}
+        self.assertEqual(set(gaps.values()), {0}, f"gap opened by intent: {gaps}")
+
+    def test_a_card_that_really_is_the_slower_half_is_still_cut(self):
+        """The floor must not become "never cut the graphics card". A weak
+        card next to a strong processor is genuinely the wall, and there the
+        cut is what buys the frames."""
+        payload = dict(PROBE)
+        # A card far enough behind this processor to land on a tier whose
+        # table actually opens a gap -- on the higher tiers the two dials are
+        # equal anyway and the floor would prove nothing.
+        payload["gpus"] = [{"name": "NVIDIA GeForce GTX 1050 Ti",
+                            "vram_bytes": 4 * 1024 ** 3, "vendor_id": 4318}]
+        got = build_profile(detect(payload), self.kb, intent="quality")
+        self.assertLess(got.video["setting.gpu_level"], got.video["setting.cpu_level"])
+
 
 class TestLaunchOptions(unittest.TestCase):
     def setUp(self):

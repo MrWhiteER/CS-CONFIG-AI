@@ -28,6 +28,23 @@ TIER_REFERENCE_INTENT = "balanced"
 # Headroom (estimated fps / target fps) required to earn each tier.
 TIER_THRESHOLDS = ((2.00, "S"), (1.50, "A"), (1.15, "B"), (0.85, "C"))
 
+# How far behind the processor the graphics card has to be before cutting its
+# detail below the processor's is worth anything. Below this it is genuinely
+# the slower half and the cut buys frames; at or above it, the processor is
+# the wall and the cut only costs picture.
+GPU_CLEARLY_BEHIND = 0.90
+
+# Which half of the machine the detail budget is spent on.
+#
+# "auto" reads it off the hardware, which is right for most people. The other
+# two exist because on a machine that cannot have everything the choice is a
+# real one and it is not ours to make: somebody with a weak graphics card and
+# a decent processor wants the card spared, and somebody with the opposite
+# wants the processor spared. Detail dials are all these are -- nothing here
+# moves work from one part to the other, it decides which part is asked to do
+# less -- and the interface says so rather than implying a scheduler.
+LOAD_BIAS = ("auto", "gpu", "cpu")
+
 # Model constants, calibrated against what the reference parts actually do in
 # CS2. A single-thread index of 100 (a 14900K) sustains roughly 550 fps at
 # competitive settings. A GPU index of 100 (a 4090) is worth roughly 1400 fps
@@ -266,10 +283,14 @@ def build_profile(
     resolution: Optional[Tuple[int, int]] = None,
     current_video: Optional[Dict[str, str]] = None,
     hide_crosshair: bool = False,
+    load_bias: str = "auto",
 ) -> Profile:
     """Score the machine and produce a complete settings plan."""
     if intent not in INTENTS:
         raise ValueError(f"unknown intent {intent!r}; expected one of {', '.join(INTENTS)}")
+    if load_bias not in LOAD_BIAS:
+        raise ValueError(
+            f"unknown load bias {load_bias!r}; expected one of {', '.join(LOAD_BIAS)}")
 
     current_video = current_video or {}
     advisories: List[Advisory] = []
@@ -289,7 +310,7 @@ def build_profile(
     # which lowers the headroom, which lowers the tier, which hands back worse
     # settings than "balanced" would have. That is the opposite of what was
     # asked for, so tiering and intent are kept independent.
-    reference_fps, _, _, _ = estimate_fps(
+    reference_fps, reference_cpu, reference_gpu, _ = estimate_fps(
         cpu_match.index, gpu_match.index, pixels, TIER_REFERENCE_INTENT
     )
     tier = _tier_for(reference_fps / target if target else 1.0)
@@ -317,6 +338,9 @@ def build_profile(
         "tier": tier,
         "headroom": headroom,
         "gpu_ratio": (gpu_ceiling / cpu_ceiling) if cpu_ceiling else 1.0,
+        # Measured at the reference cost rather than the chosen one, for the
+        # same reason the tier is: see below.
+        "gpu_standing": (reference_gpu / reference_cpu) if reference_cpu else 1.0,
     }
     for adjustment in kb.video.get("adjustments", []):
         if not _condition_met(adjustment.get("when", ""), ctx):
@@ -324,6 +348,50 @@ def build_profile(
         for key, value in (adjustment.get("set") or {}).items():
             video[key] = kb.clamp(key, int(value))
             reasons[key] = adjustment.get("reason", adjustment.get("id", ""))
+
+    # The two GPU dials are cut below the processor's only when the graphics
+    # card is genuinely the slower half.
+    #
+    # Measuring that against the chosen intent creates the feedback loop the
+    # tier code above is written to avoid, and here it bites harder. The
+    # intent's cost is applied to the GPU ceiling alone, so asking for a
+    # better picture makes the graphics card look slower, which is then read
+    # as a reason to cut graphics detail -- the cut justifying itself. On a
+    # machine whose parts are evenly matched that is enough to drop gpu_level
+    # a step below cpu_level for no reason but the question having been asked.
+    #
+    # So this uses the hardware's own standing, at the same fixed reference
+    # cost the tier uses. CS2 is CPU-bound on most machines; where the
+    # graphics card can keep up, cutting its detail buys no frames at all and
+    # only makes the picture worse. Same reasoning as the
+    # keep_gpu_quality_when_cpu_bound adjustment, applied to the two dials
+    # that actually carry the graphics card's share of the work.
+    GPU_KEYS = ("setting.gpu_level", "setting.gpu_mem_level")
+    processor = video.get("setting.cpu_level")
+    spare_the_processor = load_bias == "cpu"
+    spare_the_card = load_bias == "gpu" or (
+        load_bias == "auto" and ctx["gpu_standing"] >= GPU_CLEARLY_BEHIND)
+
+    if processor is not None and spare_the_card:
+        why = ("asked to lean on the graphics card" if load_bias == "gpu" else
+               "the graphics card keeps up with the processor, so holding it below "
+               "the processor's detail level would cost picture without buying frames")
+        for key in GPU_KEYS:
+            if video.get(key, processor) < processor:
+                video[key] = kb.clamp(key, processor)
+                reasons[key] = why
+
+    elif processor is not None and spare_the_processor:
+        # The other way round: the graphics card is asked to do less so the
+        # processor is not the one being waited on. Deliberately a step below
+        # rather than equal -- levelling them would leave nothing given back.
+        spend = kb.clamp("setting.cpu_level", processor)
+        give_back = max(spend - 1, kb.video["keys"]["setting.gpu_level"]["min"])
+        for key in GPU_KEYS:
+            if video.get(key, give_back) > give_back:
+                video[key] = kb.clamp(key, give_back)
+                reasons[key] = ("asked to lean on the processor, so the graphics card "
+                                "is given less to draw")
 
     # --- console convars --------------------------------------------------
     fps_max, fps_reason = _fps_max_value(headroom, target, estimated)
