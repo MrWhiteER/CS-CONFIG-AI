@@ -2560,14 +2560,38 @@ def _demo_page(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         pass
 
     url = direct or demos.MATCH_PAGE.format(match_id=found)
+    if not _open_in_default_browser(url):
+        return {"ok": False, "url": url,
+                "error": "could not open your browser; the link is above"}
+    return {"ok": True, "url": url, "direct": bool(direct),
+            "page": demos.MATCH_PAGE.format(match_id=found)}
+
+
+def _open_in_default_browser(url: str) -> bool:
+    """Open a link in whichever browser Windows is set to use.
+
+    os.startfile hands the URL to the shell, which is the only way to be sure
+    it lands in the browser the person actually uses. webbrowser.open is not:
+    it keeps its own ordered list and will happily fall through to whatever
+    else it found on the machine -- Edge, here -- if the default entry does
+    not take. That matters because the whole point of opening a link here is
+    that the browser is signed in to FACEIT, and a different browser is not.
+    """
+    import os
+    import sys
+
+    if sys.platform == "win32":
+        try:
+            os.startfile(url)  # noqa: S606 - a URL for the shell, not a command
+            return True
+        except OSError:
+            pass
     try:
         import webbrowser
 
-        webbrowser.open(url)
-    except Exception as exc:
-        return {"ok": False, "error": f"could not open the browser: {exc}", "url": url}
-    return {"ok": True, "url": url, "direct": bool(direct),
-            "page": demos.MATCH_PAGE.format(match_id=found)}
+        return bool(webbrowser.open(url))
+    except Exception:
+        return False
 
 
 def _demo_cancel(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
