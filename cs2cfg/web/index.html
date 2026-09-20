@@ -9189,6 +9189,7 @@ async function loadCrosshairX() {
     xhairData = { installed: false, error: String(err && err.message || err) };
   }
   renderCrosshairX();
+  startCrosshairWatch();
 }
 
 function renderCrosshairX() {
@@ -9219,8 +9220,7 @@ function renderCrosshairX() {
   box.innerHTML =
     '<div class="xh-head">' + mark +
       '<span class="xh-name"><h3>Crosshair X' +
-        '<span class="xh-live' + (d.running ? " up" : "") + '"><i></i>' +
-        (d.running ? "RUNNING" : "NOT RUNNING") + "</span></h3>" +
+        '<span class="xh-live"><i></i></span></h3>' +
         "<p>Draws its own crosshair over the game, so the game should stop " +
         "drawing one.</p></span>" +
     "</div>" +
@@ -9237,8 +9237,7 @@ function renderCrosshairX() {
       '<span class="sub2">Through Steam, after the game. If it will not start, ' +
       "the game still launches.</span></span></label>" +
     '<div class="actions">' +
-      '<button class="btn small" id="xhair-open"' + (d.running ? " disabled" : "") + ">" +
-      (d.running ? "Already running" : "Start it now") + "</button>" +
+      '<button class="btn small" id="xhair-open"></button>' +
       '<a class="btn small" href="' + esc(d.store || "") +
       '" target="_blank" rel="noopener noreferrer">Store page</a>' +
     "</div>" +
@@ -9248,6 +9247,56 @@ function renderCrosshairX() {
       "This application does not know your event&rsquo;s rules and makes no claim " +
       "about them." +
     "</p>";
+  paintCrosshairLive();
+}
+
+/* The two parts of the card that are only true for this second.
+
+   Kept apart from the render above because they are repainted while somebody
+   is looking at the card, and rebuilding the whole card to change one word
+   would throw away a checkbox mid-click. */
+function paintCrosshairLive() {
+  const d = xhairData;
+  const live = document.querySelector("#xhair-out .xh-live"), btn = $("xhair-open");
+  if (!d || !live || !btn) return;
+  live.classList.toggle("up", !!d.running);
+  live.innerHTML = "<i></i>" + (d.running ? "RUNNING" : "NOT RUNNING");
+  // Mid-start the button is saying something this does not know about.
+  if (btn.dataset.busy === "1") return;
+  btn.textContent = d.running ? "Already running" : "Start it now";
+  btn.disabled = !!d.running;
+}
+
+/* Why this is watched rather than read once.
+
+   The window gets opened on a machine that has just booted, and Crosshair X
+   is still on its way up -- Steam starts it, and Steam at boot is slow. Read
+   once, the card fixes "NOT RUNNING" in place and the button offers to start
+   something that is already running, until the page is reloaded. Reloading to
+   correct a status line is not a thing anybody should have to know to do.
+
+   The same poll covers the harsher case: a Steam library on a drive Windows
+   has not finished mounting makes Crosshair X look uninstalled, which hides
+   the card completely. It comes back on its own now.
+
+   Only while it is on screen. Each check spawns tasklist on the server, and
+   doing that forever behind a hidden window is rude. */
+let xhairTimer = null;
+
+function startCrosshairWatch() {
+  if (xhairTimer) return;
+  xhairTimer = setInterval(async () => {
+    const card = $("xhair-card");
+    if (document.hidden || activeTab !== "settings" || !card) return;
+    let fresh;
+    try { fresh = await api("/api/crosshairx", {}); } catch (err) { return; }
+    const was = xhairData || {};
+    xhairData = fresh;
+    // Appearing or disappearing changes the whole card; running or not is two
+    // words and a button, and the light touch is the safe one.
+    if (!!was.installed !== !!fresh.installed) renderCrosshairX();
+    else if (!!was.running !== !!fresh.running) paintCrosshairLive();
+  }, 5000);
 }
 
 /* What the launch did about the crosshair.
@@ -9284,6 +9333,7 @@ document.addEventListener("click", async e => {
   if (!e.target.closest("#xhair-open")) return;
   const btn = e.target.closest("#xhair-open");
   btn.disabled = true;
+  btn.dataset.busy = "1";
   const said = btn.textContent;
   btn.textContent = "Starting\u2026";
   try {
@@ -9293,7 +9343,7 @@ document.addEventListener("click", async e => {
     status(String(err && err.message || err), true);
   }
   // It takes a moment to appear, so the card is re-read rather than guessed at.
-  setTimeout(() => { loadCrosshairX(); }, 2500);
+  setTimeout(() => { delete btn.dataset.busy; loadCrosshairX(); }, 2500);
   btn.textContent = said;
   btn.disabled = false;
 });
@@ -11004,6 +11054,10 @@ function applyPrefs(ui) {
     if (!railFolded()) railOpen = railWidth;
     railApply(false);
   }
+  // The Crosshair X card reads its two switches straight from here, so if it
+  // was drawn before this arrived it is showing them both off regardless of
+  // what is saved. Redraw it now there is something true to draw.
+  if (xhairData) renderCrosshairX();
   if (ui.tab) setTab(ui.tab);
   if (ui.account) {
 

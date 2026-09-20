@@ -127,5 +127,56 @@ class Starting(unittest.TestCase):
         self.assertTrue(out["already"])
 
 
+class TheCardKeepsUp(unittest.TestCase):
+    """The card is drawn from two things that are not ready at boot.
+
+    Reported from a real machine: start the computer, open this straight
+    away, and the Crosshair X card is wrong until you reload it. Three
+    reasons, all of them timing. Crosshair X is still coming up behind Steam,
+    so the badge reads NOT RUNNING and never looks again. A Steam library on a
+    drive Windows has not finished mounting makes it look uninstalled, which
+    hides the card outright. And the two switches are read from preferences
+    that may not have arrived when the card is drawn, so they show off while
+    the saved answer is on.
+
+    These assert on the page source rather than running it -- there is no
+    browser in this suite -- so they are a guard against the fix being
+    deleted, not a test of the behaviour. The behaviour was checked in a
+    browser against a machine with Crosshair X actually running.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        from cs2cfg import paths
+
+        cls.page = (paths.bundle_root() / "web" / "index.html").read_text(
+            encoding="utf-8", errors="replace")
+
+    def test_it_looks_again_after_the_first_read(self):
+        self.assertIn("function startCrosshairWatch()", self.page)
+        self.assertIn("startCrosshairWatch();", self.page)
+
+    def test_the_watch_is_only_armed_once(self):
+        """loadCrosshairX runs on every visit to the tab; four visits must not
+        leave four timers asking the server the same question."""
+        self.assertIn("if (xhairTimer) return;", self.page)
+
+    def test_it_stops_asking_when_nobody_is_looking(self):
+        """Each check spawns tasklist on the server."""
+        self.assertIn('document.hidden || activeTab !== "settings"', self.page)
+
+    def test_the_live_part_is_repainted_rather_than_rebuilt(self):
+        """Rewriting the card every five seconds would throw away a checkbox
+        under somebody's cursor, which is a worse bug than the one fixed."""
+        self.assertIn("function paintCrosshairLive()", self.page)
+        self.assertIn("paintCrosshairLive();", self.page)
+
+    def test_a_start_in_progress_keeps_its_own_label(self):
+        self.assertIn('btn.dataset.busy === "1"', self.page)
+
+    def test_the_switches_are_redrawn_when_preferences_land(self):
+        self.assertIn("if (xhairData) renderCrosshairX();", self.page)
+
+
 if __name__ == "__main__":
     unittest.main()
