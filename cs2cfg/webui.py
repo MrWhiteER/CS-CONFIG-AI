@@ -23,7 +23,7 @@ import time
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from . import __version__, backup, cfglang, emit, profiles, steam, window
 from .hardware import Machine, ProbeError, detect
@@ -258,24 +258,46 @@ def _apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
             state.cfg_folder, state.cfg_name),
     )
 
-    # Same trap as Steam and localconfig.vdf, one file along: CS2 rewrites
-    # cs2_video.txt from memory on quit, so a picture setting written now comes
-    # back on its own and reads as the tool not having worked.
-    if body.get("write_video", True) and steam.cs2_running():
-        return {"ok": False, "error":
-                "CS2 is running. It rewrites cs2_video.txt when it quits, so the picture "
-                "settings would be put back the moment you close the game -- V-Sync "
-                "included. Close CS2, or untick the picture quality box."}
+    # Steam and CS2 each keep one file in memory and rewrite it on exit, so a
+    # write made underneath either one is undone the moment it closes.
+    #
+    # Each endangers its own file and nothing else: Steam holds
+    # localconfig.vdf, CS2 holds cs2_video.txt. So only the step at risk
+    # stands down. Refusing the whole apply over one of them -- which is what
+    # this did -- threw away every other write that was perfectly safe, and
+    # Steam being up is the normal state of a machine somebody is about to
+    # play on. It read as the picture settings being broken when nothing had
+    # even been attempted.
+    skipped: List[Dict[str, Any]] = []
+
+    write_video = bool(body.get("write_video", True))
+    if write_video and steam.cs2_running():
+        write_video = False
+        skipped.append({
+            "what": "cs2_video.txt",
+            "detail": "CS2 is running, and rewrites this file when it quits -- the picture "
+                      "settings would be put back the moment you closed the game, V-Sync "
+                      "included. Close CS2 and apply again."})
 
     write_launch = bool(body.get("write_launch", True))
     if write_launch and steam.steam_running():
-        return {"ok": False, "error":
-                "Steam is running. It rewrites localconfig.vdf when it exits, so the launch "
-                "options would be lost. Close Steam, or untick the launch options box."}
+        write_launch = False
+        skipped.append({
+            "what": "Steam launch options",
+            "detail": "Steam is running, and rewrites localconfig.vdf when it exits, so this "
+                      "would be lost. Close Steam and apply again."})
+
+    # Nothing left to do is still worth saying plainly, rather than reporting
+    # a successful apply that wrote nothing at all.
+    writes_anything = (write_video or write_launch
+                       or bool(body.get("write_cfg", True) and state.cs2_install)
+                       or bool(body.get("fix_scaling", True)))
+    if skipped and not writes_anything:
+        return {"ok": False, "error": skipped[0]["detail"], "skipped": skipped}
 
     session = backup.BackupSession(note=f"web apply {profile.intent}/tier {profile.tier}")
 
-    if body.get("write_video", True):
+    if write_video:
         try:
             diff = steam.write_video_cfg(user, profile.video, session)
             steps.append({"ok": True, "what": "cs2_video.txt",
@@ -312,8 +334,14 @@ def _apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     if body.get("fix_scaling", True):
         steps.append(_scaling_step())
 
+    # Listed after what was written, and marked as stood down rather than
+    # failed: a step that was never attempted is not a step that went wrong.
+    for stood_down in skipped:
+        steps.append({"ok": False, "skipped": True, **stood_down})
+
     backup.prune()
-    return {"ok": True, "steps": steps, "backup": None if session.empty else session.stamp}
+    return {"ok": True, "steps": steps, "skipped": skipped,
+            "backup": None if session.empty else session.stamp}
 
 
 def _revert(state: State, body: Dict[str, Any]) -> Dict[str, Any]:

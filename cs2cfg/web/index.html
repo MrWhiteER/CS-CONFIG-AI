@@ -5918,12 +5918,28 @@ $("apply").addEventListener("click", async () => {
     settleChanges();          // written to disk; nothing left to answer for
     $("results").insertAdjacentHTML("afterbegin",
       '<section class="card"><h2>Written</h2>' +
-      r.steps.map(s => '<div class="note"><div class="t" style="color:' +
-        (s.ok ? "var(--good)" : "var(--bad)") + '">' + (s.ok ? "✓ " : "× ") + esc(s.what) +
-        '</div><div class="d">' + esc(s.detail) + "</div></div>").join("") +
+      // Three states, not two. A step that stood down because Steam or CS2
+      // was holding its file was never attempted, and colouring that the
+      // same red as a write that actually failed says the wrong thing.
+      r.steps.map(s => {
+        const colour = s.skipped ? "var(--warn)" : s.ok ? "var(--good)" : "var(--bad)";
+        const mark = s.skipped ? "– " : s.ok ? "✓ " : "× ";
+        const tail = s.skipped ? " (not written)" : "";
+        return '<div class="note"><div class="t" style="color:' + colour + '">' +
+          mark + esc(s.what) + tail + '</div><div class="d">' + esc(s.detail) +
+          "</div></div>";
+      }).join("") +
       (r.backup ? '<p class="sub">Backup ' + esc(r.backup) + " — use Undo last to revert.</p>" : "") +
       "</section>");
-    status("Applied.");
+    // Never just "Applied." when part of it was not: that is how somebody
+    // ends up believing a setting was written when it was stood down.
+    const stood = r.skipped || [];
+    if (stood.length) {
+      status("Applied — but " + stood.map(x => esc(x.what)).join(" and ") +
+             " could not be written yet. " + esc(stood[0].detail), true);
+    } else {
+      status("Applied.");
+    }
     scan(true);
   } catch (e) { status("Apply failed: " + esc(e.message), true); $("apply").disabled = false; }
 });
