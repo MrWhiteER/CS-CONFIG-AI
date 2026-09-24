@@ -29,6 +29,7 @@ from __future__ import annotations
 import ctypes
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -107,6 +108,16 @@ CATALOGUE: List[Fix] = [
         "silent or crackly without anything else changing.",
         needs_admin=True, disruptive=True,
         danger="Audio stops for a second or two everywhere."),
+    Fix("steam.restart", "steam", "Restart Steam",
+        "Closes Steam properly and starts it again, then waits until it has "
+        "signed back in. For the client that has gone sour underneath the "
+        "game: \"No Steam logon\" dropping you out of a match, a game that "
+        "will not launch, a friends list stuck loading. Steam is asked to "
+        "close the way its own menu closes it, so what it was holding is "
+        "written out first.",
+        disruptive=True,
+        danger="Closes Steam, and any download it is in the middle of. CS2 has "
+               "to be closed first."),
     Fix("sound.apps", "sound", "Choose CS2's sound device",
         "Opens the Windows page where CS2 can be given its own output and "
         "input, without changing what everything else uses."),
@@ -530,9 +541,157 @@ def _fix_open_app_volume() -> Dict[str, Any]:
                       "keeps the device it already had."}
 
 
+# --- Steam ------------------------------------------------------------------
+#
+# "No Steam logon" mid-match is the client's session having gone bad, not the
+# game and not this application: it happens launching straight from Steam too,
+# and a restart of the client clears it. So the repair is a restart of the
+# client, in the one place somebody already looks when something has gone
+# wrong mid-session.
+
+STEAM_PROCESS = "steam.exe"
+# How long Steam is given to close on its own before it is ended. Generous on
+# purpose: it is flushing files on the way out, and cutting that short to save
+# ten seconds is how somebody loses the settings Steam was holding.
+STEAM_SHUTDOWN_WAIT = 30.0
+STEAM_READY_WAIT = 90.0
+
+# Steam writes this the moment a sign-in completes. Watched rather than
+# guessed at, because "the process exists" is true a second after launching it
+# and says nothing about whether it can start a game yet.
+_LOGON_MARK = "RecvMsgClientLogOnResponse() : processing complete"
+_LOG_STAMP = re.compile(r"^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]")
+
+
+def _steam_running() -> bool:
+    try:
+        done = subprocess.run(
+            ["tasklist", "/FI", f"IMAGENAME eq {STEAM_PROCESS}", "/NH"],
+            capture_output=True, text=True, timeout=15,
+            creationflags=_CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return STEAM_PROCESS.lower() in (done.stdout or "").lower()
+
+
+def _wait_until(condition, limit: float, step: float = 1.0) -> bool:
+    deadline = time.monotonic() + limit
+    while time.monotonic() < deadline:
+        if condition():
+            return True
+        time.sleep(step)
+    return bool(condition())
+
+
+def _signed_in_since(started: float) -> bool:
+    """Whether Steam has completed a sign-in since ``started``.
+
+    Read out of Steam's own connection log rather than the registry.
+    the ``ActiveUser`` value under ``ActiveProcess`` is the documented-looking answer and is
+    simply wrong here -- it reads 0 on this machine with Steam running and
+    signed in -- so it is not trusted. The log line is dated, which also makes
+    this survive Steam rotating the file to connection_log.previous.txt on
+    restart: a stale entry cannot be mistaken for a fresh one.
+    """
+    from . import steam as steam_mod
+
+    try:
+        root = steam_mod.find_steam_root()
+    except Exception:
+        return False
+    if root is None:
+        return False
+    try:
+        text = (root / "logs" / "connection_log.txt").read_text(
+            encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+    for line in reversed(text.splitlines()):
+        if _LOGON_MARK not in line:
+            continue
+        found = _LOG_STAMP.match(line)
+        if not found:
+            continue
+        try:
+            when = time.mktime(time.strptime(found.group(1), "%Y-%m-%d %H:%M:%S"))
+        except (ValueError, OverflowError):
+            continue
+        # Two seconds of slack: the log is second-resolution local time.
+        return when >= started - 2.0
+    return False
+
+
+def _fix_restart_steam(body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import launcher
+
+    if sys.platform != "win32":
+        raise FixError("restarting Steam is only implemented on Windows")
+    exe = launcher.steam_exe()
+    if exe is None:
+        raise FixError("Steam could not be found on this machine")
+
+    started = time.time()
+    steps: List[str] = []
+    forced = False
+
+    if _steam_running():
+        # Steam's own shutdown, which is what its File > Exit does. A kill
+        # here would lose whatever it had not yet written -- localconfig.vdf
+        # among it, which is where the launch options live.
+        try:
+            subprocess.Popen(
+                [str(exe), "-shutdown"],
+                creationflags=_CREATE_NO_WINDOW if sys.platform == "win32" else 0)
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise FixError(f"could not ask Steam to close: {exc}")
+        steps.append("asked Steam to close")
+
+        if _wait_until(lambda: not _steam_running(), STEAM_SHUTDOWN_WAIT):
+            steps.append("Steam closed")
+        else:
+            # Only now, and only after it has had its full chance to flush.
+            forced = True
+            subprocess.run(["taskkill", "/IM", STEAM_PROCESS, "/F", "/T"],
+                           capture_output=True, text=True, timeout=30,
+                           creationflags=_CREATE_NO_WINDOW)
+            steps.append(f"Steam did not close within {int(STEAM_SHUTDOWN_WAIT)}s, "
+                         "so it was ended")
+            if not _wait_until(lambda: not _steam_running(), 10.0):
+                raise FixError("Steam would not close, so it has not been restarted")
+    else:
+        steps.append("Steam was not running")
+
+    try:
+        subprocess.Popen([str(exe)],
+                         creationflags=_CREATE_NO_WINDOW if sys.platform == "win32" else 0)
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise FixError(f"Steam was closed but would not start again: {exc}")
+    steps.append("started Steam")
+
+    signed_in = _wait_until(lambda: _signed_in_since(started), STEAM_READY_WAIT)
+    if signed_in:
+        steps.append("Steam signed back in")
+        detail = "Steam was restarted and has signed back in"
+    else:
+        # Not an error. Steam may be waiting on a password or a phone
+        # confirmation, and saying "failed" over that would be a lie.
+        steps.append("Steam is up, but no sign-in has completed yet")
+        detail = ("Steam was restarted. It has not finished signing in -- it may "
+                  "be waiting for your password or a confirmation on your phone.")
+
+    return {"ok": True, "steps": steps, "forced": forced, "signed_in": signed_in,
+            # The page starts the ordinary launch when this comes back true,
+            # so the game still goes through the whole borderless preparation
+            # rather than a second, lesser launch path living here.
+            "then_play": bool(body.get("then_play")) and signed_in,
+            "detail": detail}
+
+
 # ---------------------------------------------------------------------------
 
 _RUNNERS = {
+    "steam.restart": _fix_restart_steam,
     "net.flush": lambda body: _fix_flush_dns(),
     "net.restart": lambda body: _fix_restart_adapter(str(body.get("adapter") or "")),
     "gpu.restart": lambda body: _fix_restart_gpu(),
