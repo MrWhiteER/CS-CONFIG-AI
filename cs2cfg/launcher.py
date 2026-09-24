@@ -444,7 +444,12 @@ def play(
     mark = phase or (lambda name: None)
     mark("preparing")
 
-    if window.find_game_window(GAME_PROCESS) is not None:
+    # By process, not by window. A window appears half a minute after the
+    # process does, and in that gap this guard used to pass -- so pressing Play
+    # twice while the game was starting started it twice. The process is the
+    # authority on whether the game is up; the window check stays behind it for
+    # the case where tasklist cannot be run at all.
+    if steam.cs2_running() or window.find_game_window(GAME_PROCESS) is not None:
         raise LaunchError("CS2 is already running. Close it first, or use `cs2cfg stretch` on the running window.")
 
     if not steam_is_installed():

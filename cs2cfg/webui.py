@@ -355,6 +355,13 @@ def _revert(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _play(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    # First thing, before anything is written or any mode is switched. The
+    # launcher refuses this too, but by then a display mode may already have
+    # been changed for a launch that cannot happen.
+    if steam.cs2_running():
+        return {"ok": False, "error":
+                "CS2 is already running. Close it before launching again -- "
+                "starting a second copy is what makes the machine crawl."}
     """Start a launch. Always through Steam; never by running cs2.exe."""
     from .launcher import LaunchError, LaunchSession
 
@@ -3186,10 +3193,20 @@ def make_handler(state: State):
             if path == "/api/play/status":
                 # Deliberately outside state.lock: the page polls this every
                 # second and must never block behind a slow operation.
+                # Whether the game and the overlay are up, every time. Both
+                # are cached reads, and both have to be answered even when
+                # this application did not start them: a game launched from
+                # Steam directly, or left running when a previous watch ended,
+                # is still a game that must not be started a second time.
+                from . import crosshairx
+
+                live = {"game_running": steam.cs2_running_recent(),
+                        "overlay_running": crosshairx.running()}
                 if state.launch is None:
-                    self._send_json({"ok": True, "phase": "idle", "active": False, "lines": []})
+                    self._send_json({"ok": True, "phase": "idle", "active": False,
+                                     "lines": [], **live})
                 else:
-                    self._send_json({"ok": True, **state.launch.snapshot()})
+                    self._send_json({"ok": True, **state.launch.snapshot(), **live})
                 return
             if path == "/api/monitor":
                 # Read-only and cheap: CPU and memory come from ctypes calls,

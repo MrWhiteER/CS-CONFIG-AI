@@ -349,6 +349,7 @@
   .fix-tile[data-family="graphics"] { --fam: #2fd0d6; }
   .fix-tile[data-family="devices"]  { --fam: #a970ff; }
   .fix-tile[data-family="sound"]    { --fam: #ff9d2e; }
+  .fix-tile[data-family="steam"]    { --fam: #66c0f4; }
   /* The bar a fix runs behind. Takes the tile's own family colour, so the
      thing that is working is lit in the colour of the thing you pressed. */
   .fix-prog { margin-top: 10px; }
@@ -6542,6 +6543,7 @@ const FIX_FAMILY_NAME = {
   graphics: "Picture",
   devices: "Devices",
   sound: "Sound",
+  steam: "Steam",
 };
 
 function fixIcon(fix) {
@@ -6627,6 +6629,16 @@ function renderFixes() {
     '<div class="actions">' + fixButton("device.restart", "Restart it", !devices.length) +
     "</div>");
 
+  // Steam sits with the repairs because that is where somebody looks when
+  // something has gone wrong mid-session, which is the only time this is
+  // wanted. The launch afterwards is offered rather than assumed: somebody
+  // restarting Steam to fix the friends list does not want a game started.
+  html += fixTile(by["steam.restart"],
+    '<label class="opt"><input type="checkbox" id="fix-steam-play" checked> ' +
+    "Launch CS2 once Steam has signed back in</label>" +
+    '<div class="actions">' + fixButton("steam.restart", "Restart Steam", false) +
+    "</div>");
+
   const sound = fixData.sound || {};
   const special = sound.special || [];
   html += fixTile(by["sound.apps"],
@@ -6667,6 +6679,9 @@ async function runFix(button) {
   const body = { id: id };
   if (id === "net.restart" && $("fix-adapter")) body.adapter = $("fix-adapter").value;
   if (id === "device.restart" && $("fix-device")) body.device = $("fix-device").value;
+  if (id === "steam.restart" && $("fix-steam-play")) {
+    body.then_play = $("fix-steam-play").checked;
+  }
 
   button.disabled = true;
   const label = button.textContent;
@@ -6689,6 +6704,14 @@ async function runFix(button) {
     // finished. Let it be read first: the moment it reports success is the one
     // the bar exists for, and the survey is not urgent.
     if (good && id !== "sound.apps") setTimeout(() => loadFixes(true), 2700);
+    // Steam is back and signed in, and the launch was asked for. Handed to
+    // the ordinary Play button rather than launched from here, so the game
+    // still gets the whole borderless preparation instead of a second,
+    // lesser launch path that would drift out of step with the first.
+    if (good && r.then_play && $("play") && !$("play").disabled) {
+      status("Steam is back — launching CS2.");
+      $("play").click();
+    }
   } catch (err) {
     const text = String(err && err.message || err);
     bar.finish("failed", text);
@@ -11682,10 +11705,10 @@ function renderLaunch(s) {
   $("log").scrollTop = $("log").scrollHeight;
 
   const busyNow = !!s.active;
-  $("play").disabled = busyNow;
-  $("play-sub").textContent = busyNow
-    ? (PHASE_TEXT[s.phase] || s.phase)
-    : "through Steam";
+  liveStatus = s;
+  if (typeof s.game_running === "boolean") gameUp = s.game_running;
+  if (typeof s.overlay_running === "boolean") overlayUp = s.overlay_running;
+  paintRunning();
   $("stop-row").classList.toggle("hidden", !busyNow);
   $("stop-hint").textContent = busyNow ? (PHASE_TEXT[s.phase] || s.phase) : "";
 
@@ -11701,6 +11724,69 @@ function renderLaunch(s) {
 async function pollLaunch() {
   try { renderLaunch(await api("/api/play/status")); }
   catch (e) { /* transient while the server is busy; next tick retries */ }
+}
+
+/* What is actually running, asked of the machine rather than remembered.
+
+   The rule this exists for: never offer to start something that is already
+   started. Starting a second CS2 does not fail cleanly -- it fights the first
+   one for the display and brings the machine to its knees.
+
+   Remembering was not enough, because the two things that make it wrong both
+   happen for real. The launch watch only polls while this application is the
+   one launching, so a game started from Steam directly, or one still running
+   after a watch was ended without closing it, left the button offering a
+   second launch. And the process exists for half a minute before its window
+   does, so "is there a window" answered no to a game that was starting.
+
+   Four seconds, from a cached read on the server, so this costs almost
+   nothing while still being current enough to stop a double press. */
+let liveStatus = {}, gameUp = false, overlayUp = false, runningTimer = null;
+
+function paintRunning() {
+  const launching = !!(liveStatus && liveStatus.active);
+  const play = $("play");
+  if (play) {
+    play.disabled = launching || gameUp;
+    const sub = $("play-sub");
+    if (sub) {
+      sub.textContent = launching
+        ? (PHASE_TEXT[liveStatus.phase] || liveStatus.phase)
+        : gameUp ? "CS2 is already running"
+        : "through Steam";
+    }
+  }
+  // The overlay's button, wherever it happens to be drawn. Kept in step from
+  // here as well as from its own card, so it is right on a tab that is not
+  // the one the card lives on.
+  if (xhairData) xhairData.running = overlayUp;
+  const start = $("xhair-open");
+  if (start && start.dataset.busy !== "1") {
+    start.textContent = overlayUp ? "Already running" : "Start it now";
+    start.disabled = overlayUp;
+  }
+  const badge = document.querySelector("#xhair-out .xh-live");
+  if (badge) {
+    badge.classList.toggle("up", overlayUp);
+    badge.innerHTML = "<i></i>" + (overlayUp ? "RUNNING" : "NOT RUNNING");
+  }
+}
+
+function startGameWatch() {
+  if (runningTimer) return;
+  const ask = async () => {
+    if (document.hidden) return;
+    try {
+      const s = await api("/api/play/status");
+      if (typeof s.game_running === "boolean") gameUp = s.game_running;
+      if (typeof s.overlay_running === "boolean") overlayUp = s.overlay_running;
+      // While a launch is in flight its own one-second poll owns the card;
+      // this only keeps the running flags current underneath it.
+      if (!pollTimer) { liveStatus = s; paintRunning(); }
+    } catch (err) { /* next tick */ }
+  };
+  ask();
+  runningTimer = setInterval(ask, 4000);
 }
 
 $("play").addEventListener("click", async () => {
@@ -11785,6 +11871,7 @@ $("rescan").addEventListener("click", () => scan(true));
   } catch (e) { /* said on the card */ }
   if ($("cfg-folder") && $("cfg-folder").value.trim()) loadSource();
   startLive();
+  startGameWatch();
   pollUpdates();
   loadWho();
   try {
