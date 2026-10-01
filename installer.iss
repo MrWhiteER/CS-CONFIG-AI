@@ -73,9 +73,13 @@ Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription
 Source: "dist\cs2-autoconfig\*"; DestDir: "{app}";   Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\{#AppName}";              Filename: "{app}\{#AppExe}"
+; AppUserModelID has to match what the program sets on itself at startup --
+; see APP_USER_MODEL_ID in cs2cfg/desktop.py. Windows matches the two to find
+; the name and the icon it puts at the head of a notification; with nothing to
+; match, it shows the executable's filename and no icon at all.
+Name: "{group}\{#AppName}";              Filename: "{app}\{#AppExe}"; AppUserModelID: "MrWhiteER.CS2Launcher"
 Name: "{group}\Uninstall {#AppName}";    Filename: "{uninstallexe}"
-Name: "{autodesktop}\{#AppName}";        Filename: "{app}\{#AppExe}"; Tasks: desktopicon
+Name: "{autodesktop}\{#AppName}";        Filename: "{app}\{#AppExe}"; Tasks: desktopicon; AppUserModelID: "MrWhiteER.CS2Launcher"
 
 [Run]
 ; Only offered in an interactive install. A silent update run by the updater

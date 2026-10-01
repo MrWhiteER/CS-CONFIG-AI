@@ -295,6 +295,37 @@ class TheIconItself(unittest.TestCase):
         self.assertEqual(len(asked), 2)
         self.assertNotEqual(asked[0], asked[1], "both loaded at the same size")
 
+    def test_the_application_names_itself_to_windows(self):
+        """The head of a notification showed "CS2 Launcher.exe" and a blank
+        icon. Windows takes both from the process's application id, matched
+        against a shortcut carrying the same one, so the id has to be set and
+        the installer has to put the same string on the shortcut."""
+        if sys.platform != "win32":
+            self.skipTest("Windows only")
+        import ctypes
+        from pathlib import Path as P
+
+        from cs2cfg import desktop as d
+
+        self.assertTrue(d._claim_identity())
+        got = ctypes.c_wchar_p()
+        ctypes.windll.shell32.GetCurrentProcessExplicitAppUserModelID(
+            ctypes.byref(got))
+        self.assertEqual(got.value, d.APP_USER_MODEL_ID)
+
+        # The two halves are useless apart, so they are checked together.
+        installer = (P(__file__).resolve().parents[1] / "installer.iss").read_text(
+            encoding="utf-8", errors="replace")
+        self.assertIn(f'AppUserModelID: "{d.APP_USER_MODEL_ID}"', installer)
+
+    def test_naming_itself_is_never_fatal(self):
+        """Cosmetic. A launcher that will not start because it could not name
+        itself would be a poor trade."""
+        from cs2cfg import desktop as d
+
+        with mock.patch.object(d.sys, "platform", "linux"):
+            self.assertFalse(d._claim_identity())
+
     def test_a_callback_that_raises_does_not_take_the_loop_with_it(self):
         """The message loop is the only route back to the window."""
         if sys.platform != "win32":

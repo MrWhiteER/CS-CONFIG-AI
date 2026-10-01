@@ -33,6 +33,38 @@ from . import __version__, appicon, webui
 from .paths import app_dir, is_frozen, storage_kind, user_data_dir
 
 APP_NAME = "CS2 Launcher"
+
+# How Windows identifies this application to itself. It decides the name and
+# the icon at the head of a notification, which is why it is here: without it
+# Windows falls back to the executable's filename and a blank icon, so a
+# notification about "CS2 Launcher" arrived titled "CS2 Launcher.exe" with
+# nothing beside it.
+#
+# Windows resolves the name and icon by matching this against a Start Menu
+# shortcut carrying the same id, which the installer sets. A portable copy has
+# no shortcut to match, so it keeps the filename -- there is nowhere for
+# Windows to read a nicer one from, and there is no inventing one.
+APP_USER_MODEL_ID = "MrWhiteER.CS2Launcher"
+
+
+def _claim_identity() -> bool:
+    """Tell Windows who this process is, before any window exists.
+
+    Has to happen before the first window or notification, because Windows
+    works the identity out once and then keeps it.
+    """
+    if sys.platform != "win32":
+        return False
+    try:
+        import ctypes
+
+        set_id = ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID
+        set_id.argtypes = [ctypes.c_wchar_p]
+        return set_id(APP_USER_MODEL_ID) == 0
+    except Exception:
+        # Cosmetic. A launcher that refuses to start because it could not name
+        # itself would be a poor trade.
+        return False
 WINDOW_TITLE = f"{APP_NAME} — cs2-autoconfig"
 MUTEX_NAME = "Global\\cs2-autoconfig-desktop-singleton"
 
@@ -423,6 +455,10 @@ def run(
             raise StartupError(
                 "The local interface did not come up in time.",
             )
+
+        # Before the window, which is when Windows settles on what this
+        # application is called and what it looks like.
+        _claim_identity()
 
         icon = None
         try:
