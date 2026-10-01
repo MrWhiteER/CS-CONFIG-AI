@@ -37,7 +37,12 @@ kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
 NIM_ADD, NIM_MODIFY, NIM_DELETE, NIM_SETVERSION = 0, 1, 2, 4
 NIF_MESSAGE, NIF_ICON, NIF_TIP, NIF_INFO, NIF_SHOWTIP = 0x01, 0x02, 0x04, 0x10, 0x80
 NOTIFYICON_VERSION_4 = 4
-NIIF_NONE, NIIF_INFO, NIIF_USER = 0x00, 0x01, 0x04
+NIIF_NONE, NIIF_INFO, NIIF_USER, NIIF_LARGE_ICON = 0x00, 0x01, 0x04, 0x20
+
+# Which icon Windows wants, measured rather than assumed: a notification area
+# icon is the small metric, a balloon's own icon is the large one. They differ
+# with the display's scaling, so neither is hardcoded.
+SM_CXICON, SM_CYICON, SM_CXSMICON, SM_CYSMICON = 11, 12, 49, 50
 
 WM_DESTROY, WM_COMMAND, WM_CLOSE, WM_NULL = 0x0002, 0x0111, 0x0010, 0x0000
 WM_LBUTTONUP, WM_CONTEXTMENU, WM_RBUTTONUP = 0x0202, 0x007B, 0x0205
@@ -137,6 +142,8 @@ user32.LoadImageW.argtypes = [wintypes.HINSTANCE, wintypes.LPCWSTR, wintypes.UIN
                               ctypes.c_int, ctypes.c_int, wintypes.UINT]
 user32.LoadIconW.restype = wintypes.HICON
 user32.LoadIconW.argtypes = [wintypes.HINSTANCE, wintypes.LPCWSTR]
+user32.GetSystemMetrics.restype = ctypes.c_int
+user32.GetSystemMetrics.argtypes = [ctypes.c_int]
 user32.CreatePopupMenu.restype = wintypes.HMENU
 user32.CreatePopupMenu.argtypes = []
 user32.AppendMenuW.argtypes = [wintypes.HMENU, wintypes.UINT, UINT_PTR,
@@ -164,7 +171,8 @@ class Tray:
         self.on_quit = on_quit
 
         self._hwnd: Optional[int] = None
-        self._hicon = None
+        self._hicon = None            # small: the icon in the tray itself
+        self._hicon_large = None      # large: the icon on the balloon
         self._ready = threading.Event()
         self._ok = False
         self._thread: Optional[threading.Thread] = None
@@ -233,11 +241,24 @@ class Tray:
         self._hwnd = hwnd
 
     def _load_icon(self) -> None:
+        """Load the mark twice, at the two sizes Windows asks for.
+
+        Loading it once at the default size -- which is the large one -- and
+        using that for both is what the first version did, and it was wrong
+        twice over. The tray then showed a 32 px icon squashed into 16, which
+        is the difference between a crisp mark and a smudge; and the balloon
+        refused it outright with "incorrect size argument", so every
+        notification fell back to the generic blue information icon.
+        """
         if self.icon_path and Path(self.icon_path).exists():
-            handle = user32.LoadImageW(None, str(self.icon_path), IMAGE_ICON,
-                                       0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE)
-            if handle:
-                self._hicon = handle
+            path = str(self.icon_path)
+            self._hicon = user32.LoadImageW(
+                None, path, IMAGE_ICON, user32.GetSystemMetrics(SM_CXSMICON),
+                user32.GetSystemMetrics(SM_CYSMICON), LR_LOADFROMFILE)
+            self._hicon_large = user32.LoadImageW(
+                None, path, IMAGE_ICON, user32.GetSystemMetrics(SM_CXICON),
+                user32.GetSystemMetrics(SM_CYICON), LR_LOADFROMFILE)
+            if self._hicon:
                 return
         # Better a generic icon than no icon: no icon means no way back.
         self._hicon = user32.LoadIconW(None, wintypes.LPCWSTR(IDI_APPLICATION))
@@ -276,14 +297,21 @@ class Tray:
         if not self._ok or not self._hwnd:
             return False
         try:
-            # NIIF_USER puts the application's own icon on the balloon, which
-            # looks better and is refused outright on this machine -- error
-            # 1462 against a perfectly valid icon handle. Rather than guess at
-            # which systems accept it, ask, and fall back to the standard info
-            # icon when the answer is no. A notification that does not appear
-            # is the whole feature failing quietly.
-            for flags, balloon in ((NIIF_USER, self._hicon), (NIIF_INFO, None)):
-                if flags == NIIF_USER and not self._hicon:
+            # Windows is particular about which icon goes with which flag,
+            # and says only "incorrect size argument" when it is not happy.
+            # NIIF_USER on its own wants the small icon; the large one needs
+            # NIIF_LARGE_ICON to go with it. The large pairing is tried first
+            # because it is the one that fills the notification properly, and
+            # the plain information icon is the last resort rather than the
+            # first -- getting that order wrong is why every notification
+            # showed a generic blue "i" instead of the application's mark.
+            attempts = (
+                (NIIF_USER | NIIF_LARGE_ICON, self._hicon_large),
+                (NIIF_USER, self._hicon),
+                (NIIF_INFO, None),
+            )
+            for flags, balloon in attempts:
+                if flags != NIIF_INFO and not balloon:
                     continue
                 data = self._data(NIF_INFO | NIF_ICON | NIF_TIP)
                 data.szInfoTitle = title[:63]

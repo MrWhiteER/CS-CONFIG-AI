@@ -15,6 +15,7 @@ Nothing here touches the real shell: the tray is a stub throughout.
 
 from __future__ import annotations
 
+import ctypes
 import sys
 import threading
 import time
@@ -226,6 +227,73 @@ class TheIconItself(unittest.TestCase):
             self.assertIsNotNone(fn.restype, f"{name} returns a handle undeclared")
         self.assertIsNotNone(tray.user32.CreateWindowExW.argtypes)
         self.assertIsNotNone(tray.shell32.Shell_NotifyIconW.argtypes)
+
+    def test_the_balloon_asks_for_the_logo_before_settling_for_less(self):
+        """Reported with a screenshot: every notification showed the generic
+        blue information icon instead of the application's mark.
+
+        Windows is particular about the pairing and says only "incorrect size
+        argument" when it is not happy -- NIIF_USER on its own wants the small
+        icon, and the large one needs NIIF_LARGE_ICON with it. The first
+        version passed the large icon with the bare flag, so the real icon was
+        refused every time and the fallback was all anybody ever saw.
+        """
+        if sys.platform != "win32":
+            self.skipTest("Windows only")
+        from cs2cfg import tray
+
+        icon = tray.Tray("t", None, on_open=lambda: None, on_quit=lambda: None)
+        icon._ok = True
+        icon._hwnd = 1
+        icon._hicon = 111
+        icon._hicon_large = 222
+
+        tried = []
+
+        def refuse(action, blob):
+            data = ctypes.cast(blob, ctypes.POINTER(tray.NOTIFYICONDATAW)).contents
+            tried.append((data.dwInfoFlags, data.hBalloonIcon))
+            return 0
+
+        with mock.patch.object(tray.shell32, "Shell_NotifyIconW", side_effect=refuse):
+            self.assertFalse(icon.notify("t", "b"))
+
+        self.assertEqual([flags for flags, _ in tried],
+                         [tray.NIIF_USER | tray.NIIF_LARGE_ICON,
+                          tray.NIIF_USER,
+                          tray.NIIF_INFO])
+        # The large icon goes with the large flag and the small one without.
+        self.assertEqual(tried[0][1], 222)
+        self.assertEqual(tried[1][1], 111)
+
+    def test_it_stops_at_the_first_pairing_windows_accepts(self):
+        if sys.platform != "win32":
+            self.skipTest("Windows only")
+        from cs2cfg import tray
+
+        icon = tray.Tray("t", None, on_open=lambda: None, on_quit=lambda: None)
+        icon._ok, icon._hwnd, icon._hicon, icon._hicon_large = True, 1, 111, 222
+        calls = []
+        with mock.patch.object(tray.shell32, "Shell_NotifyIconW",
+                               side_effect=lambda *a: calls.append(a) or 1):
+            self.assertTrue(icon.notify("t", "b"))
+        self.assertEqual(len(calls), 1, "it should not keep going after success")
+
+    def test_the_two_icon_sizes_are_asked_for_separately(self):
+        """One handle for both is what caused this: the tray showed a 32 px
+        icon squashed into 16, and the balloon refused it outright."""
+        if sys.platform != "win32":
+            self.skipTest("Windows only")
+        from cs2cfg import tray
+
+        asked = []
+        with mock.patch.object(tray.user32, "LoadImageW",
+                               side_effect=lambda *a: asked.append((a[3], a[4])) or 1),              mock.patch.object(Path, "exists", return_value=True):
+            icon = tray.Tray("t", Path("x.ico"), on_open=lambda: None,
+                             on_quit=lambda: None)
+            icon._load_icon()
+        self.assertEqual(len(asked), 2)
+        self.assertNotEqual(asked[0], asked[1], "both loaded at the same size")
 
     def test_a_callback_that_raises_does_not_take_the_loop_with_it(self):
         """The message loop is the only route back to the window."""
