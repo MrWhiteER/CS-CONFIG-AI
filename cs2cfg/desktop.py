@@ -269,6 +269,7 @@ def _launch_webview(url: str, icon: Optional[Path], on_closed: Callable[[], None
             confirm_close=False,
         )
         window.events.closed += on_closed
+        _keep_running_in_the_tray(window, icon)
 
         kwargs = {}
         if icon and icon.exists():
@@ -281,6 +282,81 @@ def _launch_webview(url: str, icon: Optional[Path], on_closed: Callable[[], None
         return True
     except Exception:
         return False
+
+
+def _keep_running_in_the_tray(window, icon: Optional[Path]) -> bool:
+    """Make X put the window away rather than end the application.
+
+    Closing the window while a game is being watched ends the watch, and with
+    it the thing that gives the desktop mode back. Hiding costs nothing and
+    keeps all of that alive.
+
+    The application only behaves this way if the icon is actually there to
+    bring it back. A window that refuses to close with nothing in the tray to
+    close it from is a program somebody has to open Task Manager to be rid of,
+    so every failure here leaves X closing the window as it always did.
+    """
+    if sys.platform != "win32":
+        return False
+    try:
+        from .tray import Tray
+    except Exception:
+        return False
+
+    state = {"quitting": False, "told": False}
+
+    def open_window() -> None:
+        try:
+            window.show()
+            window.restore()
+        except Exception:
+            pass
+
+    def quit_app() -> None:
+        state["quitting"] = True
+        try:
+            icon_handle.stop()
+        except Exception:
+            pass
+        try:
+            window.destroy()
+        except Exception:
+            pass
+
+    icon_handle = Tray(APP_NAME, icon, on_open=open_window, on_quit=quit_app)
+    if not icon_handle.start():
+        return False
+
+    def put_away() -> None:
+        try:
+            window.hide()
+        except Exception:
+            return
+        if not state["told"]:
+            # Once. Saying it every time somebody closes the window would be
+            # the kind of notification people turn off, and then the one time
+            # it matters they do not see it.
+            state["told"] = True
+            icon_handle.notify(
+                f"{APP_NAME} is still running",
+                "It is in the notification area, bottom right. Click the icon to "
+                "open it again, or right-click it to quit.")
+
+    def on_closing():
+        # Quit chose this, so let it happen.
+        if state["quitting"]:
+            return True
+        # Hidden from a timer rather than from here. This runs inside the
+        # window's own close handler, and hiding a WinForms window from inside
+        # that handler re-enters it -- the call does not come back, the
+        # handler never returns, and the close goes through as though nothing
+        # had objected. Which is exactly what it did. Cancelling first and
+        # hiding a moment later keeps the two apart.
+        threading.Timer(0.05, put_away).start()
+        return False             # cancels the close
+
+    window.events.closing += on_closing
+    return True
 
 
 def _launch_browser_app_window(url: str) -> bool:
