@@ -210,6 +210,97 @@ class PressingX(unittest.TestCase):
         self.assertEqual(window.shown, 1)
 
 
+class StartingItAgain(unittest.TestCase):
+    """Launching the application when a copy is already running.
+
+    It used to say "already running" and leave you to find the window. Worse
+    after closing to the notification area: the window is hidden then, and the
+    search skipped anything not on screen, so the one window worth finding was
+    the one it refused to look at.
+    """
+
+    def test_summon_says_no_when_nothing_is_listening(self):
+        """Also the regression guard for the import that was missing: this
+        raised NameError, the caller swallowed it, and the fallback path it
+        fell into deadlocked."""
+        if sys.platform != "win32":
+            self.skipTest("Windows only")
+        from cs2cfg import tray
+
+        with mock.patch.object(tray.user32, "FindWindowExW", return_value=0):
+            self.assertFalse(tray.summon())
+
+    def test_the_host_window_has_a_fixed_name(self):
+        """Another process has to be able to find it. A name built from the
+        instance is unfindable, which is the whole reason it is a constant."""
+        if sys.platform != "win32":
+            self.skipTest("Windows only")
+        from cs2cfg import tray
+
+        self.assertIsInstance(tray.WINDOW_CLASS, str)
+        self.assertNotIn("{", tray.WINDOW_CLASS)
+        one = tray.Tray("a", None, on_open=lambda: None, on_quit=lambda: None)
+        two = tray.Tray("b", None, on_open=lambda: None, on_quit=lambda: None)
+        self.assertEqual(tray.WINDOW_CLASS, tray.WINDOW_CLASS)
+        del one, two
+
+    def test_it_hands_over_the_right_to_come_forward(self):
+        """Windows will not let a background process take the foreground. The
+        copy just started by somebody is the one holding that right, so it
+        passes it on before asking the other copy to show itself."""
+        if sys.platform != "win32":
+            self.skipTest("Windows only")
+        from cs2cfg import tray
+
+        allowed = []
+        with mock.patch.object(tray.user32, "FindWindowExW", return_value=4242),              mock.patch.object(tray.user32, "GetWindowThreadProcessId",
+                               side_effect=lambda h, out: out._obj.__setattr__("value", 77)),              mock.patch.object(tray.user32, "AllowSetForegroundWindow",
+                               side_effect=lambda pid: allowed.append(pid) or 1),              mock.patch.object(tray.user32, "PostMessageW", return_value=1):
+            self.assertTrue(tray.summon())
+        self.assertEqual(allowed, [77], "the other copy was never granted it")
+
+
+class TheSecondCopy(unittest.TestCase):
+    """What `run` does when the mutex is already held."""
+
+    def _run_second(self, summon_works):
+        from cs2cfg import desktop as d
+
+        taken = mock.MagicMock()
+        taken.acquire.return_value = False
+        with mock.patch.object(d, "SingleInstance", return_value=taken),              mock.patch("cs2cfg.tray.summon", return_value=summon_works),              mock.patch.object(d, "focus_existing_window", return_value=True) as raise_it,              mock.patch.object(d, "show_error") as complained:
+            code = d.run()
+        return code, raise_it, complained
+
+    def test_a_successful_summon_does_not_also_reach_for_the_window(self):
+        """Doing both deadlocks: the raise attaches to the other copy's input
+        queue, and that queue is busy showing the window this very message
+        asked for. It hung for the full timeout."""
+        code, raise_it, complained = self._run_second(summon_works=True)
+        self.assertEqual(code, 0)
+        raise_it.assert_not_called()
+        complained.assert_not_called()
+
+    def test_without_a_notification_icon_it_still_raises_the_window(self):
+        """Every copy built before the icon existed, and any that could not
+        make one."""
+        code, raise_it, complained = self._run_second(summon_works=False)
+        self.assertEqual(code, 0)
+        raise_it.assert_called_once()
+        self.assertTrue(raise_it.call_args.kwargs.get("include_hidden"),
+                        "a window closed to the tray is hidden; it has to be included")
+        complained.assert_not_called()
+
+    def test_it_only_complains_when_nothing_at_all_could_be_found(self):
+        from cs2cfg import desktop as d
+
+        taken = mock.MagicMock()
+        taken.acquire.return_value = False
+        with mock.patch.object(d, "SingleInstance", return_value=taken),              mock.patch("cs2cfg.tray.summon", return_value=False),              mock.patch.object(d, "focus_existing_window", return_value=False),              mock.patch.object(d, "show_error") as complained:
+            self.assertEqual(d.run(), 0)
+        complained.assert_called_once()
+
+
 class TheIconItself(unittest.TestCase):
     """The parts of the Win32 side that can be checked without a shell."""
 

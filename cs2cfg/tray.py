@@ -23,6 +23,7 @@ thread's whole job.
 from __future__ import annotations
 
 import ctypes
+import sys
 import threading
 from ctypes import wintypes
 from pathlib import Path
@@ -62,6 +63,13 @@ CS_VREDRAW, CS_HREDRAW = 0x0001, 0x0002
 HWND_MESSAGE = wintypes.HWND(-3)
 
 ID_OPEN, ID_QUIT = 1001, 1002
+
+# Fixed rather than unique per instance, so another process can find it. That
+# is the whole point of it being fixed: starting the application again when a
+# copy is already running has to reach the copy that is running, and this is
+# the handle it reaches for. Registering a window class is per-process, so two
+# processes using the same name do not collide.
+WINDOW_CLASS = "cs2cfg-tray-host"
 
 WNDPROC = ctypes.WINFUNCTYPE(ctypes.c_long, wintypes.HWND, wintypes.UINT,
                              wintypes.WPARAM, wintypes.LPARAM)
@@ -154,10 +162,56 @@ user32.TrackPopupMenu.argtypes = [wintypes.HMENU, wintypes.UINT, ctypes.c_int,
                                   wintypes.LPVOID]
 user32.DestroyMenu.argtypes = [wintypes.HMENU]
 user32.SetForegroundWindow.argtypes = [wintypes.HWND]
+user32.AllowSetForegroundWindow.argtypes = [wintypes.DWORD]
+user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND,
+                                            ctypes.POINTER(wintypes.DWORD)]
+user32.FindWindowExW.restype = wintypes.HWND
+user32.FindWindowExW.argtypes = [wintypes.HWND, wintypes.HWND,
+                                 wintypes.LPCWSTR, wintypes.LPCWSTR]
 user32.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT,
                                 wintypes.WPARAM, wintypes.LPARAM]
 shell32.Shell_NotifyIconW.restype = wintypes.BOOL
 shell32.Shell_NotifyIconW.argtypes = [wintypes.DWORD, ctypes.c_void_p]
+
+
+def summon() -> bool:
+    """Ask a running copy to bring its window back. False if none answered.
+
+    Posted to the copy that owns the window rather than poking the window from
+    outside, because the two are not the same thing. A window closed to the
+    notification area is hidden, and ShowWindow from another process makes it
+    visible at the Win32 level while the application it belongs to still
+    believes it is hidden -- it reappears but will not take focus. Sending the
+    message instead runs the same code the tray icon's own click runs, inside
+    the process that owns the window, which shows and raises it properly.
+
+    The window looked for is message-only, so EnumWindows and FindWindow do
+    not see it; it has to be asked for by class under HWND_MESSAGE.
+    """
+    if sys.platform != "win32":
+        return False
+    try:
+        found = user32.FindWindowExW(HWND_MESSAGE, None, WINDOW_CLASS, None)
+        if not found:
+            return False
+
+        # Hand over the right to come to the front before asking it to.
+        #
+        # Windows will not let a background process take the foreground -- it
+        # is what stops things grabbing the keyboard mid-sentence -- and the
+        # copy being summoned is as background as it gets. The process that
+        # was just started by somebody double-clicking the shortcut is the one
+        # holding that right, and this is the documented way to pass it on.
+        # Without it the window comes back on screen but behind whatever was
+        # in front of it, which is not what "open it again" means.
+        owner = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(found, ctypes.byref(owner))
+        if owner.value:
+            user32.AllowSetForegroundWindow(owner.value)
+
+        return bool(user32.PostMessageW(found, TRAY_MESSAGE, 0, NIN_SELECT))
+    except Exception:
+        return False
 
 
 class Tray:
@@ -222,7 +276,7 @@ class Tray:
 
     def _make_window(self) -> None:
         instance = kernel32.GetModuleHandleW(None)
-        name = f"cs2cfg-tray-{id(self)}"
+        name = WINDOW_CLASS
         cls = WNDCLASSW()
         cls.style = CS_VREDRAW | CS_HREDRAW
         cls.lpfnWndProc = self._proc

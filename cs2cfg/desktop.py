@@ -110,7 +110,8 @@ class SingleInstance:
 
 
 def focus_existing_window(title_fragment: str = APP_NAME,
-                          same_process: bool = False) -> bool:
+                          same_process: bool = False,
+                          include_hidden: bool = False) -> bool:
     """Bring a window of this application to the front.
 
     ``same_process`` restricts the search to windows this process owns. The
@@ -121,12 +122,25 @@ def focus_existing_window(title_fragment: str = APP_NAME,
     unrelated window to the front. With this set, a session that owns no
     window (the interface open in an ordinary browser tab) simply raises
     nothing, which is the honest answer.
+
+    ``include_hidden`` keeps windows that are not on screen. Closing to the
+    notification area hides the window rather than destroying it, so the one
+    copy worth finding -- the one somebody is trying to reopen by starting the
+    application again -- is exactly the one a visibility test throws away.
+    Only the single-instance path asks for this; anything raising a window to
+    show somebody something still wants one that is on screen.
     """
     try:
         user32 = ctypes.WinDLL("user32", use_last_error=True)
     except OSError:
         return False
 
+    # Every match, not the first: a title containing the application's name
+    # is not the same thing as the application's window. Its own error boxes
+    # are called "CS2 Launcher could not start", and the graphics layer leaves
+    # a helper called "GDI+ Window (CS2 Launcher.exe)" lying around. Raising
+    # either of those instead of the window is worse than raising nothing,
+    # and raising a stale error dialog is exactly what happened.
     found: list = []
 
     @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
@@ -138,21 +152,29 @@ def focus_existing_window(title_fragment: str = APP_NAME,
         user32.GetWindowTextW(hwnd, buffer, length + 1)
         if title_fragment.lower() not in buffer.value.lower():
             return True
-        if not user32.IsWindowVisible(hwnd):
+        if not include_hidden and not user32.IsWindowVisible(hwnd):
             return True
         if same_process:
             pid = wintypes.DWORD()
             user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
             if pid.value != os.getpid():
                 return True
-        found.append(hwnd)
-        return False
+        name = ctypes.create_unicode_buffer(256)
+        user32.GetClassNameW(hwnd, name, 256)
+        found.append((hwnd, buffer.value, name.value))
+        return True
 
     user32.EnumWindows(callback, 0)
-    if not found:
+
+    DIALOG = "#32770"
+    real = [(hwnd, title) for hwnd, title, cls in found
+            if cls != DIALOG and "GDI+" not in title]
+    if not real:
         return False
 
-    return _to_front(user32, found[0])
+    # The window's actual title first, and any other survivor after it.
+    best = next((hwnd for hwnd, title in real if title == WINDOW_TITLE), real[0][0])
+    return _to_front(user32, best)
 
 
 class _FlashInfo(ctypes.Structure):
@@ -179,6 +201,10 @@ def _to_front(user32, hwnd) -> bool:
     rather than the failure: the request was to get the player's attention,
     and a taskbar flash does that without fighting the OS.
     """
+    # Shown before restored. A window closed to the notification area is
+    # hidden rather than minimised, and SW_RESTORE alone leaves a hidden
+    # window hidden -- it un-minimises, which is a different thing.
+    user32.ShowWindow(hwnd, 5)          # SW_SHOW
     user32.ShowWindow(hwnd, 9)          # SW_RESTORE
     current = user32.GetForegroundWindow()
     if current == hwnd:
@@ -343,6 +369,13 @@ def _keep_running_in_the_tray(window, icon: Optional[Path]) -> bool:
             window.restore()
         except Exception:
             pass
+        # ...and to the front, not merely on screen. Done from in here
+        # because this process owns the window: a copy reaching in from
+        # outside can make it visible but cannot hand it the keyboard.
+        try:
+            focus_existing_window(same_process=True, include_hidden=True)
+        except Exception:
+            pass
 
     def quit_app() -> None:
         state["quitting"] = True
@@ -433,7 +466,33 @@ def run(
     """Start the desktop application. Returns a process exit code."""
     instance = SingleInstance()
     if not instance.acquire():
-        if not focus_existing_window():
+        # Starting it again is how people reopen something they put away, so
+        # the second copy's whole job is to fetch the first one back: out of
+        # the notification area if that is where it went, off the taskbar if
+        # it was minimised. Hidden windows are included for exactly that
+        # reason -- after a close to the tray the window to find is not on
+        # screen, and refusing to look at it is why this said "already
+        # running" at somebody instead of doing the obvious thing.
+        # Asked of the running copy first. It can show its own window
+        # properly -- and so take focus -- where reaching in from here can
+        # only make it visible. Raising it from out here stays as the answer
+        # for a copy with no notification icon, which is every copy before
+        # this feature existed and any that could not create one.
+        summoned = False
+        try:
+            from .tray import summon
+
+            summoned = summon()
+        except Exception:
+            summoned = False
+        if summoned:
+            # Post and leave. Reaching for the window as well deadlocks: the
+            # raise attaches to the other copy's input queue, and that queue
+            # is busy showing the window this very message asked for. The
+            # copy that was summoned raises itself, which it can do properly
+            # because it owns the window.
+            return 0
+        if not focus_existing_window(include_hidden=True):
             show_error(
                 f"{APP_NAME} is already running.",
                 "Its window could not be brought to the front. Look for it on the taskbar, or "
