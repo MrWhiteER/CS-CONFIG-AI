@@ -507,6 +507,12 @@ def play(
                 raise LaunchError(
                     f"{exc}. Create the mode with Custom Resolution Utility, or use the standard fullscreen mode."
                 ) from exc
+            # Written down before the change, not after. If this application
+            # is closed or killed while the desktop is still narrow, this file
+            # is the only thing that knows what to put back.
+            from . import deskmode
+
+            deskmode.remember(mode_before, (width, height, refresh or mode_before[2]))
             window.set_mode(width, height, refresh)
             report(f"  desktop  {mode_before[0]}x{mode_before[1]}@{mode_before[2]} -> "
                    f"{width}x{height}@{refresh or mode_before[2]}", "good")
@@ -632,12 +638,31 @@ def play(
         # 5. Always give the desktop back, including on Ctrl+C or a failure.
         mark("restoring")
         if mode_before is not None:
+            from . import deskmode
+
             try:
                 window.restore_mode()
                 report(f"  desktop restored to {mode_before[0]}x{mode_before[1]}@{mode_before[2]}", "good")
+                deskmode.forget()
             except window.WindowError as exc:
-                report(f"  could not restore the desktop mode: {exc}", "bad")
-                report(f"  set it back manually: {mode_before[0]}x{mode_before[1]} @ {mode_before[2]} Hz", "dim")
+                # Asking Windows for the registry mode is one way to put the
+                # desktop back and it has just failed, so the mode is set
+                # outright instead rather than leaving somebody stranded on a
+                # narrow desktop with an apology.
+                report(f"  could not restore the desktop mode: {exc}", "warn")
+                try:
+                    window.set_mode(mode_before[0], mode_before[1], mode_before[2],
+                                    persist=True)
+                    report(f"  desktop set back to {mode_before[0]}x{mode_before[1]}"
+                           f"@{mode_before[2]} the direct way", "good")
+                    deskmode.forget()
+                except window.WindowError as second:
+                    # The record is deliberately left in place: the status
+                    # poll will keep trying, and Fix It can do it by hand.
+                    report(f"  and could not set it directly either: {second}", "bad")
+                    report(f"  set it back manually: {mode_before[0]}x{mode_before[1]} "
+                           f"@ {mode_before[2]} Hz, or use Fix It > Put the resolution back",
+                           "dim")
         if scaling_before is not None:
             # The scaling was only changed to make this session fill the screen.
             # Leaving it changed would quietly alter how every other program

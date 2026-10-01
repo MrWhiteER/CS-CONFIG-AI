@@ -3202,6 +3202,21 @@ def make_handler(state: State):
 
                 live = {"game_running": steam.cs2_running_recent(),
                         "overlay_running": crosshairx.running()}
+
+                # The desktop, if a launch narrowed it and never gave it back.
+                # Here because this is the one thing that runs whether or not
+                # this application is the one that started the game, and a
+                # desktop stuck at 1550x1440 is worse than anything else this
+                # application could be getting wrong. Costs one failed stat on
+                # a normal tick.
+                from . import deskmode
+
+                try:
+                    put_back = deskmode.tidy(live["game_running"])
+                except Exception:
+                    put_back = {}
+                if put_back.get("restored"):
+                    live["desktop_restored"] = put_back.get("detail", "")
                 if state.launch is None:
                     self._send_json({"ok": True, "phase": "idle", "active": False,
                                      "lines": [], **live})

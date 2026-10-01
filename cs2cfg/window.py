@@ -76,6 +76,7 @@ CDS_FULLSCREEN = 0x00000004
 
 DISP_CHANGE_SUCCESSFUL = 0
 ENUM_CURRENT_SETTINGS = -1
+ENUM_REGISTRY_SETTINGS = -2
 
 DISP_CHANGE_REASONS = {
     0: "succeeded",
@@ -448,6 +449,22 @@ def current_mode() -> Tuple[int, int, int]:
     mode.dmSize = ctypes.sizeof(DEVMODEW)
     if not user32.EnumDisplaySettingsW(None, ENUM_CURRENT_SETTINGS, ctypes.byref(mode)):
         raise WindowError("could not read the current display mode")
+    return mode.dmPelsWidth, mode.dmPelsHeight, mode.dmDisplayFrequency
+
+
+def registry_mode() -> Tuple[int, int, int]:
+    """The mode Windows has saved for this display, as opposed to the one it
+    is showing.
+
+    This is what the desktop is supposed to be between sessions, which makes
+    it the right answer for "put it back" when there is nothing else to go on
+    -- a stretched mode set temporarily never reaches the registry, so this
+    still reads the real one while the screen is narrow.
+    """
+    mode = DEVMODEW()
+    mode.dmSize = ctypes.sizeof(DEVMODEW)
+    if not user32.EnumDisplaySettingsW(None, ENUM_REGISTRY_SETTINGS, ctypes.byref(mode)):
+        raise WindowError("could not read the saved display mode")
     return mode.dmPelsWidth, mode.dmPelsHeight, mode.dmDisplayFrequency
 
 
