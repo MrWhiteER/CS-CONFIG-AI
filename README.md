@@ -1,3 +1,5 @@
+<img src="docs/brand/banner.svg" alt="CS CONFIG AI" width="100%">
+
 # cs2-autoconfig
 
 Reads the machine it is running on, works out what Counter-Strike 2 should look

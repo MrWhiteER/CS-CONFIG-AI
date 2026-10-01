@@ -4,12 +4,21 @@ Written with ``zlib`` and ``struct`` only. Keeping the icon as code means there
 is no binary in the repo, the PyInstaller bundle stays smaller, and the icon can
 be regenerated at any size without an image library.
 
-The mark is a crosshair: four ticks around a centre gap, on a rounded dark
-tile. It stays legible at 16 px, where anything more detailed turns to mush.
+The mark is the CS CONFIG AI one: an open violet bracket with an ivory
+targeting cross sitting in its mouth, on a rounded dark tile. It stays legible
+at 16 px, where anything more detailed turns to mush -- which is the whole
+reason the small sizes are drawn rather than scaled down from a large one.
+
+The artwork comes from the project's own brand set, and this file is the
+source of it rather than a copy of it: the bytes this produces are identical
+to the cs-config-ai.ico in that set, which the tests check. Changing a number
+here changes the application icon, the window icon, the notification area icon
+and the installer's icon together, because all four come from here.
 """
 
 from __future__ import annotations
 
+import hashlib
 import struct
 import zlib
 from pathlib import Path
@@ -17,12 +26,35 @@ from typing import List, Sequence, Tuple
 
 RGBA = Tuple[int, int, int, int]
 
-BACKGROUND: RGBA = (23, 27, 35, 255)      # matches the UI panel colour
-ACCENT: RGBA = (110, 160, 255, 255)
-ACCENT_DIM: RGBA = (60, 95, 165, 255)
+BACKGROUND: RGBA = (19, 12, 31, 255)      # #130C1F, the dark tile
+ACCENT: RGBA = (167, 139, 250, 255)       # #A78BFA, the interface violet
+CROSS: RGBA = (236, 236, 236, 255)        # #ECECEC, the targeting mark
 TRANSPARENT: RGBA = (0, 0, 0, 0)
 
 ICO_SIZES = (16, 24, 32, 48, 64, 128, 256)
+
+# The artwork itself, on the 16-unit grid it was drawn on. Out here rather
+# than inside the drawing function so the fingerprint below can see it: these
+# six names are the whole definition of the mark, and nothing else about it
+# can change without one of them changing.
+BRACKET = ((12, 3), (6, 3), (3, 6), (3, 10), (6, 13),
+           (12, 13), (12, 11), (7, 11), (5, 9), (5, 7),
+           (7, 5), (12, 5))
+# The cross, as (x0, x1, y0, y1) bars.
+CROSS_BARS = ((8, 14, 7, 9), (10, 12, 5, 11))
+
+
+def fingerprint() -> str:
+    """A cheap identity for the current artwork.
+
+    Generating the icon to find out whether it has changed costs about two
+    seconds, almost all of it in the 256 px rendering -- fine once at build
+    time and far too much on every start of the application, which is where
+    the check actually happens. This is the same question answered from the
+    handful of constants that define the drawing, which is instant.
+    """
+    material = repr((BACKGROUND, ACCENT, CROSS, ICO_SIZES, BRACKET, CROSS_BARS))
+    return hashlib.sha256(material.encode("utf-8")).hexdigest()[:16]
 
 
 def _rounded_tile(size: int) -> List[List[RGBA]]:
@@ -60,38 +92,45 @@ def _blend(base: RGBA, top: RGBA) -> RGBA:
 
 
 def _draw_crosshair(pixels: List[List[RGBA]], size: int) -> None:
-    centre = size / 2.0
-    thickness = max(1.0, size * 0.075)
-    gap = size * 0.13
-    length = size * 0.26
-    half = thickness / 2.0
+    """The bracket and the cross, sampled at 4x.
 
-    def paint(x0: float, y0: float, x1: float, y1: float, colour: RGBA) -> None:
-        for y in range(size):
-            for x in range(size):
-                px, py = x + 0.5, y + 0.5
-                inside_x = x0 - 0.5 <= px <= x1 + 0.5
-                inside_y = y0 - 0.5 <= py <= y1 + 0.5
-                if not (inside_x and inside_y):
-                    continue
-                # Soft edge: coverage falls off within half a pixel.
-                cx = min(px - (x0 - 0.5), (x1 + 0.5) - px, 1.0)
-                cy = min(py - (y0 - 0.5), (y1 + 0.5) - py, 1.0)
-                coverage = max(0.0, min(1.0, cx)) * max(0.0, min(1.0, cy))
-                if coverage <= 0:
-                    continue
-                shade = (colour[0], colour[1], colour[2], int(round(colour[3] * coverage)))
-                pixels[y][x] = _blend(pixels[y][x], shade)
+    Both shapes are described once, in the 16-unit grid the artwork was drawn
+    on, and sampled into whatever size is being rendered. Sixteen samples a
+    pixel is what keeps the bracket's diagonals smooth at 24 and 32 px, where
+    scaling a large rendering down leaves them visibly stepped.
+    """
+    polygon = BRACKET
 
-    # Vertical ticks.
-    paint(centre - half, centre - gap - length, centre + half, centre - gap, ACCENT)
-    paint(centre - half, centre + gap, centre + half, centre + gap + length, ACCENT)
-    # Horizontal ticks.
-    paint(centre - gap - length, centre - half, centre - gap, centre + half, ACCENT)
-    paint(centre + gap, centre - half, centre + gap + length, centre + half, ACCENT)
-    # Centre dot, dimmer so the gap still reads at small sizes.
-    dot = max(0.5, thickness * 0.45)
-    paint(centre - dot, centre - dot, centre + dot, centre + dot, ACCENT_DIM)
+    def inside(px, py):
+        result = False
+        j = len(polygon) - 1
+        for i, (xi, yi) in enumerate(polygon):
+            xj, yj = polygon[j]
+            if (yi > py) != (yj > py) and px < (xj-xi)*(py-yi)/(yj-yi)+xi:
+                result = not result
+            j = i
+        return result
+
+    for y in range(size):
+        for x in range(size):
+            purple = white = 0
+            for sy in range(4):
+                for sx in range(4):
+                    px = (x + (sx + .5)/4) * 16 / size
+                    py = (y + (sy + .5)/4) * 16 / size
+                    # The cross wins where the two meet: it sits in front.
+                    if any(x0 <= px < x1 and y0 <= py < y1
+                           for x0, x1, y0, y1 in CROSS_BARS):
+                        white += 1
+                    elif inside(px, py):
+                        purple += 1
+            base = pixels[y][x]
+            p, w = purple/16, white/16
+            # The tile's own alpha is kept, so the rounded corners stay soft
+            # and nothing is painted outside them.
+            pixels[y][x] = tuple(
+                round(base[c] * (1 - p - w) + ACCENT[c] * p + CROSS[c] * w)
+                for c in range(3)) + (base[3],)
 
 
 def render(size: int) -> List[List[RGBA]]:
@@ -158,10 +197,36 @@ def write_ico(path: Path, sizes: Sequence[int] = ICO_SIZES) -> Path:
 
 
 def ensure_icon(directory: Path, name: str = "cs2cfg.ico") -> Path:
-    """Return the icon path, generating it if it is not already there."""
+    """Return the icon path, writing it if it is missing or out of date.
+
+    The cached file lives in the user's data directory and outlives upgrades,
+    so checking only that it exists -- which is what this used to do -- left
+    every existing installation showing the previous icon for good after the
+    artwork changed.
+
+    What it does not do is generate the icon in order to compare it. That
+    costs about two seconds, and this runs on every start. A stamp file beside
+    the icon holds the fingerprint of the artwork it was drawn from, so the
+    usual answer -- nothing has changed -- is two small reads.
+    """
     target = Path(directory) / name
-    if not target.exists() or target.stat().st_size == 0:
-        write_ico(target)
+    stamp = target.with_name(target.name + ".id")
+    wanted = fingerprint()
+
+    if target.exists() and target.stat().st_size:
+        try:
+            if stamp.read_text(encoding="utf-8").strip() == wanted:
+                return target
+        except OSError:
+            pass                      # no stamp: treat it as out of date
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(to_ico())
+    try:
+        stamp.write_text(wanted, encoding="utf-8")
+    except OSError:
+        # Without the stamp it is redrawn next time. Slow, not wrong.
+        pass
     return target
 
 
