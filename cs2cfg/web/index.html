@@ -6536,6 +6536,22 @@ const FIX_ART = {
   "sound.restart":
     '<path d="M4 13a8 8 0 0116 0"/><path d="M4 13v3.5a2 2 0 002 2h1.5V13z"/>' +
     '<path d="M20 13v3.5a2 2 0 01-2 2h-1.5V13z"/>',
+  // A monitor with an arrow striking out to each corner: the shape everything
+  // else uses for "back to full size", so it reads before it is thought about.
+  "display.restore":
+    '<rect x="2.5" y="4" width="19" height="13" rx="2.2"/>' +
+    '<path d="M9 20.5h6M12 17v3.5"/>' +
+    // Short strokes with a gap left in the middle. Run to the centre and the
+    // four of them meet in an X, which at 24 pixels reads as a cross rather
+    // than as four arrows.
+    '<path d="M10.1 9.9L6.7 6.6M13.9 9.9L17.3 6.6' +
+    'M10.1 11.6L6.7 14.9M13.9 11.6L17.3 14.9"/>' +
+    '<path d="M6.7 6.6h2.7M6.7 6.6v2.7M17.3 6.6h-2.7M17.3 6.6v2.7' +
+    'M6.7 14.9h2.7M6.7 14.9v-2.7M17.3 14.9h-2.7M17.3 14.9v-2.7"/>',
+  // Not Steam's mark, which is theirs: the restart arrow everything uses.
+  "steam.restart":
+    '<path d="M20 11a8 8 0 10-2.2 6.3"/>' +
+    '<path d="M20 4.8V11h-6"/>',
 };
 
 const FIX_FAMILY_NAME = {
@@ -6616,6 +6632,10 @@ function renderFixes() {
 
   html += fixTile(by["gpu.restart"],
     '<div class="actions">' + fixButton("gpu.restart", "Reset the driver", false) + "</div>");
+
+  html += fixTile(by["display.restore"],
+    '<div class="actions">' + fixButton("display.restore", "Put it back", false) +
+    "</div>");
 
   const devices = fixData.devices || [];
   const listFor = show => devices.filter(d => show || d.common).map(d =>
@@ -11708,6 +11728,7 @@ function renderLaunch(s) {
   liveStatus = s;
   if (typeof s.game_running === "boolean") gameUp = s.game_running;
   if (typeof s.overlay_running === "boolean") overlayUp = s.overlay_running;
+  if (s.desktop_restored) status(esc(s.desktop_restored));
   paintRunning();
   $("stop-row").classList.toggle("hidden", !busyNow);
   $("stop-hint").textContent = busyNow ? (PHASE_TEXT[s.phase] || s.phase) : "";
@@ -11780,6 +11801,7 @@ function startGameWatch() {
       const s = await api("/api/play/status");
       if (typeof s.game_running === "boolean") gameUp = s.game_running;
       if (typeof s.overlay_running === "boolean") overlayUp = s.overlay_running;
+      if (s.desktop_restored) status(esc(s.desktop_restored));
       // While a launch is in flight its own one-second poll owns the card;
       // this only keeps the running flags current underneath it.
       if (!pollTimer) { liveStatus = s; paintRunning(); }

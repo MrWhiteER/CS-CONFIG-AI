@@ -108,6 +108,12 @@ CATALOGUE: List[Fix] = [
         "silent or crackly without anything else changing.",
         needs_admin=True, disruptive=True,
         danger="Audio stops for a second or two everywhere."),
+    Fix("display.restore", "graphics", "Put the resolution back",
+        "Returns the desktop to its normal resolution. For when a launch "
+        "narrowed it for a stretched mode and never put it back -- the game "
+        "crashed, or this application was closed while it still had it. Safe "
+        "to press when nothing is wrong: it says so and changes nothing.",
+        allowed_in_game=True),
     Fix("steam.restart", "steam", "Restart Steam",
         "Closes Steam properly and starts it again, then waits until it has "
         "signed back in. For the client that has gone sour underneath the "
@@ -690,7 +696,22 @@ def _fix_restart_steam(body: Dict[str, Any]) -> Dict[str, Any]:
 
 # ---------------------------------------------------------------------------
 
+def _fix_restore_display(_body: Dict[str, Any]) -> Dict[str, Any]:
+    """The manual version of the automatic put-back.
+
+    Allowed during a game on purpose. The automatic one stands off while the
+    game is running, because a running game is presumed to want the mode it
+    was launched with -- but if somebody is looking at a wrong desktop with
+    the game up, that presumption is already wrong and they are the ones who
+    can see it.
+    """
+    from . import deskmode
+
+    return deskmode.restore()
+
+
 _RUNNERS = {
+    "display.restore": _fix_restore_display,
     "steam.restart": _fix_restart_steam,
     "net.flush": lambda body: _fix_flush_dns(),
     "net.restart": lambda body: _fix_restart_adapter(str(body.get("adapter") or "")),
