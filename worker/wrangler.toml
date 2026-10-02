@@ -1,0 +1,31 @@
+name = "cs2-autoconfig-cloud"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+# Fill in the three ids below from your own account, then see README.md for
+# the deploy steps. Nothing here is a secret -- ids identify resources, they
+# do not grant access to them. The actual secrets (ADMIN_TOKEN, the Google
+# client secret) are set with `wrangler secret put` and never live in a file.
+
+[[d1_databases]]
+binding = "DB"
+database_name = "cs2-autoconfig"
+database_id = "PUT-YOUR-D1-DATABASE-ID-HERE"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "PUT-YOUR-R2-BUCKET-NAME-HERE"
+
+[vars]
+# The origin the launcher and the two providers will reach this on. It has to
+# match exactly: Steam checks the realm against the return address, and Google
+# will only redirect to a URI registered against the client. Leaving it unset
+# makes the Worker use whatever origin the request arrived on, which is fine
+# until a request arrives on a different one.
+PUBLIC_ORIGIN = "https://cs2-autoconfig-cloud.YOUR-SUBDOMAIN.workers.dev"
+
+# Google's client id is not a secret -- it is sent to the browser on every
+# sign-in. The matching secret is not kept here. Leave this empty and Google
+# sign-in simply switches itself off, which is what a launcher pointed at a
+# half-configured server should see.
+GOOGLE_CLIENT_ID = ""

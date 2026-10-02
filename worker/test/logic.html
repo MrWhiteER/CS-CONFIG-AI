@@ -1,0 +1,99 @@
+<!doctype html><meta charset="utf-8"><title>worker logic</title>
+<!--
+  The Worker's logic, checked without deploying it and without a build step.
+
+  There is no node in this project and no package.json, deliberately -- the
+  Worker is one file of plain JavaScript. So its own runtime does the
+  checking: serve this folder and open the page.
+
+      python -m http.server 8787
+      http://127.0.0.1:8787/worker/test/logic.html
+
+  The helpers are pulled out of src/index.js as text, with the default
+  export stripped, so nothing has to be exported for testing and the file
+  under test is the file that ships.
+
+  What is covered is the part that is self-contained and worth getting
+  right: password hashing, the timing-safe compare, what counts as an email
+  address, what counts as a Steam identity, and the two sign-in URLs. The
+  routes themselves are bound to D1 and R2 and are checked against a real
+  deployment.
+-->
+<body style="background:#0d1020;color:#dfe;font:13px/1.7 monospace;padding:18px">
+<pre id="out">running…</pre>
+<script type="module">
+const out = document.getElementById("out");
+const lines = [];
+const ok = (name, pass, extra = "") =>
+  lines.push((pass ? "  PASS  " : "  FAIL  ") + name + (extra ? "   " + extra : ""));
+
+// Pull the helpers out of the real source without modifying it: strip the
+// module's default export, append a return of the names under test.
+const src = await (await fetch("../src/index.js")).text();
+const body = src.replace(/export default\s*\{[\s\S]*\};\s*$/, "") +
+  "\nreturn { hashPassword, passwordMatches, sameSecret, looksLikeEmail, tidyEmail," +
+  " STEAM_CLAIMED_ID, authorizeUrl, ENTITLEMENTS, TIERS, MIN_PASSWORD, randomToken };";
+const F = Object.getPrototypeOf(async function () {}).constructor;
+const W = await new F(body)();
+
+// --- passwords -------------------------------------------------------------
+const stored = await W.hashPassword("correct horse battery staple");
+ok("hash has the shape pbkdf2$rounds$salt$hash", stored.split("$").length === 4);
+ok("hash is not the password", !stored.includes("correct horse"));
+ok("right password verifies", await W.passwordMatches("correct horse battery staple", stored));
+ok("wrong password does not", !(await W.passwordMatches("correct horse battery stapl", stored)));
+ok("empty password does not", !(await W.passwordMatches("", stored)));
+const again = await W.hashPassword("correct horse battery staple");
+ok("same password hashes differently (salted)", again !== stored);
+ok("...and still verifies", await W.passwordMatches("correct horse battery staple", again));
+ok("garbage stored value is refused", !(await W.passwordMatches("x", "not-a-hash")));
+ok("rounds below the floor are refused",
+   !(await W.passwordMatches("x", "pbkdf2$10$aa$bb")));
+
+// --- constant-time compare -------------------------------------------------
+ok("sameSecret matches equal", W.sameSecret("abc123", "abc123"));
+ok("sameSecret rejects different", !W.sameSecret("abc123", "abc124"));
+ok("sameSecret rejects different lengths", !W.sameSecret("abc", "abcd"));
+ok("sameSecret rejects non-strings", !W.sameSecret(null, "abc") && !W.sameSecret("abc", undefined));
+
+// --- email -----------------------------------------------------------------
+ok("accepts an ordinary address", W.looksLikeEmail("someone@example.com"));
+ok("rejects no domain", !W.looksLikeEmail("someone@"));
+ok("rejects spaces", !W.looksLikeEmail("some one@example.com"));
+ok("rejects empty", !W.looksLikeEmail(""));
+ok("normalises case and padding", W.tidyEmail("  Someone@Example.COM ") === "someone@example.com");
+
+// --- Steam identity --------------------------------------------------------
+const good = "https://steamcommunity.com/openid/id/76561198000000000";
+ok("extracts a 17-digit steam id", W.STEAM_CLAIMED_ID.exec(good)?.[1] === "76561198000000000");
+ok("rejects a look-alike host",
+   !W.STEAM_CLAIMED_ID.test("https://steamcommunity.com.evil.test/openid/id/76561198000000000"));
+ok("rejects http", !W.STEAM_CLAIMED_ID.test(good.replace("https", "http")));
+ok("rejects a short id", !W.STEAM_CLAIMED_ID.test("https://steamcommunity.com/openid/id/123"));
+
+// --- sign-in URLs ----------------------------------------------------------
+const env = { PUBLIC_ORIGIN: "https://cloud.test", GOOGLE_CLIENT_ID: "abc.apps.googleusercontent.com" };
+const u = new URL("https://cloud.test/auth/start");
+const steamUrl = W.authorizeUrl("steam", env, u, "STATE1");
+ok("steam url points at steam", steamUrl.startsWith("https://steamcommunity.com/openid/login"));
+ok("steam return_to carries the state", steamUrl.includes("state%3DSTATE1"));
+ok("steam realm is our origin", steamUrl.includes(encodeURIComponent("https://cloud.test")));
+const googleUrl = W.authorizeUrl("google", env, u, "STATE2");
+ok("google url points at google", googleUrl.startsWith("https://accounts.google.com/"));
+ok("google asks which account", googleUrl.includes("prompt=select_account"));
+ok("google never carries a secret", !googleUrl.toLowerCase().includes("secret"));
+ok("google redirect is our worker",
+   googleUrl.includes(encodeURIComponent("https://cloud.test/auth/google/return")));
+
+// --- tiers -----------------------------------------------------------------
+ok("every tier is known", W.TIERS.every(t => Array.isArray(W.ENTITLEMENTS[t])));
+ok("tiers start permissive (split not decided)",
+   W.TIERS.every(t => W.ENTITLEMENTS[t].includes("sync")));
+ok("password floor is meaningful", W.MIN_PASSWORD >= 8);
+ok("tokens are long and hex", /^[0-9a-f]{64}$/.test(W.randomToken(32)));
+ok("tokens differ", W.randomToken() !== W.randomToken());
+
+const failed = lines.filter(l => l.startsWith("  FAIL")).length;
+out.textContent = lines.join("\n") + `\n\n${lines.length - failed}/${lines.length} passed`;
+out.dataset.failed = String(failed);
+</script>
