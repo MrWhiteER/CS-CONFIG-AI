@@ -79,6 +79,18 @@ class TheSettingRow(unittest.TestCase):
         self.assertIn('aria-expanded', self.page)
         self.assertIn('e.key !== "Enter" && e.key !== " "', self.page)
 
+    def test_a_focusable_row_shows_that_it_is_focused(self):
+        """It was given a tabindex and no focus ring, which makes it reachable
+        by keyboard and invisible once reached. Caught by auditing against a
+        UX ruleset, not by looking at it."""
+        self.assertIn(".setting .top:focus-visible", self.page)
+
+    def test_anything_focusable_gets_a_ring_without_being_asked(self):
+        """Written as a catch-all rather than per component: the one that was
+        missed was missed by being added later, and so would the next."""
+        self.assertIn('[tabindex]:focus-visible, [role="button"]:focus-visible',
+                      self.page)
+
     def test_the_handler_is_delegated_not_per_row(self):
         """Rows are rewritten on every render, so a listener per row would be a
         listener per render."""

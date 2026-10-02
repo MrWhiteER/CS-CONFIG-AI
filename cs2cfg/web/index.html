@@ -1805,6 +1805,10 @@
     transition: background .13s;
   }
   .setting .top:hover { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+  .setting .top:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: -2px;
+    background: color-mix(in srgb, var(--accent) 7%, transparent);
+  }
   .setting .name { flex: 1 1 40%; min-width: 0; }
   .setting .name b { font-weight: 500; }
   .setting .ctl { flex: 0 1 auto; display: flex; gap: 8px; align-items: center; }
@@ -1918,7 +1922,14 @@
     --glow: .75;
 
     --ink:        #ece8f7;
-    --muted:      rgba(236, 232, 247, .46);
+    /* Not dimmer than this, in any theme. Every one of the seven was between
+       3.86 and 4.28 against its own background, and 4.5 is the line for
+       readable text -- this is the colour of every explanation in the
+       application, so it is the one that most needs to be read. Measured, not
+       guessed: the minimum that passes is .48 on the dark themes and .60 on
+       the light ones, and these sit above that because most of this text is
+       on a panel a shade lighter again. */
+    --muted:      rgba(236, 232, 247, .52);
     /* Hairlines are a dim violet rather than a neutral white. That single
        change does most of the work: a grey rule reads as a box drawn around
        something, a violet one reads as the surface being lit. */
@@ -1988,7 +1999,7 @@
   /* Ember -- the warm one. Amber on a near-black brown, which is where the
      hardware-dashboard look people picture usually lands. */
   :root[data-theme="ember"] {
-    --ink: #f8efe3; --muted: rgba(248, 239, 227, .46);
+    --ink: #f8efe3; --muted: rgba(248, 239, 227, .52);
     --line: rgba(245, 165, 36, .20); --line-soft: rgba(245, 165, 36, .11);
     --bg: #0a0704; --bg-2: rgba(16, 10, 5, .34);
     --panel: rgba(30, 19, 9, .62); --panel-2: rgba(42, 27, 13, .72);
@@ -2004,7 +2015,7 @@
      instrument and not the light show. The one loud colour is kept for Play,
      because on a monochrome panel it is the only thing that needs to shout. */
   :root[data-theme="carbon"] {
-    --ink: #eaeef4; --muted: rgba(234, 238, 244, .44);
+    --ink: #eaeef4; --muted: rgba(234, 238, 244, .52);
     --line: rgba(196, 211, 229, .16); --line-soft: rgba(196, 211, 229, .09);
     --bg: #060709; --bg-2: rgba(12, 14, 17, .34);
     --panel: rgba(19, 22, 27, .66); --panel-2: rgba(28, 32, 39, .74);
@@ -2019,7 +2030,7 @@
   /* Acid -- green on black. The oldest look in this game, and the only one
      here that is a reference rather than a palette. */
   :root[data-theme="acid"] {
-    --ink: #e2f7e7; --muted: rgba(226, 247, 231, .44);
+    --ink: #e2f7e7; --muted: rgba(226, 247, 231, .52);
     --line: rgba(57, 255, 136, .18); --line-soft: rgba(57, 255, 136, .09);
     --bg: #040706; --bg-2: rgba(6, 14, 10, .34);
     --panel: rgba(9, 22, 14, .64); --panel-2: rgba(13, 32, 20, .72);
@@ -2038,7 +2049,7 @@
   :root[data-theme="daylight"] {
     color-scheme: light;
     --lift: 0, 0, 0;
-    --ink: #14161b; --muted: rgba(20, 22, 27, .56);
+    --ink: #14161b; --muted: rgba(20, 22, 27, .64);
     --line: rgba(20, 22, 27, .14); --line-soft: rgba(20, 22, 27, .08);
     --bg: #eef0f4; --bg-2: rgba(255, 255, 255, .5);
     --panel: rgba(255, 255, 255, .78); --panel-2: rgba(255, 255, 255, .92);
@@ -2067,7 +2078,7 @@
     --r: 4px;
     --panel-blur: none;
     --panel-edge: 0;
-    --ink: #f1f1f1; --muted: rgba(241, 241, 241, .46);
+    --ink: #f1f1f1; --muted: rgba(241, 241, 241, .52);
     --line: rgba(241, 241, 241, .09); --line-soft: rgba(241, 241, 241, .05);
     --bg: #121212; --bg-2: rgba(241, 241, 241, .02);
     --panel: rgba(241, 241, 241, .05); --panel-2: rgba(241, 241, 241, .08);
@@ -2087,7 +2098,7 @@
   :root[data-theme="paper"] {
     color-scheme: light;
     --lift: 0, 0, 0;
-    --ink: #1c1a17; --muted: rgba(28, 26, 23, .56);
+    --ink: #1c1a17; --muted: rgba(28, 26, 23, .64);
     --line: rgba(28, 26, 23, .15); --line-soft: rgba(28, 26, 23, .08);
     --bg: #f4f1ea; --bg-2: rgba(255, 253, 248, .55);
     --panel: rgba(255, 253, 248, .8); --panel-2: rgba(255, 254, 251, .93);
@@ -3055,9 +3066,14 @@
     background: var(--sunk); color: var(--ink);
     border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px;
   }
-  input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible {
+  input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible,
+  [tabindex]:focus-visible, [role="button"]:focus-visible {
     outline: 2px solid var(--accent); outline-offset: 1px;
   }
+  /* Anything made reachable with tabindex is a control, and a control with no
+     focus ring cannot be used without a pointer. Written as a catch-all
+     rather than per component because the one that was missed was missed by
+     being added later, and the next one would be too. */
 
   input[type="range"] {
     appearance: none; width: 190px; max-width: 100%; height: 20px;

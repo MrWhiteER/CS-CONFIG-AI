@@ -130,6 +130,34 @@ class AThemeWinsItsArgument(unittest.TestCase):
         self.assertIn('body[data-hue="launcher"]', self.page)
 
 
+class TextCanBeRead(unittest.TestCase):
+    """Found by auditing against a UX ruleset rather than by looking.
+
+    --muted is the colour of every explanation in the application -- the one
+    that most needs to be readable -- and it was below 4.5:1 against its own
+    background in all seven themes, between 3.86 and 4.28. The minimum that
+    passes was measured per theme: .48 on the dark ones, .60 on the light.
+    These sit above that, because most of this text is on a panel a shade
+    lighter again than the page it was measured against.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        from cs2cfg import paths
+
+        cls.page = (paths.bundle_root() / "web" / "index.html").read_text(
+            encoding="utf-8", errors="replace")
+
+    def test_no_theme_dims_its_explanations_below_the_line(self):
+        alphas = [float(a) for a in re.findall(r"--muted:\s*rgba\([^)]*?,\s*(\.\d+)\)",
+                                               self.page)]
+        self.assertGreaterEqual(len(alphas), 7, "a theme has no muted colour")
+        for alpha in alphas:
+            self.assertGreaterEqual(
+                alpha, 0.5,
+                f"muted at {alpha} is below the measured minimum for 4.5:1")
+
+
 class ItIsRemembered(unittest.TestCase):
     def test_the_theme_is_a_saved_preference(self):
         from cs2cfg import paths
