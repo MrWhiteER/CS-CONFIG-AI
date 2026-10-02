@@ -23,7 +23,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-THEMES = ("ember", "carbon", "acid", "daylight", "paper")
+THEMES = ("ember", "carbon", "acid", "daylight", "paper", "pro")
 LIGHT = ("daylight", "paper")
 
 

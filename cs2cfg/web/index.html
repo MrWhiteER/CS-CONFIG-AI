@@ -1065,13 +1065,24 @@
      colour to cut out of. */
   /* Inside the box, the panels stop being boxes. Cards within a card is the
      thing that made this read as several objects rather than one. */
-  .subpane { background: transparent; border: 0; padding: 16px 18px 6px; }
-  .subpane .panel,
-  .subpane .card {
-    background: transparent; border: 0; box-shadow: none;
-    padding: 0; margin: 0 0 22px;
+  /* A sub-view is a deck of cards, not one long sheet.
+     It used to strip every panel inside it back to transparent -- no surface,
+     no border, no shadow -- so eight separate things became one column of
+     prose with headings in it, and nothing was scannable because nothing had
+     an edge. They get their surface back and sit side by side.
+
+     auto-fit rather than a fixed count: the window is resizable and a deck
+     that only works at one width is a deck that looks broken at every other. */
+  .subpane {
+    background: transparent; border: 0; padding: 16px 18px 6px;
+    display: grid; gap: 13px; align-items: start;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
   }
-  .subpane > *:last-child { margin-bottom: 16px; }
+  .subpane > .panel, .subpane > .card { margin: 0; }
+  /* Some things are the width of the window by nature: a row of swatches, a
+     three-way choice, a list of every setting that will change. Squeezing
+     those into a column helps nobody. */
+  .subpane > .panel.wide, .subpane > .card.wide { grid-column: 1 / -1; }
 
   /* The connection, drawn as it is measured. */
   .netbar {
@@ -1891,6 +1902,21 @@
        theme that meant dark text on a dark bar -- the navigation, invisible. */
     --rail-bg: rgba(9, 9, 13, .74);
 
+    /* Shape, not just colour. A theme that can only change hue cannot show
+       you a different kind of interface, and the difference between this
+       application and a tool like FACEIT's is mostly shape: measured on
+       theirs, 34 of 41 boxes carry no border at all, 19 are square-cornered,
+       and nothing is blurred. A box there is a 5% lighter fill and nothing
+       else. These three let a theme say that. */
+    --r: 14px;
+    --panel-blur: blur(26px) saturate(1.05);
+    --panel-edge: .6;          /* the lit top edge; 0 removes it entirely */
+    /* How much of the room the chosen profile lights up. The colour itself is
+       semantic and stays -- it says which profile you are on -- but a flat
+       theme wants the signal without the light show, so the strength is a
+       theme's to decide. */
+    --glow: .75;
+
     --ink:        #ece8f7;
     --muted:      rgba(236, 232, 247, .46);
     /* Hairlines are a dim violet rather than a neutral white. That single
@@ -1921,7 +1947,6 @@
     --faint:   rgba(238, 241, 246, .22);
     --glass-3: rgba(28, 28, 37, .74);
     --sunk:    rgba(0, 0, 0, .30);
-    --r: 14px;
 
     /* The stage gradient, overridden per section below. */
     --g1: #4a1f8c; --g2: #7b2ea8; --g3: #2a1560;
@@ -2031,6 +2056,34 @@
   /* Paper -- light, warm and almost colourless. The same idea as Daylight
      with the blue taken out: closer to a printed page than to a screen, for
      a bright room where a cool white looks clinical. */
+  /* Pro -- modelled on the tool this is usually sitting next to.
+     Measured rather than guessed: on FACEIT's own interface 34 of 41 boxes
+     carry no border, 19 are square-cornered, nothing is blurred, and a box is
+     a five-percent lighter fill over a neutral near-black. It is the flattest
+     thing here and the least decorated, which is the point -- it reads as an
+     instrument rather than as a product. The accent is their orange because
+     borrowing the shape and then arguing with the colour helps nobody. */
+  :root[data-theme="pro"] {
+    --r: 4px;
+    --panel-blur: none;
+    --panel-edge: 0;
+    --ink: #f1f1f1; --muted: rgba(241, 241, 241, .46);
+    --line: rgba(241, 241, 241, .09); --line-soft: rgba(241, 241, 241, .05);
+    --bg: #121212; --bg-2: rgba(241, 241, 241, .02);
+    --panel: rgba(241, 241, 241, .05); --panel-2: rgba(241, 241, 241, .08);
+    --chip: rgba(241, 241, 241, .09);
+    --rail-bg: #0a0a0a;
+    --accent: #ff5500; --accent-deep: #cc4400; --accent-dim: rgba(255, 85, 0, .14);
+    --violet: #ff5500; --violet-soft: #ff8f5c;
+    --ink-dim: rgba(241, 241, 241, .62); --faint: rgba(241, 241, 241, .22);
+    --glass-3: #1d1d1d;
+    --sunk: rgba(0, 0, 0, .35);
+    --neon-cyan: #ffa26b;
+    --glow: 0;
+  }
+  /* Flat all the way down: no stage wash behind the header either. */
+  :root[data-theme="pro"] body { --g1: #1d1d1d; --g2: #242424; --g3: #121212; }
+
   :root[data-theme="paper"] {
     color-scheme: light;
     --lift: 0, 0, 0;
@@ -2110,7 +2163,7 @@
       radial-gradient(70% 60% at 12% 82%,
         color-mix(in srgb, var(--mode-neon) 16%, transparent) 0%, transparent 72%);
     filter: blur(58px) saturate(130%);
-    opacity: .75;
+    opacity: var(--glow);
     transition: background 650ms ease, opacity 650ms ease;
   }
   /* The accent edges pick it up too, so panels and buttons belong to the mode
@@ -2855,17 +2908,56 @@
   .fix-row .sub { font-size: 10.5px; }
   .stop-row { margin-top: 0; }
 
-  /* --------------------------------------------------------------- surfaces */
+  /* --------------------------------------------------------------- surfaces
+     One rule paints every panel in the application, which is why it is worth
+     spending care on: a change here is a change to all eight tabs at once.
+
+     The difference between a box and a plane is the top edge. A border all the
+     way round reads as an outline drawn *around* content; a bright edge along
+     the top and a shadow beneath read as a surface with light falling on it.
+     That single detail is most of what separates a dense form from something
+     that looks built. */
   .card, .panel, .editor {
+    position: relative;
     background: var(--panel);
-    -webkit-backdrop-filter: blur(22px); backdrop-filter: blur(22px);
+    -webkit-backdrop-filter: var(--panel-blur);
+    backdrop-filter: var(--panel-blur);
     border: 1px solid var(--line); border-radius: var(--r);
-    box-shadow: 0 18px 44px -26px rgba(0, 0, 0, .9);
+    box-shadow:
+      0 22px 50px -28px rgba(0, 0, 0, .92),
+      inset 0 1px 0 rgba(var(--lift), .055);
   }
-  .card, .panel { padding: 15px 16px; margin: 0 0 12px; }
+  /* The lit edge. Carries the accent rather than white, so it belongs to the
+     theme instead of sitting on top of it. */
+  .card::before, .panel::before, .editor::before {
+    content: ""; position: absolute; inset: 0 0 auto; height: 1px;
+    border-radius: var(--r) var(--r) 0 0;
+    background: linear-gradient(90deg,
+      transparent,
+      color-mix(in srgb, var(--accent) 45%, transparent) 22%,
+      color-mix(in srgb, var(--accent) 45%, transparent) 78%,
+      transparent);
+    opacity: var(--panel-edge); pointer-events: none;
+  }
+  .card, .panel { padding: 16px 17px; margin: 0 0 13px; }
+
+  /* A heading that is a label for a surface, not a line of text above one.
+     The rule beside it does the work the old all-caps lettering was doing
+     alone: it says "this group ends here" without anybody reading a word. */
   .card > h2, .panel > h2, .side-label, .etitle {
-    margin: 0 0 10px; font-size: 9.5px; font-weight: 700;
+    display: flex; align-items: center; gap: 10px;
+    margin: 0 0 12px; font-size: 9.5px; font-weight: 700;
     letter-spacing: .22em; text-transform: uppercase; color: var(--muted);
+  }
+  .card > h2::after, .panel > h2::after {
+    content: ""; flex: 1; height: 1px;
+    background: linear-gradient(90deg, var(--line), transparent);
+  }
+  /* A mark in the accent at the start of the label, so a heading reads as a
+     heading at a glance rather than as more small grey text. */
+  .card > h2::before, .panel > h2::before {
+    content: ""; width: 3px; height: 11px; border-radius: 2px; flex: none;
+    background: var(--accent); box-shadow: 0 0 8px -1px var(--accent);
   }
   .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
 
@@ -4550,7 +4642,7 @@
         <div id="xhair-out"></div>
       </section>
 
-      <section class="panel" id="theme-card">
+      <section class="panel wide" id="theme-card">
         <h2>Look</h2>
         <p class="sub">Five of them. Nothing but colour changes &mdash; every
            control, every number and every explanation stays exactly where it is.</p>
@@ -4559,7 +4651,7 @@
 
       <!-- Which half of the machine is asked to do less, and what Windows
            itself has been told about the game. -->
-      <section class="panel" id="machine-card">
+      <section class="panel wide" id="machine-card">
         <h2>Machine</h2>
         <div id="machine-out"></div>
       </section>
@@ -9659,6 +9751,7 @@ const THEMES = [
   ["acid",     "Acid",     "green on black",     "#040706", "#09160e", "#39ff88"],
   ["daylight", "Daylight", "light, cool",        "#eef0f4", "#ffffff", "#6d28d9"],
   ["paper",    "Paper",    "light, warm",        "#f4f1ea", "#fffdf8", "#9a5b00"],
+  ["pro",      "Pro",      "flat, square, matte","#121212", "#1d1d1d", "#ff5500"],
 ];
 
 function applyTheme(id) {
