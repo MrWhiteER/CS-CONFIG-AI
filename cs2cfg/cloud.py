@@ -32,6 +32,21 @@ from . import cloudconfig
 TIMEOUT = 12.0
 TOKEN_FILE = "session.json"
 
+
+def _user_agent() -> str:
+    """Something that is not "Python-urllib".
+
+    Cloudflare refuses the default with a 403 before the request reaches the
+    Worker at all, which reads as the Worker rejecting the sign-in -- there is
+    nothing in the body to say otherwise, and the Worker's own log shows
+    nothing, because it was never asked. The same trap as the FACEIT calls in
+    demos.py, and for the same reason: an application that does not name
+    itself looks like something that does not want to be named.
+    """
+    from . import __version__
+
+    return f"cs2-autoconfig/{__version__} (+https://github.com/MrWhiteER/CS-CONFIG-AI)"
+
 # How long the launcher waits for somebody to finish in the browser, and how
 # often it asks. Matched to the Worker's own window so the two agree about
 # when a sign-in has gone stale.
@@ -100,6 +115,7 @@ def _call(method: str, path: str, body: Optional[Dict[str, Any]] = None,
     data = json.dumps(body).encode("utf-8") if body is not None else None
     request = urllib.request.Request(url, data=data, method=method)
     request.add_header("accept", "application/json")
+    request.add_header("user-agent", _user_agent())
     if data is not None:
         request.add_header("content-type", "application/json")
     if token:

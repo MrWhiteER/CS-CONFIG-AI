@@ -142,6 +142,32 @@ class TheSessionOnDisk(_Session):
         self.assertFalse(cloud.signed_in())
 
 
+class ItNamesItself(_Session):
+    """Cloudflare refuses "Python-urllib" with a 403 before the request ever
+    reaches the Worker. That reads as the Worker rejecting the sign-in -- the
+    body is empty and the Worker's own log shows nothing, because it was never
+    asked. Found on a live deployment, where /auth/start returned 403 from
+    this client and 200 from everything else."""
+
+    def test_every_request_carries_a_user_agent(self):
+        sent = {}
+
+        def capture(request, timeout=None):
+            sent.update({k.lower(): v for k, v in request.header_items()})
+            return _Answer(b'{"ok":true}')
+
+        with mock.patch.object(cloud.urllib.request, "urlopen", side_effect=capture):
+            cloud._call("GET", "/health")
+        self.assertIn("user-agent", sent)
+        self.assertNotIn("python-urllib", sent["user-agent"].lower())
+
+    def test_it_says_which_application_and_which_version(self):
+        from cs2cfg import __version__
+
+        self.assertIn("cs2-autoconfig", cloud._user_agent())
+        self.assertIn(__version__, cloud._user_agent())
+
+
 class SigningIn(_Session):
     def test_it_sends_a_hash_and_keeps_the_secret(self):
         """The state goes through the browser's address bar; the verifier
