@@ -677,6 +677,8 @@ def _save_prefs(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         # Whether Crosshair X draws the crosshair instead of the game. Per
         # account, because it changes what the generated config writes.
         "hide_crosshair", "crosshairx_launch",
+        # Which of the five looks the window wears.
+        "theme",
         # Which half of the machine the detail budget is spent on.
         "load_bias",
         # Whether Windows' own per-application graphics settings are kept in
