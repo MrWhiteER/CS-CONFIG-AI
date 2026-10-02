@@ -509,11 +509,15 @@
   /* The track carries the live category's colour; each item carries its own,
      which is what it shows on hover. */
   .segbar[data-live="apply"]   { --cat: var(--cat-apply); }
+  .segbar[data-live="apps"]    { --cat: var(--cat-apps); }
+  .segbar[data-live="look"]    { --cat: var(--cat-look); }
   .segbar[data-live="sound"]   { --cat: var(--cat-sound); }
   .segbar[data-live="config"]  { --cat: var(--cat-config); }
   .segbar[data-live="editing"] { --cat: var(--cat-editing); }
   .segbar[data-live="logs"]    { --cat: var(--cat-logs); }
   .seg-item[data-sub="apply"]   { --cat: var(--cat-apply); }
+  .seg-item[data-sub="apps"]    { --cat: var(--cat-apps); }
+  .seg-item[data-sub="look"]    { --cat: var(--cat-look); }
   .seg-item[data-sub="sound"]   { --cat: var(--cat-sound); }
   .seg-item[data-sub="config"]  { --cat: var(--cat-config); }
   .seg-item[data-sub="editing"] { --cat: var(--cat-editing); }
@@ -2124,6 +2128,8 @@
     --cat-editing: #ff2d95;
     /* Logs take the slate the Settings rail entry uses: a record of what
        happened is the one category here that is not an action. */
+    --cat-apps:    #a56bff;
+    --cat-look:    #22e6ff;
     --cat-logs:    #8ea2c0;
   }
 
@@ -4631,6 +4637,8 @@
         <div class="segbar" id="settings-subtabs" role="tablist">
           <div class="seg-thumb" id="seg-thumb"></div>
           <button class="seg-item" data-sub="apply" role="tab" aria-selected="true">Apply</button>
+          <button class="seg-item" data-sub="apps" role="tab" aria-selected="false">Apps</button>
+          <button class="seg-item" data-sub="look" role="tab" aria-selected="false">Look</button>
           <button class="seg-item" data-sub="sound" role="tab" aria-selected="false">Sound</button>
           <button class="seg-item" data-sub="config" role="tab" aria-selected="false">Config files</button>
           <button class="seg-item" data-sub="editing" role="tab" aria-selected="false">Editing</button>
@@ -4654,16 +4662,7 @@
 
       <!-- Only drawn when Crosshair X is actually installed. Advertising an
            integration for software somebody does not have is noise. -->
-      <section class="panel hidden" id="xhair-card">
-        <div id="xhair-out"></div>
-      </section>
 
-      <section class="panel wide" id="theme-card">
-        <h2>Look</h2>
-        <p class="sub">Five of them. Nothing but colour changes &mdash; every
-           control, every number and every explanation stays exactly where it is.</p>
-        <div id="theme-out" class="themes"></div>
-      </section>
 
       <!-- Which half of the machine is asked to do less, and what Windows
            itself has been told about the game. -->
@@ -4689,6 +4688,25 @@
 
       <div id="results"></div>
 
+      </div>
+
+      <!-- The other programs that run alongside the game. Crosshair X was
+           here only because it was the first one written; it is not a setting
+           about CS2's configuration and never was. -->
+      <div class="subpane hidden" data-sub="apps">
+      <section class="panel hidden" id="xhair-card">
+        <div id="xhair-out"></div>
+      </section>
+      </div>
+
+      <!-- How this application looks. Nothing to do with the game's
+           configuration, which is what every other sub-view here is about. -->
+      <div class="subpane hidden" data-sub="look">
+      <section class="panel wide" id="theme-card">
+        <h2>Look</h2>
+        <p class="sub" id="theme-count"></p>
+        <div id="theme-out" class="themes"></div>
+      </section>
       </div>
 
       <div class="subpane hidden" data-sub="sound">
@@ -9788,6 +9806,14 @@ function renderThemes() {
   const box = $("theme-out");
   if (!box) return;
   const now = currentTheme();
+  // Counted rather than written down. It said "five of them" while there were
+  // seven, which is what a number in prose does the moment the list grows.
+  const says = $("theme-count");
+  if (says) {
+    says.textContent =
+      THEMES.length + " of them. Colour and shape change — every control, " +
+      "every number and every explanation stays exactly where it is.";
+  }
   box.innerHTML = THEMES.map(([id, name, blurb, bg, panel, accent]) =>
     '<button type="button" class="theme" data-theme="' + id + '" aria-pressed="' +
       (now === id) + '">' +
