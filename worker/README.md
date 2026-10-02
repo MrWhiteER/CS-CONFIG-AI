@@ -41,9 +41,19 @@ Then **open a new terminal** -- the installer puts Node on the PATH and an
 already-open window will not see it -- and:
 
 ```powershell
-npm install -g wrangler
-wrangler login
+npm.cmd install -g wrangler
+wrangler.cmd login
 ```
+
+`.cmd`, not the bare name, and that is not a typo. Node installs each tool
+twice: a PowerShell script and a `.cmd` shim. PowerShell refuses to run the
+script half unless script execution has been turned on for the machine, so
+`npm` fails with *"running scripts is disabled on this system"* while
+`npm.cmd` does exactly the same job and is not a script. Use the `.cmd` form
+throughout -- `wrangler.cmd d1 create`, and so on.
+
+The alternative is to turn script execution on, and it is not worth it. That
+is a machine-wide security setting being changed to work around a filename.
 
 If you would rather not install Node at all, everything below can be done from
 the Cloudflare dashboard instead; see *Without wrangler* at the end.
