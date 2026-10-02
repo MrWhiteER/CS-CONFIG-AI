@@ -2865,6 +2865,93 @@ def _settle_win_graphics(state: State, wanted: bool) -> Dict[str, Any]:
         return {"ok": False, "error": str(exc)}
 
 
+# --- the cloud account ------------------------------------------------------
+
+def _cloud(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Who is signed in, on what plan, and what is still missing.
+
+    Never raises: the page asks for this while drawing, so a cloud that is
+    down has to read as signed out rather than taking the panel with it.
+    """
+    from . import cloud
+
+    return {"ok": True, **cloud.status()}
+
+
+def _cloud_login(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Begin a browser sign-in, and open the browser on it.
+
+    The state and the verifier are kept here rather than handed to the page.
+    The page has no use for them -- it only needs to know whether the browser
+    half has finished -- and the verifier is the one thing in this exchange
+    that must not travel further than it has to.
+    """
+    from . import cloud
+
+    provider = str(body.get("provider") or "steam")
+    link = bool(body.get("link"))
+    try:
+        started = cloud.begin_login(provider, link=link)
+    except cloud.CloudError as exc:
+        return {"ok": False, "error": str(exc)}
+
+    state._login = started
+    if not _open_in_default_browser(started["url"]):
+        return {"ok": True, "opened": False, "url": started["url"],
+                "detail": "Open this in your browser to finish signing in"}
+    return {"ok": True, "opened": True, "provider": provider, "link": link}
+
+
+def _cloud_poll(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Has the browser half finished? Asked repeatedly by the page."""
+    from . import cloud
+
+    pending = getattr(state, "_login", None)
+    if not pending:
+        return {"ok": True, "waiting": False, "nothing": True}
+    try:
+        answer = cloud.claim_login(pending["state"], pending["verifier"])
+    except cloud.CloudError as exc:
+        state._login = None
+        return {"ok": False, "error": str(exc)}
+    if not answer.get("waiting"):
+        state._login = None
+        cloud.forget_me()
+    return {"ok": True, **answer}
+
+
+def _cloud_cancel(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    state._login = None
+    return {"ok": True}
+
+
+def _cloud_password(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Sign in, open an account, or attach an address to one."""
+    from . import cloud
+
+    email = str(body.get("email") or "").strip()
+    password = str(body.get("password") or "")
+    mode = str(body.get("mode") or "login")
+    try:
+        if mode == "register":
+            answer = cloud.register(email, password)
+        elif mode == "link":
+            answer = cloud.add_password(email, password)
+        else:
+            answer = cloud.sign_in(email, password)
+    except cloud.CloudError as exc:
+        return {"ok": False, "error": str(exc)}
+    cloud.forget_me()
+    return {"ok": True, **answer}
+
+
+def _cloud_logout(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import cloud
+
+    state._login = None
+    return cloud.sign_out()
+
+
 def _setups(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     """Every named setup this account has, and which one it is following."""
     from . import profiles, setups
@@ -3172,6 +3259,12 @@ def make_handler(state: State):
         "/api/demos/waiting": _demo_waiting,
         "/api/demos/page": _demo_page,
         "/api/demos/pick": _demo_pick,
+        "/api/cloud": _cloud,
+        "/api/cloud/login": _cloud_login,
+        "/api/cloud/poll": _cloud_poll,
+        "/api/cloud/cancel": _cloud_cancel,
+        "/api/cloud/password": _cloud_password,
+        "/api/cloud/logout": _cloud_logout,
         "/api/wingraphics": _win_graphics,
         "/api/wingraphics/apply": _win_graphics_apply,
         "/api/crosshairx": _crosshairx,
