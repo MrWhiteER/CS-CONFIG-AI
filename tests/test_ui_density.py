@@ -79,6 +79,15 @@ class TheSettingRow(unittest.TestCase):
         self.assertIn('aria-expanded', self.page)
         self.assertIn('e.key !== "Enter" && e.key !== " "', self.page)
 
+    def test_the_change_list_is_not_squeezed_into_one_column_of_the_deck(self):
+        """It is the output of everything above it. In a 340px column a row
+        like "NVIDIA Reflex Low Latency" wrapped onto three lines and the list
+        became a scroll -- and a name, the value being left and the value being
+        taken have to sit on one line or the arrow between them means nothing."""
+        self.assertIn('<div id="results" class="wide">', self.page)
+        self.assertIn("#results {", self.page)
+        self.assertIn("minmax(460px, 1fr)", self.page)
+
     def test_a_focusable_row_shows_that_it_is_focused(self):
         """It was given a tabindex and no focus ring, which makes it reachable
         by keyboard and invisible once reached. Caught by auditing against a

@@ -178,6 +178,39 @@ class WatchingOnLaunch(unittest.TestCase):
         self.assertNotIn("../../evil.dem", listed)
 
 
+class TheScoreboardOutlivesItsWindow(unittest.TestCase):
+    """Reported from a running copy: "Cannot set properties of null".
+
+    The download row lives inside the scoreboard window, a download outlives
+    that window, and everything that reports on a download -- a poller, a late
+    failure, a cancelled request -- arrives whenever it arrives. Three places
+    wrote to the row directly, so closing the window mid-download threw.
+
+    Asserted on the page source: there is no browser in this suite, and the
+    behaviour was checked in one with the window closed.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        from cs2cfg import paths
+
+        cls.page = (paths.bundle_root() / "web" / "index.html").read_text(
+            encoding="utf-8", errors="replace")
+
+    def test_nothing_writes_to_the_row_directly(self):
+        self.assertNotIn('$("mstat-get").innerHTML', self.page)
+
+    def test_there_is_one_guarded_way_in(self):
+        """One place to guard rather than three, because the fourth writer
+        would have repeated the same mistake."""
+        self.assertIn("function sayInGetRow(", self.page)
+        self.assertIn("  if (!row) return false;", self.page)
+
+    def test_every_writer_uses_it(self):
+        # The definition plus the three callers that used to write directly.
+        self.assertGreaterEqual(self.page.count("sayInGetRow("), 4)
+
+
 if __name__ == "__main__":
     unittest.main()
 

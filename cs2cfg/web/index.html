@@ -1086,7 +1086,21 @@
   /* Some things are the width of the window by nature: a row of swatches, a
      three-way choice, a list of every setting that will change. Squeezing
      those into a column helps nobody. */
-  .subpane > .panel.wide, .subpane > .card.wide { grid-column: 1 / -1; }
+  .subpane > .panel.wide, .subpane > .card.wide, .subpane > .wide { grid-column: 1 / -1; }
+
+  /* What the next Apply will change. It is the output of everything above it,
+     so it gets the full width and lays its own cards out across it -- squeezed
+     into one column of the deck, a row like "NVIDIA Reflex Low Latency" wrapped
+     onto three lines and the list became a scroll.
+
+     Wider minimum than the deck above: these rows are a name, a value being
+     left behind and a value being taken up, and all three have to sit on one
+     line or the arrow between them stops meaning anything. */
+  #results {
+    display: grid; gap: 13px; align-items: start;
+    grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
+  }
+  #results > .card { margin: 0; }
 
   /* The connection, drawn as it is measured. */
   .netbar {
@@ -4686,7 +4700,7 @@
         </div>
       </section>
 
-      <div id="results"></div>
+      <div id="results" class="wide"></div>
 
       </div>
 
@@ -9245,6 +9259,24 @@ function showStats(s) {
 
 /* The download strip at the foot of the scoreboard: one of three states, and
    never more than one. Not downloaded, downloading, or ready to watch. */
+/* Say something in the scoreboard's download row, if that window is still
+   open.
+
+   It often is not. The row lives inside the scoreboard, a download outlives
+   it, and the things that report on a download -- a poller, a cancelled
+   request, a late failure -- all arrive whenever they arrive. Three of them
+   wrote to it directly and threw "Cannot set properties of null" the moment
+   somebody closed the window while a demo was still coming down.
+
+   One place to guard rather than three, because the fourth writer would have
+   repeated it. */
+function sayInGetRow(html) {
+  const row = $("mstat-get");
+  if (!row) return false;
+  row.innerHTML = html;
+  return true;
+}
+
 function paintGetRow() {
   const row = $("mstat-get");
   if (!row || !statsShown) return;
@@ -9503,14 +9535,14 @@ document.addEventListener("click", async e => {
     btn.disabled = true;
     try {
       const r = await api("/api/demos/page", { link: statsShown.match_id });
-      $("mstat-get").innerHTML =
+      sayInGetRow(
         '<span class="ring spin"><i></i><b></b></span>' +
         '<span class="say"><b>Waiting for your download</b><span>' +
         (r.direct ? "The demo is downloading in your browser."
                   : "The match room is open &mdash; press FACEIT&rsquo;s " +
                     "download button.") +
         " Watching " + esc(statsWaiting && statsWaiting.downloads || "Downloads") +
-        ".</span></span>";
+        ".</span></span>");
       startWaitingWatch();
     } catch (err) {
       status(esc(err.message), true);
@@ -9526,9 +9558,9 @@ document.addEventListener("click", async e => {
       if (r.already) { await loadDemos(); paintGetRow(); }
       else { demoData = demoData || {}; demoData.job = r.job; paintGetRow(); watchDemoJob(); }
     } catch (err) {
-      $("mstat-get").innerHTML =
+      sayInGetRow(
         '<span class="say"><b>Could not download it</b><span style="color:var(--bad)">' +
-        esc(err.message) + "</span></span>";
+        esc(err.message) + "</span></span>");
     }
   }
 });
@@ -9552,11 +9584,11 @@ document.addEventListener("click", async e => {
       // The game runs the chosen demo at startup, and this session is past
       // that. Saying "it will play" would be untrue, so the console line that
       // runs the same file is offered instead.
-      $("mstat-get").innerHTML =
+      sayInGetRow(
         '<span class="say"><b>Chosen</b><span>It plays on its own the next ' +
         "time CS2 starts. To watch it in this session, press <b>~</b> and run:" +
         '<br><code style="display:inline-block;margin-top:5px">' +
-        esc(r.console || "") + "</code></span></span>";
+        esc(r.console || "") + "</code></span></span>");
     } catch (err) {
       status(esc(err.message), true);
       live.disabled = false;
