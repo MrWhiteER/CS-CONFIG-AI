@@ -22,7 +22,7 @@ bucket_name = "cs2-autoconfig-settings"
 # will only redirect to a URI registered against the client. Leaving it unset
 # makes the Worker use whatever origin the request arrived on, which is fine
 # until a request arrives on a different one.
-PUBLIC_ORIGIN = "https://cs2-autoconfig-cloud.YOUR-SUBDOMAIN.workers.dev"
+PUBLIC_ORIGIN = "https://cs2-autoconfig-cloud.cs2tool.workers.dev"
 
 # Google's client id is not a secret -- it is sent to the browser on every
 # sign-in. The matching secret is not kept here. Leave this empty and Google

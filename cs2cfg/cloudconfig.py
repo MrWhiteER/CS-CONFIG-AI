@@ -30,7 +30,7 @@ from typing import Optional
 # The Worker from worker/. Replace the host with your own after deploying it;
 # until then the launcher has nowhere to sign in to and says so plainly rather
 # than failing in the middle of a sign-in.
-BASE_URL = "https://cs2-autoconfig-cloud.example.workers.dev"
+BASE_URL = "https://cs2-autoconfig-cloud.cs2tool.workers.dev"
 
 # Google's OAuth client id, from the Google Cloud console. Public: it travels
 # in the browser's address bar on every sign-in. Empty turns Google sign-in
