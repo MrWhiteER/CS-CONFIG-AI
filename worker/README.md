@@ -29,7 +29,24 @@ from a user's machine:
 
 ## Deploying it
 
-You need `wrangler` (`npm i -g wrangler`) and to be logged in (`wrangler login`).
+`wrangler` is Cloudflare's own tool and it runs on Node, which Windows does
+not ship. If `wrangler` reports *"is not recognized as the name of a cmdlet"*,
+that is what is missing -- not wrangler, Node.
+
+```powershell
+winget install OpenJS.NodeJS.LTS
+```
+
+Then **open a new terminal** -- the installer puts Node on the PATH and an
+already-open window will not see it -- and:
+
+```powershell
+npm install -g wrangler
+wrangler login
+```
+
+If you would rather not install Node at all, everything below can be done from
+the Cloudflare dashboard instead; see *Without wrangler* at the end.
 
 **1. Make the database and the bucket.**
 
@@ -160,3 +177,20 @@ one.
 
 **A rate limiter in front.** `login_attempts` stops an address being guessed at
 overnight; it is a floor, not a replacement for a real rule at the edge.
+
+## Without wrangler
+
+Nothing here needs a terminal. The same four steps, in the dashboard:
+
+1. **D1** -- *Storage & Databases -> D1 -> Create*. Call it `cs2-autoconfig`,
+   open it, and paste `schema.sql` into the console.
+2. **R2** -- *R2 -> Create bucket*. Any name; it goes in `wrangler.toml`.
+3. **The Worker** -- *Workers & Pages -> Create -> Start from Hello World*,
+   then replace the code with `src/index.js`. Under *Settings -> Bindings*,
+   add `DB` pointing at the D1 database and `BUCKET` at the R2 bucket.
+4. **The secrets** -- *Settings -> Variables and Secrets*. Add `ADMIN_TOKEN`
+   and `GOOGLE_CLIENT_SECRET` as **secrets**, not plain text, and
+   `PUBLIC_ORIGIN` and `GOOGLE_CLIENT_ID` as ordinary variables.
+
+The dashboard route is slower to repeat but has one real advantage: a secret
+added there was never on your machine and never in a shell history.
