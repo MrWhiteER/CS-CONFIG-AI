@@ -45,6 +45,29 @@ npm.cmd install -g wrangler
 wrangler.cmd login
 ```
 
+### If `wrangler` is still not found
+
+It usually will not be, the first time, and it is not wrangler's fault. A
+program's PATH is a copy taken when it started, so every shell, editor and
+terminal opened before the install keeps the old one -- and a "new" window
+launched from an `explorer.exe` that is itself stale inherits the stale copy.
+
+Rather than chase that, use the wrapper beside this file. It finds Node and
+wrangler itself and sets PATH for its own process only:
+
+```powershell
+worker\wr.cmd login
+worker\wr.cmd d1 create cs2-autoconfig
+worker\wr.cmd r2 bucket create cs2-autoconfig-settings
+worker\wr.cmd deploy
+```
+
+Everything below that says `wrangler` works the same through `worker\wr.cmd`.
+If you would rather fix it properly, restart Explorer and open a new terminal
+after that -- not before.
+
+### On the `.cmd`
+
 `.cmd`, not the bare name, and that is not a typo. Node installs each tool
 twice: a PowerShell script and a `.cmd` shim. PowerShell refuses to run the
 script half unless script execution has been turned on for the machine, so
