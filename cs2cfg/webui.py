@@ -449,6 +449,44 @@ def _play(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
             "crosshair": crosshair, "win_graphics": win_graphics}
 
 
+def _stand_down(state: State, game_running: bool) -> Dict[str, Any]:
+    """Put back anything that was armed for a launch, once the launch is over.
+
+    Reported: a demo chosen with Watch played again on the next launch, and
+    the one after that. Clearing it was tied to launching through this
+    application, so a game started from Steam -- or a session this application
+    was not running for, or a crash -- left it armed indefinitely.
+
+    So it is not tied to launching any more. The rule is simply: the game is
+    not running, therefore nothing should still be armed for it.
+
+    The trap is that the game is also not running in the half-minute between
+    pressing Watch and the game appearing, and clearing it then would disarm
+    the very launch it was meant for. So a one-shot is only stood down once
+    this has actually seen the game up since it was armed -- or once this
+    application has been restarted, which means the launch it belonged to is
+    over whatever happened to it.
+    """
+    out: Dict[str, Any] = {}
+    seen = getattr(state, "_saw_game", False)
+    if game_running:
+        state._saw_game = True
+        return out
+    # Not running. Either it has been and gone, or this is a fresh start.
+    fresh = not getattr(state, "_watched_once", False)
+    state._watched_once = True
+    if not (seen or fresh):
+        return out
+
+    state._saw_game = False
+    try:
+        if _settle_demo(state, watching=False):
+            out["demo_cleared"] = True
+    except Exception:
+        pass
+    return out
+
+
 def _settle_demo(state: State, watching: bool) -> bool:
     """Drop a one-shot demo bind once the launch it was for is over.
 
@@ -3219,6 +3257,14 @@ def make_handler(state: State):
                     put_back = {}
                 if put_back.get("restored"):
                     live["desktop_restored"] = put_back.get("detail", "")
+
+                # ...and anything else that was armed for a launch which is
+                # now over. Same rule as the desktop: the game is not running,
+                # so nothing should still be waiting for it.
+                try:
+                    live.update(_stand_down(state, live["game_running"]))
+                except Exception:
+                    pass
                 if state.launch is None:
                     self._send_json({"ok": True, "phase": "idle", "active": False,
                                      "lines": [], **live})
