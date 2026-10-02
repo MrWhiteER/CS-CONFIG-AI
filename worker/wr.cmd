@@ -87,5 +87,13 @@ rem Both on the front of PATH for this process only. Nothing outside it is
 rem changed, so there is no setting here to put back afterwards.
 set "PATH=%NODE_DIR%;%APPDATA%\npm;%PATH%"
 
+rem Run from the folder holding wrangler.toml, whatever folder this was called
+rem from. wrangler reads its configuration from the working directory, so
+rem calling this from the repository root gave "Required Worker name missing"
+rem -- which sounds like a fault in the configuration rather than what it is,
+rem which is wrangler never having found the configuration at all.
+pushd "%~dp0"
 call "%WRANGLER%" %*
-exit /b %ERRORLEVEL%
+set "CODE=%ERRORLEVEL%"
+popd
+exit /b %CODE%

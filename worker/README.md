@@ -105,9 +105,13 @@ wrangler secret put GOOGLE_CLIENT_SECRET
 
 Generate the admin token with something that is not a word you chose:
 
-```bash
-python -c "import secrets; print(secrets.token_urlsafe(32))"
+```powershell
+py -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
+
+`py`, not `python`. Windows ships the launcher under that name, and bare
+`python` hits a Microsoft Store stub that reports *"Python was not found"*
+even on a machine with Python installed and working.
 
 **4. Deploy, and set `PUBLIC_ORIGIN`** in `wrangler.toml` to the address it
 reports. It has to match exactly: Steam checks the realm against the return
