@@ -972,6 +972,44 @@
     content: " ¹3"; color: var(--accent); font-weight: 700;
   }
 
+  /* The two parts the choice is about, drawn rather than described.
+     "Lean on the graphics card" means something different once you can see
+     which card it is and how far ahead of the processor it actually is. */
+  .parts { display: grid; grid-template-columns: 1fr auto 1fr; gap: 14px;
+           align-items: center; margin: 12px 0 14px; }
+  .part { display: flex; gap: 12px; align-items: center; min-width: 0; }
+  .part.gpu { flex-direction: row-reverse; text-align: right; }
+  .part-ic {
+    width: 54px; height: 54px; flex: none; border-radius: 12px;
+    display: grid; place-items: center;
+    background: color-mix(in srgb, var(--accent) 11%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 26%, transparent);
+    color: var(--accent);
+  }
+  .part-ic svg { width: 30px; height: 30px; fill: none; stroke: currentColor;
+                 stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
+  /* Spans, so every one of these has to be told to stack. They are spans
+     because the whole row is built as one string; forgetting this put the
+     processor, its core count and its frame ceiling on a single run-on line. */
+  .part-txt { min-width: 0; display: block; }
+  .part-kind { display: block; font: 10px/1.4 var(--mono); letter-spacing: .18em;
+               color: var(--muted); }
+  .part-name { display: block; font-size: 13.5px; font-weight: 500; margin: 5px 0 3px;
+               overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .part-sub { display: block; font-size: 11px; color: var(--muted); }
+  .part-fps { display: block; font: 600 17px/1.1 var(--mono); color: var(--ink);
+              margin-top: 7px; }
+  .part-fps span { font: 10px var(--mono); color: var(--muted); letter-spacing: .1em; }
+  .part-vs { text-align: center; min-width: 118px; }
+  /* Which of the two runs out first. The whole point of the panel in one line. */
+  .part-vs b { display: block; font: 10px/1 var(--mono); letter-spacing: .16em;
+               color: var(--muted); }
+  .part-bar { width: 90px; height: 5px; border-radius: 3px; margin: 7px auto 5px;
+              background: color-mix(in srgb, var(--accent) 18%, transparent);
+              position: relative; overflow: hidden; }
+  .part-bar i { position: absolute; inset: 0 auto 0 0; background: var(--accent); }
+  .part-vs small { font-size: 10.5px; color: var(--muted); }
+
   .bias { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0 4px; }
   .bias button {
     flex: 1 1 130px; min-width: 0; padding: 9px 10px; text-align: left;
@@ -9891,13 +9929,67 @@ async function loadMachine() {
   renderMachine();
 }
 
+/* "12th Gen Intel(R) Core(TM) i9-12900K" is what Windows calls it and not
+   what anybody else does. The full name stays in the tooltip. */
+function shortPart(name) {
+  return String(name || "")
+    .replace(/\((R|TM|C)\)/g, "")
+    .replace(/(\d+th Gen|CPU|Processor|Graphics)/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 function renderMachine() {
   const box = $("machine-out");
   if (!box) return;
   const now = (prefsNow && prefsNow.load_bias) || "auto";
   const keep = !!(prefsNow && prefsNow.win_graphics_auto);
 
-  let html =
+  // The two parts, drawn, with the one that runs out first called by name.
+  let html = "";
+  const parts = wgData && wgData.parts;
+  if (parts && parts.cpu && parts.gpu) {
+    const cpu = parts.cpu, gpu = parts.gpu;
+    const total = (cpu.ceiling || 0) + (gpu.ceiling || 0);
+    const share = total ? Math.round((cpu.ceiling / total) * 100) : 50;
+    const limit = !cpu.ceiling || !gpu.ceiling ? ""
+      : cpu.ceiling < gpu.ceiling ? "the processor runs out first"
+      : gpu.ceiling < cpu.ceiling ? "the graphics card runs out first"
+      : "evenly matched";
+    const chip =
+      '<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/>' +
+      '<rect x="9.5" y="9.5" width="5" height="5" rx="1"/>' +
+      '<path d="M9 6V3M15 6V3M9 21v-3M15 21v-3M6 9H3M6 15H3M21 9h-3M21 15h-3"/></svg>';
+    const card =
+      '<svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2"/>' +
+      '<circle cx="9" cy="12" r="3.2"/><path d="M15 9.5h4M15 12h4M15 14.5h4"/>' +
+      '<path d="M6 18v2.5M18 18v2.5"/></svg>';
+
+    html +=
+      '<div class="parts">' +
+        '<span class="part cpu"><span class="part-ic">' + chip + "</span>" +
+          '<span class="part-txt"><span class="part-kind">PROCESSOR</span>' +
+          '<span class="part-name" title="' + esc(cpu.name) + '">' +
+            esc(shortPart(cpu.name)) + "</span>" +
+          '<span class="part-sub">' + esc(cpu.detail || "") + "</span>" +
+          '<span class="part-fps">' + (cpu.ceiling || "—") +
+            " <span>FPS</span></span></span></span>" +
+
+        '<span class="part-vs"><b>LIMIT</b>' +
+          '<span class="part-bar"><i style="width:' + share + '%"></i></span>' +
+          "<small>" + esc(limit) + "</small></span>" +
+
+        '<span class="part gpu"><span class="part-ic">' + card + "</span>" +
+          '<span class="part-txt"><span class="part-kind">GRAPHICS CARD</span>' +
+          '<span class="part-name" title="' + esc(gpu.name) + '">' +
+            esc(shortPart(gpu.name)) + "</span>" +
+          '<span class="part-sub">' + esc(gpu.detail || "") + "</span>" +
+          '<span class="part-fps">' + (gpu.ceiling || "—") +
+            " <span>FPS</span></span></span></span>" +
+      "</div>";
+  }
+
+  html +=
     '<p class="sub">Where the detail budget goes when the machine cannot have ' +
     "everything. These are picture settings, not a scheduler — nothing here " +
     "moves work between the two parts, it decides which one is asked to draw " +

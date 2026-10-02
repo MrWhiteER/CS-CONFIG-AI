@@ -2796,7 +2796,42 @@ def _win_graphics(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
 
     state.refresh()
     many = len(getattr(state.machine, "gpus", []) or []) > 1 if state.machine else False
-    return {"ok": True, **wingraphics.describe(state.cs2_install, multi_gpu=many)}
+    out = {"ok": True, **wingraphics.describe(state.cs2_install, multi_gpu=many)}
+
+    # The two parts the choice on this card is actually about. Named and
+    # scored, because "lean on the graphics card" means something different
+    # when you can see which card it is and how it compares.
+    machine = state.machine
+    if machine is not None:
+        kb = state.kb
+        try:
+            from .profile import estimate_fps
+
+            cpu = kb.match_cpu(machine.cpu.name) if machine.cpu else None
+            gpu = kb.match_gpu(machine.gpu.name) if machine.gpu else None
+            pixels = 1920 * 1080
+            _, cpu_ceiling, gpu_ceiling, _ = estimate_fps(
+                cpu.index if cpu else 0, gpu.index if gpu else 0, pixels, "balanced")
+        except Exception:
+            cpu = gpu = None
+            cpu_ceiling = gpu_ceiling = 0
+        out["parts"] = {
+            "cpu": {
+                "name": machine.cpu.name if machine.cpu else "",
+                "score": round(cpu.index) if cpu else None,
+                "ceiling": int(cpu_ceiling),
+                "detail": (f"{machine.cpu.cores} cores / {machine.cpu.threads} threads"
+                           if machine.cpu and machine.cpu.cores else ""),
+            },
+            "gpu": {
+                "name": machine.gpu.name if machine.gpu else "",
+                "score": round(gpu.index) if gpu else None,
+                "ceiling": int(gpu_ceiling),
+                "detail": (f"{machine.gpu.vram_gb:g} GB VRAM"
+                           if machine.gpu and machine.gpu.vram_gb else ""),
+            },
+        }
+    return out
 
 
 def _win_graphics_apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
