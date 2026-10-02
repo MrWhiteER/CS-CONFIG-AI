@@ -40,3 +40,9 @@ desktop.ini
 *.pre-skin
 *.orig
 *.rej
+
+# Wrangler's local working directory. Its cache records the Cloudflare account
+# the machine is signed in to -- id and account name, and the account name is
+# somebody's email address. Nothing here is a credential, and none of it
+# belongs in a public repository either.
+.wrangler/

@@ -10,11 +10,11 @@ compatibility_date = "2026-10-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "cs2-autoconfig"
-database_id = "PUT-YOUR-D1-DATABASE-ID-HERE"
+database_id = "69fe734c-63c4-4618-911f-2de57096429f"
 
 [[r2_buckets]]
 binding = "BUCKET"
-bucket_name = "PUT-YOUR-R2-BUCKET-NAME-HERE"
+bucket_name = "cs2-autoconfig-settings"
 
 [vars]
 # The origin the launcher and the two providers will reach this on. It has to
