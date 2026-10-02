@@ -1754,21 +1754,60 @@
 
   /* Setting controls. A row per setting: label, control, and where it came
      from -- provenance sits with the control rather than in a separate list. */
-  .setting { padding: 9px 0; border-bottom: 1px solid var(--line); }
+  /* One line per setting, and the rest on request.
+     It used to be five lines: label, flags, the convar, the file it came from,
+     and a paragraph. The paragraph was the same 126 characters on every row of
+     the group -- measured at ten repeats on one screen, 56% of all the prose
+     on the tab. None of it is gone; it is a click away, and the sentence the
+     whole group shares is now said once, in the group's own heading. */
+  .setting { border-bottom: 1px solid var(--line); }
   .setting:last-child { border-bottom: 0; }
-  .setting .top { display: flex; gap: 10px; align-items: center; }
+  .setting .top {
+    display: flex; gap: 10px; align-items: center;
+    padding: 7px 8px; border-radius: 8px; cursor: pointer;
+    transition: background .13s;
+  }
+  .setting .top:hover { background: color-mix(in srgb, var(--accent) 7%, transparent); }
   .setting .name { flex: 1 1 40%; min-width: 0; }
-  .setting .name b { font-weight: 600; }
-  .setting .ctl { flex: 1 1 55%; display: flex; gap: 8px; align-items: center; }
+  .setting .name b { font-weight: 500; }
+  .setting .ctl { flex: 0 1 auto; display: flex; gap: 8px; align-items: center; }
+  /* The "?" is the affordance for the detail. Dimmed until the row is under
+     the pointer, so forty of them do not read as forty pieces of punctuation. */
+  .setting .why {
+    flex: none; width: 17px; height: 17px; border-radius: 50%;
+    border: 1px solid var(--line); color: var(--muted);
+    font-size: 10.5px; font-weight: 600; line-height: 15px; text-align: center;
+    transition: color .13s, border-color .13s;
+  }
+  .setting .top:hover .why { color: var(--accent); border-color: var(--accent); }
+  .setting .src {
+    display: none; color: var(--muted); font-size: 11.5px; line-height: 1.5;
+    margin: 0 0 8px 9px; padding: 2px 10px 2px 11px;
+    border-left: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+  .setting.open .src { display: block; }
+  .setting.open .why { color: var(--accent); border-color: var(--accent); }
   .setting input[type=range] { flex: 1; min-width: 90px; accent-color: var(--accent); }
   .setting input[type=number], .setting input[type=text] {
     width: 110px; background: var(--panel); color: var(--ink);
     border: 1px solid var(--line); border-radius: 6px; padding: 4px 7px; font: inherit;
   }
   .setting select { width: auto; min-width: 130px; }
-  .setting .src { color: var(--muted); font-size: 11px; margin-top: 3px; }
-  .setting .src code { font-family: var(--mono); }
+  .setting .src code { font-family: var(--mono); color: var(--accent); }
   .setting.dirty { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+  /* A setting that differs from what this application would write. The one
+     thing on the row worth noticing without opening anything, and it used to
+     be buried in a wall of identical grey text. */
+  .setting .differs {
+    flex: none; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--warn); box-shadow: 0 0 6px var(--warn);
+  }
+  /* The sentence a whole group shares, said once. */
+  .subcat-note {
+    color: var(--muted); font-size: 11.5px; line-height: 1.5;
+    margin: 1px 0 7px; max-width: 78ch;
+  }
+  .subcat-note code { font-family: var(--mono); color: var(--accent); }
   .setting .flag {
     display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 9px;
     font-size: 10px; font-weight: 600; background: var(--chip);
@@ -7095,16 +7134,25 @@ function renderCs2Groups() {
     esc(g.label) + '<span class="n">' + (counts[g.id] || 0) + "</span></button>").join("");
 }
 
-function cs2Row(x) {
+/* What a row says before it is opened.
+
+   Only the flags that change what somebody would do: a setting they cannot
+   change here, one that is not written anywhere yet, one whose value is being
+   fought over by two files. "cs2_video.txt" is true of every row in the group
+   and belongs in the group's heading; "no fixed range" is a detail about the
+   control and belongs with the rest of the detail. */
+function cs2Row(x, saidAlready) {
   const spec = x.spec || {};
   let flags = "";
   if (x.unset) flags += '<span class="flag">not set</span>';
-  if (x.source === "video") flags += '<span class="flag">cs2_video.txt</span>';
   if (x.overridden) flags += '<span class="flag warn">set in ' + x.sources.length + " files</span>";
   if (x.profile_only) flags += '<span class="flag warn">profile only</span>';
   if (spec.readonly) flags += '<span class="flag">read-only here</span>';
-  if (spec.range_source === "convention") flags += '<span class="flag">no fixed range</span>';
   if (spec.confidence === "medium") flags += '<span class="flag warn">range unconfirmed</span>';
+
+  let quiet = "";
+  if (x.source === "video") quiet += '<span class="flag">cs2_video.txt</span>';
+  if (spec.range_source === "convention") quiet += '<span class="flag">no fixed range</span>';
 
   let src = x.unset
     ? "not in any file — changing it appends to <code>" +
@@ -7117,16 +7165,48 @@ function cs2Row(x) {
       .map(o => "<code>" + esc(o.file) + ":" + o.line + "</code> = " + esc(o.value))
       .join(", ") + ". The last one loaded wins.";
   }
-  if (x.note) src += "<br>" + esc(x.note);
+  // The note is the repeated one -- "Stored in cs2_video.txt under your Steam
+  // userdata..." is identical on every video-sourced row. Omitted here when
+  // the heading above has already said it. The help is the opposite: it is
+  // written per setting and is the reason somebody opened the row at all, so
+  // it always stays.
+  if (x.note && x.note !== saidAlready) src += "<br>" + esc(x.note);
   if (spec.help) src += "<br>" + esc(spec.help);
 
-  return '<div class="setting' + (cs2Edits.has(cs2Key(x)) ? " dirty" : "") +
+  const changed = cs2Edits.has(cs2Key(x));
+  return '<div class="setting' + (changed ? " dirty" : "") +
     '" id="cs2-' + esc(cs2Key(x)) + '">' +
-    '<div class="top"><div class="name"><b>' + esc(x.label) + "</b>" + flags +
-    '<br><span class="sub mono">' + esc(x.name) + "</span></div>" +
-    '<div class="ctl">' + cs2Control(x) + "</div></div>" +
-    '<div class="src">' + src + "</div></div>";
+    '<div class="top" role="button" tabindex="0" aria-expanded="false">' +
+      '<span class="name"><b>' + esc(x.label) + "</b>" + flags + "</span>" +
+      (changed ? '<span class="differs" title="changed, not saved yet"></span>' : "") +
+      '<span class="ctl">' + cs2Control(x) + "</span>" +
+      '<span class="why" aria-hidden="true">?</span>' +
+    "</div>" +
+    '<div class="src"><code>' + esc(x.name) + "</code>" + quiet + "<br>" + src + "</div></div>";
 }
+
+/* Opening a row.
+
+   Delegated, because the rows are rewritten on every render and a listener per
+   row would be a listener per render. Clicks that land on the control itself
+   are left alone: somebody reaching for a dropdown is changing the setting,
+   not asking what it means. */
+document.addEventListener("click", e => {
+  const top = e.target.closest(".setting .top");
+  if (!top) return;
+  if (e.target.closest("select, input, button, a")) return;
+  const row = top.closest(".setting");
+  const open = row.classList.toggle("open");
+  top.setAttribute("aria-expanded", String(open));
+});
+
+document.addEventListener("keydown", e => {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  const top = e.target.closest(".setting .top");
+  if (!top || e.target.closest("select, input, button, a")) return;
+  e.preventDefault();          // space would otherwise scroll the panel
+  top.click();
+});
 
 function renderCs2Body() {
   if (!cs2Data) return;
@@ -7145,8 +7225,14 @@ function renderCs2Body() {
   for (const sub of subgroups) {
     const items = sub.id === null ? mine : mine.filter(x => x.subgroup === sub.id);
     if (!items.length) continue;
+    // The sentence every item in this sub-category shares, hoisted out of the
+    // rows and into the heading. On the Video group that is one 126-character
+    // sentence that was being printed ten times on a single screen.
+    const notes = items.map(x => x.note || "");
+    const shared = notes.length > 1 && notes.every(n => n && n === notes[0]) ? notes[0] : "";
     html += '<div class="subcat">' + esc(sub.label) + "</div>";
-    for (const x of items) { placed.add(x); html += cs2Row(x); }
+    if (shared) html += '<p class="subcat-note">' + esc(shared) + "</p>";
+    for (const x of items) { placed.add(x); html += cs2Row(x, shared); }
   }
 
   // A setting whose sub-category is not in the list would otherwise vanish.
@@ -7154,7 +7240,7 @@ function renderCs2Body() {
   const orphans = mine.filter(x => !placed.has(x));
   if (orphans.length) {
     html += '<div class="subcat">Other</div>';
-    for (const x of orphans) html += cs2Row(x);
+    for (const x of orphans) html += cs2Row(x, "");
   }
 
   $("cs2-body").innerHTML = html ||
