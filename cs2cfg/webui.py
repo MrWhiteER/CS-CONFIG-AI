@@ -15,6 +15,7 @@ Security posture, since this process can write to Steam's files:
 
 from __future__ import annotations
 
+import gzip
 import json
 import mimetypes
 import secrets
@@ -3317,6 +3318,13 @@ def make_handler(state: State):
             kind = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
             self.send_response(200)
             self.send_header("Content-Type", f"{kind}; charset=utf-8" if "text" in kind or "javascript" in kind else kind)
+            # The page is one large text document, and the launcher is opened
+            # on every start. Compressed it is a fraction of the size, and the
+            # browser decompresses it in well under a millisecond.
+            if path.suffix == ".html" and "gzip" in (self.headers.get("Accept-Encoding") or ""):
+                data = gzip.compress(data, compresslevel=6)
+                self.send_header("Content-Encoding", "gzip")
+                self.send_header("Vary", "Accept-Encoding")
             self.send_header("Content-Length", str(len(data)))
             self.send_header("Cache-Control", "no-store")
             self.end_headers()

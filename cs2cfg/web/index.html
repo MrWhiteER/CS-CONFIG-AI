@@ -508,14 +508,14 @@
 
   /* The track carries the live category's colour; each item carries its own,
      which is what it shows on hover. */
-  .segbar[data-live="apply"]   { --cat: var(--cat-apply); }
-  .segbar[data-live="account"] { --cat: var(--cat-account); }
-  .segbar[data-live="apps"]    { --cat: var(--cat-apps); }
-  .segbar[data-live="look"]    { --cat: var(--cat-look); }
-  .segbar[data-live="sound"]   { --cat: var(--cat-sound); }
-  .segbar[data-live="config"]  { --cat: var(--cat-config); }
-  .segbar[data-live="editing"] { --cat: var(--cat-editing); }
-  .segbar[data-live="logs"]    { --cat: var(--cat-logs); }
+  .segbar[data-current="apply"]   { --cat: var(--cat-apply); }
+  .segbar[data-current="account"] { --cat: var(--cat-account); }
+  .segbar[data-current="apps"]    { --cat: var(--cat-apps); }
+  .segbar[data-current="look"]    { --cat: var(--cat-look); }
+  .segbar[data-current="sound"]   { --cat: var(--cat-sound); }
+  .segbar[data-current="config"]  { --cat: var(--cat-config); }
+  .segbar[data-current="editing"] { --cat: var(--cat-editing); }
+  .segbar[data-current="logs"]    { --cat: var(--cat-logs); }
   .seg-item[data-sub="apply"]   { --cat: var(--cat-apply); }
   .seg-item[data-sub="account"] { --cat: var(--cat-account); }
   .seg-item[data-sub="apps"]    { --cat: var(--cat-apps); }
@@ -4256,9 +4256,449 @@
     .subtabs { flex-direction: row; flex-wrap: wrap; }
     .subtabs button { width: auto; }
   }
+
+  /* =====================================================================
+     TACTICAL HUD  --  the redesign layer.
+
+     What changed, and why it is a layer rather than a rewrite of the 4,250
+     lines above it: the token system underneath is good. Seven themes, one
+     set of names, contrast measured rather than guessed. Throwing that away
+     to get a new look would have cost the themes and bought nothing.
+
+     What was wrong was never the tokens. It was the shape. Soft 14px
+     rectangles, prose where numbers belong, and a panel that looks the same
+     whether it is telling you the game is running or that a checkbox is off.
+     That reads as a web form with a dark theme on it.
+
+     So this layer changes shape, type and density, and leaves colour alone:
+
+       * corners are notched, not rounded -- the one cut that reads as
+         equipment rather than stationery, and it costs one clip-path;
+       * every panel carries corner brackets and a header rule, so a module
+         has edges you can see without a border box around it;
+       * headings are set in a condensed face, uppercase and tracked;
+       * every number is monospaced, so digits stop shifting width as they
+         change;
+       * every setting carries an icon, because twenty-two identical
+         checkboxes is a list you read start to finish every time.
+
+     Fonts are the ones Windows already has. A launcher that cannot draw its
+     own interface without reaching Google is a launcher that looks broken on
+     a train, and this file ships inside a single HTML document with no
+     network of its own.
+     ===================================================================== */
+
+  :root {
+    /* The display face. Bahnschrift is on every Windows 10 and 11; the DIN
+       lineage is why it reads as signage rather than as a document. The
+       fallbacks walk down to a condensed grotesque and then to whatever the
+       system has, so a machine without it degrades rather than breaks. */
+    --display: "Bahnschrift", "Oswald", "Franklin Gothic Medium",
+               "Segoe UI Variable Display", "Segoe UI", sans-serif;
+    --body: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    --mono: "Cascadia Mono", Consolas, ui-monospace, "JetBrains Mono", monospace;
+
+    /* The notch. One number, because every cut surface in the window has to
+       agree -- a panel notched 14px beside a button notched 6px reads as two
+       applications. */
+    --cut: 10px;
+    --cut-sm: 6px;
+    --r: 3px;                  /* what is left of the old radius */
+
+    /* Technical hairlines, brighter than the old ones. The previous --line
+       sat at .19 alpha, which on a blurred panel came out as nothing at all;
+       a HUD is mostly line work, so the line has to be visible. */
+    --hud-line: rgba(var(--lift), .14);
+    --hud-line-2: rgba(var(--lift), .07);
+    --hud-bracket: var(--accent);
+
+    /* Density. Dashboard scale: the old layout spent 24px where 12 would
+       have read better, and the result was panels you had to scroll past
+       rather than take in. */
+    --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px;
+    --s5: 24px; --s6: 32px; --s7: 48px;
+  }
+
+  /* ---------------------------------------------------------------------
+     Type.
+
+     Three faces doing three jobs: the condensed one names things, the mono
+     one carries anything that is a measurement, and the body face carries
+     sentences. The rule is that a number never appears in the body face --
+     a frame rate that changes width as it ticks is a frame rate you cannot
+     read.
+     --------------------------------------------------------------------- */
+
+  body { font-family: var(--body); }
+
+  h1, h2, h3, .brand, .tab .tx, .btn, .seg-item, .panel > h2 {
+    font-family: var(--display);
+    font-weight: 600;
+    letter-spacing: .06em;
+  }
+
+  .panel > h2, .card h2, .editor > h2 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .18em;
+    color: var(--ink);
+    opacity: .74;
+    display: flex; align-items: center; gap: var(--s3);
+    margin: 0 0 var(--s3);
+    font-weight: 600;
+  }
+  /* The rule that runs out of a heading to the edge of the panel. It is the
+     cheapest way to say "this label belongs to everything below it" without
+     drawing a box, and a box is what made the old panels feel like a form. */
+  .panel > h2::after, .card h2::after, .editor > h2::after {
+    content: ""; flex: 1; height: 1px;
+    background: linear-gradient(90deg, var(--hud-line), transparent);
+  }
+  /* The tick before it: a short, solid mark in the accent. Reads as a
+     channel marker on an instrument. */
+  .panel > h2::before, .editor > h2::before {
+    content: ""; flex: none;
+    width: 3px; height: 11px;
+    background: var(--accent);
+    box-shadow: 0 0 8px rgba(139, 92, 246, calc(var(--glow) * .8));
+  }
+
+  /* Anything that is a measurement. */
+  .mono, .num, .val, .ver, kbd, code,
+  .row .v, .diff .val, .meter .lbl b {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------------------------------------------------------------------
+     The module: what a panel is now.
+
+     Notched top-left and bottom-right -- diagonally opposite rather than all
+     four, because four cut corners reads as a sticker and two reads as a
+     part that was machined to fit something. The brackets go on the other
+     two, so every corner is doing one job or the other.
+     --------------------------------------------------------------------- */
+
+  .panel, .card, .editor {
+    position: relative;
+    border-radius: 0;
+    clip-path: polygon(
+      var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)),
+      calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+    border: 1px solid var(--hud-line);
+    background:
+      linear-gradient(180deg,
+        rgba(var(--lift), .045) 0%,
+        rgba(var(--lift), .012) 40%,
+        transparent 100%),
+      var(--panel);
+    padding: var(--s4);
+  }
+
+  /* The corner brackets. Drawn with two borders on an empty box rather than
+     an SVG, so they inherit the accent colour and cost nothing to theme. */
+  .panel::before, .editor::before {
+    content: ""; position: absolute; pointer-events: none;
+    top: -1px; right: -1px; width: 14px; height: 14px;
+    border-top: 2px solid var(--hud-bracket);
+    border-right: 2px solid var(--hud-bracket);
+    opacity: .55;
+  }
+  .panel::after, .editor::after {
+    content: ""; position: absolute; pointer-events: none;
+    bottom: -1px; left: -1px; width: 14px; height: 14px;
+    border-bottom: 2px solid var(--hud-bracket);
+    border-left: 2px solid var(--hud-bracket);
+    opacity: .55;
+  }
+
+  /* A panel that is reporting something live earns a brighter frame. This is
+     the thing the old design could not do: every panel looked identical
+     whether it was idle or carrying a running game. */
+  .panel.is-live { border-color: rgba(53, 208, 127, .42); }
+  .panel.is-live::before, .panel.is-live::after { border-color: var(--good); opacity: .9; }
+  .panel.is-warn { border-color: rgba(255, 180, 58, .42); }
+  .panel.is-warn::before, .panel.is-warn::after { border-color: var(--warn); opacity: .9; }
+
+  /* ---------------------------------------------------------------------
+     Settings, with an icon each.
+
+     Twenty-two checkboxes that differ only in their sentence is a list
+     nobody scans -- you read it top to bottom, every time, because there is
+     no landmark to aim at. An icon per row turns reading into recognising.
+
+     The row is a three-part grid: mark, icon, label. The control sits in the
+     mark column so every switch in the window lines up down a single axis,
+     which is the other half of why the old list was hard to use.
+     --------------------------------------------------------------------- */
+
+  label.opt {
+    display: grid;
+    grid-template-columns: 18px 1fr;
+    align-items: center;
+    gap: var(--s3);
+    padding: var(--s2) var(--s3);
+    margin: 1px 0;
+    cursor: pointer;
+    position: relative;
+    border-left: 2px solid transparent;
+    transition: background .14s ease, border-color .14s ease;
+  }
+  /* The heading's icon, in the accent, sitting after the tick. */
+  .panel > h2 .hi {
+    flex: none; width: 15px; height: 15px;
+    fill: none; stroke: var(--accent); stroke-width: 1.7;
+    stroke-linecap: round; stroke-linejoin: round;
+    opacity: .9;
+  }
+
+  /* The icon column only exists on rows that have an icon. Rows that do not
+     keep the two-column form, or their label is squeezed into the box column. */
+  label.opt:has(.si) { grid-template-columns: 18px 22px 1fr; }
+
+  label.opt:hover {
+    background: rgba(var(--lift), .045);
+    border-left-color: var(--accent);
+  }
+  label.opt:has(input:checked) { border-left-color: var(--accent); }
+  label.opt:has(input:focus-visible) {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+
+  /* The icon itself. Dim until the setting is on, which gives the list a
+     shape you can read at a glance: the lit icons are what this run will
+     do. */
+  label.opt .si {
+    grid-column: 2;
+    display: grid; place-items: center;
+    width: 22px; height: 22px;
+    color: var(--muted);
+    transition: color .14s ease;
+  }
+  label.opt .si svg {
+    width: 18px; height: 18px; display: block;
+    fill: none; stroke: currentColor; stroke-width: 1.6;
+    stroke-linecap: round; stroke-linejoin: round;
+  }
+  label.opt:hover .si { color: var(--ink); }
+  label.opt:has(input:checked) .si {
+    color: var(--accent);
+    /* no glow: an instrument lights its active state, it does not shine */
+  }
+
+  /* The checkbox, rebuilt. The native one cannot be notched and cannot carry
+     a glow, and on a light theme it was drawing its own blue. */
+  label.opt input[type=checkbox] {
+    grid-column: 1;
+    appearance: none; -webkit-appearance: none;
+    margin: 0; width: 18px; height: 18px;
+    border: 1px solid var(--hud-line);
+    background: rgba(0, 0, 0, .28);
+    clip-path: polygon(4px 0, 100% 0, 100% calc(100% - 4px),
+                       calc(100% - 4px) 100%, 0 100%, 0 4px);
+    display: grid; place-items: center;
+    cursor: pointer;
+    transition: background .14s ease, border-color .14s ease;
+  }
+  label.opt input[type=checkbox]::after {
+    content: ""; width: 8px; height: 8px;
+    background: var(--accent);
+    clip-path: polygon(2px 0, 100% 0, 100% calc(100% - 2px),
+                       calc(100% - 2px) 100%, 0 100%, 0 2px);
+    transform: scale(0); transition: transform .14s cubic-bezier(.3, 1.4, .5, 1);
+  }
+  label.opt input[type=checkbox]:checked {
+    border-color: var(--accent);
+    background: rgba(139, 92, 246, .14);
+  }
+  label.opt input[type=checkbox]:checked::after { transform: scale(1); }
+  label.opt input[type=checkbox]:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+
+  /* ---------------------------------------------------------------------
+     Buttons.
+     --------------------------------------------------------------------- */
+
+  .btn {
+    border-radius: 0;
+    clip-path: polygon(var(--cut-sm) 0, 100% 0, 100% calc(100% - var(--cut-sm)),
+                       calc(100% - var(--cut-sm)) 100%, 0 100%, 0 var(--cut-sm));
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    font-size: 11px;
+    font-weight: 600;
+    border: 1px solid var(--hud-line);
+    transition: background .14s ease, border-color .14s ease, color .14s ease;
+  }
+  .btn:hover:not(:disabled) { border-color: var(--accent); }
+  .btn.primary {
+    border-color: transparent;
+    box-shadow: inset 0 0 0 1px rgba(139, 92, 246, .55);
+  }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ---------------------------------------------------------------------
+     The rail.
+
+     It was a list of words with icons beside them. It is now an instrument
+     selector: the live item carries a lit bar on its leading edge and its
+     icon takes the accent, so "where am I" is answerable from the corner of
+     your eye rather than by reading.
+     --------------------------------------------------------------------- */
+
+  .rail { border-right: 1px solid var(--hud-line); }
+
+  .brand {
+    font-family: var(--display);
+    text-transform: uppercase;
+    letter-spacing: .14em;
+  }
+
+  .tabs .tab, .rail .tab {
+    border-radius: 0;
+    position: relative;
+    text-transform: uppercase;
+    letter-spacing: .09em;
+    font-size: 11.5px;
+    border-left: 2px solid transparent;
+    transition: background .14s ease, color .14s ease, border-color .14s ease;
+  }
+  .rail .tab[aria-selected="true"] {
+    border-left-color: var(--accent);
+    background: linear-gradient(90deg, rgba(139, 92, 246, .16), transparent 70%);
+  }
+  .rail .tab[aria-selected="true"] .ic {
+    color: var(--accent);
+    /* active state carried by colour and the leading bar alone */
+  }
+  .rail .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+  /* ---------------------------------------------------------------------
+     The segmented control inside Settings.
+     --------------------------------------------------------------------- */
+
+  .seg-item {
+    border-radius: 0;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    font-size: 10.5px;
+    clip-path: polygon(var(--cut-sm) 0, 100% 0, 100% calc(100% - var(--cut-sm)),
+                       calc(100% - var(--cut-sm)) 100%, 0 100%, 0 var(--cut-sm));
+  }
+
+  /* ---------------------------------------------------------------------
+     Inputs.
+     --------------------------------------------------------------------- */
+
+  input[type=number], input[type=text], select, textarea {
+    border-radius: 0;
+    border-color: var(--hud-line);
+    clip-path: polygon(var(--cut-sm) 0, 100% 0, 100% calc(100% - var(--cut-sm)),
+                       calc(100% - var(--cut-sm)) 100%, 0 100%, 0 var(--cut-sm));
+  }
+  /* A number field has to hold its value and its spin buttons. Narrower
+     fields elsewhere in the file set a width that clipped three digits. */
+  input[type=number] { min-width: 78px; }
+
+  input:focus-visible, select:focus-visible, textarea:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 1px;
+  }
+
+  /* ---------------------------------------------------------------------
+     Chips, badges and the status strip.
+     --------------------------------------------------------------------- */
+
+  .chip, .pill, .badge {
+    border-radius: 0;
+    clip-path: polygon(4px 0, 100% 0, 100% calc(100% - 4px),
+                       calc(100% - 4px) 100%, 0 100%, 0 4px);
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .04em;
+  }
+
+  /* A state light. Three states, and the colour is never the only signal --
+     it also pulses when live, which is what you notice peripherally. */
+  .led {
+    display: inline-block; width: 7px; height: 7px; flex: none;
+    background: var(--muted);
+    clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+  }
+  .led.on { background: var(--good); box-shadow: 0 0 8px var(--good); animation: led-pulse 2.4s ease-in-out infinite; }
+  .led.warn { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
+  .led.off { background: var(--bad); box-shadow: 0 0 8px var(--bad); }
+
+  @keyframes led-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+
+  /* ---------------------------------------------------------------------
+     Texture.
+
+     A faint diagonal hatch on the stage, and a grid behind the panels. Both
+     are nearly invisible on their own; together they are the difference
+     between a flat fill and a surface. Kept under .03 alpha so they never
+     compete with text -- the accessibility risk in a HUD is always that the
+     decoration wins.
+     --------------------------------------------------------------------- */
+
+  .stage::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+    background-image:
+      linear-gradient(rgba(var(--lift), .022) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(var(--lift), .022) 1px, transparent 1px);
+    background-size: 44px 44px;
+    mask-image: radial-gradient(120% 90% at 50% 0%, #000 20%, transparent 78%);
+  }
+
+  /* Hazard stripes, for anything destructive. Used sparingly: it is the one
+     piece of decoration here that is allowed to shout. */
+  .hazard {
+    background-image: repeating-linear-gradient(
+      -45deg,
+      rgba(255, 84, 104, .16) 0 8px,
+      transparent 8px 16px);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .led.on { animation: none; }
+    * { transition-duration: .01ms !important; }
+  }
 </style>
 </head>
 <body>
+<!-- One icon per setting. Stroke icons on a 24 grid, drawn in currentColor so
+     a row's icon takes the colour of its state rather than its own. Referenced
+     by name from OPT_ICONS below -- add an icon here and there, nowhere else. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-picture" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><circle cx="8.5" cy="9" r="1.5"/><path d="M3 16l5-4 4 3 3-2 6 5"/></symbol>
+    <symbol id="i-window" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9h18"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 13h6M9 17h6"/></symbol>
+    <symbol id="i-terminal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M12 15h5"/></symbol>
+    <symbol id="i-code" viewBox="0 0 24 24"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 5l-3 14"/></symbol>
+    <symbol id="i-expand" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+    <symbol id="i-branch" viewBox="0 0 24 24"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="7" r="2"/><path d="M6 7v10M18 9a6 6 0 01-6 6H8"/></symbol>
+    <symbol id="i-text" viewBox="0 0 24 24"><path d="M4 6h16M12 6v13M8 19h8"/></symbol>
+    <symbol id="i-speaker" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 8.5a5 5 0 010 7M18.5 6a8.5 8.5 0 010 12"/></symbol>
+    <symbol id="i-device" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/></symbol>
+    <symbol id="i-gamepad" viewBox="0 0 24 24"><path d="M7 8h10a4 4 0 014 4v2a3 3 0 01-5.5 1.6L14 15h-4l-1.5 1.6A3 3 0 013 14v-2a4 4 0 014-4z"/><path d="M8 11v3M6.5 12.5h3"/></symbol>
+    <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></symbol>
+    <symbol id="i-mouse" viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18" rx="6"/><path d="M12 3v7"/></symbol>
+    <symbol id="i-crosshair" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="1.5"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z"/></symbol>
+    <symbol id="i-gpu" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="10" rx="1.5"/><rect x="6" y="10" width="6" height="4" rx="1"/><path d="M8 4v3M16 4v3M8 17v3M16 17v3"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2.5h8a2 2 0 012 2V18a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></symbol>
+    <symbol id="i-gauge" viewBox="0 0 24 24"><path d="M4 16a8 8 0 1116 0"/><path d="M12 16l4-5"/></symbol>
+    <symbol id="i-layout" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 10h18M9 10v10"/></symbol>
+    <symbol id="i-toggle" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="10" rx="5"/><circle cx="16" cy="12" r="3"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></symbol>
+    <symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 00-5.4 5.4L4 17v3h3l5.3-5.3a4 4 0 005.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h10M18 18h2"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="16" cy="18" r="2"/></symbol>
+  </defs>
+</svg>
+
 <div id="mode-glow"></div>
 
 <!-- Everything that changed, wherever it changed, in one window over
@@ -6742,7 +7182,9 @@ function moveSegThumb(which) {
   thumb.style.width = Math.round(here.width) + "px";
   // The track takes the live category's colour, so the thumb changes hue as
   // it travels rather than staying one colour across four categories.
-  bar.dataset.live = live.dataset.sub || "";
+  // Named data-current, not data-live: the click handler treats data-live as
+  // "choose this demo", and a sub-tab click must never be read as that.
+  bar.dataset.current = live.dataset.sub || "";
   bar.classList.add("measured");
 }
 
@@ -12720,6 +13162,103 @@ $("rescan").addEventListener("click", () => scan(true));
       pollTimer = setInterval(pollLaunch, 1000);
     }
   } catch (e) { /* no launch to reattach to */ }
+})();
+</script>
+<script>
+/* Every setting row gets an icon that names what it changes.
+
+   Matched by the control's id or, for the CS2 convars, by the convar's name,
+   so rows built at runtime are covered the same as the ones written out. A
+   row that matches nothing gets the generic sliders icon -- visibly a
+   setting, never a blank gap. The observer runs the same pass on anything
+   drawn later, so a re-rendered panel does not lose its icons. */
+(function () {
+  var BY_ID = {
+    "w-video": "picture", "p-video": "window", "w-cfg": "file",
+    "w-launch": "terminal", "w-autoexec": "code", "w-scaling": "expand",
+    "cfg-family": "branch", "cfg-wording": "text", "audio-enforce": "speaker",
+    "fix-all-devices": "device", "fix-steam-play": "gamepad",
+    "xhair-hide": "crosshair", "xhair-launch": "play", "wg-auto": "gpu",
+    "setup-take-settings": "layers", "setup-take-files": "folder"
+  };
+  var BY_KB = { board: "keyboard", mouse: "mouse" };
+
+  /* Each panel's heading names the panel with an icon of its own. This is the
+     part that reaches the controls that are not checkboxes -- the dropdowns,
+     the number fields, the theme picks -- which a row icon cannot. Matched on
+     the heading's text, so a panel renamed here is renamed in one place. */
+  var BY_HEADING = {
+    "Account": "user", "Setups": "layers", "Machine": "device", "Write": "file",
+    "Written": "file", "Start a config": "play", "Carry this setup": "layers",
+    "Configuration studio": "branch", "Common settings": "sliders",
+    "Script & alias editor": "code", "Scripts": "code", "Session history": "gauge",
+    "Look": "window", "Sound devices": "speaker", "Graphics": "gpu",
+    "Picture quality": "picture", "Optimise for": "gauge", "Match demos": "play",
+    "Keyboard": "keyboard", "Fix It": "wrench", "Files": "folder",
+    "Detected": "layers", "System": "device", "Connection": "gauge",
+    "Steam launch options": "terminal", "Worth knowing": "text", "Settings": "sliders"
+  };
+
+  /* Convar names, by what they govern. First match wins. */
+  var BY_CONVAR = [
+    [/crosshair|xhair/, "crosshair"],
+    [/snd|sound|volume|audio/, "speaker"],
+    [/^m_|mouse|sensitiv|raw/, "mouse"],
+    [/fps|rate|cmd|latency/, "gauge"],
+    [/hud|radar|scoreboard|panel/, "layout"],
+    [/^cl_|^r_|video|shadow|texture|msaa/, "picture"],
+    [/^bind|key/, "keyboard"]
+  ];
+
+  function iconFor(input) {
+    if (input.id && BY_ID[input.id]) return BY_ID[input.id];
+    if (input.dataset.kbshow) return BY_KB[input.dataset.kbshow] || "sliders";
+    var key = input.dataset.key || "";
+    for (var i = 0; i < BY_CONVAR.length; i++) {
+      if (BY_CONVAR[i][0].test(key)) return BY_CONVAR[i][1];
+    }
+    return key ? "toggle" : "sliders";
+  }
+
+  function decorateHeadings(root) {
+    (root || document).querySelectorAll(".panel > h2").forEach(function (h) {
+      if (h.querySelector(":scope > .hi")) return;
+      var name = BY_HEADING[h.textContent.trim()] || "sliders";
+      var mark = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      mark.setAttribute("class", "hi");
+      mark.setAttribute("viewBox", "0 0 24 24");
+      mark.setAttribute("aria-hidden", "true");
+      mark.innerHTML = '<use href="#i-' + name + '"/>';
+      h.insertBefore(mark, h.firstChild);
+    });
+  }
+
+  function decorate(root) {
+    decorateHeadings(root);
+    (root || document).querySelectorAll("label.opt").forEach(function (row) {
+      var input = row.querySelector('input[type="checkbox"]');
+      if (!input || row.querySelector(":scope > .si")) return;
+      var mark = document.createElement("span");
+      mark.className = "si";
+      mark.setAttribute("aria-hidden", "true");
+      mark.innerHTML = '<svg viewBox="0 0 24 24"><use href="#i-' + iconFor(input) + '"/></svg>';
+      input.insertAdjacentElement("afterend", mark);
+    });
+  }
+
+  var queued = false;
+  function queue() {
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(function () { queued = false; decorate(document); });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function () { decorate(document); });
+  } else {
+    decorate(document);
+  }
+  new MutationObserver(queue).observe(document.body, { childList: true, subtree: true });
 })();
 </script>
 </body>
