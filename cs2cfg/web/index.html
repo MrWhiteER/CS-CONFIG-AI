@@ -894,6 +894,29 @@
                 0 0 18px color-mix(in srgb, var(--neon-cyan) 22%, transparent);
     color: var(--neon-cyan);
   }
+  /* FACEIT's own badge, built the same way Crosshair X's is -- a mark this
+     application drew, in the colour the real service uses, never its logo. */
+  .fc-mark {
+    flex: none; width: 48px; height: 48px; border-radius: 14px;
+    display: grid; place-items: center;
+    background:
+      radial-gradient(120% 120% at 30% 20%,
+        color-mix(in srgb, #ff5500 26%, transparent), transparent 62%),
+      linear-gradient(160deg, #2a1608, #150a04);
+    border: 1px solid color-mix(in srgb, #ff5500 40%, transparent);
+    box-shadow: inset 0 1px 0 rgba(var(--lift), .06),
+                0 0 18px color-mix(in srgb, #ff5500 22%, transparent);
+    color: #ff5500;
+  }
+  .fc-mark svg {
+    width: 26px; height: 26px; fill: none; stroke: currentColor;
+    stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .fc-word { color: #ff5500; }
+  .hero-copy h2:has(.fc-word) {
+    display: flex; align-items: center; gap: 13px;
+  }
+
   .xh-mark svg {
     width: 26px; height: 26px; fill: none; stroke: currentColor;
     stroke-width: 1.7; stroke-linecap: round;
@@ -2801,6 +2824,7 @@
      would say nothing. */
   .tabs .tab { --sec: #7f93ad; }
   .tabs .tab[data-tab="launcher"] { --sec: #17e3a1; }
+  .tabs .tab[data-tab="faceit"]   { --sec: #ff5500; }
   .tabs .tab[data-tab="cs2"]      { --sec: #4d94ff; }
   .tabs .tab[data-tab="keyboard"] { --sec: #a970ff; }
   .tabs .tab[data-tab="scripts"]  { --sec: #ff2d95; }
@@ -4730,6 +4754,11 @@
     <div class="tabs" role="tablist">
       <button class="tab" data-tab="launcher" role="tab" aria-selected="true">
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg></i><span class="tx">Launcher</span></button>
+      <!-- A trophy, not FACEIT's own mark -- drawn the same way Crosshair X's
+           icon was: the shape the category obviously uses, never the logo
+           that belongs to the service itself. -->
+      <button class="tab" data-tab="faceit" role="tab" aria-selected="false">
+        <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v4a5 5 0 01-10 0V4z"/><path d="M7 5H4.5a1 1 0 00-1 1v1a4 4 0 004 4M17 5h2.5a1 1 0 011 1v1a4 4 0 01-4 4"/><path d="M12 13v3.5"/><path d="M8.5 20h7M9 20v-1.3a1 1 0 011-1h4a1 1 0 011 1V20"/></svg></i><span class="tx">FACEIT</span></button>
       <button class="tab" data-tab="cs2" role="tab" aria-selected="false">
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.3"/><circle cx="10" cy="17" r="2.3"/></svg></i><span class="tx">CS2 Settings</span></button>
       <button class="tab" data-tab="keyboard" role="tab" aria-selected="false">
@@ -4873,32 +4902,6 @@
 
       </section>
 
-      <!-- Match demos. In the launcher rather than a tab of its own: the
-           whole point is that watching one is part of starting the game. -->
-      <section class="panel" id="demo-card">
-        <h2>Match demos</h2>
-        <p class="sub" style="margin:0 0 12px">
-          Your recent matches are below. Open one for the full scoreboard, get its
-          demo, and <b>Watch</b> starts CS2 with the demo playing on its own &mdash;
-          no console, no filenames. You can also paste any match link.
-        </p>
-        <div class="demo-get">
-          <input id="demo-link" type="text" spellcheck="false"
-                 placeholder="https://www.faceit.com/en/cs2/room/1-&hellip;">
-          <button class="btn" id="demo-fetch">Get demo</button>
-        </div>
-        <div id="demo-note"></div>
-        <!-- The followed account and its recent matches. Filled by loadFaceit;
-             hidden entirely until an account is linked. -->
-        <div id="fc-wrap"></div>
-        <div class="demo-prog hidden" id="demo-prog">
-          <div class="demo-bar"><i id="demo-bar-fill"></i></div>
-          <span class="sub2" id="demo-prog-say">starting&hellip;</span>
-          <button class="btn small" id="demo-cancel">Cancel</button>
-        </div>
-        <div id="demo-list"></div>
-      </section>
-
       <!-- Only while something is launching. The mode that used to head this
            card now sits beside the Play button, which left nothing here worth
            showing to somebody who is not mid-launch. -->
@@ -4964,6 +4967,57 @@
 
 
 
+    </div>
+
+    <!-- FACEIT, pulled out of the Launcher into a tab of its own: a page
+         you check between matches as much as one you pass through on the
+         way to playing. The badge below is drawn by this application --
+         a trophy, not FACEIT's own mark -- the same rule the Crosshair X
+         card follows: the shape the category obviously uses, never a logo
+         that belongs to someone else. -->
+    <div class="tab-panel hidden" data-panel="faceit">
+      <div class="hero">
+        <div class="hero-copy">
+          <div class="eyebrow">Matches &amp; demos</div>
+          <h2>
+            <span class="fc-mark"><svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7 4h10v4a5 5 0 01-10 0V4z"/>
+              <path d="M7 5H4.5a1 1 0 00-1 1v1a4 4 0 004 4M17 5h2.5a1 1 0 011 1v1a4 4 0 01-4 4"/>
+              <path d="M12 13v3.5"/><path d="M8.5 20h7M9 20v-1.3a1 1 0 011-1h4a1 1 0 011 1V20"/>
+            </svg></span>
+            <span class="fc-word">FACEIT</span>
+          </h2>
+          <p>
+            Follow your account and your recent matches turn up here on their own, with
+            stats and a one-click demo &mdash; or paste any match link below. <b>Watch</b>
+            starts CS2 with the demo already playing, no console, no filenames.
+          </p>
+        </div>
+      </div>
+
+      <section class="panel" id="demo-card">
+        <h2>Match demos</h2>
+        <p class="sub" style="margin:0 0 12px">
+          Your recent matches are below. Open one for the full scoreboard, get its
+          demo, and <b>Watch</b> starts CS2 with the demo playing on its own &mdash;
+          no console, no filenames. You can also paste any match link.
+        </p>
+        <div class="demo-get">
+          <input id="demo-link" type="text" spellcheck="false"
+                 placeholder="https://www.faceit.com/en/cs2/room/1-&hellip;">
+          <button class="btn" id="demo-fetch">Get demo</button>
+        </div>
+        <div id="demo-note"></div>
+        <!-- The followed account and its recent matches. Filled by loadFaceit;
+             hidden entirely until an account is linked. -->
+        <div id="fc-wrap"></div>
+        <div class="demo-prog hidden" id="demo-prog">
+          <div class="demo-bar"><i id="demo-bar-fill"></i></div>
+          <span class="sub2" id="demo-prog-say">starting&hellip;</span>
+          <button class="btn small" id="demo-cancel">Cancel</button>
+        </div>
+        <div id="demo-list"></div>
+      </section>
     </div>
 
     <div class="tab-panel hidden" data-panel="cs2">
@@ -9741,9 +9795,9 @@ async function loadFaceit(opts) {
 function startFaceitWatch() {
   if (fcTimer) return;
   fcTimer = setInterval(() => {
-    // Only while the launcher is actually on screen. Polling a tab nobody is
-    // looking at is just someone else's bandwidth.
-    const pane = document.querySelector('.tab-panel[data-panel="launcher"]');
+    // Only while the FACEIT tab is actually on screen. Polling a tab nobody
+    // is looking at is just someone else's bandwidth.
+    const pane = document.querySelector('.tab-panel[data-panel="faceit"]');
     if (pane && !pane.classList.contains("hidden")) loadFaceit();
   }, 60000);
 }
@@ -12555,7 +12609,7 @@ function setTab(name) {
   if (name === "cs2" && !cs2Data) loadCs2Settings();
   if (name === "gpu" && !gpuData) loadGpu();
   if (name === "files") loadTree(false);
-  if (name === "launcher") loadDemos().then(loadFaceit);
+  if (name === "faceit") loadDemos().then(loadFaceit);
   if (name === "scripts") loadPlugins(false);
   if (name === "keyboard") loadKeyboard(false);
   if (name === "fix") loadFixes(false);
