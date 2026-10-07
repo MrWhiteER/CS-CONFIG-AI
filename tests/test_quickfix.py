@@ -12,6 +12,7 @@ Nothing here touches a real device. Every privileged call is stubbed.
 from __future__ import annotations
 
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -224,6 +225,110 @@ class Plumbing(unittest.TestCase):
             result = quickfix._fix_restart_gpu()
         self.assertFalse(result["ok"])
         self.assertIn("administrator", result["error"])
+
+
+class PowerPlan(unittest.TestCase):
+    """Found live: powercfg refusing was read as "did not switch" rather
+    than as a refusal, because only stdout was ever kept. A plan that ran,
+    exited non-zero and said why on stderr looked identical to one that
+    quietly did nothing."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        patch = mock.patch.object(quickfix, "_power_record_path",
+                                  return_value=Path(self.tmp.name) / "power.json")
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    def _proc(self, returncode=0, stdout="", stderr=""):
+        return mock.Mock(returncode=returncode, stdout=stdout, stderr=stderr)
+
+    def test_powercfg_reports_failure_rather_than_assuming_success(self):
+        with mock.patch.object(quickfix.subprocess, "run",
+                               return_value=self._proc(1, "", "Access is denied.")):
+            result = quickfix._powercfg(["/setactive", "SCHEME_MIN"])
+        self.assertFalse(result["ok"])
+        self.assertIn("Access is denied", result["error"])
+
+    def test_a_missing_powercfg_is_a_failure_not_an_empty_string(self):
+        with mock.patch.object(quickfix.subprocess, "run",
+                               side_effect=OSError("not found")):
+            result = quickfix._powercfg(["/getactivescheme"])
+        self.assertFalse(result["ok"])
+
+    def test_setactive_does_not_escalate_when_the_plain_call_works(self):
+        with mock.patch.object(quickfix.subprocess, "run",
+                               return_value=self._proc(0, "ok")), \
+             mock.patch.object(quickfix, "_run_elevated",
+                               side_effect=AssertionError("should not have run")):
+            result = quickfix._powercfg_setactive("SCHEME_MIN")
+        self.assertTrue(result["ok"])
+
+    def test_a_refusal_is_retried_elevated(self):
+        with mock.patch.object(quickfix.subprocess, "run",
+                               return_value=self._proc(1, "", "Access is denied.")), \
+             mock.patch.object(quickfix, "_run_elevated",
+                               return_value={"ok": True}) as elevated:
+            result = quickfix._powercfg_setactive("SCHEME_MIN")
+        self.assertTrue(result["ok"])
+        elevated.assert_called_once()
+
+    def test_the_real_reason_survives_an_elevated_failure(self):
+        """The wrapper that runs an elevated script reports a caught
+        exception under "detail", not "error" -- this is the case that was
+        read as "Windows did not switch the power plan" with nothing to go
+        on."""
+        with mock.patch.object(quickfix.subprocess, "run",
+                               return_value=self._proc(1, "", "")), \
+             mock.patch.object(quickfix, "_run_elevated",
+                               return_value={"ok": False,
+                                            "detail": "powercfg exited with code 5"}):
+            result = quickfix._powercfg_setactive("SCHEME_MIN")
+        self.assertFalse(result["ok"])
+        self.assertIn("exited with code 5", result["error"])
+
+    def test_a_declined_prompt_is_reported_as_declined(self):
+        with mock.patch.object(quickfix.subprocess, "run",
+                               return_value=self._proc(1, "", "denied")), \
+             mock.patch.object(quickfix, "_run_elevated",
+                               return_value={"ok": False, "declined": True,
+                                            "error": "the administrator prompt was declined"}):
+            result = quickfix._powercfg_setactive("SCHEME_MIN")
+        self.assertTrue(result.get("declined"))
+
+    def test_switching_raises_with_the_real_message_rather_than_a_generic_one(self):
+        with mock.patch.object(quickfix, "_active_scheme_guid", return_value="guid-a"), \
+             mock.patch.object(quickfix, "_powercfg_setactive",
+                               return_value={"ok": False,
+                                            "error": "Access is denied."}):
+            with self.assertRaises(quickfix.FixError) as caught:
+                quickfix._fix_toggle_power({})
+        self.assertIn("Access is denied", str(caught.exception))
+
+    def test_switching_successfully_remembers_what_to_restore(self):
+        guids = iter(["before-guid", "after-guid"])
+        with mock.patch.object(quickfix, "_active_scheme_guid",
+                               side_effect=lambda: next(guids)), \
+             mock.patch.object(quickfix, "_powercfg_setactive",
+                               return_value={"ok": True}):
+            result = quickfix._fix_toggle_power({})
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["boosted"])
+        record = quickfix._power_record_path()
+        self.assertTrue(record.is_file())
+
+    def test_putting_it_back_also_surfaces_a_real_refusal(self):
+        quickfix._power_record_path().write_text(
+            '{"before": "before-guid", "changed_to": "after-guid", "active": true}',
+            encoding="utf-8")
+        with mock.patch.object(quickfix, "_active_scheme_guid", return_value="after-guid"), \
+             mock.patch.object(quickfix, "_powercfg_setactive",
+                               return_value={"ok": False,
+                                            "error": "Access is denied."}):
+            with self.assertRaises(quickfix.FixError) as caught:
+                quickfix._fix_toggle_power({})
+        self.assertIn("Access is denied", str(caught.exception))
 
 
 if __name__ == "__main__":

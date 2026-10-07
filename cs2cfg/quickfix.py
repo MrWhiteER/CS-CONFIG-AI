@@ -1030,21 +1030,33 @@ def _power_record_path() -> Path:
     return user_data_dir() / POWER_RECORD
 
 
-def _powercfg(args: List[str], timeout: int = 20) -> str:
+def _powercfg(args: List[str], timeout: int = 20) -> Dict[str, Any]:
+    """Run powercfg and report what actually happened.
+
+    A first version of this kept only stdout and assumed success, which is
+    how a ``/setactive`` that Windows refused -- a policy on a managed
+    machine, a scheme this edition does not offer -- went unnoticed: the
+    command returned instantly, said nothing useful on stdout, and the only
+    sign anything was wrong was the scheme not having changed a few lines
+    later. Keeping the exit code and stderr is what lets a caller tell "did
+    not run" from "ran and changed nothing" from "worked".
+    """
     try:
         done = subprocess.run(["powercfg", *args], capture_output=True, text=True,
                               timeout=timeout,
                               creationflags=_CREATE_NO_WINDOW if sys.platform == "win32" else 0)
-    except (OSError, subprocess.SubprocessError):
-        return ""
-    return (done.stdout or "").strip()
+    except (OSError, subprocess.SubprocessError) as exc:
+        return {"ok": False, "out": "", "error": str(exc)}
+    return {"ok": done.returncode == 0,
+            "out": (done.stdout or "").strip(),
+            "error": (done.stderr or done.stdout or "").strip()}
 
 
 _GUID_RE = re.compile(r"GUID:\s*([0-9a-fA-F-]{36})")
 
 
 def _active_scheme_guid() -> Optional[str]:
-    found = _GUID_RE.search(_powercfg(["/getactivescheme"]))
+    found = _GUID_RE.search(_powercfg(["/getactivescheme"])["out"])
     return found.group(1) if found else None
 
 
@@ -1059,6 +1071,40 @@ def power_status() -> Dict[str, Any]:
     except (OSError, ValueError):
         pass
     return {"supported": guid is not None, "boosted": boosted}
+
+
+def _powercfg_setactive(scheme: str) -> Dict[str, Any]:
+    """Switch the active scheme, trying the ordinary way first.
+
+    Most machines let a standard user switch power plans; a few do not --
+    seen on a real machine, failing in under a second with nothing on
+    stdout, which is exactly what a policy refusal looks like rather than a
+    crash. So a plain refusal is retried elevated before this gives up,
+    rather than reported as the final answer.
+    """
+    plain = _powercfg(["/setactive", scheme])
+    if plain["ok"]:
+        return {"ok": True}
+    elevated = _run_elevated(
+        # Through cmd rather than called directly: PowerShell wraps a native
+        # command's own stderr as an ErrorRecord rather than plain text,
+        # which is how the real reason powercfg refused was getting lost.
+        f'$msg = cmd /c "powercfg /setactive {scheme} 2>&1"\n'
+        "if ($LASTEXITCODE -ne 0) { throw ($msg -join \"`n\") }\n"
+        "$out.ok = $true\n")
+    if elevated.get("ok"):
+        return {"ok": True}
+    # Whichever attempt has something to say. A decline is its own answer and
+    # takes priority over powercfg's own wording, which would otherwise be
+    # the stale message from the plain attempt that was never the real cause.
+    if elevated.get("declined"):
+        return {"ok": False, "declined": True, "error": elevated.get("error")}
+    # error covers a prompt that never ran at all (declined, timed out);
+    # detail covers the powercfg call itself failing inside the elevated
+    # script, which is the case this was written for.
+    return {"ok": False,
+            "error": elevated.get("error") or elevated.get("detail") or
+                     plain.get("error") or "Windows would not switch the power plan"}
 
 
 def _fix_toggle_power(_body: Dict[str, Any]) -> Dict[str, Any]:
@@ -1077,7 +1123,13 @@ def _fix_toggle_power(_body: Dict[str, Any]) -> Dict[str, Any]:
     if record.get("active") and guid == record.get("changed_to"):
         previous = record.get("before")
         if previous:
-            _powercfg(["/setactive", previous])
+            result = _powercfg_setactive(previous)
+            if not result["ok"]:
+                if result.get("declined"):
+                    return {"ok": False, "declined": True,
+                            "error": "the administrator prompt was declined"}
+                raise FixError(result.get("error") or
+                               "Windows would not put the previous plan back")
         try:
             record_path.unlink()
         except OSError:
@@ -1086,10 +1138,22 @@ def _fix_toggle_power(_body: Dict[str, Any]) -> Dict[str, Any]:
                 "detail": "Back on the power plan this machine had before."}
 
     before = guid
-    _powercfg(["/setactive", "SCHEME_MIN"])
+    result = _powercfg_setactive("SCHEME_MIN")
+    if not result["ok"]:
+        if result.get("declined"):
+            return {"ok": False, "declined": True,
+                    "error": "the administrator prompt was declined"}
+        raise FixError(result.get("error") or
+                       "Windows would not switch the power plan")
     after = _active_scheme_guid()
     if after is None or after == before:
-        raise FixError("Windows did not switch the power plan")
+        # powercfg itself said this worked, so the machine simply has no
+        # separate High performance scheme to switch to -- some OEM builds
+        # ship without one. Worth saying plainly rather than as a generic
+        # failure, since there is nothing to retry here.
+        raise FixError("Windows accepted the change but the plan did not "
+                       "move -- this machine may not have a separate High "
+                       "performance scheme to switch to")
     try:
         record_path.parent.mkdir(parents=True, exist_ok=True)
         record_path.write_text(json.dumps(
