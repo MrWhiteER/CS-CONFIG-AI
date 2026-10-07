@@ -909,8 +909,7 @@
     color: #ff5500;
   }
   .fc-mark svg {
-    width: 26px; height: 26px; fill: none; stroke: currentColor;
-    stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+    width: 26px; height: 26px; fill: currentColor; stroke: none;
   }
   .fc-word { color: #ff5500; }
   .hero-copy h2:has(.fc-word) {
@@ -2847,6 +2846,10 @@
   }
   /* The launcher's play mark reads better solid. */
   .tabs .tab[data-tab="launcher"] .ic svg path { fill: currentColor; }
+  /* The monogram is solid blocks, not a stroke icon like the rest of the
+     rail -- a logo-style mark reads better filled, and at 20px a filled F
+     stays legible where a thin outline of the same shape would not. */
+  .tabs .tab[data-tab="faceit"] .ic svg rect { fill: currentColor; stroke: none; }
 
   .tabs .tab:hover .ic, .rail-foot .tab:hover .ic {
     opacity: 1; transform: scale(1.08);
@@ -4754,11 +4757,13 @@
     <div class="tabs" role="tablist">
       <button class="tab" data-tab="launcher" role="tab" aria-selected="true">
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg></i><span class="tx">Launcher</span></button>
-      <!-- A trophy, not FACEIT's own mark -- drawn the same way Crosshair X's
-           icon was: the shape the category obviously uses, never the logo
-           that belongs to the service itself. -->
+      <!-- An "F" this application built out of three rectangles -- not
+           FACEIT's own mark, which is an orange square with a white
+           triangle. A monogram reads as the service without reproducing
+           the logo that belongs to it, the same principle as Crosshair X's
+           icon: drawn here, never borrowed. -->
       <button class="tab" data-tab="faceit" role="tab" aria-selected="false">
-        <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v4a5 5 0 01-10 0V4z"/><path d="M7 5H4.5a1 1 0 00-1 1v1a4 4 0 004 4M17 5h2.5a1 1 0 011 1v1a4 4 0 01-4 4"/><path d="M12 13v3.5"/><path d="M8.5 20h7M9 20v-1.3a1 1 0 011-1h4a1 1 0 011 1V20"/></svg></i><span class="tx">FACEIT</span></button>
+        <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5.5" y="4" width="3" height="16"/><rect x="5.5" y="4" width="12.5" height="3"/><rect x="5.5" y="10.5" width="9.5" height="3"/></svg></i><span class="tx">FACEIT</span></button>
       <button class="tab" data-tab="cs2" role="tab" aria-selected="false">
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.3"/><circle cx="10" cy="17" r="2.3"/></svg></i><span class="tx">CS2 Settings</span></button>
       <button class="tab" data-tab="keyboard" role="tab" aria-selected="false">
@@ -4981,9 +4986,9 @@
           <div class="eyebrow">Matches &amp; demos</div>
           <h2>
             <span class="fc-mark"><svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M7 4h10v4a5 5 0 01-10 0V4z"/>
-              <path d="M7 5H4.5a1 1 0 00-1 1v1a4 4 0 004 4M17 5h2.5a1 1 0 011 1v1a4 4 0 01-4 4"/>
-              <path d="M12 13v3.5"/><path d="M8.5 20h7M9 20v-1.3a1 1 0 011-1h4a1 1 0 011 1V20"/>
+              <rect x="5.5" y="4" width="3" height="16"/>
+              <rect x="5.5" y="4" width="12.5" height="3"/>
+              <rect x="5.5" y="10.5" width="9.5" height="3"/>
             </svg></span>
             <span class="fc-word">FACEIT</span>
           </h2>
