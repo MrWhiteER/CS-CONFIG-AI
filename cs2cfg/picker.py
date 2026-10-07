@@ -190,17 +190,17 @@ def save_file(suggested: str = "", title: str = "Save",
     return _run(script)
 
 
-def pick_file(initial: str = "", title: str = "Choose a configuration file") -> Optional[str]:
-    """The Explorer file picker, filtered to configurations.
+def _pick_file(filter_spec: str, initial: str, title: str) -> Optional[str]:
+    """The shared dialog behind every single-file picker in this module.
 
     OpenFileDialog has been the modern dialog since Vista, so this one needs
-    no help.
+    no help. Only the filter differs between what calls it.
     """
     script = (
         "Add-Type -AssemblyName System.Windows.Forms\n"
         "$d = New-Object System.Windows.Forms.OpenFileDialog\n"
         f"$d.Title = {_literal(title)}\n"
-        f"$d.Filter = {_literal(CONFIG_FILTER)}\n"
+        f"$d.Filter = {_literal(filter_spec)}\n"
         "$d.CheckFileExists = $true\n"
         "$d.Multiselect = $false\n"
         "$d.RestoreDirectory = $true\n"
@@ -219,3 +219,23 @@ def pick_file(initial: str = "", title: str = "Choose a configuration file") -> 
         "$top.Dispose(); $d.Dispose()\n"
     )
     return _run(script)
+
+
+def pick_file(initial: str = "", title: str = "Choose a configuration file") -> Optional[str]:
+    """The Explorer file picker, filtered to configurations."""
+    return _pick_file(CONFIG_FILTER, initial, title)
+
+
+# What a companion is allowed to be. Restricted to .exe rather than offering
+# every file, because the thing being chosen is specifically what this
+# application will later ask Windows to start.
+EXE_FILTER = "Programs (*.exe)|*.exe"
+
+
+def pick_exe(initial: str = "", title: str = "Choose a program") -> Optional[str]:
+    """The Explorer file picker, filtered to programs.
+
+    For adding a companion application: Crosshair X's own install, a clip
+    recorder, anything that runs alongside the game.
+    """
+    return _pick_file(EXE_FILTER, initial, title)

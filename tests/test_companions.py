@@ -15,6 +15,7 @@ and either way somebody's configuration was touched without their say.
 from __future__ import annotations
 
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -140,6 +141,76 @@ class NothingReachesIntoAnotherApp(unittest.TestCase):
 
         cached = companions.icon_path(r"C:\Apps\Medal.exe")
         self.assertTrue(str(cached).startswith(str(paths.user_data_dir())))
+
+
+class AddingAndRemoving(unittest.TestCase):
+    """The part a person touches: picking a program, and changing their mind.
+
+    "Twenty quick tools per companion" is not buildable generically, and the
+    module says so. What is generic, and is tested here, is adding one,
+    removing one, and whether it comes up with the game -- the same three
+    things true of any program at all.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.exe = Path(self.tmp.name) / "Medal.exe"
+        self.exe.write_bytes(b"not a real binary, just has to exist")
+
+    def test_adding_one_returns_it_in_the_list_to_write(self):
+        changes = companions.add({}, str(self.exe))
+        held = changes["companions"]
+        self.assertEqual(len(held), 1)
+        self.assertEqual(held[0]["name"], "Medal")
+        self.assertEqual(held[0]["exe"], str(self.exe))
+        self.assertTrue(held[0]["with_game"])
+
+    def test_a_name_can_be_given_instead_of_the_file_stem(self):
+        changes = companions.add({}, str(self.exe), name="Clip Recorder")
+        self.assertEqual(changes["companions"][0]["name"], "Clip Recorder")
+
+    def test_a_missing_executable_is_refused_before_anything_is_added(self):
+        with self.assertRaises(companions.CompanionError):
+            companions.add({}, str(Path(self.tmp.name) / "not-here.exe"))
+
+    def test_an_empty_choice_is_refused(self):
+        with self.assertRaises(companions.CompanionError):
+            companions.add({}, "")
+
+    def test_the_same_program_cannot_be_added_twice(self):
+        once = companions.add({}, str(self.exe))
+        with self.assertRaises(companions.CompanionError):
+            companions.add(once, str(self.exe))
+
+    def test_there_is_room_for_only_so_many(self):
+        ui: dict = {}
+        for n in range(companions.MAX_COMPANIONS):
+            exe = Path(self.tmp.name) / f"app{n}.exe"
+            exe.write_bytes(b"x")
+            ui = companions.add(ui, str(exe))
+        with self.assertRaises(companions.CompanionError):
+            companions.add(ui, str(self.exe))
+
+    def test_removing_the_one_that_is_there_empties_the_list(self):
+        added = companions.add({}, str(self.exe))
+        removed = companions.remove_one(added, "medal")
+        self.assertEqual(removed["companions"], [])
+
+    def test_removing_one_that_is_not_there_is_an_error_not_a_silent_no_op(self):
+        with self.assertRaises(companions.CompanionError):
+            companions.remove_one({}, "nothing-here")
+
+    def test_with_game_can_be_turned_off_and_on(self):
+        added = companions.add({}, str(self.exe))
+        off = companions.set_with_game(added, "medal", False)
+        self.assertFalse(off["companions"][0]["with_game"])
+        on = companions.set_with_game(off, "medal", True)
+        self.assertTrue(on["companions"][0]["with_game"])
+
+    def test_turning_a_setting_for_a_companion_that_does_not_exist_is_an_error(self):
+        with self.assertRaises(companions.CompanionError):
+            companions.set_with_game({}, "nothing-here", False)
 
 
 class Icons(unittest.TestCase):

@@ -713,6 +713,9 @@ def _save_prefs(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         # also sends them back with everything else when preferences are
         # remembered; unlisted, they would be dropped on the next save.
         "setups", "setup_live",
+        # Same reasoning: companions are added and removed through their own
+        # endpoint, but still echoed back on every save.
+        "companions",
         # Whether Crosshair X draws the crosshair instead of the game. Per
         # account, because it changes what the generated config writes.
         "hide_crosshair", "crosshairx_launch",
@@ -2791,6 +2794,69 @@ def _crosshairx_start(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     return crosshairx.start()
 
 
+def _companions(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Every companion this account has added, and whether each is running."""
+    from . import companions, profiles
+    from .cli import load_prefs
+
+    ui = profiles.ui_for(load_prefs(), _active_account(state))
+    return {"ok": True, "companions": companions.survey(ui)}
+
+
+def _companions_browse(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Open the native picker for a program, to add as a companion."""
+    from . import picker
+
+    chosen = picker.pick_exe()
+    if not chosen:
+        return {"ok": True, "cancelled": True, "path": None}
+    return {"ok": True, "cancelled": False, "path": chosen}
+
+
+def _companions_act(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Add, remove, or flip whether one starts with the game."""
+    from . import companions, profiles
+    from .cli import load_prefs, save_prefs
+
+    account = _active_account(state)
+    prefs = load_prefs()
+    ui = profiles.ui_for(prefs, account)
+
+    what = str(body.get("do") or "").strip()
+    try:
+        if what == "add":
+            changes = companions.add(
+                ui, str(body.get("exe") or ""), str(body.get("name") or ""),
+                str(body.get("args") or ""), bool(body.get("with_game", True)))
+        elif what == "remove":
+            changes = companions.remove_one(ui, str(body.get("id") or ""))
+        elif what == "with_game":
+            changes = companions.set_with_game(
+                ui, str(body.get("id") or ""), bool(body.get("value")))
+        else:
+            return {"ok": False, "error": f"no such action: {what or '(none)'}"}
+    except companions.CompanionError as exc:
+        return {"ok": False, "error": str(exc)}
+
+    profiles.remember(prefs, account, changes)
+    save_prefs(prefs)
+    fresh = profiles.ui_for(prefs, account)
+    return {"ok": True, "companions": companions.survey(fresh)}
+
+
+def _companions_start(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Start one companion, by the id its tile was drawn with."""
+    from . import companions, profiles
+    from .cli import load_prefs
+
+    ui = profiles.ui_for(load_prefs(), _active_account(state))
+    wanted = str(body.get("id") or "")
+    found = next((c for c in companions.listed(ui) if c["id"] == wanted), None)
+    if found is None:
+        return {"ok": False, "error": "that companion was not found"}
+    return companions.start(found)
+
+
 def _win_graphics(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     """What Windows currently has for CS2. Reads only."""
     from . import wingraphics
@@ -3270,6 +3336,10 @@ def make_handler(state: State):
         "/api/wingraphics/apply": _win_graphics_apply,
         "/api/crosshairx": _crosshairx,
         "/api/crosshairx/start": _crosshairx_start,
+        "/api/companions": _companions,
+        "/api/companions/browse": _companions_browse,
+        "/api/companions/act": _companions_act,
+        "/api/companions/start": _companions_start,
         "/api/setups": _setups,
         "/api/setups/act": _setups_act,
         "/api/setup/export": _setup_export,
@@ -3362,6 +3432,31 @@ def make_handler(state: State):
                 self.send_header("Content-Length", str(len(data)))
                 # Steam replaces the file when the picture changes, so let the
                 # browser keep it for a session but not beyond one.
+                self.send_header("Cache-Control", "no-cache")
+                self.end_headers()
+                self.wfile.write(data)
+                return
+            if path.startswith("/companion-icon/"):
+                # A companion's own icon, pulled out of its executable and
+                # cached. Matched against this account's own companions
+                # rather than trusted from the path, the same reasoning as
+                # the avatar route above: nothing outside the cache this
+                # application built for itself can be asked for.
+                from . import companions, profiles
+                from .cli import load_prefs
+
+                wanted = path[len("/companion-icon/"):].removesuffix(".png")
+                ui = profiles.ui_for(load_prefs(), _active_account(state))
+                match = next((c for c in companions.listed(ui)
+                             if c["id"] == wanted), None)
+                icon = companions.extract_icon(match["exe"]) if match else None
+                if icon is None:
+                    self._send_json({"error": "no icon"}, 404)
+                    return
+                data = icon.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "image/png")
+                self.send_header("Content-Length", str(len(data)))
                 self.send_header("Cache-Control", "no-cache")
                 self.end_headers()
                 self.wfile.write(data)

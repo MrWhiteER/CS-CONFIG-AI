@@ -12,25 +12,12 @@
      numbers set in a monospace face so columns line up and digits do not
      shift width as they change. */
   :root {
-    /* Superseded by the :root further down, which is the one that actually
-       paints the app. Left as it was so the two do not disagree on screen
-       while looking as though they agree in the file. */
-    --bg:        #070b11;
-    --bg-2:      #0b1018;
-    --panel:     #0e141d;
-    --panel-2:   #121a25;
-    --line:      #1c2734;
-    --line-soft: #16202b;
-    --ink:       #dbe6f0;
-    --muted:     #6b7f93;
-    --accent:      #17e3a1;
-    --accent-deep: #0d9b6e;
-    --accent-dim:  #0f3d31;
-    --good:      #17e3a1;
-    --warn:      #f2b544;
-    --bad:       #ff5c6c;
-    --chip:      #16202c;
-    --mono: ui-monospace, "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    /* The only thing this used to carry that the :root further down does
+       not: every colour here used to duplicate one defined there, disagreed
+       with it in no visible way, and was never the one actually painting the
+       app. Kept to exactly this one declaration, since nothing else in the
+       file sets it for the dark themes -- lose it and native chrome (the
+       scrollbar, a checkbox before this app draws its own) renders light. */
     color-scheme: dark;
   }
   /* The panel is a fixed instrument surface: it does not follow the OS theme,
@@ -173,15 +160,8 @@
   }
   .band-svg {
     position: absolute; inset: 0; width: 100%; height: 100%;
-    overflow: visible;          /* let the blur and the glow leave the box */
+    overflow: visible;          /* let the band's own glyphs leave the box */
     pointer-events: none;
-    /* The light the band throws, beyond the band itself. */
-    filter:
-      drop-shadow(0 0 18px color-mix(in srgb, var(--neon) 34%, transparent))
-      drop-shadow(0 0 42px color-mix(in srgb, var(--neon) 20%, transparent));
-  }
-  @supports not (color: color-mix(in srgb, red 50%, blue)) {
-    .band-svg { filter: none; }
   }
   .dial.dragging .dial-ball { transition: none; }
 
@@ -917,7 +897,6 @@
   .xh-mark svg {
     width: 26px; height: 26px; fill: none; stroke: currentColor;
     stroke-width: 1.7; stroke-linecap: round;
-    filter: drop-shadow(0 0 5px color-mix(in srgb, var(--neon-cyan) 65%, transparent));
   }
   .xh-name { min-width: 0; }
   .xh-name h3 {
@@ -948,6 +927,29 @@
     background: color-mix(in srgb, var(--good) 12%, transparent);
   }
   .xh-live.up i { background: var(--good); box-shadow: 0 0 7px var(--good); }
+
+  /* Companions: one row per program, built the same width whether it has a
+     real icon yet or not, so the list does not jump as icons arrive. */
+  .comp-row {
+    display: grid;
+    grid-template-columns: 32px 1fr auto;
+    align-items: center; gap: 10px 14px;
+    padding: 11px 4px; border-top: 1px solid var(--line-soft);
+  }
+  .comp-row:first-child { border-top: 0; }
+  .comp-ic {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: var(--chip); object-fit: contain; padding: 3px;
+  }
+  .comp-name { min-width: 0; display: flex; align-items: center; gap: 10px; }
+  .comp-name b { font-weight: 650; }
+  .comp-row .opt { grid-column: 2; padding: 0; }
+  .comp-row .sub.warn { grid-column: 2; margin: 2px 0 0; color: var(--warn); }
+  .comp-row .actions { grid-column: 3; margin: 0; }
+  @media (max-width: 560px) {
+    .comp-row { grid-template-columns: 32px 1fr; }
+    .comp-row .actions { grid-column: 2; margin-top: 8px; }
+  }
 
   /* Signing in. Three doors to one account, and Steam at the end of all of
      them -- a CS2 configuration without a Steam account is a configuration
@@ -1090,7 +1092,6 @@
   }
   @supports not (color: color-mix(in srgb, red 50%, blue)) {
     .xh-mark { background: #16203a; border-color: var(--neon-cyan); box-shadow: none; }
-    .xh-mark svg { filter: none; }
     .xh-live.up { background: none; border-color: var(--good); }
     .xh-rules { border-left-color: var(--warn); }
   }
@@ -1293,7 +1294,6 @@
   }
   .chg-bolt svg {
     width: 21px; height: 21px; fill: currentColor; stroke: none;
-    filter: drop-shadow(0 0 6px color-mix(in srgb, var(--warn) 65%, transparent));
   }
 
   /* Rows inside the changes window.
@@ -1458,8 +1458,7 @@
     --notch-lo: color-mix(in srgb, var(--mode-neon, var(--accent)) 72%, black);
     filter:
       drop-shadow(0 3px 7px rgba(0, 0, 0, .55))
-      drop-shadow(0 8px 20px rgba(0, 0, 0, .42))
-      drop-shadow(0 0 14px color-mix(in srgb, var(--mode-neon, var(--accent)) 55%, transparent));
+      drop-shadow(0 8px 20px rgba(0, 0, 0, .42));
     transition: filter .3s ease;
   }
   .modenotch .fill {
@@ -1796,7 +1795,6 @@
   }
   .chgwin-mark svg {
     width: 23px; height: 23px; fill: currentColor; stroke: none;
-    filter: drop-shadow(0 0 7px color-mix(in srgb, var(--warn) 60%, transparent));
   }
   .chgwin-lead { min-width: 0; }
   .chgwin-lead h3 {
@@ -2828,11 +2826,9 @@
 
   .tabs .tab:hover .ic, .rail-foot .tab:hover .ic {
     opacity: 1; transform: scale(1.08);
-    filter: drop-shadow(0 0 7px color-mix(in srgb, var(--sec, #7f93ad) 70%, transparent));
   }
   .tabs .tab[aria-selected="true"] .ic {
     opacity: 1;
-    filter: drop-shadow(0 0 9px color-mix(in srgb, var(--sec) 85%, transparent));
   }
   /* The bar down the side of the open row picks up its colour too. */
   .tabs .tab[aria-selected="true"]::before { background: var(--sec); }
@@ -3577,7 +3573,6 @@
     width: 23px; height: 23px; display: block;
     fill: none; stroke: currentColor; stroke-width: 1.85;
     stroke-linecap: round; stroke-linejoin: round;
-    filter: drop-shadow(0 0 5px color-mix(in srgb, var(--fam) 75%, transparent));
   }
   .kb-cmd:hover:not(:disabled) .kb-ico {
     transform: scale(1.06);
@@ -5248,6 +5243,21 @@
       <div class="subpane hidden" data-sub="apps">
       <section class="panel hidden" id="xhair-card">
         <div id="xhair-out"></div>
+      </section>
+
+      <!-- Everything else that runs alongside the game. Crosshair X above is
+           the one integration this application knows by name; anything added
+           here gets the general case -- find it, say whether it is up, start
+           it -- and nothing this application cannot honestly offer. -->
+      <section class="panel wide" id="companions-card">
+        <h2>Companions</h2>
+        <p class="sub" style="margin:0 0 9px">
+          Other programs you run with CS2 &mdash; a clip recorder, an overlay, whatever
+          it is. Add one and it gets a Start button here and the choice to come up on
+          its own when the game does. Nothing in its own settings is touched; this only
+          finds it, watches whether it is running, and starts it.
+        </p>
+        <div id="companions-out"></div>
       </section>
       </div>
 
@@ -7246,6 +7256,7 @@ function setSettingsSub(name, restoring) {
   if (name === "sound") loadAudio(false);
   if (name === "logs") loadHistory();
   if (name === "config" || name === "editing") ensureScan(false);
+  if (name === "apps") loadCompanions();
   rememberPrefs();
 }
 
@@ -10419,6 +10430,141 @@ function startCrosshairWatch() {
   }, 5000);
 }
 
+/* Companions: Crosshair X above is the one integration this application
+   knows by name. Everything else gets the general case -- find it, say
+   whether it is up, start it -- which is the whole of what any program at
+   all is owed without this application reaching into its settings. */
+let companionsData = [];
+
+async function loadCompanions() {
+  try {
+    const r = await api("/api/companions", {});
+    companionsData = r.companions || [];
+  } catch (err) {
+    companionsData = [];
+  }
+  renderCompanions();
+}
+
+function companionTile(c) {
+  const icon = '<img class="comp-ic" src="/companion-icon/' + esc(c.id) +
+    '.png" alt="" onerror="this.style.visibility=\'hidden\'">';
+  const live = c.running
+    ? '<span class="xh-live up"><i></i>RUNNING</span>'
+    : '<span class="xh-live"><i></i>NOT RUNNING</span>';
+  const missing = c.installed ? "" :
+    '<p class="sub warn">Not found where it was added &mdash; it may have ' +
+    "moved, or been uninstalled.</p>";
+  return '<div class="comp-row" data-id="' + esc(c.id) + '">' +
+    icon +
+    '<span class="comp-name"><b>' + esc(c.name) + "</b>" + live + "</span>" +
+    '<label class="opt" style="margin:0"><input type="checkbox" ' +
+      'data-companion-with-game="' + esc(c.id) + '"' +
+      (c.with_game ? " checked" : "") + "> Starts with CS2</label>" +
+    missing +
+    '<div class="actions">' +
+      '<button class="btn small" data-companion-start="' + esc(c.id) + '"' +
+        (c.installed ? "" : " disabled") + ">" +
+        (c.running ? "Already running" : "Start it") + "</button>" +
+      '<button class="btn small ghost" data-companion-remove="' + esc(c.id) +
+        '">Remove</button>' +
+    "</div>" +
+  "</div>";
+}
+
+function renderCompanions() {
+  const box = $("companions-out");
+  if (!box) return;
+  const rows = companionsData.map(companionTile).join("");
+  box.innerHTML =
+    (rows || '<p class="sub">Nothing added yet.</p>') +
+    '<div class="actions" style="margin-top:10px">' +
+      '<button class="btn" id="companions-add">Add a companion&hellip;</button>' +
+    "</div>";
+}
+
+document.addEventListener("click", async e => {
+  const add = e.target.closest("#companions-add");
+  const start = e.target.closest("[data-companion-start]");
+  const remove = e.target.closest("[data-companion-remove]");
+  if (!add && !start && !remove) return;
+
+  if (add) {
+    add.disabled = true;
+    try {
+      const picked = await api("/api/companions/browse", {});
+      if (picked.cancelled || !picked.path) return;
+      const r = await api("/api/companions/act", { do: "add", exe: picked.path });
+      if (r.ok) { companionsData = r.companions || []; renderCompanions(); status("Added."); }
+      else status(r.error || "Could not add that.", true);
+    } catch (err) {
+      status(String(err && err.message || err), true);
+    } finally {
+      add.disabled = false;
+    }
+    return;
+  }
+
+  if (start) {
+    const id = start.dataset.companionStart;
+    start.disabled = true;
+    const label = start.textContent;
+    start.textContent = "Starting…";
+    try {
+      const r = await api("/api/companions/start", { id });
+      status(r.detail || r.error || (r.ok ? "Started." : "Could not start it."), !r.ok);
+    } catch (err) {
+      status(String(err && err.message || err), true);
+    } finally {
+      start.textContent = label;
+      loadCompanions();
+    }
+    return;
+  }
+
+  if (remove) {
+    const id = remove.dataset.companionRemove;
+    const found = companionsData.find(c => c.id === id);
+    if (found && !confirm("Remove " + found.name + "? This only forgets it " +
+                          "here — nothing on your machine is touched.")) return;
+    try {
+      const r = await api("/api/companions/act", { do: "remove", id });
+      if (r.ok) { companionsData = r.companions || []; renderCompanions(); }
+      else status(r.error || "Could not remove that.", true);
+    } catch (err) {
+      status(String(err && err.message || err), true);
+    }
+  }
+});
+
+document.addEventListener("change", async e => {
+  const toggle = e.target.closest("[data-companion-with-game]");
+  if (!toggle) return;
+  const id = toggle.dataset.companionWithGame;
+  try {
+    const r = await api("/api/companions/act",
+      { do: "with_game", id, value: toggle.checked });
+    if (r.ok) companionsData = r.companions || [];
+    else { toggle.checked = !toggle.checked; status(r.error || "Could not change that.", true); }
+  } catch (err) {
+    toggle.checked = !toggle.checked;
+    status(String(err && err.message || err), true);
+  }
+});
+
+// Only while the Apps view is actually on screen, for the same reason the
+// Crosshair X watch above holds itself back: a tasklist spawned every five
+// seconds behind a hidden window is rude.
+let companionsTimer = null;
+
+function startCompanionsWatch() {
+  if (companionsTimer) return;
+  companionsTimer = setInterval(() => {
+    if (document.hidden || activeTab !== "settings" || settingsSub !== "apps") return;
+    loadCompanions();
+  }, 5000);
+}
+
 /* The account panel.
 
    Three ways into one account, and Steam at the end of all of them: a CS2
@@ -12415,6 +12561,7 @@ function setTab(name) {
   if (name === "fix") loadFixes(false);
   if (name === "settings") {
     setSettingsSub(settingsSub, true); loadSetups(); loadCrosshairX();
+    loadCompanions(); startCompanionsWatch();
     loadMachine(); renderThemes(); loadCloud();
   }
   document.querySelectorAll(".tabs .tab").forEach(b =>

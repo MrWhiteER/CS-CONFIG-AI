@@ -127,6 +127,66 @@ def listed(prefs_ui: Dict[str, Any]) -> List[Dict[str, Any]]:
     return out
 
 
+# --- adding, removing, and the one setting that is generic ------------------
+#
+# "Twenty quick tools per companion" is not buildable generically -- said
+# plainly in the module's own docstring, and still true. What every companion
+# shares, whatever it turns out to do, is a path, a name, and whether it comes
+# up with the game. That is the whole of what lives here.
+
+MAX_COMPANIONS = 20
+
+
+class CompanionError(Exception):
+    """The companion cannot be added, or there is no such one to change."""
+
+
+def add(ui: Dict[str, Any], exe: str, name: str = "", args: str = "",
+       with_game: bool = True) -> Dict[str, Any]:
+    """Register a companion. Returns the preferences change to write."""
+    exe = str(exe or "").strip()
+    if not exe:
+        raise CompanionError("choose a program first")
+    if not Path(exe).is_file():
+        raise CompanionError(f"{exe} was not found")
+
+    held = listed(ui)
+    if len(held) >= MAX_COMPANIONS:
+        raise CompanionError(f"there is room for {MAX_COMPANIONS} companions; "
+                             "remove one first")
+    companion_id = Path(exe).stem.lower()
+    if any(c["id"] == companion_id for c in held):
+        raise CompanionError(f"{Path(exe).stem} is already added")
+
+    cleaned = _clean({"id": companion_id, "name": name or Path(exe).stem,
+                      "exe": exe, "args": args, "with_game": with_game})
+    held.append(cleaned)
+    return {"companions": held}
+
+
+def remove_one(ui: Dict[str, Any], companion_id: str) -> Dict[str, Any]:
+    companion_id = str(companion_id or "").strip()
+    held = listed(ui)
+    kept = [c for c in held if c["id"] != companion_id]
+    if len(kept) == len(held):
+        raise CompanionError("that companion was already removed")
+    return {"companions": kept}
+
+
+def set_with_game(ui: Dict[str, Any], companion_id: str, with_game: bool) -> Dict[str, Any]:
+    """Whether this one is started automatically when the game is."""
+    companion_id = str(companion_id or "").strip()
+    held = listed(ui)
+    found = False
+    for entry in held:
+        if entry["id"] == companion_id:
+            entry["with_game"] = bool(with_game)
+            found = True
+    if not found:
+        raise CompanionError("that companion was not found")
+    return {"companions": held}
+
+
 def describe(entry: Dict[str, Any]) -> Dict[str, Any]:
     """A companion plus the things only this machine can answer."""
     exe = Path(entry["exe"])
