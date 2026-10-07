@@ -30,12 +30,14 @@ import ctypes
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
 import time
 from ctypes import wintypes
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 _CREATE_NO_WINDOW = 0x08000000
@@ -127,6 +129,57 @@ CATALOGUE: List[Fix] = [
     Fix("sound.apps", "sound", "Choose CS2's sound device",
         "Opens the Windows page where CS2 can be given its own output and "
         "input, without changing what everything else uses."),
+    Fix("shader.clear", "graphics", "Clear the shader cache",
+        "Deletes the cached, compiled shaders for CS2's graphics driver. The "
+        "game rebuilds them on its own the moment it needs them again -- the "
+        "usual fix for stutter that started right after a game update or a "
+        "new graphics driver, when the old cache no longer matches what is "
+        "actually running.",
+        disruptive=True,
+        danger="CS2 will stutter again for the first few minutes while it "
+               "recompiles -- that is the cache doing its job, not a new "
+               "problem."),
+    Fix("steam.zombie", "steam", "End a stuck CS2",
+        "For when Steam insists CS2 is already running and refuses to start "
+        "it again, but there is no game on screen: a copy was left behind by "
+        "a crash and never let go. Checked first, so a game that is actually "
+        "up is never touched."),
+    Fix("steam.verify", "steam", "Verify CS2's files",
+        "Opens Steam's own file check for CS2 -- the official repair for "
+        "missing or corrupted files, a download that did not finish, or a "
+        "crash that started after installing a workshop map. Nothing here "
+        "touches a file; Steam does the checking and the fixing itself."),
+    Fix("mic.privacy", "sound", "Open microphone privacy settings",
+        "Opens Windows' own microphone permissions. The most common reason a "
+        "working headset still cannot be heard in CS2: access is on for apps "
+        "in general but off for “desktop apps” specifically, which "
+        "is the category CS2 and Steam are both in."),
+    Fix("startup.apps", "boost", "Open startup apps",
+        "Opens Windows' list of what starts with the machine. Thinning this "
+        "out is the single biggest thing a slow boot and a background-heavy "
+        "session usually have in common -- which program to keep is a choice "
+        "only you can make, so this opens the list rather than guessing at "
+        "it."),
+    Fix("defender.exclude", "boost", "Exclude CS2 from antivirus scanning",
+        "Tells Windows Security to stop scanning CS2's own folder in real "
+        "time. Real-time scanning re-checks files as the game reads them, "
+        "which on some machines costs noticeable stutter and load times. The "
+        "same switch puts it back.",
+        needs_admin=True,
+        danger="Anything placed in that folder stops being scanned, by "
+               "Windows or by anyone else with access to this machine."),
+    Fix("fullscreen.exclusive", "graphics", "Turn off Fullscreen Optimizations",
+        "The Windows setting from CS2's own Properties > Compatibility tab, "
+        "flipped here instead of six clicks deep in Explorer. True exclusive "
+        "fullscreen reaches the display with one less layer between the game "
+        "and the screen, which is lower input lag on some machines and does "
+        "nothing on others. The same switch puts it back."),
+    Fix("power.performance", "boost", "Switch to High performance power",
+        "Moves Windows off a balanced or power-saving plan for as long as "
+        "this stays on, which matters most on a laptop: those plans cap the "
+        "processor to save battery, and a capped processor is a lower frame "
+        "rate whatever the graphics settings say. The same switch puts the "
+        "previous plan back."),
 ]
 
 
@@ -695,6 +748,361 @@ def _fix_restart_steam(body: Dict[str, Any]) -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# CS2 itself -- the fixes for the game's own well-known problems, as opposed
+# to the device and driver repairs above.
+# ---------------------------------------------------------------------------
+
+def _cs2_install_dir() -> Optional[Path]:
+    from . import steam as steam_mod
+
+    try:
+        root = steam_mod.find_steam_root()
+        if root is None:
+            return None
+        return steam_mod.find_cs2_install(root)
+    except Exception:
+        return None
+
+
+# Every vendor's own documented shader-cache location, all under this
+# account's own AppData. Nothing here needs administrator, and nothing here
+# is a file CS2 or the driver cannot simply rebuild -- which is the same
+# reasoning that makes it safe to delete in the first place.
+SHADER_CACHE_DIRS = (
+    ("NVIDIA", ("NVIDIA", "DXCache")),
+    ("NVIDIA", ("NVIDIA", "GLCache")),
+    ("AMD", ("AMD", "DxCache")),
+    ("AMD", ("AMD", "DxcCache")),
+    ("AMD", ("AMD", "VkCache")),
+    ("Intel", ("Intel", "ShaderCache")),
+    ("Windows", ("D3DSCache",)),
+)
+
+
+def _fix_clear_shader_cache(_body: Dict[str, Any]) -> Dict[str, Any]:
+    """Empty every shader cache folder this machine actually has.
+
+    The folders themselves are left in place and only their contents are
+    removed -- the vendors' own guidance, and cheap insurance against
+    whatever first-run behaviour assumes the folder already exists.
+    """
+    base = os.environ.get("LOCALAPPDATA") or ""
+    if not base or not Path(base).is_dir():
+        raise FixError("could not find this account's AppData folder")
+
+    cleared: List[str] = []
+    freed = 0
+    for vendor, parts in SHADER_CACHE_DIRS:
+        folder = Path(base).joinpath(*parts)
+        if not folder.is_dir():
+            continue
+        count = 0
+        for child in folder.iterdir():
+            try:
+                if child.is_dir():
+                    size = sum(f.stat().st_size for f in child.rglob("*") if f.is_file())
+                    shutil.rmtree(child, ignore_errors=True)
+                else:
+                    size = child.stat().st_size
+                    child.unlink()
+                freed += size
+                count += 1
+            except OSError:
+                continue
+        if count:
+            cleared.append(f"{vendor} ({parts[-1]})")
+
+    if not cleared:
+        return {"ok": True, "cleared": [],
+                "detail": "Nothing was cached -- there was nothing to clear."}
+    mb = freed / (1024 * 1024)
+    return {"ok": True, "cleared": cleared,
+            "detail": f"Cleared {', '.join(cleared)} ({mb:.0f} MB). The first "
+                      "few minutes back in CS2 will stutter while it rebuilds "
+                      "what it needs -- that is expected."}
+
+
+def _cs2_process_running() -> bool:
+    out = _powershell(
+        "if (Get-Process -Name cs2 -ErrorAction SilentlyContinue) "
+        "{ 'yes' } else { 'no' }")
+    return out.strip().lower() == "yes"
+
+
+def _fix_end_zombie_cs2(_body: Dict[str, Any]) -> Dict[str, Any]:
+    """Ends a cs2.exe Steam has lost track of, and nothing else.
+
+    Checked twice before anything is touched: once for a process at all, and
+    once for a window on screen. A real window means a real game, and a real
+    game is never the one this ends -- the person playing it closes it
+    themselves.
+    """
+    if not _cs2_process_running():
+        return {"ok": True, "ended": False,
+                "detail": "No CS2 process was found -- there is nothing to end."}
+    if _game_running():
+        raise FixError("CS2 looks like it is actually running, with a window "
+                        "on screen. Close it the ordinary way instead.")
+    done = subprocess.run(["taskkill", "/IM", "cs2.exe", "/F"],
+                          capture_output=True, text=True, timeout=15,
+                          creationflags=_CREATE_NO_WINDOW)
+    if done.returncode != 0:
+        raise FixError((done.stderr or done.stdout or "taskkill failed").strip())
+    return {"ok": True, "ended": True,
+            "detail": "The stuck process has been ended. Steam should let CS2 "
+                      "start again now."}
+
+
+def _fix_open_verify(_body: Dict[str, Any]) -> Dict[str, Any]:
+    """Opens Steam's own integrity check for CS2 -- the official repair.
+
+    Nothing here touches a file. Steam does the checking and the fixing
+    itself, through the same page its own Properties menu opens.
+    """
+    if sys.platform != "win32":
+        raise FixError("this opens a Steam window, which needs Windows")
+    try:
+        os.startfile("steam://validate/730")
+    except OSError as exc:
+        raise FixError(f"could not ask Steam to open: {exc}")
+    return {"ok": True,
+            "detail": "Steam is checking CS2's files now. Watch its own "
+                      "Downloads page for progress."}
+
+
+def _fix_open_settings_page(uri: str, what: str) -> Dict[str, Any]:
+    if sys.platform != "win32":
+        raise FixError(f"this opens {what}, which needs Windows")
+    try:
+        os.startfile(uri)
+    except OSError as exc:
+        raise FixError(f"could not open {what}: {exc}")
+    return {"ok": True, "detail": f"Opened {what}."}
+
+
+def _fix_open_mic_privacy(_body: Dict[str, Any]) -> Dict[str, Any]:
+    return _fix_open_settings_page("ms-settings:privacy-microphone",
+                                   "the microphone privacy settings")
+
+
+def _fix_open_startup_apps(_body: Dict[str, Any]) -> Dict[str, Any]:
+    return _fix_open_settings_page("ms-settings:startupapps",
+                                   "the startup apps list")
+
+
+# ---------------------------------------------------------------------------
+# Antivirus exclusion, Fullscreen Optimizations, and the power plan -- three
+# settings that are not about a device or a driver misbehaving, but about
+# Windows costing CS2 performance on purpose. Each is a straightforward
+# toggle: the same id puts it back that turned it on.
+# ---------------------------------------------------------------------------
+
+def _defender_exclusions() -> List[str]:
+    out = _powershell("(Get-MpPreference).ExclusionPath -join '|'")
+    return [p for p in out.split("|") if p]
+
+
+def _probe_cs2_and_defender() -> Dict[str, Any]:
+    """One PowerShell call standing in for two, for the survey's sake.
+
+    The survey runs on every Fix It page open, and every separate
+    PowerShell call costs a few hundred milliseconds just to start the
+    interpreter -- measurable on a page meant to feel instant. The two
+    functions above still make their own separate calls, because they run
+    once, when a button is pressed, and correctness matters more there than
+    a few hundred milliseconds does.
+    """
+    out = _powershell(
+        "$p = Get-Process -Name cs2 -ErrorAction SilentlyContinue;"
+        "$d = @((Get-MpPreference -ErrorAction SilentlyContinue).ExclusionPath);"
+        "(@{ cs2 = [bool]$p; exclusions = $d } | ConvertTo-Json -Compress -Depth 2)")
+    try:
+        data = json.loads(out) if out else {}
+    except ValueError:
+        data = {}
+    exclusions = data.get("exclusions")
+    if exclusions is None:
+        exclusions = []
+    elif isinstance(exclusions, str):
+        exclusions = [exclusions]
+    return {"cs2_running": bool(data.get("cs2")),
+            "exclusions": [str(x) for x in exclusions]}
+
+
+def defender_status() -> Dict[str, Any]:
+    """Whether CS2's folder is currently excluded. Read-only, for the survey."""
+    install = _cs2_install_dir()
+    if sys.platform != "win32" or install is None:
+        return {"supported": False}
+    path = str(install)
+    excluded = any(path.lower() == p.lower() for p in _defender_exclusions())
+    return {"supported": True, "excluded": excluded}
+
+
+def _fix_toggle_defender(_body: Dict[str, Any]) -> Dict[str, Any]:
+    install = _cs2_install_dir()
+    if install is None:
+        raise FixError("CS2's install folder could not be found")
+    path = str(install)
+    now_excluded = any(path.lower() == p.lower() for p in _defender_exclusions())
+    verb = "Remove-MpPreference" if now_excluded else "Add-MpPreference"
+    escaped = path.replace("'", "''")
+    result = _run_elevated(
+        f"{verb} -ExclusionPath '{escaped}'\n"
+        "$out.ok = $true\n")
+    if not result.get("ok"):
+        return result
+    return {"ok": True, "excluded": not now_excluded,
+            "detail": ("The exclusion has been removed -- CS2's folder is "
+                       "scanned normally again." if now_excluded else
+                       "CS2's folder is excluded from real-time scanning now.")}
+
+
+FS_OPT_KEY = r"Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers"
+FS_OPT_TOKEN = "DISABLEDXMAXIMIZEDWINDOWEDMODE"
+
+
+def _fullscreen_exe() -> Optional[Path]:
+    from . import wingraphics
+
+    return wingraphics.exe_path(_cs2_install_dir())
+
+
+def _fs_opt_read(exe: Path) -> str:
+    try:
+        import winreg
+
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, FS_OPT_KEY) as key:
+            value, _ = winreg.QueryValueEx(key, str(exe))
+        return str(value)
+    except OSError:
+        return ""
+
+
+def fullscreen_status() -> Dict[str, Any]:
+    exe = _fullscreen_exe()
+    if sys.platform != "win32" or exe is None:
+        return {"supported": False}
+    return {"supported": True, "disabled": FS_OPT_TOKEN in _fs_opt_read(exe)}
+
+
+def _fix_toggle_fullscreen_opt(_body: Dict[str, Any]) -> Dict[str, Any]:
+    exe = _fullscreen_exe()
+    if exe is None:
+        raise FixError("CS2's executable was not found")
+    current = _fs_opt_read(exe)
+    now_disabled = FS_OPT_TOKEN in current
+    # Anything else already in the value -- HIGHDPIAWARE is common -- is kept;
+    # only the one token this fix owns is added or removed.
+    tokens = [t for t in current.split() if t not in ("~", FS_OPT_TOKEN)]
+    if not now_disabled:
+        tokens.append(FS_OPT_TOKEN)
+    try:
+        import winreg
+
+        if tokens:
+            with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, FS_OPT_KEY, 0,
+                                    winreg.KEY_SET_VALUE) as key:
+                winreg.SetValueEx(key, str(exe), 0, winreg.REG_SZ,
+                                  "~ " + " ".join(tokens))
+        else:
+            try:
+                with winreg.OpenKey(winreg.HKEY_CURRENT_USER, FS_OPT_KEY, 0,
+                                    winreg.KEY_SET_VALUE) as key:
+                    winreg.DeleteValue(key, str(exe))
+            except OSError:
+                pass
+    except OSError as exc:
+        raise FixError(f"could not write the setting: {exc}")
+    return {"ok": True, "disabled": not now_disabled,
+            "detail": ("Fullscreen Optimizations are back on for CS2."
+                       if now_disabled else
+                       "Fullscreen Optimizations are off for CS2 -- it will "
+                       "run in true exclusive fullscreen.")}
+
+
+POWER_RECORD = "power_plan.json"
+
+
+def _power_record_path() -> Path:
+    from .paths import user_data_dir
+
+    return user_data_dir() / POWER_RECORD
+
+
+def _powercfg(args: List[str], timeout: int = 20) -> str:
+    try:
+        done = subprocess.run(["powercfg", *args], capture_output=True, text=True,
+                              timeout=timeout,
+                              creationflags=_CREATE_NO_WINDOW if sys.platform == "win32" else 0)
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return (done.stdout or "").strip()
+
+
+_GUID_RE = re.compile(r"GUID:\s*([0-9a-fA-F-]{36})")
+
+
+def _active_scheme_guid() -> Optional[str]:
+    found = _GUID_RE.search(_powercfg(["/getactivescheme"]))
+    return found.group(1) if found else None
+
+
+def power_status() -> Dict[str, Any]:
+    if sys.platform != "win32":
+        return {"supported": False}
+    guid = _active_scheme_guid()
+    boosted = False
+    try:
+        record = json.loads(_power_record_path().read_text(encoding="utf-8"))
+        boosted = bool(record.get("active")) and guid == record.get("changed_to")
+    except (OSError, ValueError):
+        pass
+    return {"supported": guid is not None, "boosted": boosted}
+
+
+def _fix_toggle_power(_body: Dict[str, Any]) -> Dict[str, Any]:
+    if sys.platform != "win32":
+        raise FixError("power plans are a Windows setting")
+    guid = _active_scheme_guid()
+    if guid is None:
+        raise FixError("could not read the current power plan")
+
+    record_path = _power_record_path()
+    try:
+        record = json.loads(record_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        record = {}
+
+    if record.get("active") and guid == record.get("changed_to"):
+        previous = record.get("before")
+        if previous:
+            _powercfg(["/setactive", previous])
+        try:
+            record_path.unlink()
+        except OSError:
+            pass
+        return {"ok": True, "boosted": False,
+                "detail": "Back on the power plan this machine had before."}
+
+    before = guid
+    _powercfg(["/setactive", "SCHEME_MIN"])
+    after = _active_scheme_guid()
+    if after is None or after == before:
+        raise FixError("Windows did not switch the power plan")
+    try:
+        record_path.parent.mkdir(parents=True, exist_ok=True)
+        record_path.write_text(json.dumps(
+            {"before": before, "changed_to": after, "active": True},
+            indent=1), encoding="utf-8")
+    except OSError:
+        pass
+    return {"ok": True, "boosted": True,
+            "detail": "Switched to High performance. The same button puts "
+                      "the previous plan back."}
+
+
+# ---------------------------------------------------------------------------
 
 def _fix_restore_display(_body: Dict[str, Any]) -> Dict[str, Any]:
     """The manual version of the automatic put-back.
@@ -719,6 +1127,14 @@ _RUNNERS = {
     "device.restart": lambda body: _fix_restart_device(str(body.get("device") or "")),
     "sound.restart": lambda body: _fix_restart_audio(),
     "sound.apps": lambda body: _fix_open_app_volume(),
+    "shader.clear": lambda body: _fix_clear_shader_cache(body),
+    "steam.zombie": lambda body: _fix_end_zombie_cs2(body),
+    "steam.verify": lambda body: _fix_open_verify(body),
+    "mic.privacy": lambda body: _fix_open_mic_privacy(body),
+    "startup.apps": lambda body: _fix_open_startup_apps(body),
+    "defender.exclude": lambda body: _fix_toggle_defender(body),
+    "fullscreen.exclusive": lambda body: _fix_toggle_fullscreen_opt(body),
+    "power.performance": lambda body: _fix_toggle_power(body),
 }
 
 
@@ -740,13 +1156,50 @@ def run(fix_id: str, body: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
 
 
 def survey() -> Dict[str, Any]:
-    """Everything the page needs to draw the tab."""
+    """Everything the page needs to draw the tab.
+
+    Each piece below is an independent read: nothing writes anything, and
+    none of them depends on what another one finds. Run one after another
+    they cost their sum -- on the machine this was measured on, five
+    PowerShell processes started in turn came to five seconds, on a tab meant
+    to feel instant. Run together the wall-clock cost is whichever one is
+    slowest, which is the whole reason to bother.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        f_adapters = pool.submit(adapters)
+        f_devices = pool.submit(devices)
+        f_sound = pool.submit(sound_devices)
+        f_probe = pool.submit(_probe_cs2_and_defender)
+        f_fullscreen = pool.submit(fullscreen_status)
+        f_power = pool.submit(power_status)
+
+        adapters_result = f_adapters.result()
+        devices_result = f_devices.result()
+        sound_result = f_sound.result()
+        probe = f_probe.result()
+        fullscreen = f_fullscreen.result()
+        power = f_power.result()
+
+    game_up = _game_running()
+    install = _cs2_install_dir()
+    defender: Dict[str, Any] = {"supported": False}
+    if sys.platform == "win32" and install is not None:
+        path = str(install)
+        defender = {"supported": True,
+                    "excluded": any(path.lower() == p.lower()
+                                    for p in probe["exclusions"])}
     return {
         "ok": True,
         "fixes": catalogue(),
-        "adapters": adapters(),
-        "devices": devices(),
-        "sound": sound_devices(),
-        "game_running": _game_running(),
+        "adapters": adapters_result,
+        "devices": devices_result,
+        "sound": sound_result,
+        "game_running": game_up,
         "elevated": _elevated(),
+        "zombie_cs2": probe["cs2_running"] and not game_up,
+        "defender": defender,
+        "fullscreen": fullscreen,
+        "power": power,
     }

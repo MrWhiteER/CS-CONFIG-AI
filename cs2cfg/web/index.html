@@ -353,6 +353,7 @@
   .fix-tile[data-family="devices"]  { --fam: #a970ff; }
   .fix-tile[data-family="sound"]    { --fam: #ff9d2e; }
   .fix-tile[data-family="steam"]    { --fam: #66c0f4; }
+  .fix-tile[data-family="boost"]    { --fam: #35d07f; }
   /* The bar a fix runs behind. Takes the tile's own family colour, so the
      thing that is working is lit in the colour of the thing you pressed. */
   .fix-prog { margin-top: 10px; }
@@ -7439,6 +7440,31 @@ const FIX_ART = {
   "steam.restart":
     '<path d="M20 11a8 8 0 10-2.2 6.3"/>' +
     '<path d="M20 4.8V11h-6"/>',
+  // A shader: three overlapping panes catching light, the shape used
+  // elsewhere in this file for "picture".
+  "shader.clear":
+    '<rect x="3" y="4" width="18" height="14" rx="2"/>' +
+    '<circle cx="8.5" cy="9" r="1.5"/><path d="M3 16l5-4 4 3 3-2 6 5"/>',
+  // A process that stopped answering: a window with an X instead of content.
+  "steam.zombie":
+    '<rect x="3" y="4" width="18" height="16" rx="1.5"/>' +
+    '<path d="M3 9h18M9 13l6 6M15 13l-6 6"/>',
+  // A checkmark inside a shield -- verification, not a repair.
+  "steam.verify":
+    '<path d="M12 3l7 3v5c0 5-3.2 8-7 10-3.8-2-7-5-7-10V6z"/>' +
+    '<path d="M9 12l2 2 4-4"/>',
+  "mic.privacy":
+    '<rect x="9" y="3" width="6" height="11" rx="3"/>' +
+    '<path d="M6 11a6 6 0 0012 0M12 17v3.5M9 20.5h6"/>',
+  "startup.apps":
+    '<rect x="3" y="4" width="18" height="16" rx="1.5"/>' +
+    '<path d="M3 10h18M7 14h4"/>',
+  "defender.exclude":
+    '<path d="M12 3l7 3v5c0 5-3.2 8-7 10-3.8-2-7-5-7-10V6z"/>',
+  "fullscreen.exclusive":
+    '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
+  "power.performance":
+    '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
 };
 
 const FIX_FAMILY_NAME = {
@@ -7447,6 +7473,7 @@ const FIX_FAMILY_NAME = {
   devices: "Devices",
   sound: "Sound",
   steam: "Steam",
+  boost: "Boost",
 };
 
 function fixIcon(fix) {
@@ -7560,6 +7587,60 @@ function renderFixes() {
 
   html += fixTile(by["sound.restart"],
     '<div class="actions">' + fixButton("sound.restart", "Restart audio", false) + "</div>");
+
+  html += fixTile(by["mic.privacy"],
+    '<div class="actions">' + fixButton("mic.privacy", "Open it", false) + "</div>");
+
+  // CS2 itself: the stutter-after-update, the stuck-process and the
+  // file-integrity fixes that are about the game rather than a device.
+  html += fixTile(by["shader.clear"],
+    '<div class="actions">' + fixButton("shader.clear", "Clear it", false) + "</div>");
+
+  html += fixTile(by["steam.zombie"],
+    (fixData.zombie_cs2
+      ? ""
+      : '<p class="sub">No stuck process right now — nothing to do.</p>') +
+    '<div class="actions">' +
+      fixButton("steam.zombie", "End it", !fixData.zombie_cs2) + "</div>");
+
+  html += fixTile(by["steam.verify"],
+    '<div class="actions">' + fixButton("steam.verify", "Open Steam's check", false) + "</div>");
+
+  // Boost: the settings Windows itself controls that cost CS2 performance,
+  // each a straightforward toggle with its own remembered way back.
+  const defender = fixData.defender || {};
+  html += fixTile(by["defender.exclude"],
+    (defender.supported === false
+      ? '<p class="sub">Windows Security was not found on this machine.</p>'
+      : "") +
+    '<div class="actions">' +
+      fixButton("defender.exclude", defender.excluded ? "Remove the exclusion" : "Exclude it",
+                defender.supported === false) +
+    "</div>");
+
+  const fullscreen = fixData.fullscreen || {};
+  html += fixTile(by["fullscreen.exclusive"],
+    (fullscreen.supported === false
+      ? '<p class="sub">CS2 was not found, so there is nothing to flip yet.</p>'
+      : "") +
+    '<div class="actions">' +
+      fixButton("fullscreen.exclusive", fullscreen.disabled ? "Turn it back on" : "Turn it off",
+                fullscreen.supported === false) +
+    "</div>");
+
+  const power = fixData.power || {};
+  html += fixTile(by["power.performance"],
+    (power.supported === false
+      ? '<p class="sub">Windows would not report a power plan on this machine.</p>'
+      : "") +
+    '<div class="actions">' +
+      fixButton("power.performance",
+                power.boosted ? "Put the previous plan back" : "Switch to it",
+                power.supported === false) +
+    "</div>");
+
+  html += fixTile(by["startup.apps"],
+    '<div class="actions">' + fixButton("startup.apps", "Open the list", false) + "</div>");
 
   html += "</div>";
   box.innerHTML = html;
