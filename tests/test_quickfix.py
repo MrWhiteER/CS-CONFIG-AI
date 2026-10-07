@@ -299,6 +299,8 @@ class PowerPlan(unittest.TestCase):
 
     def test_switching_raises_with_the_real_message_rather_than_a_generic_one(self):
         with mock.patch.object(quickfix, "_active_scheme_guid", return_value="guid-a"), \
+             mock.patch.object(quickfix, "_find_or_create_ultimate_scheme",
+                               return_value="ultimate-guid"), \
              mock.patch.object(quickfix, "_powercfg_setactive",
                                return_value={"ok": False,
                                             "error": "Access is denied."}):
@@ -310,13 +312,91 @@ class PowerPlan(unittest.TestCase):
         guids = iter(["before-guid", "after-guid"])
         with mock.patch.object(quickfix, "_active_scheme_guid",
                                side_effect=lambda: next(guids)), \
+             mock.patch.object(quickfix, "_find_or_create_ultimate_scheme",
+                               return_value="ultimate-guid"), \
              mock.patch.object(quickfix, "_powercfg_setactive",
                                return_value={"ok": True}):
             result = quickfix._fix_toggle_power({})
         self.assertTrue(result["ok"])
         self.assertTrue(result["boosted"])
+        self.assertEqual(result["plan"], "Ultimate Performance")
         record = quickfix._power_record_path()
         self.assertTrue(record.is_file())
+
+    def test_already_being_on_the_target_plan_is_success_not_a_refusal(self):
+        """Found live: the machine this was tested on already had Ultimate
+        Performance active. The old code read "nothing changed" as a
+        failure in every case, which made an already-correct machine report
+        an error for a repair that had nothing to repair."""
+        with mock.patch.object(quickfix, "_active_scheme_guid",
+                               return_value="same-guid"), \
+             mock.patch.object(quickfix, "_find_or_create_ultimate_scheme",
+                               return_value="same-guid"), \
+             mock.patch.object(quickfix, "_powercfg_setactive",
+                               return_value={"ok": True}):
+            result = quickfix._fix_toggle_power({})
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["boosted"])
+        self.assertIn("Already on", result["detail"])
+        self.assertFalse(quickfix._power_record_path().is_file(),
+                         "nothing changed, so there is nothing to put back")
+
+    def test_falling_back_to_high_performance_when_ultimate_cannot_be_made(self):
+        """Rare: duplicating the template itself failed. The switch still
+        goes through, just onto the plan every edition already ships with."""
+        guids = iter(["before-guid", "after-guid"])
+        with mock.patch.object(quickfix, "_active_scheme_guid",
+                               side_effect=lambda: next(guids)), \
+             mock.patch.object(quickfix, "_find_or_create_ultimate_scheme",
+                               return_value=None), \
+             mock.patch.object(quickfix, "_powercfg_setactive",
+                               return_value={"ok": True}) as setactive:
+            result = quickfix._fix_toggle_power({})
+        self.assertEqual(result["plan"], "High performance")
+        setactive.assert_called_once_with("SCHEME_MIN")
+
+    def test_schemes_are_parsed_from_a_real_shaped_listing(self):
+        listing = (
+            "Existing Power Schemes (* Active)\n"
+            "-----------------------------------\n"
+            "Power Scheme GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  (Balanced)\n"
+            "Power Scheme GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c  "
+            "(High performance) *\n"
+            "Power Scheme GUID: eee9dd6d-34f7-4662-b9a9-b69497e6568d  "
+            "(Ultimate Performance)\n")
+        with mock.patch.object(quickfix, "_powercfg",
+                               return_value={"ok": True, "out": listing}):
+            found = quickfix._schemes()
+        self.assertIn(("eee9dd6d-34f7-4662-b9a9-b69497e6568d",
+                       "Ultimate Performance"), found)
+        self.assertEqual(len(found), 3)
+
+    def test_an_existing_ultimate_scheme_is_reused_not_duplicated_again(self):
+        with mock.patch.object(quickfix, "_schemes",
+                               return_value=[("abc-guid", "Ultimate Performance")]), \
+             mock.patch.object(quickfix, "_powercfg",
+                               side_effect=AssertionError("should not duplicate again")):
+            found = quickfix._find_or_create_ultimate_scheme()
+        self.assertEqual(found, "abc-guid")
+
+    def test_a_missing_ultimate_scheme_is_duplicated_in(self):
+        new_guid = "11111111-2222-3333-4444-555555555555"
+        created = {"ok": True,
+                  "out": f"Power Scheme GUID: {new_guid}  (Ultimate Performance)"}
+        with mock.patch.object(quickfix, "_schemes", return_value=[]), \
+             mock.patch.object(quickfix, "_powercfg",
+                               return_value=created) as powercfg:
+            found = quickfix._find_or_create_ultimate_scheme()
+        self.assertEqual(found, new_guid)
+        powercfg.assert_called_once_with(
+            ["-duplicatescheme", quickfix.ULTIMATE_TEMPLATE_GUID])
+
+    def test_a_refused_duplication_falls_back_cleanly(self):
+        with mock.patch.object(quickfix, "_schemes", return_value=[]), \
+             mock.patch.object(quickfix, "_powercfg",
+                               return_value={"ok": False, "out": "", "error": "no"}):
+            found = quickfix._find_or_create_ultimate_scheme()
+        self.assertIsNone(found)
 
     def test_putting_it_back_also_surfaces_a_real_refusal(self):
         quickfix._power_record_path().write_text(

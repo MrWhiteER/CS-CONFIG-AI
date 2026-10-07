@@ -38,7 +38,7 @@ import time
 from ctypes import wintypes
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 _CREATE_NO_WINDOW = 0x08000000
 
@@ -174,12 +174,15 @@ CATALOGUE: List[Fix] = [
         "fullscreen reaches the display with one less layer between the game "
         "and the screen, which is lower input lag on some machines and does "
         "nothing on others. The same switch puts it back."),
-    Fix("power.performance", "boost", "Switch to High performance power",
-        "Moves Windows off a balanced or power-saving plan for as long as "
-        "this stays on, which matters most on a laptop: those plans cap the "
-        "processor to save battery, and a capped processor is a lower frame "
-        "rate whatever the graphics settings say. The same switch puts the "
-        "previous plan back."),
+    Fix("power.performance", "boost", "Switch to Ultimate Performance power",
+        "Moves Windows onto its own Ultimate Performance plan, which Windows "
+        "ships but keeps hidden on most machines. It goes further than High "
+        "performance: parking cores, USB selective suspend and PCIe link "
+        "power-saving are all the kind of thing that costs a tiny stall when "
+        "a device wakes back up, and this plan asks Windows to stop doing "
+        "them for as long as it stays on. Falls back to High performance if "
+        "this edition of Windows will not create it. The same switch puts "
+        "the previous plan back."),
 ]
 
 
@@ -1053,10 +1056,38 @@ def _powercfg(args: List[str], timeout: int = 20) -> Dict[str, Any]:
 
 
 _GUID_RE = re.compile(r"GUID:\s*([0-9a-fA-F-]{36})")
+_SCHEME_LINE_RE = re.compile(r"Power Scheme GUID:\s*([0-9a-fA-F-]{36})\s*\(([^)]*)\)")
+
+# Ships inside Windows itself but stays off the list in /list until it has
+# been duplicated in -- the documented way to reach it, and confirmed on a
+# real machine: a GUID already present there did not match this one, which is
+# what duplicating it once looks like afterward.
+ULTIMATE_TEMPLATE_GUID = "e9a42b02-d5df-448d-aa00-03f14749eb61"
 
 
 def _active_scheme_guid() -> Optional[str]:
     found = _GUID_RE.search(_powercfg(["/getactivescheme"])["out"])
+    return found.group(1) if found else None
+
+
+def _schemes() -> List[Tuple[str, str]]:
+    """Every power scheme Windows currently lists, as (guid, name) pairs."""
+    out = _powercfg(["/list"])["out"]
+    return [(m.group(1), m.group(2).strip()) for m in _SCHEME_LINE_RE.finditer(out)]
+
+
+def _find_or_create_ultimate_scheme() -> Optional[str]:
+    """The Ultimate Performance plan's GUID, duplicating it in if this is
+    the first time. None if this edition of Windows refuses to -- rare, and
+    the caller falls back to High performance rather than failing outright.
+    """
+    for guid, name in _schemes():
+        if name.lower() == "ultimate performance":
+            return guid
+    created = _powercfg(["-duplicatescheme", ULTIMATE_TEMPLATE_GUID])
+    if not created["ok"]:
+        return None
+    found = _GUID_RE.search(created["out"])
     return found.group(1) if found else None
 
 
@@ -1138,7 +1169,15 @@ def _fix_toggle_power(_body: Dict[str, Any]) -> Dict[str, Any]:
                 "detail": "Back on the power plan this machine had before."}
 
     before = guid
-    result = _powercfg_setactive("SCHEME_MIN")
+    target_name = "Ultimate Performance"
+    target = _find_or_create_ultimate_scheme()
+    if target is None:
+        # Rare: duplicating the template itself failed. High performance is
+        # the fallback rather than giving up, since it is the one every
+        # edition of Windows ships with already.
+        target_name = "High performance"
+        target = "SCHEME_MIN"
+    result = _powercfg_setactive(target)
     if not result["ok"]:
         if result.get("declined"):
             return {"ok": False, "declined": True,
@@ -1146,14 +1185,15 @@ def _fix_toggle_power(_body: Dict[str, Any]) -> Dict[str, Any]:
         raise FixError(result.get("error") or
                        "Windows would not switch the power plan")
     after = _active_scheme_guid()
-    if after is None or after == before:
-        # powercfg itself said this worked, so the machine simply has no
-        # separate High performance scheme to switch to -- some OEM builds
-        # ship without one. Worth saying plainly rather than as a generic
-        # failure, since there is nothing to retry here.
-        raise FixError("Windows accepted the change but the plan did not "
-                       "move -- this machine may not have a separate High "
-                       "performance scheme to switch to")
+    if after is None:
+        raise FixError("powercfg accepted the change but the new plan "
+                       "could not be read back")
+    if after == before:
+        # powercfg reported success and the scheme genuinely did not move --
+        # overwhelmingly because it was already the active one. Nothing to
+        # remember putting back, since nothing here actually changed.
+        return {"ok": True, "boosted": True, "plan": target_name,
+                "detail": f"Already on {target_name}."}
     try:
         record_path.parent.mkdir(parents=True, exist_ok=True)
         record_path.write_text(json.dumps(
@@ -1161,8 +1201,8 @@ def _fix_toggle_power(_body: Dict[str, Any]) -> Dict[str, Any]:
             indent=1), encoding="utf-8")
     except OSError:
         pass
-    return {"ok": True, "boosted": True,
-            "detail": "Switched to High performance. The same button puts "
+    return {"ok": True, "boosted": True, "plan": target_name,
+            "detail": f"Switched to {target_name}. The same button puts "
                       "the previous plan back."}
 
 
