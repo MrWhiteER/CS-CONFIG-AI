@@ -424,29 +424,28 @@ def _play(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     # created. Never allowed to stop the launch.
     win_graphics = _settle_win_graphics(state, bool(body.get("win_graphics_auto")))
 
+    # Whatever the player wants up before the game, gathered here so the
+    # launch thread can start and confirm every one of them before CS2 is
+    # handed to Steam -- not alongside it, which is how this used to race
+    # Crosshair X for a window.
+    from . import companions, profiles
+    from .cli import load_prefs
+
+    ui = profiles.ui_for(load_prefs(), _active_account(state))
+    companions_before = [c for c in companions.listed(ui) if c["with_game"]]
+
     state.launch = LaunchSession(user, width, height, refresh, stretch_mode,
                                  patch_video=bool(body.get("patch_video", True)),
-                                 extra_args=extra)
+                                 extra_args=extra,
+                                 companions_before=companions_before,
+                                 start_crosshairx=bool(body.get("crosshairx_launch")))
     try:
         state.launch.start()
     except LaunchError as exc:
         return {"ok": False, "error": str(exc)}
 
-    # The overlay, if it was asked for and is not already up. After the game
-    # has been told to start, and never allowed to stop it: somebody who wants
-    # a crosshair overlay still wants to play if the overlay will not come.
-    overlay = ""
-    if body.get("crosshairx_launch"):
-        try:
-            from . import crosshairx
-
-            if not crosshairx.running():
-                overlay = crosshairx.start().get("detail", "")
-        except Exception as exc:
-            overlay = f"could not start Crosshair X: {exc}"
-
     return {"ok": True, "width": width, "height": height, "refresh": refresh,
-            "stretch_mode": stretch_mode, "overlay": overlay,
+            "stretch_mode": stretch_mode,
             "crosshair": crosshair, "win_graphics": win_graphics}
 
 

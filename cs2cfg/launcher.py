@@ -39,7 +39,8 @@ import threading
 import time
 import urllib.parse
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Optional, Tuple
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from . import steam, telemetry, window
 from .backup import BackupSession
@@ -422,6 +423,80 @@ def _make_it_fill(report: Callable[[str, str], None]) -> Optional[Tuple[int, int
     return result["display_id"], result["previous"]
 
 
+# How long this waits, in total, for everything asked to come up with the
+# game. Generous, because a companion still starting when the window is
+# given up on is not a reason to stop the launch -- it just starts the game
+# anyway and says so.
+COMPANION_WAIT = 15.0
+
+
+def _bring_up_companions(
+    companions_before: Optional[List[Dict[str, Any]]],
+    start_crosshairx: bool,
+    report: Callable[[str, str], None],
+    should_stop: Optional[Callable[[], bool]] = None,
+) -> None:
+    """Start whatever the player wants up before the game, and wait for each
+    to actually be running -- not merely asked to start -- before this
+    returns.
+
+    Starting Crosshair X after the game used to mean both raced for a window
+    at the same time, which is what this replaces: everything here starts
+    first, and CS2 is not launched until each one answers or this gives up
+    on it. Never fatal and never indefinite -- a companion that will not
+    start, or is simply slow, costs this wait and nothing else.
+    """
+    from . import companions as companions_mod
+
+    pending: List[Tuple[str, Callable[[], bool]]] = []
+
+    if start_crosshairx:
+        from . import crosshairx
+
+        if crosshairx.running():
+            report(f"  {crosshairx.APP_NAME} is already running", "dim")
+        else:
+            result = crosshairx.start()
+            if result.get("ok"):
+                report(f"  starting {crosshairx.APP_NAME}...", "")
+                pending.append((crosshairx.APP_NAME, crosshairx.running))
+            else:
+                report(f"  could not start {crosshairx.APP_NAME}: "
+                      f"{result.get('error', 'unknown error')}", "warn")
+
+    for entry in (companions_before or []):
+        exe_name = Path(entry.get("exe") or "").name
+        if not exe_name:
+            continue
+        if companions_mod.running(exe_name):
+            report(f"  {entry['name']} is already running", "dim")
+            continue
+        result = companions_mod.start(entry)
+        if result.get("ok") and not result.get("already"):
+            report(f"  starting {entry['name']}...", "")
+            pending.append((entry["name"], lambda n=exe_name: companions_mod.running(n)))
+        elif not result.get("ok"):
+            report(f"  could not start {entry['name']}: "
+                  f"{result.get('error', 'unknown error')}", "warn")
+
+    if not pending:
+        return
+
+    deadline = time.monotonic() + COMPANION_WAIT
+    still = {name for name, _ in pending}
+    while still and time.monotonic() < deadline:
+        if should_stop and should_stop():
+            return
+        for name, is_up in pending:
+            if name in still and is_up():
+                still.discard(name)
+                report(f"  {name} is up", "good")
+        if still:
+            time.sleep(0.5)
+    for name in still:
+        report(f"  {name} did not answer in time — starting CS2 anyway", "warn")
+
+
 def play(
     user: steam.SteamUser,
     width: int,
@@ -435,8 +510,11 @@ def play(
     say: Optional[Callable[[str, str], None]] = None,
     should_stop: Optional[Callable[[], bool]] = None,
     phase: Optional[Callable[[str], None]] = None,
+    companions_before: Optional[List[Dict[str, Any]]] = None,
+    start_crosshairx: bool = False,
 ) -> int:
-    """The whole sequence: prepare, switch mode, launch, fit, restore.
+    """The whole sequence: prepare, switch mode, bring up companions, launch,
+    fit, restore.
 
     Returns a process-style exit code.
     """
@@ -518,7 +596,14 @@ def play(
                    f"{width}x{height}@{refresh or mode_before[2]}", "good")
             time.sleep(0.5)
 
-    # 3. Hand off to Steam.
+    # 3. Whatever runs alongside the game, started and confirmed up first --
+    #    not launched in the same breath as CS2, which is how it used to race
+    #    the game for a window.
+    if companions_before or start_crosshairx:
+        mark("companions")
+        _bring_up_companions(companions_before, start_crosshairx, report, should_stop)
+
+    # 4. Hand off to Steam.
     try:
         mark("launching")
         report("  launching through Steam...", "")
@@ -544,7 +629,7 @@ def play(
         report(f"  window   {found.title or GAME_PROCESS}  "
                f"{found.size[0]}x{found.size[1]}", "good")
 
-        # 4. Sit it flush over the screen. With the desktop already at the
+        # 5. Sit it flush over the screen. With the desktop already at the
         #    target mode this is usually a no-op, but it corrects CS2 when it
         #    places the window off-origin or a pixel short.
         time.sleep(1.5)
@@ -689,12 +774,14 @@ class LaunchSession:
     :meth:`snapshot`.
     """
 
-    PHASES = ("idle", "preparing", "switching", "launching", "waiting",
-              "running", "restoring", "done", "error")
+    PHASES = ("idle", "preparing", "switching", "companions", "launching",
+              "waiting", "running", "restoring", "done", "error")
 
     def __init__(self, user: steam.SteamUser, width: int, height: int,
                  refresh: int = 0, stretch_mode: str = "borderless",
-                 patch_video: bool = True, extra_args: str = "") -> None:
+                 patch_video: bool = True, extra_args: str = "",
+                 companions_before: Optional[List[Dict[str, Any]]] = None,
+                 start_crosshairx: bool = False) -> None:
         self.user = user
         self.width = width
         self.height = height
@@ -704,6 +791,9 @@ class LaunchSession:
         # Passed to Steam for this launch only -- "+playdemo ..." for the
         # watch-now button. Never written into the stored launch options.
         self.extra_args = extra_args
+        # Started and confirmed running before CS2 is, not alongside it.
+        self.companions_before = companions_before
+        self.start_crosshairx = start_crosshairx
 
         self._lock = threading.Lock()
         self._thread: Optional[threading.Thread] = None
@@ -777,6 +867,8 @@ class LaunchSession:
                 extra_args=self.extra_args,
                 session=session, say=self._say,
                 should_stop=self._stop.is_set, phase=self._phase,
+                companions_before=self.companions_before,
+                start_crosshairx=self.start_crosshairx,
             )
             self._phase("done")
         except (LaunchError, steam.SteamError, window.WindowError) as exc:
