@@ -27,6 +27,7 @@ import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from urllib.parse import parse_qs
 
 from . import __version__, backup, cfglang, emit, profiles, steam, window
 from .hardware import Machine, ProbeError, detect
@@ -2848,6 +2849,67 @@ def _inventory_inspect(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     return {"ok": True, "detail": "Opening in CS2…"}
 
 
+def _skins_vpk(state: State) -> Path:
+    state.refresh()
+    if not state.cs2_install:
+        raise steam.SteamError("CS2 is not installed where Steam says it should be")
+    vpk = state.cs2_install / "game" / "csgo" / "pak01_dir.vpk"
+    if not vpk.is_file():
+        raise steam.SteamError("the game's own data file was not found")
+    return vpk
+
+
+def _skins_catalog(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Every weapon/finish combo CS2 has released -- names and rarity only,
+    read fresh from the account's own install. See cs2cfg.skins_catalog."""
+    from . import skins_catalog
+
+    try:
+        vpk_path = _skins_vpk(state)
+        items = skins_catalog.build(vpk_path, force=bool(body.get("force")))
+    except (steam.SteamError, skins_catalog.CatalogError) as exc:
+        return {"ok": False, "error": str(exc)}
+
+    groups: Dict[str, List[Dict[str, Any]]] = {}
+    for it in items:
+        groups.setdefault(skins_catalog.group_of(it["weapon_class"]), []).append(it)
+    return {"ok": True, "items": items, "count": len(items),
+            "groups": [{"name": name, "items": entries} for name, entries in groups.items()]}
+
+
+def _skins_tool_status(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Whether a 3D viewer tool is configured, and whether it is actually
+    sitting where it was last pointed at. Never fetched or run by this
+    application on its own -- see cs2cfg.skin_render."""
+    from . import skin_render
+    from .cli import load_prefs
+
+    return {"ok": True, **skin_render.status(load_prefs())}
+
+
+def _skins_tool_browse(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Open the native picker so the user can point at their own copy of
+    the viewer tool, wherever they installed it."""
+    from . import picker
+
+    chosen = picker.pick_exe(title="Choose Source2Viewer-CLI.exe")
+    if not chosen:
+        return {"ok": True, "cancelled": True, "path": None}
+    return {"ok": True, "cancelled": False, "path": chosen}
+
+
+def _skins_tool_set(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Remember where the user says the viewer tool lives."""
+    from . import skin_render
+    from .cli import load_prefs, save_prefs
+
+    path = str(body.get("path") or "").strip()
+    prefs = load_prefs()
+    prefs[skin_render.PREF_KEY] = path
+    save_prefs(prefs)
+    return {"ok": True, **skin_render.status(prefs)}
+
+
 def _companions_act(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     """Add, remove, or flip whether one starts with the game."""
     from . import companions, profiles
@@ -3374,6 +3436,10 @@ def make_handler(state: State):
         "/api/companions": _companions,
         "/api/inventory": _inventory,
         "/api/inventory/inspect": _inventory_inspect,
+        "/api/skins/catalog": _skins_catalog,
+        "/api/skins/tool_status": _skins_tool_status,
+        "/api/skins/tool_browse": _skins_tool_browse,
+        "/api/skins/tool_set": _skins_tool_set,
         "/api/companions/browse": _companions_browse,
         "/api/companions/act": _companions_act,
         "/api/companions/start": _companions_start,
@@ -3479,7 +3545,10 @@ def make_handler(state: State):
                 # rather than trusted from the path, the same reasoning as
                 # the avatar route above: nothing outside the cache this
                 # application built for itself can be asked for.
-                from . import companions, profiles
+                # profiles is already a module-level import; re-importing it
+                # here too would make it a local name for all of do_GET and
+                # break every other branch's reference to the global.
+                from . import companions
                 from .cli import load_prefs
 
                 wanted = path[len("/companion-icon/"):].removesuffix(".png")
@@ -3495,6 +3564,113 @@ def make_handler(state: State):
                 self.send_header("Content-Type", "image/png")
                 self.send_header("Content-Length", str(len(data)))
                 self.send_header("Cache-Control", "no-cache")
+                self.end_headers()
+                self.wfile.write(data)
+                return
+            if path == "/api/skins/render":
+                # A live export, not a file this server has: the viewer
+                # tool the user installed runs once per request and the
+                # bytes it produced are handed over and forgotten -- see
+                # cs2cfg.skin_render for why nothing here is ever cached
+                # to disk. Slow enough (a real subprocess) that this is
+                # deliberately outside state.lock, the same reasoning as
+                # the avatar and companion-icon routes above.
+                #
+                # Everything below is one broad try: a route that calls out
+                # to an external process and parses a VPK has plenty of ways
+                # to fail that are not steam.SteamError or RenderError (the
+                # game mid-update and briefly locking the VPK, for one), and
+                # an exception that reaches socketserver uncaught just drops
+                # the connection -- which the browser reports as "Failed to
+                # fetch" with no explanation. A clear 500 is always better.
+                try:
+                    from . import skin_render, skins_catalog
+                    from .cli import load_prefs
+
+                    query = parse_qs(self.path.split("?", 1)[1] if "?" in self.path else "")
+                    weapon_class = (query.get("weapon") or [""])[0]
+                    paintkit = (query.get("paintkit") or [""])[0]
+
+                    prefs = load_prefs()
+                    tool = skin_render.tool_path(prefs)
+                    if tool is None:
+                        self._send_json({"error": "no 3D viewer tool is set up"}, 409)
+                        return
+                    vpk_path = _skins_vpk(state)
+                    items = skins_catalog.build(vpk_path)
+                    combo = next((it for it in items if it["weapon_class"] == weapon_class
+                                 and it["paintkit"] == paintkit), None)
+                    if combo is None:
+                        self._send_json({"error": "no such weapon/finish combination"}, 404)
+                        return
+                    data = skin_render.render(vpk_path, combo["model"], tool)
+                except (steam.SteamError, skins_catalog.CatalogError, skin_render.RenderError) as exc:
+                    self._send_json({"error": str(exc)}, 500)
+                    return
+                except Exception as exc:  # see the comment above
+                    self._send_json({"error": f"{type(exc).__name__}: {exc}"}, 500)
+                    return
+                self.send_response(200)
+                self.send_header("Content-Type", "model/gltf-binary")
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(data)
+                return
+            if path == "/api/skins/texture":
+                # The actual paint, which the model export above never
+                # carries -- a skin's colour lives in a separate file CS2
+                # composites on at runtime (see cs2cfg.skin_render.texture_path),
+                # not in the weapon model itself. 404 here is a normal
+                # answer, not a failure: plenty of combos resolve to no
+                # identifiable texture, and the page shows the bare model
+                # rather than treating that as an error. Everything else is
+                # one broad try, for the same reason as the render route
+                # above -- an uncaught exception here drops the connection
+                # rather than answering it, which the browser just reports
+                # as "Failed to fetch".
+                try:
+                    from . import skin_render, skins_catalog
+                    from .cli import load_prefs
+
+                    query = parse_qs(self.path.split("?", 1)[1] if "?" in self.path else "")
+                    weapon_class = (query.get("weapon") or [""])[0]
+                    paintkit = (query.get("paintkit") or [""])[0]
+
+                    prefs = load_prefs()
+                    tool = skin_render.tool_path(prefs)
+                    if tool is None:
+                        self._send_json({"error": "no 3D viewer tool is set up"}, 409)
+                        return
+                    vpk_path = _skins_vpk(state)
+                    items = skins_catalog.build(vpk_path)
+                    combo = next((it for it in items if it["weapon_class"] == weapon_class
+                                 and it["paintkit"] == paintkit), None)
+                    if combo is None:
+                        self._send_json({"error": "no such weapon/finish combination"}, 404)
+                        return
+                    resolved = skin_render.texture_path(vpk_path, tool, weapon_class, paintkit)
+                    if resolved is None:
+                        self._send_json({"error": "no texture could be identified for that finish"}, 404)
+                        return
+                    data = skin_render.render_texture(vpk_path, resolved.path, tool)
+                except (steam.SteamError, skins_catalog.CatalogError, skin_render.RenderError) as exc:
+                    self._send_json({"error": str(exc)}, 500)
+                    return
+                except Exception as exc:  # see the comment above
+                    self._send_json({"error": f"{type(exc).__name__}: {exc}"}, 500)
+                    return
+                self.send_response(200)
+                self.send_header("Content-Type", "image/png")
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Cache-Control", "no-store")
+                # Whether this is a small pattern meant to repeat (the
+                # "Gunsmith" patina finishes) or one image mapped once over
+                # the whole weapon (everything else) -- see
+                # cs2cfg.skin_render.TextureInfo. The page needs this to
+                # pick the right texture wrap mode; tiling the wrong kind
+                # produces a shattered-looking mess, not just a soft error.
+                self.send_header("X-Texture-Tiled", "1" if resolved.tiled else "0")
                 self.end_headers()
                 self.wfile.write(data)
                 return

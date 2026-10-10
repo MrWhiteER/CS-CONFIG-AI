@@ -1018,6 +1018,59 @@
     font-size: 10px; padding: 4px 9px; margin-top: 2px;
   }
 
+  /* All Skins: the full catalog, filterable, with an on-demand 3D look. */
+  .skins-toolbar {
+    display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px;
+  }
+  .skins-toolbar input[type="search"] { flex: 1 1 220px; min-width: 160px; }
+  .skins-toolbar select { flex: 0 0 auto; }
+  .skins-grid {
+    display: grid; gap: 10px;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+  .skin-card {
+    background: var(--chip); border: 1px solid var(--line); border-left: 3px solid var(--line);
+    border-radius: 10px; padding: 10px; text-align: left; cursor: pointer;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .skin-card:hover { background: rgba(var(--lift), .08); }
+  .skin-card .wn { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+  .skin-card .sn {
+    font-size: 12px; color: var(--ink); line-height: 1.3;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .skin-card .rr { font-size: 10px; margin-top: 2px; }
+  .skins-count { font-size: 11px; color: var(--muted); margin: -4px 0 12px; }
+
+  .skin-viewer-overlay {
+    position: fixed; inset: 0; z-index: 500; padding: 20px;
+    background: rgba(3, 6, 10, .72); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .skin-viewer-overlay.hidden { display: none; }
+  .skin-viewer-box {
+    width: min(720px, 92vw); height: min(560px, 82vh);
+    background: linear-gradient(180deg, var(--panel-2), var(--panel));
+    border: 1px solid var(--line); border-radius: 12px;
+    box-shadow: 0 24px 70px rgba(0,0,0,.6);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .skin-viewer-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 14px; border-bottom: 1px solid var(--line); font-size: 13px;
+  }
+  .skin-viewer-head-actions { display: flex; align-items: center; gap: 8px; }
+  .skin-viewer-head-actions a.btn { text-decoration: none; }
+  #skin-viewer-body {
+    flex: 1; position: relative; display: flex; align-items: center; justify-content: center;
+    /* A neutral studio-style backdrop, not the page's own near-black panel:
+       a dark skin (several genuinely are mostly black, e.g. Kill Confirmed)
+       needs real contrast behind it or it just disappears. */
+    background: radial-gradient(circle at 50% 42%, #44454c, #202126 72%);
+  }
+  #skin-viewer-canvas { width: 100%; height: 100%; touch-action: none; cursor: grab; }
+  .skin-viewer-note { padding: 18px; text-align: center; max-width: 420px; }
+
   /* Signing in. Three doors to one account, and Steam at the end of all of
      them -- a CS2 configuration without a Steam account is a configuration
      for nobody, so the panel says so rather than letting somebody finish and
@@ -4813,6 +4866,9 @@
       <!-- A crate, for what is in it. -->
       <button class="tab" data-tab="inventory" role="tab" aria-selected="false">
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8l9-4.5L21 8v8l-9 4.5L3 16z"/><path d="M3 8l9 4.5L21 8M12 12.5V21"/></svg></i><span class="tx">Inventory</span></button>
+      <!-- A paint swatch -- what the tab is about, not any one weapon or brand. -->
+      <button class="tab" data-tab="skins" role="tab" aria-selected="false">
+        <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="7.5" r="1.6"/><circle cx="16.2" cy="10.3" r="1.6"/><circle cx="16.2" cy="14.8" r="1.6"/><circle cx="7.8" cy="10.3" r="1.6"/></svg></i><span class="tx">All Skins</span></button>
       <button class="tab" data-tab="cs2" role="tab" aria-selected="false">
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.3"/><circle cx="10" cy="17" r="2.3"/></svg></i><span class="tx">CS2 Settings</span></button>
       <button class="tab" data-tab="keyboard" role="tab" aria-selected="false">
@@ -5088,6 +5144,54 @@
         <h2>Items</h2>
         <div id="inv-out"><span class="sub"><span class="spin"></span> Reading&hellip;</span></div>
       </section>
+    </div>
+
+    <!-- Every weapon/finish combo CS2 has released, owned or not -- names
+         and rarity read fresh from the game's own data (see
+         cs2cfg.skins_catalog), nothing bundled or shipped with this app.
+         The 3D look is on demand only, through a tool the user installs
+         themselves; nothing extracted is ever saved to disk or kept. -->
+    <div class="tab-panel hidden" data-panel="skins">
+      <div class="hero">
+        <div class="hero-copy">
+          <div class="eyebrow">Every finish, owned or not</div>
+          <h2>All <em>Skins</em></h2>
+          <p>
+            Every weapon and finish CS2 has ever released, read fresh from the
+            game's own files &mdash; not just what is in your inventory.
+            <b>View in 3D</b> is a look, nothing more: the model is exported on
+            the spot through a tool you install yourself, shown once, and never
+            written anywhere or kept.
+          </p>
+        </div>
+      </div>
+      <section class="panel wide" id="skins-card">
+        <h2>Browse</h2>
+        <div class="skins-toolbar">
+          <input type="search" id="skins-search" placeholder="Search by weapon or finish&hellip;">
+          <select id="skins-weapon-filter"><option value="">All weapons</option></select>
+          <select id="skins-rarity-filter"><option value="">All rarities</option></select>
+          <button class="btn small" id="skins-reload">Re-read</button>
+        </div>
+        <div id="skins-out"><span class="sub"><span class="spin"></span> Reading&hellip;</span></div>
+      </section>
+    </div>
+
+    <div class="skin-viewer-overlay hidden" id="skin-viewer-overlay">
+      <div class="skin-viewer-box">
+        <div class="skin-viewer-head">
+          <span id="skin-viewer-title">&nbsp;</span>
+          <span class="skin-viewer-head-actions">
+            <a class="btn small" id="skin-viewer-market" href="#" target="_blank" rel="noopener"
+               title="Opens the Steam Market listings for this finish &mdash; from there, Steam's own Inspect in Game button shows it on the real character, on a real map, under real lighting.">
+              See it on a character &amp; map&hellip;</a>
+            <button class="btn small" id="skin-viewer-close">Close</button>
+          </span>
+        </div>
+        <div id="skin-viewer-body">
+          <canvas id="skin-viewer-canvas"></canvas>
+        </div>
+      </div>
     </div>
 
     <div class="tab-panel hidden" data-panel="cs2">
@@ -5577,6 +5681,7 @@
     </div>
   </div>
 </div>
+<script src="skin-viewer.js"></script>
 <script>
 const TOKEN = "__CS2CFG_TOKEN__";
 const $ = (id) => document.getElementById(id);
@@ -10763,6 +10868,232 @@ document.addEventListener("click", async e => {
   }
 });
 
+/* All Skins: every weapon/finish combo CS2 has released, read fresh from
+   the game's own files (see cs2cfg.skins_catalog) -- not just what is in
+   this account's inventory. The 3D look is a separate, on-demand step
+   through cs2cfg.skin_render: nothing is exported until a card is opened,
+   and nothing it exports is ever written anywhere this page can get back
+   to later -- the model is shown once and the next open asks again. */
+let skinsData = null;
+let skinsFilters = { search: "", weapon: "", rarity: "" };
+let skinsToolStatus = null;
+let skinViewer = null;
+let skinViewerCurrent = null;
+
+async function loadSkinsCatalog(force) {
+  const box = $("skins-out");
+  if (box) box.innerHTML = '<span class="sub"><span class="spin"></span> Reading&hellip;</span>';
+  try {
+    skinsData = await api("/api/skins/catalog", { force: !!force });
+  } catch (err) {
+    skinsData = { ok: false, error: String(err && err.message || err) };
+  }
+  renderSkins();
+}
+
+async function loadSkinsToolStatus() {
+  try {
+    skinsToolStatus = await api("/api/skins/tool_status", {});
+  } catch (err) {
+    skinsToolStatus = { configured: false, found: false, path: "" };
+  }
+}
+
+function filteredSkins() {
+  const items = (skinsData && skinsData.items) || [];
+  const q = skinsFilters.search.trim().toLowerCase();
+  return items.filter(it => {
+    if (skinsFilters.weapon && it.weapon_class !== skinsFilters.weapon) return false;
+    if (skinsFilters.rarity && it.rarity !== skinsFilters.rarity) return false;
+    if (q && !it.display_name.toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+
+function skinCard(it) {
+  return '<div class="skin-card" style="border-left-color:' + esc(it.rarity_color) + '" ' +
+    'data-weapon="' + esc(it.weapon_class) + '" data-paintkit="' + esc(it.paintkit) + '" ' +
+    'data-name="' + esc(it.display_name) + '">' +
+    '<span class="wn">' + esc(it.weapon_name) + '</span>' +
+    '<span class="sn">' + esc(it.skin_name) + '</span>' +
+    '<span class="rr" style="color:' + esc(it.rarity_color) + '">' + esc(it.rarity) + '</span>' +
+    '</div>';
+}
+
+function fillSkinsFilterOptions() {
+  const weaponSel = $("skins-weapon-filter");
+  const raritySel = $("skins-rarity-filter");
+  if (!weaponSel || weaponSel.dataset.filled) return;
+  const items = (skinsData && skinsData.items) || [];
+  const weapons = [...new Map(items.map(it => [it.weapon_class, it.weapon_name])).entries()]
+    .sort((a, b) => a[1].localeCompare(b[1]));
+  const rarities = [...new Set(items.map(it => it.rarity))].filter(Boolean);
+  weaponSel.insertAdjacentHTML("beforeend",
+    weapons.map(([cls, name]) => '<option value="' + esc(cls) + '">' + esc(name) + "</option>").join(""));
+  raritySel.insertAdjacentHTML("beforeend",
+    rarities.map(r => '<option value="' + esc(r) + '">' + esc(r) + "</option>").join(""));
+  weaponSel.dataset.filled = "1";
+}
+
+function renderSkins() {
+  const box = $("skins-out");
+  if (!box) return;
+  const d = skinsData;
+  if (!d || !d.ok) {
+    box.innerHTML = '<p class="sub warn">' + esc((d && d.error) || "Could not read the game's own data.") + "</p>" +
+      '<div class="actions"><button class="btn" id="skins-reload-inline">Try again</button></div>';
+    return;
+  }
+  fillSkinsFilterOptions();
+  const items = filteredSkins();
+  box.innerHTML = '<p class="skins-count">' + items.length + " of " + d.count + " shown</p>" +
+    '<div class="skins-grid">' + items.map(skinCard).join("") + "</div>";
+}
+
+document.addEventListener("input", e => {
+  if (e.target.id === "skins-search") {
+    skinsFilters.search = e.target.value;
+    renderSkins();
+  }
+});
+document.addEventListener("change", e => {
+  if (e.target.id === "skins-weapon-filter") { skinsFilters.weapon = e.target.value; renderSkins(); }
+  if (e.target.id === "skins-rarity-filter") { skinsFilters.rarity = e.target.value; renderSkins(); }
+});
+
+function skinViewerSetupPrompt() {
+  return '<div class="skin-viewer-note">' +
+    '<p class="sub">No 3D viewer tool is set up yet. Install ' +
+    '<a href="https://github.com/ValveResourceFormat/ValveResourceFormat/releases" target="_blank" rel="noopener">' +
+    'ValveResourceFormat</a> yourself, then point this at it &mdash; it is only ever run on your own machine, ' +
+    'against your own install.</p>' +
+    '<button class="btn primary" id="skins-tool-choose">Choose Source2Viewer-CLI.exe&hellip;</button></div>';
+}
+
+// The tool this runs against does not handle two copies of itself running
+// at once well (see cs2cfg.skin_render's _TOOL_LOCK) -- opening a second
+// skin before the first finished left the first request just hanging, the
+// "sometimes failed to fetch" this chases down. Only one render is ever
+// allowed to be in flight: starting a new one, or closing the viewer,
+// cancels whatever came before it, and a cancelled request never touches
+// the page -- a newer call (or the closed modal) already owns it by then.
+let skinRenderAbort = null;
+
+async function runSkinRender(weaponClass, paintkit, displayName) {
+  if (skinRenderAbort) skinRenderAbort.abort();
+  const controller = new AbortController();
+  skinRenderAbort = controller;
+  const { signal } = controller;
+
+  const body = $("skin-viewer-body");
+  body.innerHTML = '<span class="sub"><span class="spin"></span> Exporting&hellip;</span>';
+  try {
+    const res = await fetch("/api/skins/render?weapon=" + encodeURIComponent(weaponClass) +
+      "&paintkit=" + encodeURIComponent(paintkit),
+      { headers: { "X-CS2CFG-Token": TOKEN }, signal });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || ("HTTP " + res.status));
+    }
+    const buffer = await res.arrayBuffer();
+    if (signal.aborted) return;
+    body.innerHTML = '<canvas id="skin-viewer-canvas"></canvas>';
+    const canvas = $("skin-viewer-canvas");
+    if (!skinViewer || skinViewer.canvas !== canvas) {
+      skinViewer = new SkinViewer(canvas);
+    }
+    skinViewer.resize();
+    await skinViewer.load(buffer);
+    skinViewer.resize();
+
+    // The paint is a second, separate fetch -- see cs2cfg.skin_render.
+    // A 404 here is an ordinary outcome (not every combo resolves to a
+    // texture this build can identify yet), so the bare model stays up
+    // rather than being treated as a failure.
+    try {
+      const texRes = await fetch("/api/skins/texture?weapon=" + encodeURIComponent(weaponClass) +
+        "&paintkit=" + encodeURIComponent(paintkit),
+        { headers: { "X-CS2CFG-Token": TOKEN }, signal });
+      if (texRes.ok && !signal.aborted) {
+        const texBuffer = await texRes.arrayBuffer();
+        if (!signal.aborted) {
+          const tiled = texRes.headers.get("X-Texture-Tiled") === "1";
+          await skinViewer.setOverrideTexture(texBuffer, texRes.headers.get("Content-Type"), tiled);
+        }
+      }
+    } catch (texErr) {
+      // The model is already up; losing the paint is not worth losing that.
+    }
+  } catch (err) {
+    if (err && err.name === "AbortError") return;  // superseded, not a failure
+    body.innerHTML = '<div class="skin-viewer-note"><p class="sub warn">' +
+      esc(String(err && err.message || err)) + "</p></div>";
+  }
+}
+
+async function openSkinViewer(weaponClass, paintkit, displayName) {
+  skinViewerCurrent = { weaponClass, paintkit, displayName };
+  $("skin-viewer-title").textContent = displayName;
+  // Steam Market's own listings for this finish -- from any one of them,
+  // Steam's own Inspect in Game button shows it on the real player model,
+  // on a real map, under the game's own lighting. Not something this
+  // viewer reproduces; the real thing is one click further from here.
+  $("skin-viewer-market").href = "https://steamcommunity.com/market/search?appid=730&q=" +
+    encodeURIComponent(displayName);
+  $("skin-viewer-overlay").classList.remove("hidden");
+  if (!skinsToolStatus) await loadSkinsToolStatus();
+  if (!skinsToolStatus.found) {
+    if (skinRenderAbort) { skinRenderAbort.abort(); skinRenderAbort = null; }
+    $("skin-viewer-body").innerHTML = skinViewerSetupPrompt();
+    return;
+  }
+  await runSkinRender(weaponClass, paintkit, displayName);
+}
+
+document.addEventListener("click", async e => {
+  if (e.target.closest("#skins-reload") || e.target.closest("#skins-reload-inline")) {
+    loadSkinsCatalog(true);
+    return;
+  }
+  const card = e.target.closest(".skin-card");
+  if (card) {
+    openSkinViewer(card.dataset.weapon, card.dataset.paintkit, card.dataset.name);
+    return;
+  }
+  if (e.target.closest("#skin-viewer-close")) {
+    if (skinRenderAbort) { skinRenderAbort.abort(); skinRenderAbort = null; }
+    $("skin-viewer-overlay").classList.add("hidden");
+    skinViewerCurrent = null;
+    return;
+  }
+  if (e.target.closest("#skin-viewer-overlay") && e.target.id === "skin-viewer-overlay") {
+    if (skinRenderAbort) { skinRenderAbort.abort(); skinRenderAbort = null; }
+    $("skin-viewer-overlay").classList.add("hidden");
+    skinViewerCurrent = null;
+    return;
+  }
+  const chooseTool = e.target.closest("#skins-tool-choose");
+  if (chooseTool) {
+    chooseTool.disabled = true;
+    try {
+      const picked = await api("/api/skins/tool_browse", {});
+      if (picked.cancelled || !picked.path) return;
+      skinsToolStatus = await api("/api/skins/tool_set", { path: picked.path });
+      if (skinsToolStatus.found && skinViewerCurrent) {
+        await runSkinRender(skinViewerCurrent.weaponClass, skinViewerCurrent.paintkit, skinViewerCurrent.displayName);
+      }
+    } catch (err) {
+      status(String(err && err.message || err), true);
+    } finally {
+      chooseTool.disabled = false;
+    }
+  }
+});
+
+window.addEventListener("resize", () => {
+  if (skinViewer && !$("skin-viewer-overlay").classList.contains("hidden")) skinViewer.resize();
+});
+
 /* The account panel.
 
    Three ways into one account, and Steam at the end of all of them: a CS2
@@ -12755,6 +13086,7 @@ function setTab(name) {
   if (name === "files") loadTree(false);
   if (name === "faceit") loadDemos().then(loadFaceit);
   if (name === "inventory" && !inventoryData) loadInventory(false);
+  if (name === "skins") { if (!skinsToolStatus) loadSkinsToolStatus(); if (!skinsData) loadSkinsCatalog(false); }
   if (name === "scripts") loadPlugins(false);
   if (name === "keyboard") loadKeyboard(false);
   if (name === "fix") loadFixes(false);
