@@ -18,7 +18,9 @@ from __future__ import annotations
 import gzip
 import json
 import mimetypes
+import os
 import secrets
+import sys
 import threading
 import time
 import traceback
@@ -2802,6 +2804,18 @@ def _companions(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     return {"ok": True, "companions": companions.survey(ui)}
 
 
+def _inventory(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """This account's CS2 inventory, read straight from Steam. Read-only."""
+    from . import inventory
+
+    state.refresh()
+    user = state.user_for(body.get("account"))
+    result = inventory.fetch(user.steam_id64, force=bool(body.get("force")))
+    if result.get("ok"):
+        result["groups"] = inventory.grouped(result["items"])
+    return result
+
+
 def _companions_browse(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     """Open the native picker for a program, to add as a companion."""
     from . import picker
@@ -2810,6 +2824,28 @@ def _companions_browse(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     if not chosen:
         return {"ok": True, "cancelled": True, "path": None}
     return {"ok": True, "cancelled": False, "path": chosen}
+
+
+def _inventory_inspect(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Open Steam's own "Inspect in Game" link for one item.
+
+    The link itself comes from Steam -- see cs2cfg.inventory -- never built
+    here. Checked before it is opened, the same reasoning as every other
+    os.startfile in this file: a link pasted back from the page has to still
+    look like what it claims to be, or this becomes a way to open anything
+    at all through a field that was supposed to hold one specific kind of
+    Steam URI.
+    """
+    link = str(body.get("link") or "")
+    if not link.startswith("steam://rungame/730/") or "csgo_econ_action_preview" not in link:
+        return {"ok": False, "error": "that does not look like an inspect link"}
+    if sys.platform != "win32":
+        return {"ok": False, "error": "this opens Steam, which needs Windows"}
+    try:
+        os.startfile(link)
+    except OSError as exc:
+        return {"ok": False, "error": f"could not ask Steam to open: {exc}"}
+    return {"ok": True, "detail": "Opening in CS2…"}
 
 
 def _companions_act(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -3336,6 +3372,8 @@ def make_handler(state: State):
         "/api/crosshairx": _crosshairx,
         "/api/crosshairx/start": _crosshairx_start,
         "/api/companions": _companions,
+        "/api/inventory": _inventory,
+        "/api/inventory/inspect": _inventory_inspect,
         "/api/companions/browse": _companions_browse,
         "/api/companions/act": _companions_act,
         "/api/companions/start": _companions_start,
