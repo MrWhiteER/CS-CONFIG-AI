@@ -11,6 +11,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -669,6 +670,65 @@ class TestSettingControls(FixtureCase):
                                         "mrwhiteer/autoperf.vcfg", 9999)
         self.assertIn('fps_max_ui "144"', text)
         self.assertEqual(text.count("fps_max_ui"), 1)
+
+
+class TestRecommendedSettings(unittest.TestCase):
+    """The curated subset surfaced under its own tab -- not a separate set
+    of cvars, just a list of which existing ones to group together."""
+
+    def test_cl_color_is_recommended(self):
+        self.assertIn("cl_color", cfgscan.recommended_settings())
+
+    def test_every_recommended_name_is_a_real_setting(self):
+        """Recommending a cvar that is not in "settings" at all would be a
+        row the rest of the page can never actually render."""
+        specs = cfgscan._load_setting_specs().get("settings", {})
+        for name in cfgscan.recommended_settings():
+            self.assertIn(name, specs, f"{name!r} is recommended but has no spec")
+
+    def test_an_empty_knowledge_base_recommends_nothing(self):
+        with mock.patch.object(cfgscan, "_load_setting_specs", return_value={}):
+            self.assertEqual(cfgscan.recommended_settings(), [])
+
+
+class TestApplyScript(FixtureCase):
+    """The key-triggered 'reload my configs' alias -- the one thing this app
+    writes that is not a value the user asked to change, so it gets its own
+    checks: right file, right exec target, and readable back as a script."""
+
+    def test_targets_the_real_entry_point(self):
+        _, text = cfgscan.append_apply_script(self.result)
+        self.assertIn('alias "cs2cfg_apply" "exec mrwhiteer/autoexec.vcfg"', text)
+
+    def test_lands_in_the_same_file_new_settings_would(self):
+        relative, _ = cfgscan.append_apply_script(self.result)
+        self.assertEqual(relative, cfgscan.default_target(self.result))
+
+    def test_installing_twice_raises(self):
+        relative, text = cfgscan.append_apply_script(self.result)
+        config = next(c for c in self.result.files.values() if c.relative == relative)
+        cfglang.write_config_text(config.path, text)
+        again = cfgscan.scan(self.collection, cfg_root=self.cfg_root)
+        with self.assertRaises(ValueError) as caught:
+            cfgscan.append_apply_script(again)
+        self.assertIn("already installed", str(caught.exception))
+
+    def test_reads_back_as_a_script(self):
+        """The whole point of the banner shape: plugins.py has to recognise
+        this as a feature, or it never shows up in the Scripts tab."""
+        from cs2cfg import plugins
+
+        relative, text = cfgscan.append_apply_script(self.result)
+        config = next(c for c in self.result.files.values() if c.relative == relative)
+        cfglang.write_config_text(config.path, text)
+        again = cfgscan.scan(self.collection, cfg_root=self.cfg_root)
+
+        found = plugins.find(again)
+        match = next((p for p in found if p.entry == "cs2cfg_apply"), None)
+        self.assertIsNotNone(match, [p.entry for p in found])
+        self.assertEqual(match.name, "Apply Saved Settings")
+        self.assertFalse(match.missing, "exec target should resolve to a real file")
+        self.assertEqual(match.bound_to, [])
 
 
 class TestFolderPicking(FixtureCase):

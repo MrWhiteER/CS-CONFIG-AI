@@ -246,6 +246,23 @@ class ResolvingTheTexture(unittest.TestCase):
             found = skin_render.texture_path(Path("d.vpk"), Path("s2v.exe"), "weapon_ak47", "x")
         self.assertIsNone(found)
 
+    def test_a_generic_filler_texture_is_treated_as_no_texture(self):
+        """A glove (and occasionally a weapon) material with no real paint
+        of its own points g_tPattern at Valve's generic filler texture
+        under materials/default/ -- confirmed on a real glove finish
+        (King Snake) that resolves exactly this way. Showing that filler
+        as if it were the paint would be worse than the plain model this
+        already falls back to when nothing resolves."""
+        index = _fake_index(["materials/models/weapons/customization/paints/vmats/x.vmat_c"])
+        vmat_dump = ('m_name = "g_tPattern"\nm_pValue = resource:"materials/default/default_tga_51411dfa.vtex"\n'
+                    'm_name = "g_tColor"\nm_pValue = resource:"materials/default/default_weapon_color.vtex"\n')
+        with mock.patch.object(skin_render.vpk, "read_index", return_value=index), \
+             mock.patch.object(skin_render.subprocess, "run",
+                               return_value=subprocess.CompletedProcess(
+                                   [], 0, stdout=vmat_dump.encode(), stderr=b"")):
+            found = skin_render.texture_path(Path("d.vpk"), Path("s2v.exe"), "weapon_ak47", "x")
+        self.assertIsNone(found)
+
     def test_a_weapon_specific_vmat_variant_is_still_found(self):
         index = _fake_index([
             "materials/models/weapons/customization/paints/vmats/so_red_sg553.vmat_c",
@@ -272,6 +289,21 @@ class ResolvingTheTexture(unittest.TestCase):
                                side_effect=subprocess.TimeoutExpired("s2v", 30)):
             found = skin_render.texture_path(Path("d.vpk"), Path("s2v.exe"), "weapon_ak47", "x")
         self.assertIsNone(found)
+
+    def test_a_vmat_outside_the_usual_weapon_folder_is_still_found(self):
+        """Gloves keep their materials somewhere completely different --
+        gloves/paints/ for older finishes, items/assets/paintkits/*/ for
+        newer ones -- confirmed against the account's own real glove
+        materials. There is no fixed folder to assume for those the way
+        there is for a weapon, so this has to search by filename."""
+        index = _fake_index(["gloves/paints/sporty_hunter.vmat_c"])
+        vmat_dump = 'm_name = "g_tPattern"\nm_pValue = resource:"gloves/textiles/hunter_blaze_orange.vtex"\n'
+        with mock.patch.object(skin_render.vpk, "read_index", return_value=index), \
+             mock.patch.object(skin_render.subprocess, "run",
+                               return_value=subprocess.CompletedProcess(
+                                   [], 0, stdout=vmat_dump.encode(), stderr=b"")):
+            found = skin_render.texture_path(Path("d.vpk"), Path("s2v.exe"), "glove_sport", "sporty_hunter")
+        self.assertIn("hunter_blaze_orange", found.path)
 
 
 class SerializingToolCalls(unittest.TestCase):

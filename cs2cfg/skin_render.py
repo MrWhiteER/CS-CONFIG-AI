@@ -132,14 +132,24 @@ def _composite_texture_path(index: Dict[str, "vpk.Entry"], paintkit: str) -> Opt
 
 def _legacy_vmat_path(index: Dict[str, "vpk.Entry"], paintkit: str) -> Optional[str]:
     """An older skin's single material file, if it has one. Tried by exact
-    name first, then by the weapon-specific variants Valve sometimes used
-    (``<paintkit>_<weapon>.vmat_c``)."""
+    name first under the usual weapon paints folder, then by the
+    weapon-specific variants Valve sometimes used
+    (``<paintkit>_<weapon>.vmat_c``), then anywhere else in the VPK by
+    exact filename -- gloves keep theirs in a completely different place
+    (``gloves/paints/`` for the older ones, ``items/assets/paintkits/*/``
+    for the newer ones), and there is no fixed folder to assume for those
+    the way there is for a weapon.
+    """
     exact = f"{VMAT_DIR}{paintkit}.vmat_c"
     if exact in index:
         return exact
     prefix = f"{VMAT_DIR}{paintkit}_"
     for path in index:
         if path.startswith(prefix) and path.endswith(".vmat_c"):
+            return path
+    suffix = f"/{paintkit}.vmat_c"
+    for path in index:
+        if path.endswith(suffix):
             return path
     return None
 
@@ -170,8 +180,16 @@ def _legacy_pattern_texture(dir_vpk: Path, vmat_path: str, tool_exe: Path,
     style_m = _PAINT_STYLE.search(text)
     tiled = bool(style_m) and int(style_m.group(1)) in _TILED_PAINT_STYLES
     for name in ("g_tPattern", "g_tColor"):
-        if name in by_name:
-            return TextureInfo(by_name[name], tiled)
+        path = by_name.get(name)
+        # Some materials (gloves especially, which blend several texture
+        # layers through a mask this does not composite -- see
+        # cs2cfg.skins_catalog's own note on that) have no real pattern of
+        # their own and g_tPattern just points at Valve's generic filler
+        # texture. Showing that filler as if it were the actual paint would
+        # be a worse result than the plain model this already falls back
+        # to when nothing resolves at all.
+        if path and "materials/default/" not in path:
+            return TextureInfo(path, tiled)
     return None
 
 

@@ -1019,6 +1019,16 @@
   }
 
   /* All Skins: the full catalog, filterable, with an on-demand 3D look. */
+  .skins-kind-tabs {
+    display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap;
+  }
+  .skins-kind-tab {
+    background: var(--chip); border: 1px solid var(--line); color: var(--muted);
+    border-radius: 999px; padding: 6px 14px; font-size: 12px; font-weight: 600;
+    cursor: pointer;
+  }
+  .skins-kind-tab.active { background: rgba(var(--lift), .12); color: var(--ink); border-color: rgba(var(--lift), .3); }
+  .skins-kind-tab:disabled { opacity: .45; cursor: not-allowed; }
   .skins-toolbar {
     display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px;
   }
@@ -1063,10 +1073,17 @@
   .skin-viewer-head-actions a.btn { text-decoration: none; }
   #skin-viewer-body {
     flex: 1; position: relative; display: flex; align-items: center; justify-content: center;
-    /* A neutral studio-style backdrop, not the page's own near-black panel:
-       a dark skin (several genuinely are mostly black, e.g. Kill Confirmed)
-       needs real contrast behind it or it just disappears. */
-    background: radial-gradient(circle at 50% 42%, #44454c, #202126 72%);
+    /* An original sky/ground backdrop, not a photo of any real CS2 map --
+       reproducing Valve's own map art here would be the same line this
+       project already declined to cross for models and textures. Just two
+       flat tones and a horizon, enough to read as "presented outdoors"
+       rather than floating in a studio void. The radial vignette on top
+       keeps contrast for a genuinely dark skin (several are, e.g. Kill
+       Confirmed), which would otherwise disappear against a bright sky.
+    */
+    background:
+      radial-gradient(circle at 50% 46%, rgba(0,0,0,0), rgba(0,0,0,.38) 75%),
+      linear-gradient(180deg, #7a8699 0%, #b9c2cf 46%, #8c8577 48%, #4d473e 100%);
   }
   #skin-viewer-canvas { width: 100%; height: 100%; touch-action: none; cursor: grab; }
   .skin-viewer-note { padding: 18px; text-align: center; max-width: 420px; }
@@ -4327,6 +4344,9 @@
   }
   .cline.has-error { background: rgba(255, 84, 104, .10); box-shadow: inset 3px 0 0 var(--bad); }
   .cline.has-warn  { background: rgba(255, 180, 58, .09); box-shadow: inset 3px 0 0 var(--warn); }
+  .cline.jump-target {
+    background: rgba(61, 139, 253, .18); box-shadow: inset 3px 0 0 var(--accent);
+  }
   .code-wrap:not(.editing) .cline:hover { background: rgba(var(--lift), .035); }
   .cline .c { font-style: normal; color: #7fb2ff; }        /* the command  */
   .cline .s { font-style: normal; color: #9ae6a0; }        /* quoted value */
@@ -5167,6 +5187,13 @@
       </div>
       <section class="panel wide" id="skins-card">
         <h2>Browse</h2>
+        <div class="skins-kind-tabs" role="tablist">
+          <button class="skins-kind-tab active" data-kind="gun" role="tab" aria-selected="true">Guns</button>
+          <button class="skins-kind-tab" data-kind="knife" role="tab" aria-selected="false">Knives</button>
+          <button class="skins-kind-tab" data-kind="glove" role="tab" aria-selected="false">Gloves</button>
+          <button class="skins-kind-tab" disabled title="Agents are full player-character models &mdash; a different export pipeline than a weapon, not built yet.">Agents</button>
+          <button class="skins-kind-tab" disabled title="Stickers are a 2D decal composited onto a specific spot on the model, not a texture override &mdash; not built yet.">Stickers</button>
+        </div>
         <div class="skins-toolbar">
           <input type="search" id="skins-search" placeholder="Search by weapon or finish&hellip;">
           <select id="skins-weapon-filter"><option value="">All weapons</option></select>
@@ -8172,6 +8199,23 @@ let cs2Section = null;
 let cs2Group = null;
 const cs2Edits = new Map();
 
+// The "Recommended" section is not a real part of the game's menu: it is a
+// curated subset of cvars that already live under their own real section
+// (see cfg_settings.json's "recommended" list), grouped together here for a
+// quick first pass. A setting belongs to it by name, not by the "group" the
+// server tags it with -- cl_color is still genuinely Game > Team underneath,
+// it just also shows up here. This is the one place that distinction has to
+// be made; everywhere else that used to compare `x.group === id` now asks
+// this instead, so the synthetic section cannot silently fall out of sync.
+const RECOMMENDED_GROUP = "recommended_main";
+
+function cs2InGroup(x, groupId) {
+  if (groupId === RECOMMENDED_GROUP) {
+    return !!(cs2Data && cs2Data.recommended && cs2Data.recommended.includes(x.name));
+  }
+  return x.group === groupId;
+}
+
 function cs2Key(x) { return x.source + "|" + x.file + "|" + x.line + "|" + x.name; }
 
 function cs2Control(x) {
@@ -8230,9 +8274,13 @@ function cs2Visible(x) {
 
 function cs2GroupCounts() {
   const counts = {};
+  const recommended = (cs2Data && cs2Data.recommended) || [];
   for (const x of cs2Data.settings) {
     if (!cs2Visible(x)) continue;
     counts[x.group] = (counts[x.group] || 0) + 1;
+    if (recommended.includes(x.name)) {
+      counts[RECOMMENDED_GROUP] = (counts[RECOMMENDED_GROUP] || 0) + 1;
+    }
   }
   return counts;
 }
@@ -8374,6 +8422,104 @@ document.addEventListener("keydown", e => {
   top.click();
 });
 
+function cs2DisplayValue(x) {
+  const spec = x.spec || {};
+  const v = String(x.value);
+  if (x.control === "toggle") return v.trim() !== "0" ? "on" : "off";
+  if (x.control === "select" && spec.options && spec.options[v.trim()] != null) {
+    return spec.options[v.trim()];
+  }
+  return v;
+}
+
+// A plain, read-only reminder of what the player's own configs and scripts
+// already do -- not another control surface, just the "I already have X"
+// half of the Recommended page. Reuses the same quiet .chg-list look as the
+// profile diff's "already correct" list, since both are "nothing to do here".
+function cs2YoursHtml() {
+  const scripts = (plugData && plugData.plugins) || [];
+  const recommended = cs2Data.recommended || [];
+  // Video settings always carry a value -- cs2_video.txt has every one of
+  // them from the moment Steam writes it, whether you ever opened the video
+  // menu or not -- so "set" there means nothing about what you chose. Only
+  // convars written in your own config files say that.
+  const settings = cs2Data.settings.filter(x =>
+    !x.unset && x.source !== "video" && !recommended.includes(x.name));
+  if (!scripts.length && !settings.length) return "";
+
+  let html = "";
+  if (scripts.length) {
+    html += '<div class="subcat">Your scripts</div><div class="chg-list quiet">' +
+      scripts.map(p => '<div class="chg-row"><div class="chg-name">' + esc(p.name) + "</div>" +
+        '<div class="chg-move"><span class="chg-chip same">' +
+        esc(p.bound_labels.length ? p.bound_labels.join(" / ") : "not bound") +
+        (p.enabled ? "" : " — off") + "</span></div></div>").join("") +
+      "</div>";
+  }
+  if (settings.length) {
+    html += '<div class="subcat">Your settings</div><div class="chg-list quiet">' +
+      settings.map(x => '<div class="chg-row"><div class="chg-name">' + esc(x.label) + "</div>" +
+        '<div class="chg-move"><span class="chg-chip same">' + esc(cs2DisplayValue(x)) +
+        "</span></div></div>").join("") +
+      "</div>";
+  }
+  return html;
+}
+
+// Many hand-written configs already carry their own "reload my config" key
+// -- cfgscan looks for one by what it actually runs, not by name, so this
+// never suggests adding a second, redundant one next to it.
+function cs2ApplyCardHtml() {
+  const st = applyScriptStatus;
+  const bound = st && st.bound_to && st.bound_to.length;
+  let note, label = "";
+  if (!st || !st.already_installed) {
+    note = "Adds a key that reloads your configs from inside CS2, the same way the game " +
+      "itself does on launch &mdash; just run from a key press instead of a restart. Only " +
+      "ever writes to your own config files; nothing is injected into the game.";
+    label = "Set up (binds F12)";
+  } else if (bound) {
+    note = "Press <b>" + esc(st.bound_labels.join(" / ")) + "</b> in-game to reload your " +
+      "configs &mdash; any setting you change here takes effect immediately, no relaunch." +
+      (st.detected
+        ? " You already had this (<code>" + esc(st.alias) + "</code>, " +
+          esc(st.file) + ":" + st.line + "), so nothing new was added."
+        : " Rebind it any time from the Scripts tab.");
+  } else {
+    note = "<code>" + esc(st.alias) + "</code> reloads your configs but has no key " +
+      "yet" + (st.detected ? " (" + esc(st.file) + ":" + st.line + ")" : "") + ".";
+    label = "Bind F12";
+  }
+  return '<div class="subcat">Apply without restarting CS2</div>' +
+    '<p class="subcat-note">' + note + "</p>" +
+    (label ? '<button class="btn primary small" id="cs2-apply-script-action">' +
+      esc(label) + "</button>" : "");
+}
+
+document.addEventListener("click", async e => {
+  const btn = e.target.closest("#cs2-apply-script-action");
+  if (!btn) return;
+  btn.disabled = true;
+  try {
+    if (!applyScriptStatus || !applyScriptStatus.already_installed) {
+      applyScriptStatus = await api("/api/cfg/apply-script/install", {});
+    }
+    if (applyScriptStatus.already_installed && !applyScriptStatus.detected &&
+        !(applyScriptStatus.bound_to && applyScriptStatus.bound_to.length)) {
+      await loadPlugins(true);
+      const found = (plugData.plugins || [])
+        .find(p => p.aliases && p.aliases.includes(applyScriptStatus.alias));
+      if (found) await applyBind(found.id, "F12", false);
+      applyScriptStatus = await api("/api/cfg/apply-script/status", {});
+    }
+    renderCs2Body();
+  } catch (err) {
+    status("Could not set this up: " + String(err && err.message || err), true);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
 function renderCs2Body() {
   if (!cs2Data) return;
   const section = currentSection();
@@ -8382,11 +8528,11 @@ function renderCs2Body() {
   const group = section.groups.find(g => g.id === cs2Group) || section.groups[0];
   if (!group) { $("cs2-body").innerHTML = ""; return; }
 
-  const mine = cs2Data.settings.filter(x => x.group === group.id && cs2Visible(x));
+  const mine = cs2Data.settings.filter(x => cs2InGroup(x, group.id) && cs2Visible(x));
   const subgroups = group.subgroups && group.subgroups.length
     ? group.subgroups : [{ id: null, label: group.label }];
 
-  let html = "";
+  let html = group.id === RECOMMENDED_GROUP ? cs2ApplyCardHtml() : "";
   const placed = new Set();
   for (const sub of subgroups) {
     const items = sub.id === null ? mine : mine.filter(x => x.subgroup === sub.id);
@@ -8408,6 +8554,8 @@ function renderCs2Body() {
     html += '<div class="subcat">Other</div>';
     for (const x of orphans) html += cs2Row(x, "");
   }
+
+  if (group.id === RECOMMENDED_GROUP) html += cs2YoursHtml();
 
   $("cs2-body").innerHTML = html ||
     '<span class="sub">Nothing in this category was found in your files.</span>';
@@ -8434,7 +8582,7 @@ function cs2PendingIn(sectionId) {
   const out = [];
   for (const [key, edit] of cs2Edits) {
     const original = cs2Data.settings.find(x => cs2Key(x) === key);
-    if (original && groups.has(original.group)) {
+    if (original && [...groups].some(gid => cs2InGroup(original, gid))) {
       out.push({ key, name: edit.name, label: original.label, file: original.file,
                  was: original.value, value: edit.value });
     }
@@ -8722,6 +8870,10 @@ document.addEventListener("change", e => {
    -------------------------------------------------------------------------- */
 let treeData = null;
 let openFile = null;
+// A line to scroll to and highlight once, consumed the first time renderFile
+// draws it -- otherwise every later re-render (an edit, a toggle elsewhere)
+// would keep yanking the view back to wherever "Open" last pointed.
+let openFileLine = null;
 let openDirs = null;
 
 function fmtBytes(n) {
@@ -8807,7 +8959,8 @@ function codeBlock(text, issues, editable) {
     const marks = issues[String(i + 1)] || [];
     const bad = marks.some(m => m.severity === "error");
     const cls = marks.length ? (bad ? " has-error" : " has-warn") : "";
-    return '<div class="cline' + cls + '">' + (highlightCfg(line) || "&nbsp;") + "</div>";
+    return '<div class="cline' + cls + '" data-line="' + (i + 1) + '">' +
+      (highlightCfg(line) || "&nbsp;") + "</div>";
   }).join("");
 
   return '<div class="code-wrap' + (editable ? " editing" : "") + '">' +
@@ -8834,6 +8987,21 @@ function renderFile() {
   box.innerHTML = editorHead(f, meta) +
     codeBlock(editing ? editDraft : f.text, f.issues, editing);
   syncCode();
+  jumpToOpenLine();
+}
+
+// Scrolls the line "Open" was clicked for into view and flashes it, so
+// landing on a 400-line file still shows the one line anyone came here for.
+function jumpToOpenLine() {
+  if (!openFileLine) return;
+  const line = openFileLine;
+  openFileLine = null;
+  const row = $("code-layer") &&
+    $("code-layer").querySelector('.cline[data-line="' + line + '"]');
+  if (!row) return;
+  row.scrollIntoView({ block: "center" });
+  row.classList.add("jump-target");
+  setTimeout(() => row.classList.remove("jump-target"), 2400);
 }
 
 // Enough structure to read at a glance: comments recede, the command leads,
@@ -8954,7 +9122,7 @@ async function makeStarter(quiet) {
         "Launch options should exec " + r.launch_target + "."
       : "A config was already there; nothing was changed.");
     // The tabs that were empty have something to show now.
-    treeData = null; plugData = null; keyData = null; cfgSettings = null;
+    treeData = null; plugData = null; applyScriptStatus = null; keyData = null; cfgSettings = null;
     setTab(activeTab);
     return r;
   } catch (err) {
@@ -9000,9 +9168,10 @@ async function loadTree(force) {
   }
 }
 
-async function showFile(path) {
+async function showFile(path, line) {
   try {
     openFile = await api("/api/cfg/file", { path: path });
+    openFileLine = line || null;
     renderTree();
     renderFile();
   } catch (err) {
@@ -9028,6 +9197,7 @@ document.addEventListener("click", e => {
    stale: rename a script in the config and it is renamed here too.
    ------------------------------------------------------------------------ */
 let plugData = null;
+let applyScriptStatus = null;
 let favourites = new Set();
 
 // Favourites live in the same store as the rest of the page's preferences, so
@@ -9104,7 +9274,7 @@ function plugCard(p) {
     '<div class="plug-name">' + esc(p.name) + "</div>" +
     '<div class="plug-controls">' +
     '<button class="btn small ghost plug-open" data-open-file="' + esc(p.file) +
-    '" title="' + esc(p.file) + ":" + p.line + '">Open</button>' +
+    '" data-open-line="' + p.line + '" title="' + esc(p.file) + ":" + p.line + '">Open</button>' +
     '<label class="switch" title="' +
     (p.enabled ? "Comment this block out" : "Uncomment this block") + '">' +
     '<input type="checkbox" data-toggle="' + esc(p.id) + '"' +
@@ -9764,7 +9934,7 @@ function kbDetail() {
     '<div class="row"><span class="k">From</span><span class="v mono sub2">' +
     esc(hit.file) + ":" + hit.line + "</span></div>" +
     '<div class="actions"><button class="btn small" data-open-file="' +
-    esc(hit.file) + '">Open the file</button></div>' +
+    esc(hit.file) + '" data-open-line="' + hit.line + '">Open the file</button></div>' +
     "</div>" + kbPicker() + "</div>";
 }
 
@@ -10875,7 +11045,7 @@ document.addEventListener("click", async e => {
    and nothing it exports is ever written anywhere this page can get back
    to later -- the model is shown once and the next open asks again. */
 let skinsData = null;
-let skinsFilters = { search: "", weapon: "", rarity: "" };
+let skinsFilters = { search: "", weapon: "", rarity: "", kind: "gun" };
 let skinsToolStatus = null;
 let skinViewer = null;
 let skinViewerCurrent = null;
@@ -10903,6 +11073,7 @@ function filteredSkins() {
   const items = (skinsData && skinsData.items) || [];
   const q = skinsFilters.search.trim().toLowerCase();
   return items.filter(it => {
+    if (it.kind !== skinsFilters.kind) return false;
     if (skinsFilters.weapon && it.weapon_class !== skinsFilters.weapon) return false;
     if (skinsFilters.rarity && it.rarity !== skinsFilters.rarity) return false;
     if (q && !it.display_name.toLowerCase().includes(q)) return false;
@@ -10914,7 +11085,7 @@ function skinCard(it) {
   return '<div class="skin-card" style="border-left-color:' + esc(it.rarity_color) + '" ' +
     'data-weapon="' + esc(it.weapon_class) + '" data-paintkit="' + esc(it.paintkit) + '" ' +
     'data-name="' + esc(it.display_name) + '">' +
-    '<span class="wn">' + esc(it.weapon_name) + '</span>' +
+    '<span class="wn">' + (it.kind === "knife" || it.kind === "glove" ? "★ " : "") + esc(it.weapon_name) + '</span>' +
     '<span class="sn">' + esc(it.skin_name) + '</span>' +
     '<span class="rr" style="color:' + esc(it.rarity_color) + '">' + esc(it.rarity) + '</span>' +
     '</div>';
@@ -10923,16 +11094,16 @@ function skinCard(it) {
 function fillSkinsFilterOptions() {
   const weaponSel = $("skins-weapon-filter");
   const raritySel = $("skins-rarity-filter");
-  if (!weaponSel || weaponSel.dataset.filled) return;
-  const items = (skinsData && skinsData.items) || [];
+  if (!weaponSel || weaponSel.dataset.filledFor === skinsFilters.kind) return;
+  const items = ((skinsData && skinsData.items) || []).filter(it => it.kind === skinsFilters.kind);
   const weapons = [...new Map(items.map(it => [it.weapon_class, it.weapon_name])).entries()]
     .sort((a, b) => a[1].localeCompare(b[1]));
   const rarities = [...new Set(items.map(it => it.rarity))].filter(Boolean);
-  weaponSel.insertAdjacentHTML("beforeend",
-    weapons.map(([cls, name]) => '<option value="' + esc(cls) + '">' + esc(name) + "</option>").join(""));
-  raritySel.insertAdjacentHTML("beforeend",
-    rarities.map(r => '<option value="' + esc(r) + '">' + esc(r) + "</option>").join(""));
-  weaponSel.dataset.filled = "1";
+  weaponSel.innerHTML = '<option value="">All weapons</option>' +
+    weapons.map(([cls, name]) => '<option value="' + esc(cls) + '">' + esc(name) + "</option>").join("");
+  raritySel.innerHTML = '<option value="">All rarities</option>' +
+    rarities.map(r => '<option value="' + esc(r) + '">' + esc(r) + "</option>").join("");
+  weaponSel.dataset.filledFor = skinsFilters.kind;
 }
 
 function renderSkins() {
@@ -11053,6 +11224,18 @@ async function openSkinViewer(weaponClass, paintkit, displayName) {
 document.addEventListener("click", async e => {
   if (e.target.closest("#skins-reload") || e.target.closest("#skins-reload-inline")) {
     loadSkinsCatalog(true);
+    return;
+  }
+  const kindTab = e.target.closest(".skins-kind-tab");
+  if (kindTab && !kindTab.disabled && kindTab.dataset.kind) {
+    skinsFilters.kind = kindTab.dataset.kind;
+    skinsFilters.weapon = "";
+    skinsFilters.rarity = "";
+    document.querySelectorAll(".skins-kind-tab").forEach(t => {
+      t.classList.toggle("active", t === kindTab);
+      t.setAttribute("aria-selected", String(t === kindTab));
+    });
+    renderSkins();
     return;
   }
   const card = e.target.closest(".skin-card");
@@ -12001,7 +12184,8 @@ document.addEventListener("click", async e => {
   if (!open) return;
   setTab("files");
   await loadTree(false);
-  await showFile(open.dataset.openFile);
+  const line = open.dataset.openLine ? Number(open.dataset.openLine) : null;
+  await showFile(open.dataset.openFile, line);
 });
 
 $("files-reload").addEventListener("click", () => loadTree(true));
@@ -12258,6 +12442,30 @@ async function loadCs2Settings(force, keepEdits) {
       scannedFolder = folder;
     }
     cs2Data = await api("/api/cfg/settings", { account: currentAccount() });
+    // A curated front page, not part of the game's own menu -- see
+    // cs2InGroup's own comment for why membership in it is by name rather
+    // than by the "group" every other section is keyed on.
+    if ((cs2Data.recommended || []).length) {
+      cs2Data.sections.unshift({
+        id: "recommended", label: "Recommended",
+        groups: [{ id: RECOMMENDED_GROUP, label: "Recommended", subgroups: [] }],
+      });
+    }
+    // The scripts your own config already defines, for the "what I already
+    // have" list on the Recommended page. Reuses the Scripts tab's own cache
+    // so opening Recommended first does not cost a second read of the same
+    // files, and failing to load them (no folder scanned yet, odd config)
+    // should not take the rest of the settings page down with it.
+    if (!plugData || force) {
+      try { plugData = await api("/api/cfg/plugins", {}); }
+      catch (e) { /* Recommended just shows no scripts; the rest still works. */ }
+    }
+    // Read-only: whether something already reloads the startup chain on a
+    // key, so the apply card knows its state before anyone clicks anything.
+    if (!applyScriptStatus || force) {
+      try { applyScriptStatus = await api("/api/cfg/apply-script/status", {}); }
+      catch (e) { /* The card just offers to set one up; nothing else depends on it. */ }
+    }
     if (!keepEdits) cs2Edits.clear();
     if (!cs2Section) cs2Section = (cs2Data.sections[0] || {}).id;
     renderCs2Sections();
@@ -12936,7 +13144,7 @@ async function reloadForAccount() {
     applyPrefs(ui);
   } catch (err) { /* a first run has nothing stored yet */ }
   cs2Data = null; gpuData = null; keyData = null; cfgSettings = null;
-  pickedKey = null; kbOptions = null; treeData = null; plugData = null;
+  pickedKey = null; kbOptions = null; treeData = null; plugData = null; applyScriptStatus = null;
   scannedFolder = null;
   const folder = $("cfg-folder") ? $("cfg-folder").value.trim() : "";
   srcFiles = null;

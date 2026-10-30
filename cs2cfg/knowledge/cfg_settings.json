@@ -1983,5 +1983,9 @@
       "subgroup": "ragdolls"
     }
   },
+  "recommended": [
+    "cl_color"
+  ],
+  "recommended_note": "A curated subset of the settings above, surfaced together under their own tab for a quick first pass -- not a separate set of cvars. Each name here must already exist as a key in \"settings\"; everything about reading, editing and saving one still goes through that entry exactly as it does in its own section.",
   "layout_note": "Three levels: section, category, sub-category. A setting with no explicit sub-category falls back to the first one in its category, so nothing is ever hidden by being unclassified."
 }

@@ -1176,6 +1176,7 @@ def _cfg_settings(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "ok": True,
         "sections": sections,
+        "recommended": cfgscan.recommended_settings(),
         "video_path": video_path,
         "default_target": cfgscan.default_target(result),
         "settings": [
@@ -1278,6 +1279,83 @@ def _cfg_settings_apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     backup.prune()
     return {"ok": True, "applied": applied, "files": sorted(set(files)),
             "backup": None if session.empty else session.stamp}
+
+
+def _apply_script_state(result, cfgscan, keys) -> Optional[Dict[str, Any]]:
+    """What already reloads the startup chain on a key, app-written or not.
+
+    Checked the same way on a plain status read and before installing, so the
+    two never disagree about whether something is already there.
+    """
+    existing = cfgscan.existing_apply_script(result)
+    if existing:
+        return {"already_installed": True, "detected": True,
+                "alias": existing["alias"], "file": existing["file"],
+                "line": existing["line"], "bound_to": existing["bound_to"],
+                "bound_labels": [keys.label(b) for b in existing["bound_to"]]}
+
+    if result.aliases.get(cfgscan.APPLY_SCRIPT_ALIAS):
+        bound = sorted({
+            key for key, entries in result.binds.items() for b in entries
+            if (b.body or "").strip().strip(chr(34)).lower() == cfgscan.APPLY_SCRIPT_ALIAS
+        })
+        return {"already_installed": True, "detected": False,
+                "alias": cfgscan.APPLY_SCRIPT_ALIAS, "bound_to": bound,
+                "bound_labels": [keys.label(b) for b in bound]}
+
+    return None
+
+
+def _cfg_apply_script_status(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Read-only: what already reloads the startup chain on a key, if anything.
+
+    Called whenever the Recommended page is shown, so it never writes --
+    only the explicit install click below does that.
+    """
+    from . import cfgscan, keys
+
+    result = _rescan(state)
+    if result is None:
+        return {"ok": False, "error": "scan a configuration folder first"}
+
+    found = _apply_script_state(result, cfgscan, keys)
+    return {"ok": True, **(found or {"already_installed": False})}
+
+
+def _cfg_apply_script_install(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """One-time: add the alias that reloads the startup chain on a key press.
+
+    Only ever runs from an explicit click -- this is the one script the app
+    itself writes rather than reads, so it never happens as a side effect of
+    opening a tab. A config that already has something doing this -- its own
+    alias, or a prior install -- is left alone rather than getting a second,
+    redundant one.
+    """
+    from . import cfgscan, keys
+
+    result = _rescan(state)
+    if result is None:
+        return {"ok": False, "error": "scan a configuration folder first"}
+
+    found = _apply_script_state(result, cfgscan, keys)
+    if found:
+        return {"ok": True, **found}
+
+    try:
+        target, text = cfgscan.append_apply_script(result)
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
+
+    config = next(c for c in result.files.values() if c.relative == target)
+    session = backup.BackupSession(note="live-apply script (web)")
+    session.add(config.path)
+    cfglang.write_config_text(config.path, text, config.document.encoding)
+    backup.prune()
+
+    state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+    return {"ok": True, "already_installed": False, "detected": False,
+            "alias": cfgscan.APPLY_SCRIPT_ALIAS, "bound_to": [],
+            "file": target, "backup": None if session.empty else session.stamp}
 
 
 def _rescan(state: State):
@@ -3389,6 +3467,8 @@ def make_handler(state: State):
         "/api/cfg/bind": _cfg_bind,
         "/api/cfg/settings": _cfg_settings,
         "/api/cfg/settings/apply": _cfg_settings_apply,
+        "/api/cfg/apply-script/status": _cfg_apply_script_status,
+        "/api/cfg/apply-script/install": _cfg_apply_script_install,
         "/api/cfg/suggest": _cfg_suggest,
         "/api/cfg/browse": _cfg_browse,
         "/api/cfg/source": _cfg_source,

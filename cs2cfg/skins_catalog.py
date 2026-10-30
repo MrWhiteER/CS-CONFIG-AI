@@ -193,6 +193,233 @@ def _load_text(dir_vpk: Path, internal_path: str) -> str:
     return raw.decode("utf-8", "replace").lstrip("﻿")
 
 
+# Knife skins are not enumerable the way weapon skins are: a weapon's
+# finishes come from a fixed collection/case list in items_game.txt, but
+# any of a fixed, well-known set of "universal" finishes can go on any
+# knife (how a case actually picks one at unbox time), and no such list
+# is enumerated anywhere in the file. These codenames were each confirmed
+# individually against the account's own data -- resolved by searching the
+# localization file for the finish's real, public display name (the
+# ordinary flow: "Case Hardened" is sold under that name, so the file has
+# to contain it, under a #PaintKit_<codename>_Tag key -- that pattern
+# already matches everything built on in this module) and matching the
+# codename back from the tag -- not guessed from memory. Ruby/Sapphire/
+# Black Pearl Dopplers and knife-specific style variants are not included.
+KNIFE_FINISHES = {
+    "aq_oiled": "Case Hardened",
+    "aa_fade": "Fade",
+    "an_tiger_orange": "Tiger Tooth",
+    "am_marble_fade": "Marble Fade",
+    "hy_webs": "Crimson Web",
+    "aq_damascus": "Damascus Steel",
+    "am_marked_up": "Freehand",
+    "aq_steel_bravo": "Rust Coat",
+    "am_zebra": "Slaughter",
+    "hy_ocean": "Bright Water",
+    "so_purple": "Ultraviolet",
+    "aq_forced": "Stained",
+    "aq_blued": "Blue Steel",
+    "so_night": "Night",
+    "hy_forest_boreal": "Boreal Forest",
+    "sp_tape_urban": "Urban Masked",
+    "sp_mesh_tan": "Safari Mesh",
+    "sp_dapple": "Scorched",
+    "hy_ak47lam_bw": "Black Laminate",
+    "gs_autotronic": "Autotronic",
+    "am_doppler_phase1": "Doppler (Phase 1)",
+    "am_doppler_phase2": "Doppler (Phase 2)",
+    "am_doppler_phase3": "Doppler (Phase 3)",
+    "am_doppler_phase4": "Doppler (Phase 4)",
+    "am_gamma_doppler_phase1": "Gamma Doppler (Phase 1)",
+    "am_gamma_doppler_phase2": "Gamma Doppler (Phase 2)",
+    "am_gamma_doppler_phase3": "Gamma Doppler (Phase 3)",
+    "am_gamma_doppler_phase4": "Gamma Doppler (Phase 4)",
+}
+
+# Every real knife model, read straight from items_game.txt's own weapon
+# prefabs the same way cs2cfg.skins_catalog._weapon_prefabs reads guns --
+# listed here because a knife's item_class is not referenced from any
+# collection's bracket syntax the way a gun's is, so _combos never finds it.
+KNIFE_MODELS = {
+    "weapon_bayonet": ("Bayonet", "weapons/models/knife/knife_bayonet/weapon_knife_bayonet.vmdl"),
+    "weapon_knife_css": ("Classic Knife", "weapons/models/knife/knife_css/weapon_knife_css.vmdl"),
+    "weapon_knife_flip": ("Flip Knife", "weapons/models/knife/knife_flip/weapon_knife_flip.vmdl"),
+    "weapon_knife_gut": ("Gut Knife", "weapons/models/knife/knife_gut/weapon_knife_gut.vmdl"),
+    "weapon_knife_karambit": ("Karambit", "weapons/models/knife/knife_karambit/weapon_knife_karambit.vmdl"),
+    "weapon_knife_m9_bayonet": ("M9 Bayonet", "weapons/models/knife/knife_m9/weapon_knife_m9.vmdl"),
+    "weapon_knife_tactical": ("Huntsman Knife", "weapons/models/knife/knife_tactical/weapon_knife_tactical.vmdl"),
+    "weapon_knife_falchion": ("Falchion Knife", "weapons/models/knife/knife_falchion/weapon_knife_falchion.vmdl"),
+    "weapon_knife_survival_bowie": ("Bowie Knife", "weapons/models/knife/knife_bowie/weapon_knife_bowie.vmdl"),
+    "weapon_knife_butterfly": ("Butterfly Knife", "weapons/models/knife/knife_butterfly/weapon_knife_butterfly.vmdl"),
+    "weapon_knife_push": ("Shadow Daggers", "weapons/models/knife/knife_push/weapon_knife_push.vmdl"),
+    "weapon_knife_cord": ("Paracord Knife", "weapons/models/knife/knife_cord/weapon_knife_cord.vmdl"),
+    "weapon_knife_canis": ("Survival Knife", "weapons/models/knife/knife_canis/weapon_knife_canis.vmdl"),
+    "weapon_knife_ursus": ("Ursus Knife", "weapons/models/knife/knife_ursus/weapon_knife_ursus.vmdl"),
+    "weapon_knife_gypsy_jackknife": ("Navaja Knife", "weapons/models/knife/knife_navaja/weapon_knife_navaja.vmdl"),
+    "weapon_knife_outdoor": ("Nomad Knife", "weapons/models/knife/knife_outdoor/weapon_knife_outdoor.vmdl"),
+    "weapon_knife_stiletto": ("Stiletto Knife", "weapons/models/knife/knife_stiletto/weapon_knife_stiletto.vmdl"),
+    "weapon_knife_widowmaker": ("Talon Knife", "weapons/models/knife/knife_talon/weapon_knife_talon.vmdl"),
+    "weapon_knife_skeleton": ("Skeleton Knife", "weapons/models/knife/knife_skeleton/weapon_knife_skeleton.vmdl"),
+    "weapon_knife_kukri": ("Kukri Knife", "weapons/models/knife/knife_kukri/weapon_knife_kukri.vmdl"),
+}
+
+
+def _knife_entries() -> List[Dict[str, Any]]:
+    # A knife is always ★ Covert -- that is the knife's own rarity as an
+    # item, independent of whichever tier the same finish happens to sit at
+    # on a gun (reusing the gun's tier here would have shown "Consumer
+    # Grade" knives, which do not exist).
+    rarity_name, rarity_color = RARITY["legendary"]
+    out: List[Dict[str, Any]] = []
+    for weapon_class, (weapon_label, model) in KNIFE_MODELS.items():
+        for paintkit_name, skin_label in KNIFE_FINISHES.items():
+            out.append({
+                "kind": "knife",
+                "weapon_class": weapon_class,
+                "weapon_name": weapon_label,
+                "paintkit": paintkit_name,
+                "skin_name": skin_label,
+                "display_name": f"{weapon_label} | {skin_label}",
+                "rarity": rarity_name,
+                "rarity_color": rarity_color,
+                "wear_min": 0.0,
+                "wear_max": 1.0,
+                "model": model,
+            })
+    return out
+
+
+# Gloves are yet another shape again: unlike a gun's fixed collection list
+# or a knife's "any universal finish on any knife", each glove finish is
+# tied to exactly one specific glove model and nothing else -- there is no
+# "Driver Gloves | Vice" the way there is no real reason to expect one.
+# Nothing in items_game.txt lists these pairs directly (the same gap a
+# knife has), so they were found the same deliberate way as everywhere
+# else in this module: not guessed, but read back from a real pairing CS2
+# itself writes out -- here, the generated preview-icon filenames under
+# panorama/images/econ/default_generated/, each named
+# "<model>_gloves_<finish>_heavy_png.vtex_c", which is the one place in
+# the game's own data that actually states which finish belongs to which
+# model. Every finish below was cross-checked against that file list and
+# resolved to its real display name through the account's own paint_kits
+# and localization data, the same path every other entry in this catalog
+# takes. Bloodhound, Hydra, Broken Fang and Hand Wraps gloves do not
+# appear in that generated-icon set (each is closer to a single fixed
+# item than a model with swappable finishes) and are not included yet.
+GLOVE_MODELS = {
+    "glove_driver": ("Driver Gloves", "agents/models/shared/arms/glove_slick/glove_slick.vmdl"),
+    "glove_specialist": ("Specialist Gloves", "agents/models/shared/arms/glove_specialist/glove_specialist.vmdl"),
+    "glove_sport": ("Sport Gloves", "agents/models/shared/arms/glove_sporty/glove_sporty.vmdl"),
+    "glove_moto": ("Moto Gloves", "agents/models/shared/arms/glove_motorcycle/glove_motorcycle.vmdl"),
+}
+
+# weapon_class (made up here -- gloves have no item_class of their own the
+# way a weapon does) -> (paintkit codename, display name), read back from
+# the generated-icon pairing described above.
+GLOVE_FINISHES = {
+    "glove_moto": [
+        ("motorcycle_basic_black", "Eclipse"),
+        ("motorcycle_basic_green_orange", "Turtle"),
+        ("motorcycle_carbonfiber_red", "Blood Pressure"),
+        ("motorcycle_checker_flag_blue_green", "Finish Line"),
+        ("motorcycle_choco_boom", "POW!"),
+        ("motorcycle_commando_ksk", "3rd Commando Company"),
+        ("motorcycle_mint_triangle", "Spearmint"),
+        ("motorcycle_mono_boom", "Boom!"),
+        ("motorcycle_smoke", "Smoke Out"),
+        ("motorcycle_triangle_blue", "Cool Mint"),
+        ("motorcycle_trigrid_blue", "Polygon"),
+        ("motorcycle_yellow_camo", "Transport"),
+    ],
+    "glove_driver": [
+        ("glove_driver_brocade_crane_red", "Brocade Crane"),
+        ("glove_driver_brocade_flower_red", "Brocade Flowers"),
+        ("glove_driver_dragon_scale_red", "Dragon Fists"),
+        ("glove_driver_embroidered_flowers_teal", "Garden"),
+        ("glove_driver_knit_argyle_green", "Hand Sweaters"),
+        ("glove_driver_ostrich_purple", "Plum Quill"),
+        ("glove_driver_scallop_metallic_blue", "Seigaiha"),
+        ("glove_driver_silk_dragon_white", "Wave Chaser"),
+        ("slick_black", "Lunar Weave"),
+        ("slick_jaguar_white", "Snow Leopard"),
+        ("slick_jaguar_yellow", "Queen Jaguar"),
+        ("slick_military", "Convoy"),
+        ("slick_plaid_purple", "Imperial Plaid"),
+        ("slick_red", "Crimson Weave"),
+        ("slick_rezan", "Rezan the Red"),
+        ("slick_snakeskin_white", "King Snake"),
+        ("slick_snakeskin_yellow", "Diamondback"),
+        ("slick_stitched_black_orange", "Overtake"),
+        ("slick_stitched_black_white", "Black Tie"),
+        ("slick_stitched_green_grey", "Racing Green"),
+    ],
+    "glove_specialist": [
+        ("glove_specialist_abstract_green", "Lime Polycam"),
+        ("glove_specialist_dragon_blue", "Cloud Chaser"),
+        ("glove_specialist_graffiti_black", "Blackbook"),
+        ("glove_specialist_quilted_black", "Chocolate Chesterfield"),
+        ("glove_specialist_quilted_white", "Pillow Punchers"),
+        ("glove_specialist_sunburst_red", "Sunburst"),
+        ("glove_specialist_wave_blue", "Big Swell"),
+        ("specialist_ddpat_green_camo", "Forest DDPAT"),
+        ("specialist_emerald_web", "Emerald Web"),
+        ("specialist_fade", "Fade"),
+        ("specialist_fbi", "Field Agent"),
+        ("specialist_forest_brown", "Buckshot"),
+        ("specialist_kimono_diamonds_red", "Crimson Kimono"),
+        ("specialist_marble_fade", "Marble Fade"),
+        ("specialist_orange_white", "Foundation"),
+        ("specialist_ricksaw_camo", "Lt. Commander"),
+        ("specialist_tiger_orange", "Tiger Strike"),
+        ("specialist_webs_red", "Crimson Web"),
+        ("specialist_winterhex", "Mogul"),
+    ],
+    "glove_sport": [
+        ("glove_sport_beadwork_diamonds_purple", "Violet Beadwork"),
+        ("glove_sport_camo_winter", "Frosty"),
+        ("glove_sport_flames_orange", "Blaze"),
+        ("glove_sport_pinstripe_black", "Creme Pinstripe"),
+        ("glove_sport_racer_red", "Red Racer"),
+        ("glove_sport_tech_gradient_bright", "Ultra Violent"),
+        ("glove_sport_velvet_red", "Occult"),
+        ("sporty_black_webbing_yellow", "Omega"),
+        ("sporty_blue_pink", "Vice"),
+        ("sporty_green", "Hedge Maze"),
+        ("sporty_houndstooth_red", "Scarlet Shamagh"),
+        ("sporty_hunter", "Big Game"),
+        ("sporty_jaguar", "Nocts"),
+        ("sporty_light_blue", "Superconductor"),
+        ("sporty_military", "Arid"),
+        ("sporty_poison_frog_blue_white", "Amphibious"),
+        ("sporty_poison_frog_red_green", "Bronze Morph"),
+        ("sporty_purple", "Pandora's Box"),
+        ("sporty_slingshot", "Slingshot"),
+    ],
+}
+
+
+def _glove_entries() -> List[Dict[str, Any]]:
+    # A glove is always ★ Covert too, the same reasoning as a knife.
+    rarity_name, rarity_color = RARITY["legendary"]
+    out: List[Dict[str, Any]] = []
+    for weapon_class, (weapon_label, model) in GLOVE_MODELS.items():
+        for paintkit_name, skin_label in GLOVE_FINISHES.get(weapon_class, []):
+            out.append({
+                "kind": "glove",
+                "weapon_class": weapon_class,
+                "weapon_name": weapon_label,
+                "paintkit": paintkit_name,
+                "skin_name": skin_label,
+                "display_name": f"{weapon_label} | {skin_label}",
+                "rarity": rarity_name,
+                "rarity_color": rarity_color,
+                "wear_min": 0.0,
+                "wear_max": 1.0,
+                "model": model,
+            })
+    return out
+
+
 def build(dir_vpk: Path, force: bool = False) -> List[Dict[str, Any]]:
     """Every weapon/finish combo CS2 has released, with a display name and
     rarity resolved. Cached in memory -- this is static game data, re-read
@@ -225,6 +452,7 @@ def build(dir_vpk: Path, force: bool = False) -> List[Dict[str, Any]]:
         rarity_key = rarity_keys.get(paintkit_name, "")
         rarity_name, rarity_color = RARITY.get(rarity_key, ("", "#4b4b4b"))
         by_combo[(weapon_class, paintkit_name)] = {
+            "kind": "gun",
             "weapon_class": weapon_class,
             "weapon_name": weapon_label,
             "paintkit": paintkit_name,
@@ -238,6 +466,8 @@ def build(dir_vpk: Path, force: bool = False) -> List[Dict[str, Any]]:
         }
 
     out = sorted(by_combo.values(), key=lambda it: (it["weapon_name"], it["skin_name"]))
+    out += sorted(_knife_entries(), key=lambda it: (it["weapon_name"], it["skin_name"]))
+    out += sorted(_glove_entries(), key=lambda it: (it["weapon_name"], it["skin_name"]))
     _CACHE[key] = {"at": time.time(), "data": out}
     return out
 

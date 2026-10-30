@@ -16,6 +16,7 @@ any intervening redefinition.
 from __future__ import annotations
 
 import hashlib
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
@@ -702,6 +703,13 @@ def _load_setting_specs() -> Dict[str, Dict[str, object]]:
         return {}
 
 
+def recommended_settings() -> List[str]:
+    """The curated subset of cvar names to surface together under their own
+    tab -- see cfg_settings.json's own "recommended_note". Each one is still
+    a normal entry in "settings"; this only says which ones to group."""
+    return list(_load_setting_specs().get("recommended", []))
+
+
 def settings_view(
     result: ScanResult,
     video_values: Optional[Dict[str, str]] = None,
@@ -914,6 +922,99 @@ def append_setting(result: ScanResult, name: str, value: str,
         body = body + newline + block
 
     body = body + newline + line
+    if config.document.trailing_newline:
+        body += newline
+    return relative, body
+
+
+# The one-time "push what I changed in the app into a running game" key. A
+# fixed name rather than a generated one, so installing it twice recognises
+# the first one instead of stacking a second alias nothing points at.
+APPLY_SCRIPT_ALIAS = "cs2cfg_apply"
+APPLY_SCRIPT_NAME = "Apply Saved Settings"
+
+
+def existing_apply_script(result: ScanResult) -> Optional[Dict[str, object]]:
+    """An alias already in the collection that reloads the startup chain.
+
+    Plenty of hand-written configs already carry a "reload my config" key --
+    matched by what it actually runs (an exec of the first entry point, the
+    same thing CS2 itself runs on launch), not by name, since the name is
+    whatever its author happened to call it. Writing a second, separate one
+    next to an alias that already does this would just be clutter.
+    """
+    if not result.entry_points:
+        return None
+    wanted = normalise_exec_path(result.entry_points[0])
+
+    bound_keys: Dict[str, List[str]] = {}
+    for key, entries in result.binds.items():
+        for b in entries:
+            for word in re.split(r"[;\s]+", b.body or ""):
+                if word:
+                    bound_keys.setdefault(word.lower(), []).append(key)
+
+    for name, defs in result.aliases.items():
+        for a in defs:
+            for command in a.commands:
+                if command.lname != "exec":
+                    continue
+                target = exec_target(command)
+                if target and normalise_exec_path(target) == wanted:
+                    return {
+                        "alias": a.name, "file": a.file, "line": a.line,
+                        "bound_to": sorted(set(bound_keys.get(name, []))),
+                    }
+    return None
+
+
+def append_apply_script(result: ScanResult) -> Tuple[str, str]:
+    """Add the key-triggered reload that applies settings without restarting.
+
+    ``exec``-ing the first entry point is exactly what CS2 itself does on
+    launch, just run from a key instead of a relaunch, so every file in the
+    startup chain -- wherever this app actually writes a changed setting --
+    gets re-read. The key itself is assigned the normal way any script gets
+    one, with cfg_bind's own conflict check; this only adds the alias.
+
+    Written as its own banner block, the same shape plugins.py already reads
+    back as a feature, so it shows up in the Scripts tab immediately -- no
+    separate listing needs to know this one exists.
+    """
+    if result.aliases.get(APPLY_SCRIPT_ALIAS):
+        raise ValueError("the apply-settings script is already installed")
+    if existing_apply_script(result):
+        raise ValueError(
+            "a script in this collection already reloads the startup chain; "
+            "use that one instead of adding a second"
+        )
+
+    entry = result.entry_points[0] if result.entry_points else None
+    if not entry:
+        raise ValueError("no config file loads at startup to reload")
+
+    relative = default_target(result) or entry
+    config = next((c for c in result.files.values() if c.relative == relative), None)
+    if config is None:
+        raise ValueError(f"{relative} is not part of the scan")
+
+    text = config.path.read_bytes().decode(config.document.encoding, errors="replace")
+    newline = config.document.newline
+    body = text.rstrip("\r\n")
+
+    # Unquoted on purpose: this line sits inside the alias's own quoted
+    # command string, and a quoted path here would close that string early.
+    # cfg paths are relative to the cfg root with forward slashes and never
+    # contain spaces, so this is safe the same way a bind's "exec name" is.
+    block = newline.join([
+        "", "// --------------------------",
+        f"// {APPLY_SCRIPT_NAME}", "// --------------------------",
+        f'alias "{APPLY_SCRIPT_ALIAS}" "exec {entry}"',
+        "",
+        'ECHO "---Script---Apply Saved Settings reloads your configs, so '
+        'changes made in the app take effect without restarting CS2."',
+    ])
+    body = body + newline + block
     if config.document.trailing_newline:
         body += newline
     return relative, body

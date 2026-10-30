@@ -229,6 +229,86 @@ class DetectingLeakedTokens(unittest.TestCase):
         self.assertEqual(broken["skin_name"], "broken_kit")
 
 
+class GloveEntries(unittest.TestCase):
+    """Unlike a knife (any universal finish on any knife), each glove
+    finish belongs to exactly one specific glove model and nothing else --
+    see _glove_entries' own docstring for how that pairing was actually
+    found (CS2's own generated preview-icon filenames), not guessed."""
+
+    def setUp(self):
+        skins_catalog.forget_all()
+        self.addCleanup(skins_catalog.forget_all)
+        patch = mock.patch.object(skins_catalog, "_load_text", side_effect=_fake_load_text)
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    def test_every_listed_finish_is_present(self):
+        catalog = skins_catalog.build(Path("fake.vpk"))
+        gloves = [it for it in catalog if it["kind"] == "glove"]
+        expected = sum(len(v) for v in skins_catalog.GLOVE_FINISHES.values())
+        self.assertEqual(len(gloves), expected)
+
+    def test_a_glove_is_always_covert_rarity(self):
+        catalog = skins_catalog.build(Path("fake.vpk"))
+        gloves = [it for it in catalog if it["kind"] == "glove"]
+        self.assertTrue(gloves)
+        self.assertTrue(all(it["rarity"] == "Covert" for it in gloves))
+
+    def test_a_finish_only_appears_under_its_own_model(self):
+        """King Snake is a Driver Gloves finish and nothing else -- a
+        glove finish does not cross over to other glove models the way a
+        knife's universal finishes do."""
+        catalog = skins_catalog.build(Path("fake.vpk"))
+        king_snake = [it for it in catalog if it["skin_name"] == "King Snake"]
+        self.assertEqual(len(king_snake), 1)
+        self.assertEqual(king_snake[0]["weapon_name"], "Driver Gloves")
+
+    def test_a_known_combo_has_a_real_model_path(self):
+        catalog = skins_catalog.build(Path("fake.vpk"))
+        kimono = next(it for it in catalog if it["display_name"] == "Specialist Gloves | Crimson Kimono")
+        self.assertTrue(kimono["model"].endswith(".vmdl"))
+
+
+class KnifeEntries(unittest.TestCase):
+    """Knives are not in the fixture's item_sets at all -- see
+    _knife_entries' own docstring for why they can't be read the way gun
+    skins are, and have to be listed instead."""
+
+    def setUp(self):
+        skins_catalog.forget_all()
+        self.addCleanup(skins_catalog.forget_all)
+        patch = mock.patch.object(skins_catalog, "_load_text", side_effect=_fake_load_text)
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    def test_every_knife_model_times_every_finish_is_present(self):
+        catalog = skins_catalog.build(Path("fake.vpk"))
+        knives = [it for it in catalog if it["kind"] == "knife"]
+        self.assertEqual(len(knives), len(skins_catalog.KNIFE_MODELS) * len(skins_catalog.KNIFE_FINISHES))
+
+    def test_a_knife_is_always_covert_rarity(self):
+        """A real knife skin is always ★ Covert as an item, regardless of
+        which tier the same finish sits at on a gun -- reusing the gun's
+        tier would show a "Consumer Grade" knife, which does not exist."""
+        catalog = skins_catalog.build(Path("fake.vpk"))
+        knives = [it for it in catalog if it["kind"] == "knife"]
+        self.assertTrue(knives)
+        self.assertTrue(all(it["rarity"] == "Covert" for it in knives))
+
+    def test_a_gun_entry_is_tagged_gun_not_knife(self):
+        catalog = skins_catalog.build(Path("fake.vpk"))
+        guns = [it for it in catalog if it["kind"] == "gun"]
+        self.assertTrue(guns)
+        self.assertTrue(all("knife" not in it["weapon_class"] for it in guns))
+
+    def test_a_known_knife_and_finish_combo_has_a_real_model_path(self):
+        catalog = skins_catalog.build(Path("fake.vpk"))
+        karambit = next(it for it in catalog
+                        if it["weapon_class"] == "weapon_knife_karambit" and it["paintkit"] == "aq_oiled")
+        self.assertEqual(karambit["display_name"], "Karambit | Case Hardened")
+        self.assertTrue(karambit["model"].endswith(".vmdl"))
+
+
 class GroupingWeapons(unittest.TestCase):
     def test_a_known_weapon_lands_in_its_family(self):
         self.assertEqual(skins_catalog.group_of("weapon_ak47"), "Rifle")

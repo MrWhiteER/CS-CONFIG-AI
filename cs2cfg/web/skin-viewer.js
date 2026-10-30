@@ -177,7 +177,12 @@
       float key = max(dot(n, -uLightDir), 0.0);
       float fill = max(dot(n, uLightDir), 0.0);
       float light = 0.6 + 0.32 * key + 0.2 * fill;
-      gl_FragColor = vec4(base.rgb * light, base.a);
+      // The source alpha on a skin texture is a paint mask from Valve's own
+      // layered compositing (bare metal vs. painted), not real opacity for
+      // a flat texture applied the way this does it -- using it as alpha
+      // made most of a dark skin's base coat nearly transparent, invisible
+      // against anything but a backdrop exactly as dark as it was.
+      gl_FragColor = vec4(base.rgb * light, 1.0);
     }
   `;
 
