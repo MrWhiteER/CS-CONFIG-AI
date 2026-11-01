@@ -1518,6 +1518,20 @@ def _cfg_layouts_apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         return {"ok": True, "changed": False, "empty": empty, "file": profile_file,
                 "label": label, "applied": [], "skipped": [keys.label(k) for k in skipped]}
 
+    # The first time any of these keys is ever overridden, remember what it
+    # was -- the one thing that makes a later "Default" mean something.
+    chain = cfgscan.startup_chain(result)
+    config = next(c for c in result.files.values() if c.relative == profile_file)
+    overrides = {o["key"]: o for o in
+                 cfgscan._profile_entry(result, chain, config)["overrides"]}
+    by_file: Dict[str, Dict[str, str]] = {}
+    for key in applied:
+        item = overrides.get(key)
+        if item is not None:
+            by_file.setdefault(item["standard_file"], {})[key] = item["standard_body"]
+    for file, bodies in by_file.items():
+        layouts.record_baseline(result.root, file, bodies)
+
     session = backup.BackupSession(note=f"switch to profile {profile_file} (web)")
     for file, text in texts.items():
         config = next(c for c in result.files.values() if c.relative == file)
@@ -1531,6 +1545,45 @@ def _cfg_layouts_apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         "ok": True, "changed": True, "file": profile_file, "label": label,
         "applied": [keys.label(k) for k in applied],
         "skipped": [keys.label(k) for k in skipped],
+        "backup": None if session.empty else session.stamp,
+        "apply_keys": sorted((apply_info or {}).get("bound_to") or []),
+    }
+
+
+def _cfg_layouts_default(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Go back to Default: restore every key a profile has ever overridden
+    back to what it was the first time that happened.
+
+    The Keyboard tab's switcher shows this alongside the profiles themselves
+    as the one way out of a profile that got applied -- with no "Default" to
+    switch back to, a key a profile took over stayed that way for good.
+    """
+    from . import cfgscan, keys, layouts
+
+    result = _rescan(state)
+    if result is None:
+        return {"ok": False, "error": "scan a configuration folder first"}
+
+    baseline = layouts.load_baseline(result.root)
+    applied, texts = cfgscan.apply_default_layout(result, baseline)
+
+    if not applied:
+        return {"ok": True, "changed": False,
+                "empty": not any(baseline.values()),
+                "applied": []}
+
+    session = backup.BackupSession(note="restore default layout (web)")
+    for file, text in texts.items():
+        config = next(c for c in result.files.values() if c.relative == file)
+        session.add(config.path)
+        cfglang.write_config_text(config.path, text, config.document.encoding)
+    backup.prune()
+
+    state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+    apply_info = cfgscan.existing_apply_script(state.cfg_scan)
+    return {
+        "ok": True, "changed": True,
+        "applied": [keys.label(k) for k in applied],
         "backup": None if session.empty else session.stamp,
         "apply_keys": sorted((apply_info or {}).get("bound_to") or []),
     }
@@ -1571,7 +1624,7 @@ def _profile_selector_view(
 def _cfg_layouts_profiles(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     """Read-only: every match-profile file, for the switcher and the
     create/copy/delete list."""
-    from . import layouts
+    from . import cfgscan, layouts
 
     result = _rescan(state)
     if result is None:
@@ -1579,7 +1632,9 @@ def _cfg_layouts_profiles(state: State, _body: Dict[str, Any]) -> Dict[str, Any]
 
     registry = layouts.load_registry(result.root)
     pins = layouts.load_pins(result.root)
-    return {"ok": True, "profiles": _profile_selector_view(result, registry, pins)}
+    baseline = layouts.load_baseline(result.root)
+    return {"ok": True, "profiles": _profile_selector_view(result, registry, pins),
+            "default_active": cfgscan.default_is_active(result, baseline)}
 
 
 def _cfg_layouts_create(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -1681,11 +1736,10 @@ def _remove_generated_wrapper(result, generated: str, session) -> None:
 
 
 def _cfg_layouts_delete(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
-    """Permanently delete a profile file this app created.
-
-    Refuses on anything hand-written -- ``_cfg_layouts_remove`` is the only
-    thing that can drop one of those from the list, and it never touches the
-    file itself.
+    """Permanently delete a profile file -- app-created or hand-written
+    alike, the one way profiles are removed now that the tab bar's
+    right-click menu is the only place that manages them. Always backed up
+    first, so it can still be brought back from Backups.
     """
     from . import cfgscan, layouts
 
@@ -1694,12 +1748,6 @@ def _cfg_layouts_delete(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         return {"ok": False, "error": "scan a configuration folder first"}
 
     file = str(body.get("file") or "")
-    registry = layouts.load_registry(result.root)
-    if file not in registry["created"]:
-        return {"ok": False, "error":
-                "only a profile created in the app can be deleted here; "
-                "use Remove for a hand-written one"}
-
     profiles = {p["file"]: p for p in cfgscan.match_profiles(result)}
     profile = profiles.get(file)
     config = next((c for c in result.files.values() if c.relative == file), None)
@@ -1757,6 +1805,79 @@ def _cfg_layouts_remove(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     fresh_pins = layouts.load_pins(result.root)
     return {"ok": True, "file": file,
             "profiles": _profile_selector_view(state.cfg_scan, fresh_registry, fresh_pins)}
+
+
+def _cfg_layouts_export(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Save a profile's own file to wherever the user picks -- a plain
+    ``.vcfg``, exactly as it sits in the collection, so it can be handed to
+    someone else or kept outside the app.
+    """
+    from . import cfgscan, picker
+
+    result = _rescan(state)
+    if result is None:
+        return {"ok": False, "error": "scan a configuration folder first"}
+
+    file = str(body.get("file") or "")
+    profiles = {p["file"]: p for p in cfgscan.match_profiles(result)}
+    profile = profiles.get(file)
+    config = next((c for c in result.files.values() if c.relative == file), None)
+    if profile is None or config is None:
+        return {"ok": False, "error": f"{file} is not a detected layout profile"}
+
+    where = str(body.get("path") or "").strip()
+    if not where:
+        where = picker.save_file(Path(file).name, "Export profile",
+                                 picker.CONFIG_FILTER) or ""
+    if not where:
+        return {"ok": False, "declined": True, "error": "no file chosen"}
+
+    try:
+        Path(where).write_bytes(config.path.read_bytes())
+    except OSError as exc:
+        return {"ok": False, "error": f"could not write it: {exc}"}
+    return {"ok": True, "file": file, "label": profile["label"], "path": where}
+
+
+def _cfg_layouts_import(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Add a profile from a ``.vcfg`` file the user picks -- the import side
+    of ``_cfg_layouts_export``. Always written as a brand new profile in this
+    collection; it never overwrites one already here with the same name.
+    """
+    from . import cfgscan, layouts, picker
+
+    result = _rescan(state)
+    if result is None:
+        return {"ok": False, "error": "scan a configuration folder first"}
+
+    where = str(body.get("path") or "").strip()
+    if not where:
+        where = picker.pick_file("", "Choose a profile to import") or ""
+    if not where:
+        return {"ok": False, "declined": True, "error": "no file chosen"}
+
+    source = Path(where)
+    try:
+        text = source.read_bytes().decode("utf-8", errors="replace")
+    except OSError as exc:
+        return {"ok": False, "error": f"could not read it: {exc}"}
+
+    name = str(body.get("name") or "").strip() or source.stem.replace("_", " ").title()
+    relative = cfgscan.new_profile_path(result, name)
+    path = Path(result.cfg_root) / Path(relative)
+
+    session = backup.BackupSession(note=f"import profile {relative} (web)")
+    session.add(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    cfglang.write_config_text(path, text, "utf-8")
+    backup.prune()
+
+    layouts.mark_created(result.root, relative)
+    state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+    registry = layouts.load_registry(result.root)
+    pins = layouts.load_pins(result.root)
+    return {"ok": True, "file": relative,
+            "profiles": _profile_selector_view(state.cfg_scan, registry, pins)}
 
 
 def _safe_cloud_relative(cfg_root: Path, relative: object) -> Optional[Path]:
@@ -4083,11 +4204,14 @@ def make_handler(state: State):
         "/api/cfg/layouts/status": _cfg_layouts_status,
         "/api/cfg/layouts/pin": _cfg_layouts_pin,
         "/api/cfg/layouts/apply": _cfg_layouts_apply,
+        "/api/cfg/layouts/default": _cfg_layouts_default,
         "/api/cfg/layouts/profiles": _cfg_layouts_profiles,
         "/api/cfg/layouts/create": _cfg_layouts_create,
         "/api/cfg/layouts/copy": _cfg_layouts_copy,
         "/api/cfg/layouts/delete": _cfg_layouts_delete,
         "/api/cfg/layouts/remove": _cfg_layouts_remove,
+        "/api/cfg/layouts/export": _cfg_layouts_export,
+        "/api/cfg/layouts/import": _cfg_layouts_import,
         "/api/cfg/layouts/sync/push": _cfg_layouts_sync_push,
         "/api/cfg/layouts/sync/pull": _cfg_layouts_sync_pull,
         "/api/cfg/suggest": _cfg_suggest,

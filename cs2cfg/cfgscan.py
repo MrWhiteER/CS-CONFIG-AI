@@ -1188,6 +1188,38 @@ def is_match_profile(result: ScanResult, relative: str) -> bool:
     return _is_match_profile(config, startup_chain(result))
 
 
+def _write_bind_bodies(
+    result: ScanResult, changes: List[Dict[str, object]],
+) -> Dict[str, str]:
+    """Replace each change's bind body in place, at its own file and line.
+
+    ``changes`` items are ``{"file", "line", "from_body", "to_body"}``.
+    Grouped by file and read once each, so a profile touching several keys in
+    the same file reads and writes that file only once. Returns each touched
+    file's new text, ready to write.
+    """
+    by_file: Dict[str, List[Dict[str, object]]] = {}
+    for item in changes:
+        by_file.setdefault(item["file"], []).append(item)
+
+    texts: Dict[str, str] = {}
+    for file, items in by_file.items():
+        target = next(c for c in result.files.values() if c.relative == file)
+        original = target.path.read_bytes().decode(target.document.encoding, errors="replace")
+        flat = cfglang.restore_newlines(original, "\n", False)
+        lines = flat.split("\n")
+        for item in items:
+            index = item["line"] - 1
+            if not (0 <= index < len(lines)):
+                continue
+            lines[index] = lines[index].replace(
+                '"' + item["from_body"] + '"', '"' + item["to_body"] + '"', 1)
+        texts[file] = cfglang.restore_newlines(
+            "\n".join(lines), target.document.newline, target.document.trailing_newline)
+
+    return texts
+
+
 def apply_profile_overrides(
     result: ScanResult, profile_file: str, skip_keys: Iterable[str] = (),
 ) -> Tuple[List[str], List[str], Dict[str, str]]:
@@ -1212,31 +1244,64 @@ def apply_profile_overrides(
 
     applied: List[str] = []
     skipped: List[str] = []
-    by_file: Dict[str, List[Dict[str, object]]] = {}
+    changes: List[Dict[str, object]] = []
     for item in entry["overrides"]:
         if item["key"].lower() in skip:
             skipped.append(item["key"])
             continue
         applied.append(item["key"])
-        by_file.setdefault(item["standard_file"], []).append(item)
+        changes.append({
+            "file": item["standard_file"], "line": item["standard_line"],
+            "from_body": item["standard_body"], "to_body": item["profile_body"],
+        })
 
-    texts: Dict[str, str] = {}
-    for file, items in by_file.items():
-        target = next(c for c in result.files.values() if c.relative == file)
-        original = target.path.read_bytes().decode(target.document.encoding, errors="replace")
-        flat = cfglang.restore_newlines(original, "\n", False)
-        lines = flat.split("\n")
-        for item in items:
-            index = item["standard_line"] - 1
-            if not (0 <= index < len(lines)):
+    return applied, skipped, _write_bind_bodies(result, changes)
+
+
+def default_restorable(
+    result: ScanResult, baseline: Dict[str, Dict[str, str]],
+) -> List[Dict[str, object]]:
+    """Every baseline key whose standard bind currently differs from it --
+    what switching to "Default" would actually change.
+
+    ``baseline`` is ``{standard_file: {key: original_body}}``, recorded the
+    first time a profile ever overrode that key (see
+    ``cs2cfg.layouts.record_baseline``). A key with no baseline entry has
+    never been overridden by a profile, so there is nothing to restore it
+    from.
+    """
+    out = []
+    for file, keys in baseline.items():
+        for key, original_body in keys.items():
+            current = next(
+                (d for d in result.binds.get(key, ()) if d.file == file), None)
+            if current is None or current.body == original_body:
                 continue
-            was = item["standard_body"]
-            lines[index] = lines[index].replace(
-                '"' + was + '"', '"' + item["profile_body"] + '"', 1)
-        texts[file] = cfglang.restore_newlines(
-            "\n".join(lines), target.document.newline, target.document.trailing_newline)
+            out.append({
+                "key": key, "file": file, "line": current.line,
+                "from_body": current.body, "to_body": original_body,
+            })
+    return out
 
-    return applied, skipped, texts
+
+def default_is_active(result: ScanResult, baseline: Dict[str, Dict[str, str]]) -> bool:
+    """Whether the standard layout already matches every baseline key --
+    true both once it has been restored, and before any profile has ever
+    overridden anything at all."""
+    return not default_restorable(result, baseline)
+
+
+def apply_default_layout(
+    result: ScanResult, baseline: Dict[str, Dict[str, str]],
+) -> Tuple[List[str], Dict[str, str]]:
+    """Restore every key a profile has ever overridden back to what it was
+    the first time that happened -- the "go back to Default" tab.
+
+    Returns the keys actually changed and each touched file's new text,
+    ready to write, the same shape ``apply_profile_overrides`` returns.
+    """
+    changes = default_restorable(result, baseline)
+    return [c["key"] for c in changes], _write_bind_bodies(result, changes)
 
 
 _SLUG_RE = re.compile(r"[^a-z0-9]+")

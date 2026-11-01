@@ -4066,6 +4066,44 @@
   }
   .kbsw-tab.active .kbsw-count { color: var(--good); background: rgba(53, 208, 127, .12); }
 
+  .kbsw-add {
+    font-size: 15px; font-weight: 700; padding: 7px 13px; line-height: 1;
+    border-style: dashed; color: var(--faint);
+  }
+  .kbsw-add:hover { color: var(--ink); }
+  .kbsw-cloud { padding: 7px 11px; color: var(--faint); }
+
+  .kbsw-popover {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    justify-content: center; margin-top: 10px; padding: 10px 12px;
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px;
+  }
+  .kbsw-popover-label { font-size: 12px; color: var(--muted); }
+  .kbsw-popover input {
+    font: inherit; font-size: 12.5px; padding: 6px 10px; border-radius: 8px;
+    background: var(--bg-2); border: 1px solid var(--line); color: var(--ink);
+    min-width: 160px;
+  }
+
+  .kbsw-menu {
+    position: fixed; z-index: 60; min-width: 168px; padding: 6px;
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, .45);
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .kbsw-menu-label {
+    padding: 5px 9px 7px; font-size: 11px; font-weight: 700; color: var(--muted);
+    border-bottom: 1px solid var(--line); margin-bottom: 3px;
+  }
+  .kbsw-menu button {
+    appearance: none; cursor: pointer; font: inherit; text-align: left;
+    background: none; border: 0; border-radius: 6px; padding: 7px 9px;
+    font-size: 12.5px; color: var(--ink-dim);
+  }
+  .kbsw-menu button:hover { background: rgba(var(--lift), .08); color: var(--ink); }
+  .kbsw-menu button.danger { color: var(--bad); }
+  .kbsw-menu button.danger:hover { background: rgba(255, 84, 104, .12); }
+
   .kb-detail {
     margin: 18px auto 0; max-width: 620px;
     background: rgba(0, 0, 0, .3); border: 1px solid var(--line);
@@ -5351,7 +5389,6 @@
         </div>
         <div id="kb-switcher"></div>
         <div id="kb-out"><span class="sub">Scan a configuration folder first.</span></div>
-        <div id="kb-profiles"></div>
         <div id="kb-layouts"></div>
       </section>
     </div>
@@ -9164,7 +9201,7 @@ async function makeStarter(quiet) {
       : "A config was already there; nothing was changed.");
     // The tabs that were empty have something to show now.
     treeData = null; plugData = null; applyScriptStatus = null; keyData = null; cfgSettings = null;
-    layoutData = null; layoutPending = {}; profileData = null; profileCopySource = null;
+    layoutData = null; layoutPending = {}; profileData = null; kbswMenu = null; kbswPopover = null;
     setTab(activeTab);
     return r;
   } catch (err) {
@@ -9243,7 +9280,8 @@ let applyScriptStatus = null;
 let layoutData = null;
 let layoutPending = {};
 let profileData = null;
-let profileCopySource = null;
+let kbswMenu = null;      // {file, label, x, y} -- the open right-click menu, or none
+let kbswPopover = null;   // {mode: "create"|"copy", source, defaultName} -- the open name box, or none
 let favourites = new Set();
 
 // Favourites live in the same store as the rest of the page's preferences, so
@@ -9956,159 +9994,268 @@ function renderKeyboard() {
 
 let kbSwitchBusy = null;
 
-// A row of profile tabs sitting right above the board/mouse, the way Razer
-// Synapse shows its own profiles above the device it is drawing. Clicking
-// one that is not already active writes its overrides onto the standard
-// layout right now -- the create/copy/delete list further down still
-// manages the files themselves; this is only about which one is loaded.
+// The profile switcher: a row of tabs sitting right above the board/mouse,
+// the way Razer Synapse shows its own profiles above the device it is
+// drawing. This is the *only* place profiles are managed now -- a tab
+// switches to it, "+" creates or imports one, and right-clicking an
+// existing tab opens Copy/Cut/Export/Delete. "Default" always comes first:
+// the one way back to how things were once a profile has been applied,
+// since without it a key a profile took over stayed that way for good.
 function renderKbSwitcher() {
   const box = $("kb-switcher");
   if (!box) return;
   const profiles = (profileData && profileData.profiles) || [];
-  if (!profiles.length) { box.innerHTML = ""; return; }
+  const defaultActive = !!(profileData && profileData.default_active);
+  const defaultBusy = kbSwitchBusy === "\0default";
 
-  box.innerHTML = '<div class="kbsw-row">' +
-    profiles.map(p => {
-      const busy = kbSwitchBusy === p.file;
-      const title = (p.override_count
-        ? p.override_count + " key" + (p.override_count === 1 ? "" : "s") + " set"
-        : "nothing set yet") +
-        (p.trigger_alias ? " · key: " + p.trigger_alias : " · no key switches to this yet");
-      return '<button class="kbsw-tab' + (p.active ? " active" : "") +
-        (busy ? " busy" : "") + '" data-kbsw="' + esc(p.file) +
-        '" title="' + esc(title) + '">' +
-        '<span class="kbsw-dot"></span>' +
-        '<span class="kbsw-label">' + esc(p.label) + "</span>" +
-        (p.override_count
-          ? '<span class="kbsw-count">' + p.override_count + "</span>" : "") +
-        "</button>";
-    }).join("") +
-    "</div>";
-}
+  const defaultTab =
+    '<button class="kbsw-tab kbsw-default' + (defaultActive ? " active" : "") +
+    (defaultBusy ? " busy" : "") + '" data-kbsw-default ' +
+    'title="Put every key back to what it was before any profile touched it">' +
+    '<span class="kbsw-dot"></span><span class="kbsw-label">Default</span></button>';
 
-document.addEventListener("click", async e => {
-  const tab = e.target.closest("[data-kbsw]");
-  if (!tab || kbSwitchBusy) return;
-  const file = tab.dataset.kbsw;
-  kbSwitchBusy = file;
-  renderKbSwitcher();
-  try {
-    const r = await api("/api/cfg/layouts/apply", { file });
-    if (!r.changed) {
-      status(r.empty ? r.label + " doesn't set any keys yet." : r.label + " is already active.");
-    } else {
-      const applyKeys = r.apply_keys || [];
-      status("Switched to " + r.label + " — " + r.applied.length +
-             " key" + (r.applied.length === 1 ? "" : "s") + " changed" +
-             (r.skipped.length
-               ? " (" + r.skipped.length + " pinned, left alone)" : "") +
-             (applyKeys.length
-               ? " — press " + applyKeys.join(" or ") + " to apply it live"
-               : " — takes effect next time you reload your configs") +
-             (r.backup ? ", backup " + r.backup : ""));
-    }
-    await loadKeyboard(true);
-  } catch (err) {
-    status("Could not switch profiles: " + String(err && err.message || err), true);
-  } finally {
-    kbSwitchBusy = null;
-    renderKbSwitcher();
-  }
-});
-
-// Create/copy/delete over whole profile files (warmup.vcfg, 5v5.vcfg, ...),
-// the full settings-and-binds bundles the pin cards below work with. A
-// profile this app created can be deleted outright; a hand-written one can
-// only be dropped from this list, which never touches its file.
-function renderKbProfiles() {
-  const box = $("kb-profiles");
-  if (!box) return;
-  const profiles = (profileData && profileData.profiles) || [];
-  const copying = profileCopySource
-    ? profiles.find(p => p.file === profileCopySource)
-    : null;
-
-  const rows = profiles.map(p => {
-    const meta = p.trigger_alias
-      ? "key: <code>" + esc(p.trigger_alias) + "</code>"
-      : "no key switches to this yet";
-    const removeLabel = p.app_created ? "Delete" : "Remove";
-    const removeClass = p.app_created ? "btn small danger" : "btn small ghost";
-    return '<div class="chg-row kbp-row">' +
-      '<span class="chg-name">' + esc(p.label) +
-        (p.app_created ? ' <i class="chg-chip new">app-created</i>' : "") +
-        (p.active ? ' <i class="chg-chip to">active now</i>' : "") +
-      "</span>" +
-      '<div class="chg-move">' +
-        '<button class="btn small ghost" data-kbp-copy="' + esc(p.file) +
-        '" data-kbp-label="' + esc(p.label) + '">Copy</button>' +
-        '<button class="' + removeClass + '" data-kbp-remove="' + esc(p.file) +
-        '" data-kbp-label="' + esc(p.label) +
-        '" data-kbp-created="' + (p.app_created ? "1" : "0") + '">' +
-        removeLabel + "</button>" +
-      "</div>" +
-      '<div class="chg-why">' + meta + "</div>" +
-    "</div>";
+  const profileTabs = profiles.map(p => {
+    const busy = kbSwitchBusy === p.file;
+    const title = (p.override_count
+      ? p.override_count + " key" + (p.override_count === 1 ? "" : "s") + " set"
+      : "nothing set yet") +
+      (p.trigger_alias ? " · key: " + p.trigger_alias : " · no key switches to this yet") +
+      " · right-click for more";
+    return '<button class="kbsw-tab' + (p.active ? " active" : "") +
+      (busy ? " busy" : "") + '" data-kbsw="' + esc(p.file) +
+      '" data-kbsw-label="' + esc(p.label) + '" title="' + esc(title) + '">' +
+      '<span class="kbsw-dot"></span>' +
+      '<span class="kbsw-label">' + esc(p.label) + "</span>" +
+      (p.override_count
+        ? '<span class="kbsw-count">' + p.override_count + "</span>" : "") +
+      "</button>";
   }).join("");
 
-  box.innerHTML =
-    '<div class="subcat">Profiles</div>' +
-    '<p class="subcat-note">' +
-      "Full settings-and-binds bundles like warmup, 5v5 or lan &mdash; only " +
-      "loaded when you switch to them with a key. Create a blank one, copy " +
-      "an existing one, or take one off this list." +
-    "</p>" +
-    '<div class="chg-list quiet">' +
-      (rows || '<p class="sub">No profile files detected in this collection yet.</p>') +
-    "</div>" +
-    '<div class="setup-new">' +
-      '<input id="kbp-name" placeholder="' +
-      (copying ? esc(copying.label + " copy") : "e.g. Competitive") +
-      '" maxlength="40" aria-label="Profile name">' +
-      '<button class="btn small" id="kbp-go">' +
-      (copying ? "Copy " + esc(copying.label) : "New profile") + "</button>" +
-      (copying ? '<button class="btn small ghost" id="kbp-cancel-copy">Cancel</button>' : "") +
-    "</div>" +
-    (cloudData && cloudData.signed_in
-      ? '<div class="setup-new" style="margin-top:8px">' +
-          '<button class="btn small ghost" id="kbp-push">Push to cloud</button>' +
-          '<button class="btn small ghost" id="kbp-pull">Pull from cloud</button>' +
-        "</div>" +
-        '<p class="sub">Profiles are matched across devices by this collection’s ' +
-        "folder name (&ldquo;" + esc((scannedFolder || "").split(/[\\/]/).pop() || "") +
-        "&rdquo;).</p>"
-      : '<p class="sub">Sign in under Settings to sync these profiles across your devices.</p>');
+  const addTab = '<button class="kbsw-tab kbsw-add" data-kbsw-add ' +
+    'title="New profile, or import one">+</button>';
 
+  const cloudTabs = (cloudData && cloudData.signed_in)
+    ? '<button class="kbsw-tab kbsw-cloud" data-kbsw-push ' +
+      'title="Push profiles to the cloud">&#8593;</button>' +
+      '<button class="kbsw-tab kbsw-cloud" data-kbsw-pull ' +
+      'title="Pull profiles from the cloud">&#8595;</button>'
+    : "";
+
+  box.innerHTML = '<div class="kbsw-row">' +
+    defaultTab + profileTabs + addTab + cloudTabs +
+    "</div>" + renderKbswPopover() + renderKbswMenu();
+
+  const nameField = $("kbsw-name");
+  if (nameField) nameField.focus();
+}
+
+// The one box this now has for naming something: a blank profile, a copy of
+// an existing one, or (from the "+" tab) a pick between those and Import.
+function renderKbswPopover() {
+  if (!kbswPopover) return "";
+  const isCopy = kbswPopover.mode === "copy";
+  return '<div class="kbsw-popover">' +
+    (isCopy ? '<span class="kbsw-popover-label">Copy ' +
+      esc(kbswPopover.sourceLabel) + ' as</span>' : "") +
+    '<input id="kbsw-name" placeholder="' + esc(kbswPopover.defaultName) +
+    '" maxlength="40" aria-label="Profile name">' +
+    '<button class="btn small" id="kbsw-name-go">' +
+    (isCopy ? "Copy" : "Create") + "</button>" +
+    (isCopy ? "" :
+      '<button class="btn small ghost" id="kbsw-name-import">Import…</button>') +
+    '<button class="btn small ghost" id="kbsw-name-cancel">Cancel</button>' +
+    "</div>";
+}
+
+// Right-click on a profile tab: everything that touches the file itself.
+function renderKbswMenu() {
+  if (!kbswMenu) return "";
+  const x = Math.min(kbswMenu.x, window.innerWidth - 190);
+  const y = Math.min(kbswMenu.y, window.innerHeight - 180);
+  return '<div class="kbsw-menu" style="left:' + x + 'px; top:' + y + 'px;">' +
+    '<div class="kbsw-menu-label">' + esc(kbswMenu.label) + "</div>" +
+    '<button data-kbsw-menu="copy">Copy</button>' +
+    '<button data-kbsw-menu="cut">Cut</button>' +
+    '<button data-kbsw-menu="export">Export…</button>' +
+    '<button class="danger" data-kbsw-menu="delete">Delete completely</button>' +
+    "</div>";
+}
+
+function closeKbswPopover() { kbswPopover = null; renderKbSwitcher(); }
+
+function openKbswCreatePopover() {
+  kbswMenu = null;
+  kbswPopover = (kbswPopover && kbswPopover.mode === "create") ? null :
+    { mode: "create", defaultName: "e.g. Competitive" };
   renderKbSwitcher();
 }
 
+function openKbswCopyPopover(file, label) {
+  kbswMenu = null;
+  kbswPopover = { mode: "copy", source: file, sourceLabel: label,
+                 defaultName: label + " copy" };
+  renderKbSwitcher();
+}
+
+// Refetches the switcher's own data (profiles, active state, Default) after
+// anything that could have changed it, without touching the keyboard diagram
+// or the pin cards -- those refresh separately, only where they need to.
+async function refreshKbSwitcher() {
+  try { profileData = await api("/api/cfg/layouts/profiles", {}); }
+  catch (e) { profileData = null; }
+  renderKbSwitcher();
+}
+
+document.addEventListener("contextmenu", e => {
+  const tab = e.target.closest("[data-kbsw]");
+  if (!tab) return;
+  e.preventDefault();
+  kbswPopover = null;
+  kbswMenu = { file: tab.dataset.kbsw, label: tab.dataset.kbswLabel,
+              x: e.clientX, y: e.clientY };
+  renderKbSwitcher();
+});
+
 document.addEventListener("click", async e => {
-  const copyBtn = e.target.closest("[data-kbp-copy]");
-  if (copyBtn) {
-    profileCopySource = copyBtn.dataset.kbpCopy;
-    renderKbProfiles();
-    const field = $("kbp-name");
-    if (field) { field.value = copyBtn.dataset.kbpLabel + " copy"; field.focus(); }
+  // Clicking anywhere outside an open menu or popover closes it -- but not
+  // the clicks that open one in the first place, handled below.
+  const insideMenu = e.target.closest(".kbsw-menu");
+  const insidePopover = e.target.closest(".kbsw-popover");
+  const opener = e.target.closest("[data-kbsw-add], [data-kbsw-menu]");
+  if (!insideMenu && !insidePopover && !opener && (kbswMenu || kbswPopover)) {
+    kbswMenu = null; kbswPopover = null;
+    renderKbSwitcher();
+  }
+
+  const tab = e.target.closest("[data-kbsw]");
+  if (tab && !kbSwitchBusy) {
+    const file = tab.dataset.kbsw;
+    kbSwitchBusy = file;
+    renderKbSwitcher();
+    try {
+      const r = await api("/api/cfg/layouts/apply", { file });
+      if (!r.changed) {
+        status(r.empty ? r.label + " doesn't set any keys yet."
+                       : r.label + " is already active.");
+      } else {
+        const applyKeys = r.apply_keys || [];
+        status("Switched to " + r.label + " — " + r.applied.length +
+               " key" + (r.applied.length === 1 ? "" : "s") + " changed" +
+               (r.skipped.length
+                 ? " (" + r.skipped.length + " pinned, left alone)" : "") +
+               (applyKeys.length
+                 ? " — press " + applyKeys.join(" or ") + " to apply it live"
+                 : " — takes effect next time you reload your configs") +
+               (r.backup ? ", backup " + r.backup : ""));
+      }
+      await loadKeyboard(true);
+    } catch (err) {
+      status("Could not switch profiles: " + String(err && err.message || err), true);
+    } finally {
+      kbSwitchBusy = null;
+      renderKbSwitcher();
+    }
     return;
   }
-  if (e.target.closest("#kbp-cancel-copy")) {
-    profileCopySource = null;
-    renderKbProfiles();
+
+  if (e.target.closest("[data-kbsw-default]")) {
+    if (kbSwitchBusy) return;
+    kbSwitchBusy = "\0default";
+    renderKbSwitcher();
+    try {
+      const r = await api("/api/cfg/layouts/default", {});
+      if (!r.changed) {
+        status(r.empty ? "Nothing to go back to yet — no profile has been switched to."
+                       : "Already at your default.");
+      } else {
+        const applyKeys = r.apply_keys || [];
+        status("Back to default — " + r.applied.length +
+               " key" + (r.applied.length === 1 ? "" : "s") + " restored" +
+               (applyKeys.length
+                 ? " — press " + applyKeys.join(" or ") + " to apply it live"
+                 : " — takes effect next time you reload your configs") +
+               (r.backup ? ", backup " + r.backup : ""));
+      }
+      await loadKeyboard(true);
+    } catch (err) {
+      status("Could not go back to default: " + String(err && err.message || err), true);
+    } finally {
+      kbSwitchBusy = null;
+      renderKbSwitcher();
+    }
     return;
   }
-  if (e.target.closest("#kbp-go")) {
-    const field = $("kbp-name");
+
+  if (e.target.closest("[data-kbsw-add]")) { openKbswCreatePopover(); return; }
+
+  const menuBtn = e.target.closest("[data-kbsw-menu]");
+  if (menuBtn) {
+    const { file, label } = kbswMenu || {};
+    const action = menuBtn.dataset.kbswMenu;
+    kbswMenu = null;
+    if (!file) { renderKbSwitcher(); return; }
+
+    if (action === "copy") { openKbswCopyPopover(file, label); return; }
+    renderKbSwitcher();
+
+    if (action === "export") {
+      try {
+        const r = await api("/api/cfg/layouts/export", { file });
+        if (!r.declined) status("Exported " + label + " to " + r.path + ".");
+      } catch (err) {
+        status("Could not export: " + String(err && err.message || err), true);
+      }
+      return;
+    }
+    if (action === "cut") {
+      try {
+        const r = await api("/api/cfg/layouts/export", { file });
+        if (r.declined) return;
+        if (!confirm("Saved a copy of “" + label + "” to " + r.path +
+            ". Remove it from here now?")) return;
+        await api("/api/cfg/layouts/delete", { file });
+        status("Cut " + label + " — saved to " + r.path + " and removed from here.");
+        await refreshKbSwitcher();
+        layoutData = await api("/api/cfg/layouts/status", {});
+        renderKbLayouts();
+      } catch (err) {
+        status("Could not cut: " + String(err && err.message || err), true);
+      }
+      return;
+    }
+    if (action === "delete") {
+      if (!confirm("Delete “" + label + "” completely? This removes its file " +
+          "for good (backed up first, so it can still be restored from Backups).")) return;
+      try {
+        await api("/api/cfg/layouts/delete", { file });
+        status("Deleted " + label + ".");
+        await refreshKbSwitcher();
+        layoutData = await api("/api/cfg/layouts/status", {});
+        renderKbLayouts();
+      } catch (err) {
+        status("Could not delete: " + String(err && err.message || err), true);
+      }
+      return;
+    }
+    return;
+  }
+
+  if (e.target.closest("#kbsw-name-cancel")) { closeKbswPopover(); return; }
+
+  if (e.target.closest("#kbsw-name-go")) {
+    const field = $("kbsw-name");
     const name = (field.value || field.placeholder || "").trim();
     if (!name) { status("Give the profile a name first.", true); return; }
-    const source = profileCopySource;
+    const popover = kbswPopover;
     try {
-      profileData = source
-        ? await api("/api/cfg/layouts/copy", { file: source, name })
+      const r = popover.mode === "copy"
+        ? await api("/api/cfg/layouts/copy", { file: popover.source, name })
         : await api("/api/cfg/layouts/create", { name });
-      status((source ? "Copied to " : "Created ") +
-        profileData.file.split("/").pop() + ".");
-      profileCopySource = null;
-      renderKbProfiles();
+      status((popover.mode === "copy" ? "Copied to " : "Created ") +
+        r.file.split("/").pop() + ".");
+      kbswPopover = null;
+      profileData = { ...r, default_active: profileData ? profileData.default_active : true };
+      renderKbSwitcher();
       layoutData = await api("/api/cfg/layouts/status", {});
       renderKbLayouts();
     } catch (err) {
@@ -10116,32 +10263,25 @@ document.addEventListener("click", async e => {
     }
     return;
   }
-  const rm = e.target.closest("[data-kbp-remove]");
-  if (rm) {
-    const file = rm.dataset.kbpRemove;
-    const label = rm.dataset.kbpLabel;
-    const created = rm.dataset.kbpCreated === "1";
-    const sure = created
-      ? confirm("Delete “" + label + "”? This removes its file for good " +
-        "(backed up first, so it can still be restored from Backups).")
-      : confirm("Remove “" + label + "” from this list? Its file is left " +
-        "exactly as it is — only the switch key is unwired.");
-    if (!sure) return;
+
+  if (e.target.closest("#kbsw-name-import")) {
+    kbswPopover = null;
+    renderKbSwitcher();
     try {
-      profileData = await api(
-        created ? "/api/cfg/layouts/delete" : "/api/cfg/layouts/remove", { file });
-      status((created ? "Deleted " : "Removed ") + label + ".");
-      renderKbProfiles();
+      const r = await api("/api/cfg/layouts/import", {});
+      if (r.declined) return;
+      status("Imported " + r.file.split("/").pop() + ".");
+      profileData = { ...r, default_active: profileData ? profileData.default_active : true };
+      renderKbSwitcher();
       layoutData = await api("/api/cfg/layouts/status", {});
       renderKbLayouts();
     } catch (err) {
-      status("Could not finish: " + String(err && err.message || err), true);
+      status("Could not import: " + String(err && err.message || err), true);
     }
     return;
   }
-  const pushBtn = e.target.closest("#kbp-push");
-  if (pushBtn) {
-    pushBtn.disabled = true;
+
+  if (e.target.closest("[data-kbsw-push]")) {
     try {
       const r = await api("/api/cfg/layouts/sync/push", {});
       status(r.files.length
@@ -10149,32 +10289,42 @@ document.addEventListener("click", async e => {
         : "Nothing to push yet — no profiles detected in this collection.");
     } catch (err) {
       status("Could not push to the cloud: " + String(err && err.message || err), true);
-    } finally {
-      pushBtn.disabled = false;
     }
     return;
   }
-  const pullBtn = e.target.closest("#kbp-pull");
-  if (pullBtn) {
+  if (e.target.closest("[data-kbsw-pull]")) {
     if (!confirm("Pull profiles from the cloud? A local file with the same " +
         "name is overwritten — backed up first, so it can still be " +
         "restored from Backups.")) return;
-    pullBtn.disabled = true;
     try {
-      profileData = await api("/api/cfg/layouts/sync/pull", {});
-      status(profileData.files.length
-        ? "Pulled " + profileData.files.length + " profile(s) from the cloud."
+      const r = await api("/api/cfg/layouts/sync/pull", {});
+      status(r.files.length
+        ? "Pulled " + r.files.length + " profile(s) from the cloud."
         : "Nothing new to pull.");
-      renderKbProfiles();
+      await refreshKbSwitcher();
       layoutData = await api("/api/cfg/layouts/status", {});
       renderKbLayouts();
     } catch (err) {
       status("Could not pull from the cloud: " + String(err && err.message || err), true);
-    } finally {
-      pullBtn.disabled = false;
     }
+    return;
   }
 });
+
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && (kbswMenu || kbswPopover)) {
+    kbswMenu = null; kbswPopover = null; renderKbSwitcher();
+    return;
+  }
+  if (e.key === "Enter" && kbswPopover && e.target.id === "kbsw-name") {
+    $("kbsw-name-go").click();
+  }
+});
+
+// Kept as the name the rest of the page already calls after anything that
+// might have changed the profile list -- it simply draws the switcher now
+// that the switcher is the only profile UI there is.
+function renderKbProfiles() { renderKbSwitcher(); }
 
 // Match-profile files like lan/warmup.vcfg: loaded only by pressing a key,
 // and only changing the handful of binds they mention -- everything else
@@ -13556,7 +13706,7 @@ async function reloadForAccount() {
   } catch (err) { /* a first run has nothing stored yet */ }
   cs2Data = null; gpuData = null; keyData = null; cfgSettings = null;
   pickedKey = null; kbOptions = null; treeData = null; plugData = null; applyScriptStatus = null;
-  layoutData = null; layoutPending = {}; profileData = null; profileCopySource = null;
+  layoutData = null; layoutPending = {}; profileData = null; kbswMenu = null; kbswPopover = null;
   scannedFolder = null;
   const folder = $("cfg-folder") ? $("cfg-folder").value.trim() : "";
   srcFiles = null;

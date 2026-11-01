@@ -1045,6 +1045,50 @@ class TestLayoutProfiles(unittest.TestCase):
             cfgscan.profile_is_active(again, "mrwhiteer/lan/warmup.vcfg",
                                       skip_keys=["mouse4"]))
 
+    def test_default_restorable_is_empty_with_no_baseline(self):
+        self.assertEqual(cfgscan.default_restorable(self.result, {}), [])
+        self.assertTrue(cfgscan.default_is_active(self.result, {}))
+
+    def test_default_restorable_finds_a_key_that_now_differs(self):
+        baseline = {"mrwhiteer/mainsettings/key_binds.vcfg":
+                    {"mouse3": "say custom text"}}
+        _, _, texts = cfgscan.apply_profile_overrides(
+            self.result, "mrwhiteer/lan/warmup.vcfg")
+        config = next(c for c in self.result.files.values()
+                      if c.relative == "mrwhiteer/mainsettings/key_binds.vcfg")
+        config.path.write_text(texts[config.relative], encoding="utf-8")
+        again = self.rescan()
+
+        restorable = cfgscan.default_restorable(again, baseline)
+        self.assertEqual(len(restorable), 1)
+        self.assertEqual(restorable[0]["key"], "mouse3")
+        self.assertEqual(restorable[0]["to_body"], "say custom text")
+        self.assertFalse(cfgscan.default_is_active(again, baseline))
+
+    def test_apply_default_layout_writes_the_baseline_body_back(self):
+        baseline = {"mrwhiteer/mainsettings/key_binds.vcfg":
+                    {"mouse3": "say custom text", "mouse4": "player_ping"}}
+        _, _, texts = cfgscan.apply_profile_overrides(
+            self.result, "mrwhiteer/lan/warmup.vcfg")
+        config = next(c for c in self.result.files.values()
+                      if c.relative == "mrwhiteer/mainsettings/key_binds.vcfg")
+        config.path.write_text(texts[config.relative], encoding="utf-8")
+        again = self.rescan()
+
+        applied, restored = cfgscan.apply_default_layout(again, baseline)
+        self.assertEqual(set(applied), {"mouse3", "mouse4"})
+        self.assertIn('bind "mouse3" "say custom text"',
+                      restored["mrwhiteer/mainsettings/key_binds.vcfg"])
+        self.assertIn('bind "mouse4" "player_ping"',
+                      restored["mrwhiteer/mainsettings/key_binds.vcfg"])
+
+    def test_apply_default_layout_with_nothing_to_restore_writes_nothing(self):
+        baseline = {"mrwhiteer/mainsettings/key_binds.vcfg":
+                    {"mouse3": "say custom text"}}
+        applied, restored = cfgscan.apply_default_layout(self.result, baseline)
+        self.assertEqual(applied, [])
+        self.assertEqual(restored, {})
+
 
 class TestFolderPicking(FixtureCase):
     """Choosing a folder should not require typing a path."""

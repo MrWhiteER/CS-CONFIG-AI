@@ -61,6 +61,51 @@ def load_pins(root: Path) -> Dict[str, List[str]]:
     }
 
 
+def _baseline_path(root: Path) -> Path:
+    return _store() / f"{_collection_key(root)}.baseline.json"
+
+
+def load_baseline(root: Path) -> Dict[str, Dict[str, str]]:
+    """``{standard_file: {key: original_body}}`` -- what each key a profile
+    has ever overridden looked like the first time that happened, so the
+    Keyboard tab's "Default" option can put it back.
+    """
+    try:
+        data = json.loads(_baseline_path(root).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    out: Dict[str, Dict[str, str]] = {}
+    for file, keys in data.items():
+        if isinstance(keys, dict):
+            out[str(file)] = {str(k): str(v) for k, v in keys.items()}
+    return out
+
+
+def record_baseline(root: Path, file: str, bodies: Dict[str, str]) -> None:
+    """Remember what each of these keys was bound to in ``file``, right
+    before a profile is about to override it for the first time.
+
+    Never overwrites a key already recorded -- the whole point is to keep
+    the *original* value even after several different profiles have since
+    taken turns overriding it.
+    """
+    baseline = load_baseline(root)
+    known = baseline.setdefault(file, {})
+    changed = False
+    for key, body in bodies.items():
+        if key not in known:
+            known[key] = body
+            changed = True
+    if not changed:
+        return
+
+    path = _baseline_path(root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(baseline, indent=1), encoding="utf-8")
+
+
 def save_pins(root: Path, profile_file: str, keys: List[str]) -> Dict[str, List[str]]:
     """Set (or clear, with an empty list) the pins for one profile file."""
     all_pins = load_pins(root)

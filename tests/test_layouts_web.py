@@ -81,6 +81,18 @@ class LayoutsWebCase(unittest.TestCase):
     def switch(self, file):
         return webui._cfg_layouts_apply(self.state, {"file": file})
 
+    def default(self):
+        return webui._cfg_layouts_default(self.state, {})
+
+    def export(self, file, path):
+        return webui._cfg_layouts_export(self.state, {"file": file, "path": str(path)})
+
+    def import_profile(self, path, name=""):
+        body = {"path": str(path)}
+        if name:
+            body["name"] = name
+        return webui._cfg_layouts_import(self.state, body)
+
     def switch_file(self):
         return self.cfg_root / "mrwhiteer/lan/warmup.layout.vcfg"
 
@@ -164,6 +176,9 @@ class TestProfileSelector(LayoutsWebCase):
         found = {p["file"]: p for p in self.profiles()["profiles"]}
         self.assertFalse(found["mrwhiteer/lan/competitive.vcfg"]["active"])
 
+    def test_default_is_active_before_anything_has_ever_been_switched(self):
+        self.assertTrue(self.profiles()["default_active"])
+
 
 class TestSwitchingProfiles(LayoutsWebCase):
     """Switching to a profile right now: writing its overrides onto the
@@ -225,6 +240,106 @@ class TestSwitchingProfiles(LayoutsWebCase):
         self.assertTrue(result["empty"], "nothing to compare, so not the same as already active")
 
 
+class TestDefault(LayoutsWebCase):
+    """Going back to Default: the one way out of a profile that got applied,
+    restoring every key a profile has ever overridden to what it was the
+    first time that happened."""
+
+    def test_switching_away_and_back_to_default_restores_the_original_binds(self):
+        before = (self.cfg_root / "mrwhiteer/mainsettings/key_binds.vcfg").read_bytes()
+        self.switch("mrwhiteer/lan/warmup.vcfg")
+
+        result = self.default()
+        self.assertTrue(result["ok"], result)
+        self.assertTrue(result["changed"])
+        self.assertEqual(set(result["applied"]), {"Mouse 3", "Mouse 4"})
+        after = (self.cfg_root / "mrwhiteer/mainsettings/key_binds.vcfg").read_bytes()
+        self.assertEqual(before, after)
+
+    def test_default_is_active_again_afterwards(self):
+        self.switch("mrwhiteer/lan/warmup.vcfg")
+        self.default()
+        self.assertTrue(self.profiles()["default_active"])
+
+    def test_default_survives_switching_through_a_second_profile(self):
+        """The original value is remembered the *first* time a key is ever
+        overridden -- switching to a second profile that touches the same
+        key must not forget it."""
+        self.copy("mrwhiteer/lan/warmup.vcfg", "Second")
+        self.switch("mrwhiteer/lan/warmup.vcfg")
+        self.switch("mrwhiteer/lan/second.vcfg")
+
+        before = (self.cfg_root / "mrwhiteer/mainsettings/key_binds.vcfg").read_bytes()
+        result = self.default()
+        self.assertTrue(result["ok"], result)
+        after = (self.cfg_root / "mrwhiteer/mainsettings/key_binds.vcfg").read_bytes()
+        self.assertNotEqual(before, after)
+        text = after.decode("utf-8")
+        self.assertIn('bind "mouse3" "say custom text"', text)
+        self.assertIn('bind "mouse4" "player_ping"', text)
+
+    def test_default_with_nothing_ever_switched_changes_nothing(self):
+        result = self.default()
+        self.assertTrue(result["ok"], result)
+        self.assertFalse(result["changed"])
+        self.assertTrue(result["empty"])
+
+    def test_default_once_already_restored_changes_nothing_further(self):
+        self.switch("mrwhiteer/lan/warmup.vcfg")
+        self.default()
+        result = self.default()
+        self.assertTrue(result["ok"], result)
+        self.assertFalse(result["changed"])
+        self.assertFalse(result["empty"], "something has been tracked, it just already matches")
+
+    def test_a_pinned_key_is_untouched_by_default_too(self):
+        self.pin("mrwhiteer/lan/warmup.vcfg", ["mouse4"])
+        self.switch("mrwhiteer/lan/warmup.vcfg")
+        result = self.default()
+        self.assertEqual(result["applied"], ["Mouse 3"])
+
+
+class TestExportImport(LayoutsWebCase):
+    def test_exporting_writes_the_profiles_own_file_to_the_chosen_path(self):
+        out = self.sandbox / "exported.vcfg"
+        result = self.export("mrwhiteer/lan/warmup.vcfg", out)
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(out.read_text(encoding="utf-8"),
+                         FILES["mrwhiteer/lan/warmup.vcfg"])
+
+    def test_exporting_an_unknown_profile_is_refused(self):
+        result = self.export("mrwhiteer/does/not/exist.vcfg", self.sandbox / "x.vcfg")
+        self.assertFalse(result["ok"])
+
+    def test_importing_adds_it_as_a_new_profile(self):
+        source = self.sandbox / "incoming.vcfg"
+        source.write_text('bind "f6" "noclip"\n', encoding="utf-8")
+
+        result = self.import_profile(source, "Incoming")
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(result["file"], "mrwhiteer/lan/incoming.vcfg")
+        path = self.cfg_root / "mrwhiteer/lan/incoming.vcfg"
+        self.assertEqual(path.read_text(encoding="utf-8"), 'bind "f6" "noclip"\n')
+        self.assertIn("mrwhiteer/lan/incoming.vcfg",
+                      {p["file"] for p in result["profiles"]})
+
+    def test_importing_without_a_name_uses_the_file_stem(self):
+        source = self.sandbox / "my_comp_setup.vcfg"
+        source.write_text('bind "f7" "noclip"\n', encoding="utf-8")
+        result = self.import_profile(source)
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(result["file"], "mrwhiteer/lan/my_comp_setup.vcfg")
+
+    def test_a_round_trip_keeps_the_content_identical(self):
+        out = self.sandbox / "roundtrip.vcfg"
+        self.export("mrwhiteer/lan/warmup.vcfg", out)
+        result = self.import_profile(out, "Roundtrip")
+        self.assertTrue(result["ok"], result)
+        path = self.cfg_root / "mrwhiteer/lan/roundtrip.vcfg"
+        self.assertEqual(path.read_text(encoding="utf-8"),
+                         FILES["mrwhiteer/lan/warmup.vcfg"])
+
+
 class TestCreate(LayoutsWebCase):
     def test_creates_a_blank_profile_and_marks_it_app_created(self):
         result = self.create("Competitive")
@@ -270,11 +385,16 @@ class TestCopy(LayoutsWebCase):
 
 
 class TestDelete(LayoutsWebCase):
-    def test_a_hand_written_profile_cannot_be_deleted(self):
+    def test_a_hand_written_profile_can_be_deleted_too(self):
+        """Delete now runs from the tab bar's right-click menu for any
+        profile -- app-created or hand-written -- now that the separate
+        app-created-only restriction and the softer Remove button are gone
+        from the UI."""
         result = self.delete("mrwhiteer/lan/warmup.vcfg")
-        self.assertFalse(result["ok"])
-        self.assertIn("created in the app", result["error"])
-        self.assertTrue((self.cfg_root / "mrwhiteer/lan/warmup.vcfg").is_file())
+        self.assertTrue(result["ok"], result)
+        self.assertFalse((self.cfg_root / "mrwhiteer/lan/warmup.vcfg").exists())
+        self.assertNotIn("mrwhiteer/lan/warmup.vcfg",
+                         {p["file"] for p in result["profiles"]})
 
     def test_deleting_an_app_created_profile_removes_its_file(self):
         self.create("Competitive")
