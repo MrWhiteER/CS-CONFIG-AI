@@ -15,8 +15,9 @@ from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from cs2cfg import cfgedit, cfgformat, cfglang, cfgscan  # noqa: E402
+from cs2cfg import cfgedit, cfgformat, cfglang, cfgscan, layouts  # noqa: E402
 from cs2cfg.cfglang import Severity, parse, tokenize_line  # noqa: E402
+from sandbox import redirect_layouts  # noqa: E402
 
 
 class TestTokenising(unittest.TestCase):
@@ -729,6 +730,320 @@ class TestApplyScript(FixtureCase):
         self.assertEqual(match.name, "Apply Saved Settings")
         self.assertFalse(match.missing, "exec target should resolve to a real file")
         self.assertEqual(match.bound_to, [])
+
+
+class TestDispatcherState(FixtureCase):
+    """Jumping a toggle/cycle's dispatcher (GM -> 1GM -> 2GM -> ...) straight
+    to a chosen state, instead of pressing its key through every step
+    between wherever it is now and the one that is actually wanted."""
+
+    def test_points_gm_at_the_chosen_state_with_the_files_own_casing(self):
+        """plugins.py only ever knows state names in lowercase; the file's
+        own casing is what should actually land on disk."""
+        _, text = cfgscan.set_dispatcher_state(self.result, "GM", "2gm")
+        self.assertIn('alias "GM" "2GM"', text)
+
+    def test_an_unknown_state_is_refused(self):
+        with self.assertRaises(ValueError) as caught:
+            cfgscan.set_dispatcher_state(self.result, "GM", "3GM")
+        self.assertIn("not a defined alias", str(caught.exception))
+
+    def test_an_unknown_dispatcher_is_refused(self):
+        with self.assertRaises(ValueError):
+            cfgscan.set_dispatcher_state(self.result, "NoSuchDispatcher", "2GM")
+
+    def test_refuses_when_the_dispatcher_does_more_than_name_a_state(self):
+        """A hand-edit that added a second command to GM's own line would
+        have that command silently dropped by a plain text substitution --
+        refused instead of risked."""
+        scripts = self.cfg_root / "mrwhiteer/tools/scripts.vcfg"
+        text = scripts.read_text(encoding="utf-8").replace(
+            'alias "GM" "1GM"', 'alias "GM" "1GM; echo hi"')
+        scripts.write_text(text, encoding="utf-8")
+        again = cfgscan.scan(self.collection, cfg_root=self.cfg_root)
+
+        with self.assertRaises(ValueError) as caught:
+            cfgscan.set_dispatcher_state(again, "GM", "2GM")
+        self.assertIn("not safe to retarget", str(caught.exception))
+
+
+class TestLayoutProfiles(unittest.TestCase):
+    """Pinning keys on a match profile like warmup.vcfg so it can't take them
+    over, built on a small collection mirroring the real !5v5/!warmup/GM
+    toggle: a startup-chain file with standard binds, a profile file outside
+    it that overrides some of them, and an alias that execs the profile."""
+
+    FILES = {
+        "mrwhiteer/autoexec.vcfg": (
+            'exec "mrwhiteer/tools/alias.vcfg"\n'
+            'exec "mrwhiteer/mainsettings/key_binds.vcfg"\n'
+        ),
+        "mrwhiteer/tools/alias.vcfg": (
+            'alias "!warmup" "exec mrwhiteer/lan/warmup.vcfg"     // Warmup loader\n'
+        ),
+        "mrwhiteer/mainsettings/key_binds.vcfg": (
+            'bind "mouse3" "say custom text"      // CUSTOM {BUTTON - MOUSE3}\n'
+            'bind "mouse4" "player_ping"           // PING {BUTTON - MOUSE4}\n'
+        ),
+        "mrwhiteer/lan/warmup.vcfg": (
+            'bind "mouse3" "noclip"\n'
+            'bind "mouse4" "bot_place"\n'
+        ),
+    }
+
+    def setUp(self):
+        self.sandbox = Path(tempfile.mkdtemp(prefix="cs2cfg-test-"))
+        self.cfg_root = self.sandbox / "cfg"
+        for relative, text in self.FILES.items():
+            path = self.cfg_root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text, encoding="utf-8")
+        self.collection = self.cfg_root / "mrwhiteer"
+        self.result = cfgscan.scan(self.collection, cfg_root=self.cfg_root)
+        redirect_layouts(self)
+
+    def tearDown(self):
+        shutil.rmtree(self.sandbox, ignore_errors=True)
+
+    def rescan(self):
+        return cfgscan.scan(self.collection, cfg_root=self.cfg_root)
+
+    def test_detects_warmup_as_a_profile_with_two_overrides(self):
+        profiles = cfgscan.layout_profiles(self.result)
+        self.assertEqual(len(profiles), 1)
+        profile = profiles[0]
+        self.assertEqual(profile["file"], "mrwhiteer/lan/warmup.vcfg")
+        keys = {o["key"] for o in profile["overrides"]}
+        self.assertEqual(keys, {"mouse3", "mouse4"})
+
+    def test_finds_the_alias_that_switches_to_it(self):
+        profile = cfgscan.layout_profiles(self.result)[0]
+        self.assertEqual(profile["trigger"]["alias"], "!warmup")
+        self.assertEqual(profile["trigger"]["file"], "mrwhiteer/tools/alias.vcfg")
+
+    def test_a_file_the_startup_chain_never_touches_has_nothing_pinnable(self):
+        """lan.vcfg-style file with no bind the standard layout also sets."""
+        path = self.cfg_root / "mrwhiteer/lan/lan.vcfg"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('bind "\\" "matchpause"\n', encoding="utf-8")
+        again = self.rescan()
+        files = {p["file"] for p in cfgscan.layout_profiles(again)}
+        self.assertNotIn("mrwhiteer/lan/lan.vcfg", files)
+
+    def test_switch_path_sits_beside_the_profile_it_wraps(self):
+        self.assertEqual(
+            cfgscan.layout_switch_path("mrwhiteer/lan/warmup.vcfg"),
+            "mrwhiteer/lan/warmup.layout.vcfg")
+
+    def test_switch_text_execs_the_profile_then_reasserts_pins(self):
+        text = cfgscan.layout_switch_text(
+            "mrwhiteer/lan/warmup.vcfg", {"mouse4": "player_ping"})
+        self.assertIn('exec "mrwhiteer/lan/warmup.vcfg"', text)
+        self.assertIn('bind "mouse4" "player_ping"', text)
+        self.assertNotIn("mouse3", text)
+
+    def test_switch_text_with_no_pins_is_a_plain_passthrough(self):
+        text = cfgscan.layout_switch_text("mrwhiteer/lan/warmup.vcfg", {})
+        self.assertIn('exec "mrwhiteer/lan/warmup.vcfg"', text)
+        self.assertNotIn("bind", text)
+
+    def test_retargets_the_triggering_alias_to_the_generated_file(self):
+        profile = cfgscan.layout_profiles(self.result)[0]
+        trigger = profile["trigger"]
+        _, text = cfgscan.retarget_alias_exec(
+            self.result, trigger["file"], trigger["line"],
+            trigger["target_text"], "mrwhiteer/lan/warmup.layout.vcfg")
+        self.assertIn(
+            'alias "!warmup" "exec mrwhiteer/lan/warmup.layout.vcfg"', text)
+        self.assertIn("Warmup loader", text, "the comment should survive untouched")
+
+    def test_retarget_refuses_when_the_text_is_not_unique(self):
+        config = next(c for c in self.result.files.values()
+                     if c.relative == "mrwhiteer/tools/alias.vcfg")
+        config.path.write_text(
+            'alias "!warmup" "exec mrwhiteer/lan/warmup.vcfg"  '
+            '// also mentions mrwhiteer/lan/warmup.vcfg right here\n',
+            encoding="utf-8")
+        again = self.rescan()
+        trigger = cfgscan.layout_profiles(again)[0]["trigger"]
+        with self.assertRaises(ValueError):
+            cfgscan.retarget_alias_exec(
+                again, trigger["file"], trigger["line"],
+                "mrwhiteer/lan/warmup.vcfg", "mrwhiteer/lan/warmup.layout.vcfg")
+
+    def test_pins_round_trip_through_storage(self):
+        layouts.save_pins(self.collection, "mrwhiteer/lan/warmup.vcfg", ["mouse4"])
+        self.assertEqual(
+            layouts.load_pins(self.collection),
+            {"mrwhiteer/lan/warmup.vcfg": ["mouse4"]})
+
+    def test_clearing_pins_removes_the_entry(self):
+        layouts.save_pins(self.collection, "mrwhiteer/lan/warmup.vcfg", ["mouse4"])
+        layouts.save_pins(self.collection, "mrwhiteer/lan/warmup.vcfg", [])
+        self.assertEqual(layouts.load_pins(self.collection), {})
+
+    def test_match_profiles_includes_one_with_nothing_pinnable(self):
+        """Unlike layout_profiles, the broader listing used by the profile
+        selector must still show a blank/new profile with zero overrides."""
+        path = self.cfg_root / "mrwhiteer/lan/lan.vcfg"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('bind "\\" "matchpause"\n', encoding="utf-8")
+        again = self.rescan()
+        files = {p["file"] for p in cfgscan.match_profiles(again)}
+        self.assertIn("mrwhiteer/lan/lan.vcfg", files)
+        self.assertIn("mrwhiteer/lan/warmup.vcfg", files)
+        self.assertNotIn("mrwhiteer/lan/lan.vcfg",
+                         {p["file"] for p in cfgscan.layout_profiles(again)})
+
+    def test_is_match_profile_true_for_a_profile_false_for_startup_files(self):
+        self.assertTrue(
+            cfgscan.is_match_profile(self.result, "mrwhiteer/lan/warmup.vcfg"))
+        self.assertFalse(
+            cfgscan.is_match_profile(self.result, "mrwhiteer/autoexec.vcfg"))
+        self.assertFalse(
+            cfgscan.is_match_profile(self.result, "mrwhiteer/does/not/exist.vcfg"))
+
+    def test_profile_slug_strips_everything_but_letters_and_digits(self):
+        self.assertEqual(cfgscan.profile_slug("5v5 Setup!"), "5v5_setup")
+        self.assertEqual(cfgscan.profile_slug("../../etc/passwd"), "etc_passwd")
+        self.assertEqual(cfgscan.profile_slug("   "), "profile")
+
+    def test_new_profile_path_lands_beside_the_existing_lan_folder(self):
+        self.assertEqual(
+            cfgscan.new_profile_path(self.result, "Competitive"),
+            "mrwhiteer/lan/competitive.vcfg")
+
+    def test_new_profile_path_avoids_a_collision(self):
+        self.assertEqual(
+            cfgscan.new_profile_path(self.result, "warmup"),
+            "mrwhiteer/lan/warmup_2.vcfg")
+
+    def test_blank_profile_text_is_just_a_banner(self):
+        text = cfgscan.profile_blank_text("Competitive")
+        self.assertIn("Competitive", text)
+        self.assertNotIn("GENERATED BY", text)
+
+    def test_disable_line_comments_out_the_triggering_alias(self):
+        trigger = cfgscan.layout_profiles(self.result)[0]["trigger"]
+        _, text = cfgscan.disable_line(
+            self.result, trigger["file"], trigger["line"], "test")
+        self.assertIn('// alias "!warmup" "exec mrwhiteer/lan/warmup.vcfg"', text)
+
+    def test_disable_line_refuses_to_disable_twice(self):
+        trigger = cfgscan.layout_profiles(self.result)[0]["trigger"]
+        _, text = cfgscan.disable_line(
+            self.result, trigger["file"], trigger["line"], "test")
+        config = next(c for c in self.result.files.values()
+                      if c.relative == trigger["file"])
+        config.path.write_text(text, encoding="utf-8")
+        again = self.rescan()
+        with self.assertRaises(ValueError):
+            cfgscan.disable_line(again, trigger["file"], trigger["line"], "test again")
+
+    def test_registry_tracks_created_and_hidden_profiles(self):
+        layouts.mark_created(self.collection, "mrwhiteer/lan/new.vcfg")
+        self.assertTrue(layouts.is_created(self.collection, "mrwhiteer/lan/new.vcfg"))
+        self.assertFalse(layouts.is_created(self.collection, "mrwhiteer/lan/warmup.vcfg"))
+
+        layouts.hide_profile(self.collection, "mrwhiteer/lan/warmup.vcfg")
+        self.assertIn("mrwhiteer/lan/warmup.vcfg",
+                      layouts.load_registry(self.collection)["hidden"])
+
+    def test_forget_profile_clears_pins_and_both_registry_flags(self):
+        layouts.mark_created(self.collection, "mrwhiteer/lan/new.vcfg")
+        layouts.hide_profile(self.collection, "mrwhiteer/lan/new.vcfg")
+        layouts.save_pins(self.collection, "mrwhiteer/lan/new.vcfg", ["mouse4"])
+
+        layouts.forget_profile(self.collection, "mrwhiteer/lan/new.vcfg")
+
+        registry = layouts.load_registry(self.collection)
+        self.assertNotIn("mrwhiteer/lan/new.vcfg", registry["created"])
+        self.assertNotIn("mrwhiteer/lan/new.vcfg", registry["hidden"])
+        self.assertEqual(layouts.load_pins(self.collection), {})
+
+    def test_apply_writes_every_override_onto_the_standard_file(self):
+        applied, skipped, texts = cfgscan.apply_profile_overrides(
+            self.result, "mrwhiteer/lan/warmup.vcfg")
+        self.assertEqual(set(applied), {"mouse3", "mouse4"})
+        self.assertEqual(skipped, [])
+        text = texts["mrwhiteer/mainsettings/key_binds.vcfg"]
+        self.assertIn('bind "mouse3" "noclip"', text)
+        self.assertIn('bind "mouse4" "bot_place"', text)
+        # The comment beside each bind is untouched -- only the body moved.
+        self.assertIn("CUSTOM {BUTTON - MOUSE3}", text)
+        self.assertIn("PING {BUTTON - MOUSE4}", text)
+
+    def test_apply_leaves_a_pinned_key_on_its_standard_binding(self):
+        applied, skipped, texts = cfgscan.apply_profile_overrides(
+            self.result, "mrwhiteer/lan/warmup.vcfg", skip_keys=["mouse4"])
+        self.assertEqual(applied, ["mouse3"])
+        self.assertEqual(skipped, ["mouse4"])
+        text = texts["mrwhiteer/mainsettings/key_binds.vcfg"]
+        self.assertIn('bind "mouse3" "noclip"', text)
+        self.assertIn('bind "mouse4" "player_ping"', text, "pinned, so unchanged")
+
+    def test_apply_with_every_key_pinned_writes_nothing(self):
+        applied, skipped, texts = cfgscan.apply_profile_overrides(
+            self.result, "mrwhiteer/lan/warmup.vcfg", skip_keys=["mouse3", "mouse4"])
+        self.assertEqual(applied, [])
+        self.assertEqual(set(skipped), {"mouse3", "mouse4"})
+        self.assertEqual(texts, {})
+
+    def test_apply_refuses_a_file_that_is_not_a_profile(self):
+        with self.assertRaises(ValueError):
+            cfgscan.apply_profile_overrides(self.result, "mrwhiteer/autoexec.vcfg")
+
+    def test_applying_twice_is_idempotent(self):
+        """Writing a profile's own values back onto itself a second time
+        changes nothing further -- the whole point of "already switched"."""
+        applied, _, texts = cfgscan.apply_profile_overrides(
+            self.result, "mrwhiteer/lan/warmup.vcfg")
+        config = next(c for c in self.result.files.values()
+                      if c.relative == "mrwhiteer/mainsettings/key_binds.vcfg")
+        config.path.write_text(texts[config.relative], encoding="utf-8")
+        again = self.rescan()
+
+        applied2, _, texts2 = cfgscan.apply_profile_overrides(
+            again, "mrwhiteer/lan/warmup.vcfg")
+        self.assertEqual(applied2, [])
+        self.assertEqual(texts2, {})
+
+    def test_not_active_before_anything_has_been_applied(self):
+        self.assertFalse(
+            cfgscan.profile_is_active(self.result, "mrwhiteer/lan/warmup.vcfg"))
+
+    def test_active_once_the_standard_layout_matches_it(self):
+        _, _, texts = cfgscan.apply_profile_overrides(
+            self.result, "mrwhiteer/lan/warmup.vcfg")
+        config = next(c for c in self.result.files.values()
+                      if c.relative == "mrwhiteer/mainsettings/key_binds.vcfg")
+        config.path.write_text(texts[config.relative], encoding="utf-8")
+        again = self.rescan()
+        self.assertTrue(
+            cfgscan.profile_is_active(again, "mrwhiteer/lan/warmup.vcfg"))
+
+    def test_a_profile_with_no_binds_of_its_own_is_never_active(self):
+        path = self.cfg_root / "mrwhiteer/lan/blank.vcfg"
+        path.write_text("// nothing here yet\n", encoding="utf-8")
+        again = self.rescan()
+        self.assertFalse(cfgscan.profile_is_active(again, "mrwhiteer/lan/blank.vcfg"))
+
+    def test_active_ignores_a_key_pinned_away(self):
+        """Only one of the two keys is applied; the other stays on its
+        standard binding, same as a pin already keeps it. Active should
+        still read true once the pinned key is excluded from the check."""
+        _, _, texts = cfgscan.apply_profile_overrides(
+            self.result, "mrwhiteer/lan/warmup.vcfg", skip_keys=["mouse4"])
+        config = next(c for c in self.result.files.values()
+                      if c.relative == "mrwhiteer/mainsettings/key_binds.vcfg")
+        config.path.write_text(texts[config.relative], encoding="utf-8")
+        again = self.rescan()
+        self.assertFalse(
+            cfgscan.profile_is_active(again, "mrwhiteer/lan/warmup.vcfg"),
+            "mouse4 still differs, and nothing is pinned here yet")
+        self.assertTrue(
+            cfgscan.profile_is_active(again, "mrwhiteer/lan/warmup.vcfg",
+                                      skip_keys=["mouse4"]))
 
 
 class TestFolderPicking(FixtureCase):

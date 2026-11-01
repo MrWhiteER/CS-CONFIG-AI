@@ -4030,6 +4030,42 @@
   .kb-legend .dot.bound { background: #2b4d75; box-shadow: 0 0 9px rgba(61, 139, 253, .6); }
   .kb-legend .dot.free { background: #2b2e39; }
 
+  #kb-layouts { margin-top: 22px; }
+  #kb-layouts .chg-row { cursor: pointer; }
+  #kb-layouts .chg-name input[type="checkbox"] { margin-right: 7px; vertical-align: -2px; }
+
+  /* The profile switcher: tabs above the board/mouse, the way Razer Synapse
+     sits its own profile strip above the device it is drawing. */
+  #kb-switcher { margin-bottom: 16px; }
+  .kbsw-row {
+    display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+  }
+  .kbsw-tab {
+    appearance: none; cursor: pointer; font: inherit;
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 7px 14px; border-radius: 999px;
+    background: var(--bg-2); border: 1px solid var(--line); color: var(--ink-dim);
+    transition: background .12s, border-color .12s, color .12s;
+  }
+  .kbsw-tab:hover { border-color: var(--accent-deep); color: var(--ink); }
+  .kbsw-tab.active {
+    background: rgba(53, 208, 127, .14); border-color: var(--good); color: var(--good);
+  }
+  .kbsw-tab.busy { opacity: .55; cursor: wait; }
+  .kbsw-dot {
+    width: 7px; height: 7px; border-radius: 50%; flex: none;
+    background: var(--line); box-shadow: none;
+  }
+  .kbsw-tab.active .kbsw-dot {
+    background: var(--good); box-shadow: 0 0 7px rgba(53, 208, 127, .75);
+  }
+  .kbsw-label { font-size: 12.5px; font-weight: 600; }
+  .kbsw-count {
+    font-family: var(--mono); font-size: 10px; color: var(--faint);
+    background: rgba(var(--lift), .08); border-radius: 999px; padding: 1px 7px;
+  }
+  .kbsw-tab.active .kbsw-count { color: var(--good); background: rgba(53, 208, 127, .12); }
+
   .kb-detail {
     margin: 18px auto 0; max-width: 620px;
     background: rgba(0, 0, 0, .3); border: 1px solid var(--line);
@@ -4240,6 +4276,8 @@
     margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--line-soft);
     font-family: var(--mono); font-size: 9.5px; color: var(--faint);
   }
+  .plug-jump select { padding: 3px 6px; font-size: 10.5px; }
+  .plug-jump .btn.small { padding: 3px 10px; font-size: 10.5px; }
 
   /* The file browser: tree down the left, the file itself on the right, the
      way a repository browser lays it out. Both sides scroll independently so
@@ -5311,7 +5349,10 @@
           <button class="btn ghost small" id="kb-reset">Reset layout</button>
           <button class="btn ghost small" id="kb-reload">Re-read</button>
         </div>
+        <div id="kb-switcher"></div>
         <div id="kb-out"><span class="sub">Scan a configuration folder first.</span></div>
+        <div id="kb-profiles"></div>
+        <div id="kb-layouts"></div>
       </section>
     </div>
 
@@ -9123,6 +9164,7 @@ async function makeStarter(quiet) {
       : "A config was already there; nothing was changed.");
     // The tabs that were empty have something to show now.
     treeData = null; plugData = null; applyScriptStatus = null; keyData = null; cfgSettings = null;
+    layoutData = null; layoutPending = {}; profileData = null; profileCopySource = null;
     setTab(activeTab);
     return r;
   } catch (err) {
@@ -9198,6 +9240,10 @@ document.addEventListener("click", e => {
    ------------------------------------------------------------------------ */
 let plugData = null;
 let applyScriptStatus = null;
+let layoutData = null;
+let layoutPending = {};
+let profileData = null;
+let profileCopySource = null;
 let favourites = new Set();
 
 // Favourites live in the same store as the rest of the page's preferences, so
@@ -9241,6 +9287,24 @@ function plugLayout(p) {
 
   return '<div class="plug-steps">' + rows +
     (rest > 0 ? '<div class="sub2 step-more">and ' + rest + " more like it</div>" : "") +
+    "</div>";
+}
+
+// A toggle/cycle's dispatcher only ever points at the next state it would
+// land on if the key were pressed from wherever it is now. This lets the
+// card jump it straight to the wanted state in one edit, so the key does not
+// have to be pressed through every step in between.
+function plugJump(p) {
+  if (!["toggle", "cycle"].includes(p.kind) || !p.enabled || !p.states.length) return "";
+  const current = (p.current || "").toLowerCase();
+  const options = p.states.map(s =>
+    '<option value="' + esc(s) + '"' +
+    (s.toLowerCase() === current ? " selected" : "") + ">" + esc(s) + "</option>"
+  ).join("");
+  return '<div class="plug-row plug-jump">' +
+    '<span>jump to</span>' +
+    '<select class="jump-state" data-jump-select="' + esc(p.id) + '">' + options + "</select>" +
+    '<button class="btn small ghost" data-jump="' + esc(p.id) + '">Set</button>' +
     "</div>";
 }
 
@@ -9300,6 +9364,7 @@ function plugCard(p) {
         "</div>"
       : "") +
     plugLayout(p) +
+    plugJump(p) +
     // The key it is actually bound to, not the one its message claims -- the
     // two disagreed on several scripts. Click to put it on a different one.
     '<div class="plug-src">' +
@@ -9888,6 +9953,309 @@ function renderKeyboard() {
 
   ["board", "mouse"].forEach(kbPlace);
 }
+
+let kbSwitchBusy = null;
+
+// A row of profile tabs sitting right above the board/mouse, the way Razer
+// Synapse shows its own profiles above the device it is drawing. Clicking
+// one that is not already active writes its overrides onto the standard
+// layout right now -- the create/copy/delete list further down still
+// manages the files themselves; this is only about which one is loaded.
+function renderKbSwitcher() {
+  const box = $("kb-switcher");
+  if (!box) return;
+  const profiles = (profileData && profileData.profiles) || [];
+  if (!profiles.length) { box.innerHTML = ""; return; }
+
+  box.innerHTML = '<div class="kbsw-row">' +
+    profiles.map(p => {
+      const busy = kbSwitchBusy === p.file;
+      const title = (p.override_count
+        ? p.override_count + " key" + (p.override_count === 1 ? "" : "s") + " set"
+        : "nothing set yet") +
+        (p.trigger_alias ? " · key: " + p.trigger_alias : " · no key switches to this yet");
+      return '<button class="kbsw-tab' + (p.active ? " active" : "") +
+        (busy ? " busy" : "") + '" data-kbsw="' + esc(p.file) +
+        '" title="' + esc(title) + '">' +
+        '<span class="kbsw-dot"></span>' +
+        '<span class="kbsw-label">' + esc(p.label) + "</span>" +
+        (p.override_count
+          ? '<span class="kbsw-count">' + p.override_count + "</span>" : "") +
+        "</button>";
+    }).join("") +
+    "</div>";
+}
+
+document.addEventListener("click", async e => {
+  const tab = e.target.closest("[data-kbsw]");
+  if (!tab || kbSwitchBusy) return;
+  const file = tab.dataset.kbsw;
+  kbSwitchBusy = file;
+  renderKbSwitcher();
+  try {
+    const r = await api("/api/cfg/layouts/apply", { file });
+    if (!r.changed) {
+      status(r.empty ? r.label + " doesn't set any keys yet." : r.label + " is already active.");
+    } else {
+      const applyKeys = r.apply_keys || [];
+      status("Switched to " + r.label + " — " + r.applied.length +
+             " key" + (r.applied.length === 1 ? "" : "s") + " changed" +
+             (r.skipped.length
+               ? " (" + r.skipped.length + " pinned, left alone)" : "") +
+             (applyKeys.length
+               ? " — press " + applyKeys.join(" or ") + " to apply it live"
+               : " — takes effect next time you reload your configs") +
+             (r.backup ? ", backup " + r.backup : ""));
+    }
+    await loadKeyboard(true);
+  } catch (err) {
+    status("Could not switch profiles: " + String(err && err.message || err), true);
+  } finally {
+    kbSwitchBusy = null;
+    renderKbSwitcher();
+  }
+});
+
+// Create/copy/delete over whole profile files (warmup.vcfg, 5v5.vcfg, ...),
+// the full settings-and-binds bundles the pin cards below work with. A
+// profile this app created can be deleted outright; a hand-written one can
+// only be dropped from this list, which never touches its file.
+function renderKbProfiles() {
+  const box = $("kb-profiles");
+  if (!box) return;
+  const profiles = (profileData && profileData.profiles) || [];
+  const copying = profileCopySource
+    ? profiles.find(p => p.file === profileCopySource)
+    : null;
+
+  const rows = profiles.map(p => {
+    const meta = p.trigger_alias
+      ? "key: <code>" + esc(p.trigger_alias) + "</code>"
+      : "no key switches to this yet";
+    const removeLabel = p.app_created ? "Delete" : "Remove";
+    const removeClass = p.app_created ? "btn small danger" : "btn small ghost";
+    return '<div class="chg-row kbp-row">' +
+      '<span class="chg-name">' + esc(p.label) +
+        (p.app_created ? ' <i class="chg-chip new">app-created</i>' : "") +
+        (p.active ? ' <i class="chg-chip to">active now</i>' : "") +
+      "</span>" +
+      '<div class="chg-move">' +
+        '<button class="btn small ghost" data-kbp-copy="' + esc(p.file) +
+        '" data-kbp-label="' + esc(p.label) + '">Copy</button>' +
+        '<button class="' + removeClass + '" data-kbp-remove="' + esc(p.file) +
+        '" data-kbp-label="' + esc(p.label) +
+        '" data-kbp-created="' + (p.app_created ? "1" : "0") + '">' +
+        removeLabel + "</button>" +
+      "</div>" +
+      '<div class="chg-why">' + meta + "</div>" +
+    "</div>";
+  }).join("");
+
+  box.innerHTML =
+    '<div class="subcat">Profiles</div>' +
+    '<p class="subcat-note">' +
+      "Full settings-and-binds bundles like warmup, 5v5 or lan &mdash; only " +
+      "loaded when you switch to them with a key. Create a blank one, copy " +
+      "an existing one, or take one off this list." +
+    "</p>" +
+    '<div class="chg-list quiet">' +
+      (rows || '<p class="sub">No profile files detected in this collection yet.</p>') +
+    "</div>" +
+    '<div class="setup-new">' +
+      '<input id="kbp-name" placeholder="' +
+      (copying ? esc(copying.label + " copy") : "e.g. Competitive") +
+      '" maxlength="40" aria-label="Profile name">' +
+      '<button class="btn small" id="kbp-go">' +
+      (copying ? "Copy " + esc(copying.label) : "New profile") + "</button>" +
+      (copying ? '<button class="btn small ghost" id="kbp-cancel-copy">Cancel</button>' : "") +
+    "</div>" +
+    (cloudData && cloudData.signed_in
+      ? '<div class="setup-new" style="margin-top:8px">' +
+          '<button class="btn small ghost" id="kbp-push">Push to cloud</button>' +
+          '<button class="btn small ghost" id="kbp-pull">Pull from cloud</button>' +
+        "</div>" +
+        '<p class="sub">Profiles are matched across devices by this collection’s ' +
+        "folder name (&ldquo;" + esc((scannedFolder || "").split(/[\\/]/).pop() || "") +
+        "&rdquo;).</p>"
+      : '<p class="sub">Sign in under Settings to sync these profiles across your devices.</p>');
+
+  renderKbSwitcher();
+}
+
+document.addEventListener("click", async e => {
+  const copyBtn = e.target.closest("[data-kbp-copy]");
+  if (copyBtn) {
+    profileCopySource = copyBtn.dataset.kbpCopy;
+    renderKbProfiles();
+    const field = $("kbp-name");
+    if (field) { field.value = copyBtn.dataset.kbpLabel + " copy"; field.focus(); }
+    return;
+  }
+  if (e.target.closest("#kbp-cancel-copy")) {
+    profileCopySource = null;
+    renderKbProfiles();
+    return;
+  }
+  if (e.target.closest("#kbp-go")) {
+    const field = $("kbp-name");
+    const name = (field.value || field.placeholder || "").trim();
+    if (!name) { status("Give the profile a name first.", true); return; }
+    const source = profileCopySource;
+    try {
+      profileData = source
+        ? await api("/api/cfg/layouts/copy", { file: source, name })
+        : await api("/api/cfg/layouts/create", { name });
+      status((source ? "Copied to " : "Created ") +
+        profileData.file.split("/").pop() + ".");
+      profileCopySource = null;
+      renderKbProfiles();
+      layoutData = await api("/api/cfg/layouts/status", {});
+      renderKbLayouts();
+    } catch (err) {
+      status("Could not save the profile: " + String(err && err.message || err), true);
+    }
+    return;
+  }
+  const rm = e.target.closest("[data-kbp-remove]");
+  if (rm) {
+    const file = rm.dataset.kbpRemove;
+    const label = rm.dataset.kbpLabel;
+    const created = rm.dataset.kbpCreated === "1";
+    const sure = created
+      ? confirm("Delete “" + label + "”? This removes its file for good " +
+        "(backed up first, so it can still be restored from Backups).")
+      : confirm("Remove “" + label + "” from this list? Its file is left " +
+        "exactly as it is — only the switch key is unwired.");
+    if (!sure) return;
+    try {
+      profileData = await api(
+        created ? "/api/cfg/layouts/delete" : "/api/cfg/layouts/remove", { file });
+      status((created ? "Deleted " : "Removed ") + label + ".");
+      renderKbProfiles();
+      layoutData = await api("/api/cfg/layouts/status", {});
+      renderKbLayouts();
+    } catch (err) {
+      status("Could not finish: " + String(err && err.message || err), true);
+    }
+    return;
+  }
+  const pushBtn = e.target.closest("#kbp-push");
+  if (pushBtn) {
+    pushBtn.disabled = true;
+    try {
+      const r = await api("/api/cfg/layouts/sync/push", {});
+      status(r.files.length
+        ? "Pushed " + r.files.length + " profile(s) to the cloud."
+        : "Nothing to push yet — no profiles detected in this collection.");
+    } catch (err) {
+      status("Could not push to the cloud: " + String(err && err.message || err), true);
+    } finally {
+      pushBtn.disabled = false;
+    }
+    return;
+  }
+  const pullBtn = e.target.closest("#kbp-pull");
+  if (pullBtn) {
+    if (!confirm("Pull profiles from the cloud? A local file with the same " +
+        "name is overwritten — backed up first, so it can still be " +
+        "restored from Backups.")) return;
+    pullBtn.disabled = true;
+    try {
+      profileData = await api("/api/cfg/layouts/sync/pull", {});
+      status(profileData.files.length
+        ? "Pulled " + profileData.files.length + " profile(s) from the cloud."
+        : "Nothing new to pull.");
+      renderKbProfiles();
+      layoutData = await api("/api/cfg/layouts/status", {});
+      renderKbLayouts();
+    } catch (err) {
+      status("Could not pull from the cloud: " + String(err && err.message || err), true);
+    } finally {
+      pullBtn.disabled = false;
+    }
+  }
+});
+
+// Match-profile files like lan/warmup.vcfg: loaded only by pressing a key,
+// and only changing the handful of binds they mention -- everything else
+// keeps whatever the standard layout last set. Pinning a key here forces it
+// back to the standard binding even when the profile tries to take it.
+function renderKbLayouts() {
+  const box = $("kb-layouts");
+  if (!box) return;
+  const profiles = (layoutData && layoutData.profiles) || [];
+  if (!profiles.length) { box.innerHTML = ""; return; }
+  box.innerHTML = '<div class="subcat">Layout profiles</div>' +
+    '<p class="subcat-note">' +
+    "Files like these only load when you switch to them with a key, and only " +
+    "change the binds they mention. Pin a key below to keep its standard " +
+    "binding even while this profile is active." +
+    "</p>" + profiles.map(cs2LayoutCardHtml).join("");
+}
+
+function cs2LayoutCardHtml(profile) {
+  let pending = layoutPending[profile.file];
+  if (!pending) {
+    pending = new Set(profile.overrides.filter(o => o.pinned).map(o => o.key));
+    layoutPending[profile.file] = pending;
+  }
+  const rows = profile.overrides.map(o => {
+    const checked = pending.has(o.key);
+    return '<label class="chg-row">' +
+      '<span class="chg-name"><input type="checkbox" data-layout-pin="' +
+      esc(profile.file) + '" data-layout-key="' + esc(o.key) + '"' +
+      (checked ? " checked" : "") + "> " + esc(o.label) + "</span>" +
+      '<div class="chg-move"><span class="chg-chip ' + (checked ? "same" : "new") + '">' +
+      (checked
+        ? "stays <i>" + esc(o.standard_body) + "</i>"
+        : "becomes <i>" + esc(o.profile_body) + "</i>") +
+      "</span></div></label>";
+  }).join("");
+
+  let note;
+  if (!profile.trigger_alias) {
+    note = "Nothing in your configs execs " + esc(profile.file) + " on a key yet, so " +
+      "there is nothing to wire a pin into.";
+  } else if (pending.size && profile.wired) {
+    note = "Set up: <code>" + esc(profile.trigger_alias) + "</code> loads your pins first.";
+  } else if (pending.size) {
+    note = "Not saved yet.";
+  } else {
+    note = "Loads " + esc(profile.file) + " as-is &mdash; nothing pinned.";
+  }
+
+  return '<div class="subcat">' + esc(profile.label) + "</div>" +
+    '<div class="chg-list quiet">' + rows + "</div>" +
+    '<p class="subcat-note">' + note + "</p>" +
+    '<button class="btn small" data-layout-save="' + esc(profile.file) +
+    '">Save pins</button>';
+}
+
+document.addEventListener("change", e => {
+  const box = e.target.closest("[data-layout-pin]");
+  if (!box) return;
+  const set = layoutPending[box.dataset.layoutPin] ||
+    (layoutPending[box.dataset.layoutPin] = new Set());
+  if (box.checked) set.add(box.dataset.layoutKey); else set.delete(box.dataset.layoutKey);
+  renderKbLayouts();
+});
+
+document.addEventListener("click", async e => {
+  const btn = e.target.closest("[data-layout-save]");
+  if (!btn) return;
+  const file = btn.dataset.layoutSave;
+  btn.disabled = true;
+  try {
+    const pinned = Array.from(layoutPending[file] || []);
+    layoutData = await api("/api/cfg/layouts/pin", { file, pinned });
+    status(layoutData.note || "Saved pins for " + file.split("/").pop());
+    renderKbLayouts();
+  } catch (err) {
+    status("Could not save pins: " + String(err && err.message || err), true);
+  } finally {
+    btn.disabled = false;
+  }
+});
 
 function kbDetail() {
   if (!pickedKey) {
@@ -11305,6 +11673,9 @@ async function loadCloud() {
   try { cloudData = await api("/api/cloud", {}); }
   catch (err) { cloudData = { configured: false, error: String(err && err.message || err) }; }
   renderCloud();
+  // The Keyboard tab's sync buttons depend on this too, and may already be
+  // drawn with a stale "signed out" state from before this resolved.
+  if (typeof renderKbProfiles === "function") renderKbProfiles();
 }
 
 function cloudWay(kind, title, blurb, link) {
@@ -11933,7 +12304,7 @@ document.addEventListener("click", e => {
 
 async function loadKeyboard(force) {
   const box = $("kb-out");
-  if (keyData && !force) { renderKeyboard(); return; }
+  if (keyData && !force) { renderKeyboard(); renderKbLayouts(); renderKbProfiles(); return; }
   if (box) box.innerHTML = '<span class="sub"><span class="spin"></span> Reading&hellip;</span>';
   if (!await ensureScan(force)) { noFolderYet(box, "binds"); return; }
   try {
@@ -11942,7 +12313,20 @@ async function loadKeyboard(force) {
   } catch (err) {
     if (box) box.innerHTML = '<span class="sub warn">' +
       esc(String(err && err.message || err)) + "</span>";
+    return;
   }
+  // Read-only, and never fatal to the board above: a collection with no
+  // match-profile files like lan.vcfg/warmup.vcfg just has nothing to show.
+  if (!layoutData || force) {
+    try { layoutData = await api("/api/cfg/layouts/status", {}); }
+    catch (e) { layoutData = null; }
+  }
+  renderKbLayouts();
+  if (!profileData || force) {
+    try { profileData = await api("/api/cfg/layouts/profiles", {}); }
+    catch (e) { profileData = null; }
+  }
+  renderKbProfiles();
 }
 
 document.addEventListener("change", e => {
@@ -12134,6 +12518,33 @@ document.addEventListener("click", e => {
   const card = key.closest(".plug");
   const name = card ? card.querySelector(".plug-name").textContent.trim() : "this script";
   askForKey(key.dataset.rebind, name);
+});
+
+document.addEventListener("click", async e => {
+  const btn = e.target.closest("[data-jump]");
+  if (!btn) return;
+  const id = btn.dataset.jump;
+  const select = btn.closest(".plug-jump").querySelector("[data-jump-select]");
+  const stateName = select.value;
+  btn.disabled = true;
+  try {
+    const r = await api("/api/cfg/plugin/state", { id: id, state: stateName });
+    if (!r.changed) {
+      status(r.name + " is already on " + r.state + ".");
+    } else {
+      const applyKeys = r.apply_keys || [];
+      status(r.name + " now opens on " + r.state +
+             (applyKeys.length
+               ? " — press " + applyKeys.join(" or ") + " to apply it live"
+               : " — takes effect next time its key runs") +
+             (r.backup ? ", backup " + r.backup : ""));
+    }
+    await loadPlugins(true);
+  } catch (err) {
+    status("Could not set " + id + ": " + (err && err.message || err), true);
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 document.addEventListener("click", e => {
@@ -13145,6 +13556,7 @@ async function reloadForAccount() {
   } catch (err) { /* a first run has nothing stored yet */ }
   cs2Data = null; gpuData = null; keyData = null; cfgSettings = null;
   pickedKey = null; kbOptions = null; treeData = null; plugData = null; applyScriptStatus = null;
+  layoutData = null; layoutPending = {}; profileData = null; profileCopySource = null;
   scannedFolder = null;
   const folder = $("cfg-folder") ? $("cfg-folder").value.trim() : "";
   srcFiles = null;

@@ -99,6 +99,16 @@ class TheCatalogue(unittest.TestCase):
                           and f"\n  {e['icon']}: " not in art})
         self.assertEqual(undrawn, [], "named in the catalogue, not drawn in the page")
 
+    def test_practice_and_cheat_commands_are_offered(self):
+        """Noclip, god mode and the like -- common in a practice config, but
+        not bound by default, so nothing offers them unless this does."""
+        group = next(g for g in self.cat["groups"] if g["id"] == "practice")
+        offered = {e["command"] for e in group["commands"]}
+        self.assertEqual(offered, {
+            "noclip", "god", "buddha", "bot_add", "bot_kick",
+            "mp_warmup_end", "sv_rethrow_last_grenade",
+        })
+
     def test_a_missing_catalogue_does_not_break_the_picker(self):
         commands._cache = None
         with mock.patch.object(Path, "read_text", side_effect=OSError("gone")):

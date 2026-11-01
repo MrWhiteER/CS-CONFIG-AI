@@ -58,6 +58,10 @@ KNOWN_ENGINE_COMMANDS = {
     # Their absence here meant a perfectly ordinary bind was reported unknown.
     "invnext", "invprev", "buyammo1", "buyammo2", "show_loadout_toggle",
     "jpeg", "cs_quit_prompt",
+    # Practice/cheat commands (need sv_cheats 1 except bot_add/bot_kick) --
+    # not bound by default, but common enough in a hand-written practice
+    # config that a bind using one is a real command, not a typo.
+    "god", "buddha", "bot_add", "bot_kick",
 }
 
 # Engine actions that come in +press / -release pairs. Listed without the sign.
@@ -1018,6 +1022,425 @@ def append_apply_script(result: ScanResult) -> Tuple[str, str]:
     if config.document.trailing_newline:
         body += newline
     return relative, body
+
+
+# ---------------------------------------------------------------------------
+# Keyboard/mouse layout profiles
+# ---------------------------------------------------------------------------
+
+def _effective_bind(result: ScanResult, chain: Set[str], key: str) -> Optional[BindDef]:
+    defs = result.binds.get(key.lower())
+    if not defs:
+        return None
+    ordered = sorted(defs, key=lambda d: d.order)
+    chain_defs = [d for d in ordered if d.file in chain]
+    return (chain_defs or ordered)[-1]
+
+
+def _alias_execing(result: ScanResult, *relatives: str) -> Optional[Dict[str, object]]:
+    """An alias in the collection whose body execs one of ``relatives``, if any.
+
+    The same match ``existing_apply_script`` uses for the startup chain,
+    generalised to any file -- this is how a profile's own switch key
+    (``!warmup``, in a typical collection) is found without assuming its name.
+
+    Takes more than one candidate path because once a profile is wired up,
+    the switch key points at its generated ``.layout.vcfg`` instead of the
+    profile file directly -- a caller that only ever looked for the original
+    path would stop finding its own switch key the moment it switched it.
+    """
+    wanted = {normalise_exec_path(r) for r in relatives}
+    for name, defs in result.aliases.items():
+        for a in defs:
+            for command in a.commands:
+                if command.lname != "exec":
+                    continue
+                target = exec_target(command)
+                if target and normalise_exec_path(target) in wanted:
+                    return {"alias": a.name, "file": a.file, "line": a.line,
+                            "target_text": target}
+    return None
+
+
+def _is_match_profile(config: ConfigFile, chain: Set[str]) -> bool:
+    return config.is_commands and not config.generated_by and config.relative not in chain
+
+
+def _profile_own_binds(result: ScanResult, relative: str) -> Dict[str, BindDef]:
+    """Every bind ``relative`` defines for itself, whatever currently wins."""
+    own: Dict[str, BindDef] = {}
+    for key, defs in result.binds.items():
+        for d in defs:
+            if d.file == relative:
+                own[key] = d
+    return own
+
+
+def _profile_entry(result: ScanResult, chain: Set[str], config: ConfigFile) -> Dict[str, object]:
+    relative = config.relative
+    own = _profile_own_binds(result, relative)
+
+    overrides = []
+    for key, bind in sorted(own.items()):
+        standard = _effective_bind(result, chain, key)
+        if standard is not None and standard.file != relative and standard.body != bind.body:
+            overrides.append({
+                "key": bind.key,
+                "profile_body": bind.body,
+                "standard_body": standard.body,
+                "standard_file": standard.file,
+                "standard_line": standard.line,
+            })
+
+    trigger = _alias_execing(result, relative, layout_switch_path(relative))
+    return {
+        "file": relative,
+        "label": Path(relative).stem.replace("_", " ").title(),
+        "overrides": overrides,
+        "trigger": trigger,
+    }
+
+
+def profile_is_active(
+    result: ScanResult, profile_file: str, skip_keys: Iterable[str] = (),
+) -> bool:
+    """Whether the standard layout already matches this profile's own binds,
+    key for key -- the same thing as having just switched to it and nothing
+    having changed since.
+
+    Unlike comparing against ``overrides``, this still works once a profile
+    is active: a key an override list would have mentioned (because it used
+    to differ) simply stops appearing there the moment the two agree, which
+    would make an applied profile look un-applied. A key in ``skip_keys`` is
+    left out of the comparison, same as a pin leaves it alone when applying.
+    False for a profile that defines no binds of its own to compare, pinned
+    away or not -- there is nothing there to call "active".
+    """
+    chain = startup_chain(result)
+    config = next((c for c in result.files.values() if c.relative == profile_file), None)
+    if config is None or not _is_match_profile(config, chain):
+        return False
+
+    skip = {k.lower() for k in skip_keys}
+    own = _profile_own_binds(result, profile_file)
+
+    compared = []
+    for key, bind in own.items():
+        if key.lower() in skip:
+            continue
+        standard = _effective_bind(result, chain, key)
+        if standard is not None and standard.file != profile_file:
+            compared.append(standard.body == bind.body)
+
+    return bool(compared) and all(compared)
+
+
+def layout_profiles(result: ScanResult) -> List[Dict[str, object]]:
+    """Match-profile files with binds of their own -- candidates for pinning.
+
+    A profile is any commands file outside the startup chain (reachable only
+    by pressing a key, the same thing that makes ``lan.vcfg`` a "match
+    profile" rather than part of startup -- see ``startup_chain``) that writes
+    at least one bind the standard layout also defines, differently. Only
+    those keys are worth pinning: a key a profile adds that the standard
+    layout never touches has nothing to pin back to.
+
+    Checked against every commands file rather than just ``entry_points``:
+    once a profile is wired up (see ``layout_switch_text``), the generated
+    switch file execs it literally, which would otherwise make the scanner's
+    own "what execs nothing" definition of an entry point stop counting the
+    profile as one. Generated files are excluded instead -- a switch file is
+    never itself the profile being pinned.
+    """
+    chain = startup_chain(result)
+    out = []
+    for config in sorted(result.files.values(), key=lambda c: c.relative):
+        if not _is_match_profile(config, chain):
+            continue
+        entry = _profile_entry(result, chain, config)
+        if entry["overrides"]:
+            out.append(entry)
+    return out
+
+
+def match_profiles(result: ScanResult) -> List[Dict[str, object]]:
+    """Every match-profile file, whether or not it has anything pinnable.
+
+    Used by the profile selector (create/copy/delete), which needs to show a
+    brand new, still-blank profile too -- ``layout_profiles`` would hide it
+    until it had at least one bind overriding the standard layout.
+    """
+    chain = startup_chain(result)
+    out = []
+    for config in sorted(result.files.values(), key=lambda c: c.relative):
+        if _is_match_profile(config, chain):
+            out.append(_profile_entry(result, chain, config))
+    return out
+
+
+def is_match_profile(result: ScanResult, relative: str) -> bool:
+    """Whether ``relative`` is a file ``match_profiles`` would list -- checked
+    before copying or deleting one, so a caller never has to duplicate the
+    startup-chain/generated-file filter itself."""
+    config = next((c for c in result.files.values() if c.relative == relative), None)
+    if config is None:
+        return False
+    return _is_match_profile(config, startup_chain(result))
+
+
+def apply_profile_overrides(
+    result: ScanResult, profile_file: str, skip_keys: Iterable[str] = (),
+) -> Tuple[List[str], List[str], Dict[str, str]]:
+    """Write a profile's overrides onto the standard layout in place -- as if
+    its switch key had just been pressed and the result kept for good,
+    instead of only ever taking effect for as long as the profile stays
+    loaded.
+
+    A key named in ``skip_keys`` (case-insensitive -- the same keys a pin on
+    the Keyboard tab names) is left on its standard binding rather than
+    overwritten. Returns the keys actually changed, the keys left alone
+    because they are pinned, and each touched file's new text, ready to
+    write.
+    """
+    chain = startup_chain(result)
+    config = next((c for c in result.files.values() if c.relative == profile_file), None)
+    if config is None or not _is_match_profile(config, chain):
+        raise ValueError(f"'{profile_file}' is not a detected layout profile")
+
+    entry = _profile_entry(result, chain, config)
+    skip = {k.lower() for k in skip_keys}
+
+    applied: List[str] = []
+    skipped: List[str] = []
+    by_file: Dict[str, List[Dict[str, object]]] = {}
+    for item in entry["overrides"]:
+        if item["key"].lower() in skip:
+            skipped.append(item["key"])
+            continue
+        applied.append(item["key"])
+        by_file.setdefault(item["standard_file"], []).append(item)
+
+    texts: Dict[str, str] = {}
+    for file, items in by_file.items():
+        target = next(c for c in result.files.values() if c.relative == file)
+        original = target.path.read_bytes().decode(target.document.encoding, errors="replace")
+        flat = cfglang.restore_newlines(original, "\n", False)
+        lines = flat.split("\n")
+        for item in items:
+            index = item["standard_line"] - 1
+            if not (0 <= index < len(lines)):
+                continue
+            was = item["standard_body"]
+            lines[index] = lines[index].replace(
+                '"' + was + '"', '"' + item["profile_body"] + '"', 1)
+        texts[file] = cfglang.restore_newlines(
+            "\n".join(lines), target.document.newline, target.document.trailing_newline)
+
+    return applied, skipped, texts
+
+
+_SLUG_RE = re.compile(r"[^a-z0-9]+")
+
+
+def profile_slug(name: str) -> str:
+    """A filesystem-safe stem for a profile name: lowercase, ``_``-joined.
+
+    Strips everything but letters and digits, so the result can never contain
+    a path separator or a ``..`` -- the caller does not need to check the
+    name for traversal, only for emptiness.
+    """
+    slug = _SLUG_RE.sub("_", name.strip().lower()).strip("_")
+    return slug or "profile"
+
+
+def _profiles_dir(result: ScanResult) -> str:
+    """Where a newly created profile file should live.
+
+    Matches the convention this app's own collections already use -- a
+    ``lan/`` folder holding files like ``warmup.vcfg`` and ``5v5.vcfg`` --
+    when one exists, so a new profile sits next to the others. Otherwise it
+    goes straight in the collection's own root.
+    """
+    root_name = Path(result.root).name
+    lan_prefix = f"{root_name}/lan/"
+    for config in result.files.values():
+        if config.relative.replace("\\", "/").startswith(lan_prefix):
+            return f"{root_name}/lan"
+    return root_name
+
+
+def new_profile_path(result: ScanResult, name: str) -> str:
+    """A free relative path for a new profile named ``name``.
+
+    Adds a numeric suffix if the slug is already taken, rather than
+    overwriting an existing file of the same name.
+    """
+    directory = _profiles_dir(result)
+    slug = profile_slug(name)
+    existing = {normalise_exec_path(c.relative) for c in result.files.values()}
+
+    candidate = f"{directory}/{slug}.vcfg"
+    n = 2
+    while normalise_exec_path(candidate) in existing:
+        candidate = f"{directory}/{slug}_{n}.vcfg"
+        n += 1
+    return candidate
+
+
+def profile_blank_text(label: str) -> str:
+    """A brand new profile's starting content: nothing but a banner.
+
+    Not marked "GENERATED BY" -- that banner means a file this app rewrites
+    on every save and the user should never hand-edit. This one is the
+    opposite: built up from scratch by the user, from here on.
+    """
+    return (
+        f"// {label} -- created in cs2-autoconfig\n"
+        "// Add settings and binds here, then switch to it with a key.\n"
+    )
+
+
+def disable_line(result: ScanResult, file: str, line: int, reason: str) -> Tuple[str, str]:
+    """Comment out one line, verbatim, so it stops taking effect.
+
+    Used to unwire a profile's switch key -- from a profile that no longer
+    exists (deleted), or one being dropped from the list (hand-written, so
+    its own file is never touched) -- without deleting anything. Only ever
+    called with a ``(file, line)`` found by walking a real command (see
+    ``_alias_execing``), and refuses if the line looks already disabled, so
+    this can never double a prefix after an unrelated edit shifted things.
+    """
+    config = next((c for c in result.files.values() if c.relative == file), None)
+    if config is None:
+        raise ValueError(f"{file} is not part of the scan")
+
+    lines = config.path.read_bytes().decode(
+        config.document.encoding, errors="replace"
+    ).splitlines()
+    index = line - 1
+    if not (0 <= index < len(lines)):
+        raise ValueError(f"{file}:{line} is out of range")
+
+    original = lines[index]
+    stripped = original.strip()
+    if stripped.startswith("//"):
+        raise ValueError(f"{file}:{line} is already disabled")
+
+    indent = original[:len(original) - len(original.lstrip())]
+    lines[index] = f"{indent}// {stripped}  // disabled by cs2-autoconfig: {reason}"
+
+    newline = config.document.newline
+    text = newline.join(lines) + (newline if config.document.trailing_newline else "")
+    return file, text
+
+
+def layout_switch_path(profile_file: str) -> str:
+    """Where the generated switch file for ``profile_file`` lives.
+
+    Beside the profile it wraps, named after it -- ``lan/warmup.vcfg`` becomes
+    ``lan/warmup.layout.vcfg`` -- so it needs no folder convention of its own
+    and reads clearly next to the file it loads.
+    """
+    posix = profile_file.replace("\\", "/")
+    directory, _, name = posix.rpartition("/")
+    stem = name.rsplit(".", 1)[0]
+    generated = f"{stem}.layout.vcfg"
+    return f"{directory}/{generated}" if directory else generated
+
+
+def layout_switch_text(profile_file: str, pinned: Dict[str, str]) -> str:
+    """The generated file's contents: exec the profile, then reassert pins.
+
+    ``pinned`` maps a bind key to the exact standard body to force back --
+    resolved by the caller from ``layout_profiles``, so this just writes what
+    it is given. Order doesn't matter for correctness (each ``bind`` only ever
+    touches its own key) but is sorted for a stable diff between saves.
+    """
+    lines = [
+        "// GENERATED BY cs2-autoconfig -- DO NOT EDIT BY HAND",
+        f"// Loads {profile_file}, then puts back the keys pinned to your",
+        "// standard layout so this profile can't take them over. Change",
+        "// pins from the Keyboard tab; this file is rewritten each time.",
+        "",
+        f'exec "{profile_file}"',
+    ]
+    if pinned:
+        lines.append("")
+        for key in sorted(pinned):
+            lines.append(f'bind "{key}" "{pinned[key]}"' + " " * 8 +
+                         "// pinned to your standard layout")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def retarget_alias_exec(result: ScanResult, file: str, line: int,
+                        old_target: str, new_target: str) -> Tuple[str, str]:
+    """Point an alias's own exec line at a different file, text for text.
+
+    Only ever called with a ``(file, line, old_target)`` found by walking a
+    real exec command (``_alias_execing``), never guessed -- and even then,
+    only replaces the literal target text, and only if it appears on that
+    line exactly once, so a comment or another alias mentioning the same path
+    can never be rewritten by accident.
+    """
+    config = next((c for c in result.files.values() if c.relative == file), None)
+    if config is None:
+        raise ValueError(f"{file} is not part of the scan")
+
+    lines = config.path.read_bytes().decode(
+        config.document.encoding, errors="replace"
+    ).splitlines()
+    index = line - 1
+    if not (0 <= index < len(lines)):
+        raise ValueError(f"{file}:{line} is out of range")
+
+    original = lines[index]
+    if original.count(old_target) != 1:
+        raise ValueError(
+            f"{file}:{line} does not contain exactly one occurrence of "
+            f"{old_target!r} any more; not safe to retarget automatically"
+        )
+    lines[index] = original.replace(old_target, new_target)
+
+    newline = config.document.newline
+    text = newline.join(lines) + (newline if config.document.trailing_newline else "")
+    return file, text
+
+
+def set_dispatcher_state(result: ScanResult, entry: str, state: str) -> Tuple[str, str]:
+    """Point a toggle/cycle's dispatcher alias straight at one of its states.
+
+    ``entry`` is plugins.py's own name for the alias a key is bound to (e.g.
+    "GM" in ``alias "1GM" "!5v5; alias GM 2GM"``) -- the one thing every state
+    in the rotation redefines to hand off to the next press. Pointing it here
+    means the *next* press runs the chosen state immediately, rather than
+    however many presses away it currently is.
+
+    ``state`` is matched case-insensitively, since plugins.py only ever knows
+    alias names in lowercase; the name actually written is the state's own
+    original casing from the file, not the caller's.
+
+    Refuses rather than guesses when the dispatcher's current body is not
+    simply a bare state name (say, a hand-edit added a second command to it)
+    -- replacing a whole multi-command body with just the new state's name
+    would silently drop whatever else it was doing.
+    """
+    current = result.effective_alias(entry)
+    if current is None:
+        raise ValueError(f"'{entry}' is not a defined alias in this collection")
+
+    commands = current.commands
+    if len(commands) != 1 or len(commands[0].tokens) != 1:
+        raise ValueError(
+            f"'{entry}' currently does more than just name a state "
+            f"({current.body!r}); not safe to retarget automatically"
+        )
+
+    defs = result.aliases.get(state.lower())
+    if not defs:
+        raise ValueError(f"'{state}' is not a defined alias in this collection")
+
+    return retarget_alias_exec(result, current.file, current.line, current.body, defs[0].name)
 
 
 def write_setting(result: ScanResult, name: str, value: str,

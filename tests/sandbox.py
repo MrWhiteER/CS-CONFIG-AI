@@ -19,7 +19,7 @@ import tempfile
 from pathlib import Path
 from unittest import mock
 
-from cs2cfg import backup
+from cs2cfg import backup, layouts
 
 
 def redirect_backups(case) -> Path:
@@ -32,6 +32,17 @@ def redirect_backups(case) -> Path:
     case.addCleanup(tmp.cleanup)
     root = Path(tmp.name)
     patch = mock.patch.object(backup, "backups_root", return_value=root)
+    patch.start()
+    case.addCleanup(patch.stop)
+    return root
+
+
+def redirect_layouts(case) -> Path:
+    """Send saved layout pins somewhere disposable for the lifetime of ``case``."""
+    tmp = tempfile.TemporaryDirectory(prefix="cs2cfg-layouts-")
+    case.addCleanup(tmp.cleanup)
+    root = Path(tmp.name)
+    patch = mock.patch.object(layouts, "_store", return_value=root)
     patch.start()
     case.addCleanup(patch.stop)
     return root

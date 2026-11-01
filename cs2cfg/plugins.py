@@ -81,6 +81,7 @@ class Plugin:
     kind: str = "action"          # toggle | hold | cycle | action | empty
     aliases: List[str] = field(default_factory=list)
     entry: str = ""               # what you actually run or bind
+    current: str = ""             # for a toggle/cycle, which state it is on now
     states: List[str] = field(default_factory=list)
     touches: List[str] = field(default_factory=list)   # convars it changes
     missing: List[str] = field(default_factory=list)   # names it calls that do not exist
@@ -273,6 +274,12 @@ def find(result) -> List[Plugin]:
 
             kind, entry, states = _classify(names, bodies)
 
+            current = ""
+            if kind in ("toggle", "cycle") and entry:
+                dispatcher = result.effective_alias(entry.lower())
+                if dispatcher is not None:
+                    current = dispatcher.body.strip()
+
             touches: Set[str] = set()
             for body_text in bodies.values():
                 touches.update(_convars(body_text))
@@ -338,7 +345,7 @@ def find(result) -> List[Plugin]:
             plugin = Plugin(
                 name=title, file=config.relative, line=line_no,
                 description=description, kind=kind,
-                aliases=sorted(names), entry=entry, states=states,
+                aliases=sorted(names), entry=entry, current=current, states=states,
                 touches=sorted(touches), missing=missing,
                 bound_to=sorted(set(binds.get(entry.lower(), []))),
                 applies=sorted(set(applied)),
@@ -376,7 +383,8 @@ def as_dict(plugins: List[Plugin]) -> dict:
             {
                 "name": p.name, "file": p.file, "line": p.line,
                 "description": p.description, "key": p.key, "command": p.command,
-                "kind": p.kind, "entry": p.entry, "aliases": p.aliases,
+                "kind": p.kind, "entry": p.entry, "current": p.current,
+                "aliases": p.aliases,
                 "states": p.states, "touches": p.touches, "missing": p.missing,
                 "bound_to": p.bound_to, "broken": p.broken,
                 # scancode44 means nothing on a card; Space does.

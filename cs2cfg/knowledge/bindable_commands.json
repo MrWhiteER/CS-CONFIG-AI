@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated": "2026-09-12",
+  "updated": "2026-11-01",
   "note": "Commands offered when binding a key from the keyboard view. Every one is either bound by CS2 itself in game/csgo/cfg/user_keys_default.vcfg, or already listed in cs2cfg/cfgscan.py as an engine command or engine action -- so nothing here is a guess about what the engine accepts. A command that does not exist would bind silently and then do nothing when pressed, which is the failure this list exists to avoid.",
   "sources": [
     "CS2's own cfg/user_keys_default.vcfg, read at runtime by cs2cfg/defaults.py",
@@ -384,6 +384,51 @@
           "label": "Quit (asks first)",
           "note": "CS2 binds this to F10 by default.",
           "icon": "power"
+        }
+      ]
+    },
+    {
+      "id": "practice",
+      "name": "Practice & cheats",
+      "commands": [
+        {
+          "command": "noclip",
+          "label": "Fly through walls",
+          "note": "Needs sv_cheats 1. Toggles -- press again to turn off.",
+          "icon": "dot"
+        },
+        {
+          "command": "god",
+          "label": "Invincibility",
+          "note": "Needs sv_cheats 1. Toggles -- press again to turn off.",
+          "icon": "dot"
+        },
+        {
+          "command": "buddha",
+          "label": "Can't die",
+          "note": "Needs sv_cheats 1. Still takes damage, but health won't drop below 1. Toggles.",
+          "icon": "dot"
+        },
+        {
+          "command": "bot_add",
+          "label": "Add a bot",
+          "icon": "people"
+        },
+        {
+          "command": "bot_kick",
+          "label": "Remove all bots",
+          "icon": "close"
+        },
+        {
+          "command": "mp_warmup_end",
+          "label": "End warmup now",
+          "icon": "dot"
+        },
+        {
+          "command": "sv_rethrow_last_grenade",
+          "label": "Re-throw your last grenade",
+          "note": "Needs sv_cheats 1.",
+          "icon": "grenade"
         }
       ]
     }

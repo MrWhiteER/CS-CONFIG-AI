@@ -1358,6 +1358,550 @@ def _cfg_apply_script_install(state: State, _body: Dict[str, Any]) -> Dict[str, 
             "file": target, "backup": None if session.empty else session.stamp}
 
 
+def _layout_view(result, pins: Dict[str, Any], keys,
+                 hidden: Optional[set] = None) -> List[Dict[str, Any]]:
+    """Each detected profile, its overridable keys, and which are pinned."""
+    from . import cfgscan
+
+    hidden = hidden or set()
+    out = []
+    for profile in cfgscan.layout_profiles(result):
+        if profile["file"] in hidden:
+            continue
+        pinned = set(pins.get(profile["file"], []))
+        overrides = [{
+            **o,
+            "label": keys.label(o["key"]),
+            "pinned": o["key"] in pinned or o["key"].lower() in pinned,
+        } for o in profile["overrides"]]
+        trigger = profile["trigger"]
+        generated = cfgscan.layout_switch_path(profile["file"])
+        wired = bool(trigger) and cfglang.normalise_exec_path(
+            trigger["target_text"]) == cfglang.normalise_exec_path(generated)
+        out.append({
+            "file": profile["file"],
+            "label": profile["label"],
+            "overrides": overrides,
+            "trigger_alias": trigger["alias"] if trigger else None,
+            "wired": wired,
+        })
+    return out
+
+
+def _cfg_layouts_status(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Read-only: every detected layout profile and its current pins."""
+    from . import cfgscan, keys, layouts
+
+    result = _rescan(state)
+    if result is None:
+        return {"ok": False, "error": "scan a configuration folder first"}
+
+    pins = layouts.load_pins(result.root)
+    hidden = set(layouts.load_registry(result.root)["hidden"])
+    return {"ok": True, "profiles": _layout_view(result, pins, keys, hidden)}
+
+
+def _cfg_layouts_pin(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Set which of one profile's overridden keys stay on their standard
+    binding, and wire (or unwire) that profile's switch key accordingly.
+
+    Only ever runs from an explicit save on the Keyboard tab. Writes nothing
+    when the pins do not actually change what the switch key would load.
+    """
+    from . import cfgscan, keys, layouts
+
+    result = _rescan(state)
+    if result is None:
+        return {"ok": False, "error": "scan a configuration folder first"}
+
+    profile_file = str(body.get("file") or "")
+    requested = [str(k) for k in (body.get("pinned") or [])]
+
+    profiles = {p["file"]: p for p in cfgscan.layout_profiles(result)}
+    profile = profiles.get(profile_file)
+    if profile is None:
+        return {"ok": False, "error": f"{profile_file} is not a detected layout profile"}
+
+    valid_keys = {o["key"].lower(): o for o in profile["overrides"]}
+    pinned_keys = sorted({k for k in requested if k.lower() in valid_keys},
+                         key=str.lower)
+
+    pins = layouts.save_pins(result.root, profile_file, pinned_keys)
+    generated = cfgscan.layout_switch_path(profile_file)
+    trigger = profile["trigger"]
+
+    session = backup.BackupSession(note="layout profile pins (web)")
+    wired = False
+    note = ""
+
+    if pinned_keys:
+        pinned_bodies = {valid_keys[k.lower()]["key"]: valid_keys[k.lower()]["standard_body"]
+                         for k in pinned_keys}
+        text = cfgscan.layout_switch_text(profile_file, pinned_bodies)
+        config = next((c for c in result.files.values() if c.relative == generated), None)
+        target_path = (config.path if config is not None
+                       else Path(result.cfg_root) / Path(generated))
+        session.add(target_path)
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        cfglang.write_config_text(target_path, text, "utf-8")
+
+        if trigger and cfglang.normalise_exec_path(trigger["target_text"]) != \
+                cfglang.normalise_exec_path(generated):
+            alias_config = next((c for c in result.files.values()
+                                 if c.relative == trigger["file"]), None)
+            if alias_config is not None:
+                session.add(alias_config.path)
+                _, new_text = cfgscan.retarget_alias_exec(
+                    result, trigger["file"], trigger["line"],
+                    trigger["target_text"], generated)
+                cfglang.write_config_text(alias_config.path, new_text,
+                                          alias_config.document.encoding)
+                wired = True
+        elif trigger:
+            wired = True
+        else:
+            note = (f"nothing in this collection execs {profile_file} on a key, "
+                   f"so point that key at {generated} yourself")
+    elif trigger and cfglang.normalise_exec_path(trigger["target_text"]) == \
+            cfglang.normalise_exec_path(generated):
+        # No pins left: point the switch key back at the profile directly.
+        alias_config = next((c for c in result.files.values()
+                             if c.relative == trigger["file"]), None)
+        if alias_config is not None:
+            session.add(alias_config.path)
+            _, new_text = cfgscan.retarget_alias_exec(
+                result, trigger["file"], trigger["line"],
+                trigger["target_text"], profile_file)
+            cfglang.write_config_text(alias_config.path, new_text,
+                                      alias_config.document.encoding)
+
+    backup.prune()
+    state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+    fresh_pins = layouts.load_pins(result.root)
+    fresh_hidden = set(layouts.load_registry(result.root)["hidden"])
+    return {"ok": True, "note": note, "wired": wired,
+            "profiles": _layout_view(state.cfg_scan, fresh_pins, keys, fresh_hidden)}
+
+
+def _cfg_layouts_apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Switch to a profile right now: write its overrides onto the standard
+    layout in place, as if its own key had just been pressed and the result
+    kept for good.
+
+    A pinned key is left alone, same as it already would be if the profile
+    loaded live. Only edits files on disk -- getting it into a running game
+    still takes whatever already reloads live edits (the apply-saved-settings
+    key, if one is set up, or a relaunch).
+    """
+    from . import cfgscan, keys, layouts
+
+    result = _rescan(state)
+    if result is None:
+        return {"ok": False, "error": "scan a configuration folder first"}
+
+    profile_file = str(body.get("file") or "")
+    pins = layouts.load_pins(result.root)
+    skip_keys = pins.get(profile_file, [])
+
+    try:
+        applied, skipped, texts = cfgscan.apply_profile_overrides(
+            result, profile_file, skip_keys)
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
+
+    profiles = {p["file"]: p for p in cfgscan.match_profiles(result)}
+    profile = profiles.get(profile_file)
+    label = profile["label"] if profile else profile_file
+
+    if not applied:
+        empty = not cfgscan._profile_own_binds(result, profile_file)
+        return {"ok": True, "changed": False, "empty": empty, "file": profile_file,
+                "label": label, "applied": [], "skipped": [keys.label(k) for k in skipped]}
+
+    session = backup.BackupSession(note=f"switch to profile {profile_file} (web)")
+    for file, text in texts.items():
+        config = next(c for c in result.files.values() if c.relative == file)
+        session.add(config.path)
+        cfglang.write_config_text(config.path, text, config.document.encoding)
+    backup.prune()
+
+    state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+    apply_info = cfgscan.existing_apply_script(state.cfg_scan)
+    return {
+        "ok": True, "changed": True, "file": profile_file, "label": label,
+        "applied": [keys.label(k) for k in applied],
+        "skipped": [keys.label(k) for k in skipped],
+        "backup": None if session.empty else session.stamp,
+        "apply_keys": sorted((apply_info or {}).get("bound_to") or []),
+    }
+
+
+def _profile_selector_view(
+    result, registry: Dict[str, List[str]],
+    pins: Optional[Dict[str, List[str]]] = None,
+) -> List[Dict[str, Any]]:
+    """Every match-profile file, for the Keyboard tab's switcher and its
+    create/copy/delete list.
+
+    Unlike ``_layout_view`` this includes a profile with nothing pinnable yet
+    -- a brand new, still-blank one most of all.
+    """
+    from . import cfgscan
+
+    hidden = set(registry["hidden"])
+    created = set(registry["created"])
+    pins = pins or {}
+    out = []
+    for profile in cfgscan.match_profiles(result):
+        if profile["file"] in hidden:
+            continue
+        trigger = profile["trigger"]
+        out.append({
+            "file": profile["file"],
+            "label": profile["label"],
+            "override_count": len(profile["overrides"]),
+            "trigger_alias": trigger["alias"] if trigger else None,
+            "app_created": profile["file"] in created,
+            "active": cfgscan.profile_is_active(
+                result, profile["file"], pins.get(profile["file"], [])),
+        })
+    return out
+
+
+def _cfg_layouts_profiles(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Read-only: every match-profile file, for the switcher and the
+    create/copy/delete list."""
+    from . import layouts
+
+    result = _rescan(state)
+    if result is None:
+        return {"ok": False, "error": "scan a configuration folder first"}
+
+    registry = layouts.load_registry(result.root)
+    pins = layouts.load_pins(result.root)
+    return {"ok": True, "profiles": _profile_selector_view(result, registry, pins)}
+
+
+def _cfg_layouts_create(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Add a brand new, blank profile file.
+
+    Always recorded as app-created, so it is eligible for a full delete later
+    -- nothing hand-written is ever touched by this handler.
+    """
+    from . import cfgscan, layouts
+
+    result = _rescan(state)
+    if result is None:
+        return {"ok": False, "error": "scan a configuration folder first"}
+
+    name = str(body.get("name") or "").strip()
+    if not name:
+        return {"ok": False, "error": "give the profile a name"}
+
+    relative = cfgscan.new_profile_path(result, name)
+    text = cfgscan.profile_blank_text(name)
+    path = Path(result.cfg_root) / Path(relative)
+
+    session = backup.BackupSession(note=f"new profile {relative} (web)")
+    session.add(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    cfglang.write_config_text(path, text, "utf-8")
+    backup.prune()
+
+    layouts.mark_created(result.root, relative)
+    state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+    registry = layouts.load_registry(result.root)
+    pins = layouts.load_pins(result.root)
+    return {"ok": True, "file": relative,
+            "profiles": _profile_selector_view(state.cfg_scan, registry, pins)}
+
+
+def _cfg_layouts_copy(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Duplicate an existing profile's content into a new file.
+
+    Always recorded as app-created, whatever the source was -- the copy is
+    the app's own file from the moment it is written, and deleting it later
+    never has to reach back and touch the file it was copied from.
+    """
+    from . import cfgscan, layouts
+
+    result = _rescan(state)
+    if result is None:
+        return {"ok": False, "error": "scan a configuration folder first"}
+
+    source_file = str(body.get("file") or "")
+    name = str(body.get("name") or "").strip()
+    if not name:
+        return {"ok": False, "error": "give the copy a name"}
+    if not cfgscan.is_match_profile(result, source_file):
+        return {"ok": False, "error": f"{source_file} is not a detected layout profile"}
+
+    source = next(c for c in result.files.values() if c.relative == source_file)
+    relative = cfgscan.new_profile_path(result, name)
+    text = source.path.read_bytes().decode(source.document.encoding, errors="replace")
+    path = Path(result.cfg_root) / Path(relative)
+
+    session = backup.BackupSession(note=f"copy profile {source_file} -> {relative} (web)")
+    session.add(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    cfglang.write_config_text(path, text, "utf-8")
+    backup.prune()
+
+    layouts.mark_created(result.root, relative)
+    state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+    registry = layouts.load_registry(result.root)
+    pins = layouts.load_pins(result.root)
+    return {"ok": True, "file": relative,
+            "profiles": _profile_selector_view(state.cfg_scan, registry, pins)}
+
+
+def _unwire_profile_key(result, trigger: Optional[Dict[str, Any]],
+                        file: str, reason: str, session) -> None:
+    """Disable the switch key for ``file``, if one was found, in place."""
+    from . import cfgscan
+
+    if not trigger:
+        return
+    alias_config = next((c for c in result.files.values()
+                         if c.relative == trigger["file"]), None)
+    if alias_config is None:
+        return
+    session.add(alias_config.path)
+    _, new_text = cfgscan.disable_line(result, trigger["file"], trigger["line"], reason)
+    cfglang.write_config_text(alias_config.path, new_text, alias_config.document.encoding)
+
+
+def _remove_generated_wrapper(result, generated: str, session) -> None:
+    """Delete a profile's generated ``.layout.vcfg`` switch file, if any."""
+    config = next((c for c in result.files.values() if c.relative == generated), None)
+    path = config.path if config is not None else Path(result.cfg_root) / Path(generated)
+    session.add(path)
+    if path.exists():
+        path.unlink()
+
+
+def _cfg_layouts_delete(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Permanently delete a profile file this app created.
+
+    Refuses on anything hand-written -- ``_cfg_layouts_remove`` is the only
+    thing that can drop one of those from the list, and it never touches the
+    file itself.
+    """
+    from . import cfgscan, layouts
+
+    result = _rescan(state)
+    if result is None:
+        return {"ok": False, "error": "scan a configuration folder first"}
+
+    file = str(body.get("file") or "")
+    registry = layouts.load_registry(result.root)
+    if file not in registry["created"]:
+        return {"ok": False, "error":
+                "only a profile created in the app can be deleted here; "
+                "use Remove for a hand-written one"}
+
+    profiles = {p["file"]: p for p in cfgscan.match_profiles(result)}
+    profile = profiles.get(file)
+    config = next((c for c in result.files.values() if c.relative == file), None)
+    if profile is None or config is None:
+        layouts.forget_profile(result.root, file)
+        return {"ok": False, "error": f"{file} is no longer part of the scan"}
+
+    generated = cfgscan.layout_switch_path(file)
+    session = backup.BackupSession(note=f"delete profile {file} (web)")
+    _unwire_profile_key(result, profile["trigger"], file,
+                        f"profile {file} deleted", session)
+    _remove_generated_wrapper(result, generated, session)
+    session.add(config.path)
+    config.path.unlink()
+    backup.prune()
+
+    layouts.forget_profile(result.root, file)
+    state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+    fresh_registry = layouts.load_registry(result.root)
+    fresh_pins = layouts.load_pins(result.root)
+    return {"ok": True, "file": file,
+            "profiles": _profile_selector_view(state.cfg_scan, fresh_registry, fresh_pins)}
+
+
+def _cfg_layouts_remove(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Drop a profile from the list without touching its file.
+
+    The only option for a hand-written profile, and a softer alternative to
+    ``_cfg_layouts_delete`` for one the app created. Unwires its switch key
+    and clears its pins; the profile's own file is left exactly as it was.
+    """
+    from . import cfgscan, layouts
+
+    result = _rescan(state)
+    if result is None:
+        return {"ok": False, "error": "scan a configuration folder first"}
+
+    file = str(body.get("file") or "")
+    profiles = {p["file"]: p for p in cfgscan.match_profiles(result)}
+    profile = profiles.get(file)
+    if profile is None:
+        return {"ok": False, "error": f"{file} is not a detected layout profile"}
+
+    generated = cfgscan.layout_switch_path(file)
+    session = backup.BackupSession(note=f"remove profile {file} from list (web)")
+    _unwire_profile_key(result, profile["trigger"], file,
+                        f"profile {file} removed from list", session)
+    _remove_generated_wrapper(result, generated, session)
+    backup.prune()
+
+    layouts.hide_profile(result.root, file)
+    layouts.save_pins(result.root, file, [])
+    state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+    fresh_registry = layouts.load_registry(result.root)
+    fresh_pins = layouts.load_pins(result.root)
+    return {"ok": True, "file": file,
+            "profiles": _profile_selector_view(state.cfg_scan, fresh_registry, fresh_pins)}
+
+
+def _safe_cloud_relative(cfg_root: Path, relative: object) -> Optional[Path]:
+    """A profile path read back from the cloud, if it is safe to write.
+
+    The payload is this account's own data, but it still travelled over the
+    network and back, so it is worth checking the same way any external input
+    would be: a real relative ``.cfg``/``.vcfg`` path that resolves to
+    somewhere inside ``cfg_root``, never an absolute path or a ``..`` that
+    climbs out of it.
+    """
+    from . import cfgscan
+
+    if not isinstance(relative, str) or not relative:
+        return None
+    if relative.startswith(("/", "\\")) or ":" in relative or "\\" in relative:
+        return None
+    if Path(relative).suffix.lower() not in cfgscan.CONFIG_SUFFIXES:
+        return None
+    if ".." in Path(relative).parts:
+        return None
+
+    cfg_root = Path(cfg_root).resolve()
+    candidate = (cfg_root / Path(relative)).resolve()
+    try:
+        candidate.relative_to(cfg_root)
+    except ValueError:
+        return None
+    return candidate
+
+
+def _cfg_layouts_sync_push(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Upload this collection's profiles to the signed-in account's cloud
+    storage, so another machine on the same account can pull the same set.
+
+    Reads the cloud's existing blob first and only replaces this collection's
+    own entry in it -- the Worker's ``/settings`` route replaces the whole
+    thing on every PUT, and this machine may not be the only one keeping
+    something there.
+    """
+    from . import cfgscan, cloud, layouts
+
+    if not cloud.signed_in():
+        return {"ok": False, "error": "sign in first"}
+
+    result = _rescan(state)
+    if result is None:
+        return {"ok": False, "error": "scan a configuration folder first"}
+
+    registry = layouts.load_registry(result.root)
+    pins = layouts.load_pins(result.root)
+    key = layouts.sync_key(result.root)
+
+    files: Dict[str, str] = {}
+    for profile in cfgscan.match_profiles(result):
+        relative = profile["file"]
+        if relative in registry["hidden"]:
+            continue
+        config = next(c for c in result.files.values() if c.relative == relative)
+        files[relative] = config.path.read_bytes().decode(
+            config.document.encoding, errors="replace")
+
+    entry = {
+        "updated_at": time.time(),
+        "files": files,
+        "created": sorted(set(registry["created"]) & set(files)),
+        "pins": {f: keys for f, keys in pins.items() if f in files},
+    }
+
+    try:
+        held = cloud.pull_settings()
+    except cloud.CloudError as exc:
+        return {"ok": False, "error": str(exc)}
+    existing = (held.get("settings") or {}) if held.get("found") else {}
+    collections = dict(existing.get("collections") or {})
+    collections[key] = entry
+    merged = {**existing, "schema": 1, "collections": collections}
+
+    try:
+        cloud.push_settings(merged)
+    except cloud.CloudError as exc:
+        return {"ok": False, "error": str(exc)}
+
+    return {"ok": True, "collection": key, "files": sorted(files)}
+
+
+def _cfg_layouts_sync_pull(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Download this collection's profiles from the cloud and write them here.
+
+    Every write goes through a backup first, same as any other write this app
+    makes, so pulling a stale or unwanted copy is never a one-way door.
+    """
+    from . import cfgscan, cloud, layouts
+
+    if not cloud.signed_in():
+        return {"ok": False, "error": "sign in first"}
+
+    result = _rescan(state)
+    if result is None:
+        return {"ok": False, "error": "scan a configuration folder first"}
+
+    key = layouts.sync_key(result.root)
+    try:
+        held = cloud.pull_settings()
+    except cloud.CloudError as exc:
+        return {"ok": False, "error": str(exc)}
+
+    settings = (held.get("settings") or {}) if held.get("found") else {}
+    entry = (settings.get("collections") or {}).get(key)
+    if not entry:
+        return {"ok": False,
+                "error": f'nothing saved in the cloud yet for "{key}"'}
+
+    files = entry.get("files") if isinstance(entry.get("files"), dict) else {}
+    created = set(entry.get("created") or [])
+    pins = entry.get("pins") if isinstance(entry.get("pins"), dict) else {}
+
+    session = backup.BackupSession(note=f"pull profiles from cloud ({key}) (web)")
+    written = []
+    for relative, text in files.items():
+        if not isinstance(text, str):
+            continue
+        path = _safe_cloud_relative(result.cfg_root, relative)
+        if path is None:
+            continue
+        session.add(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        cfglang.write_config_text(path, text, "utf-8")
+        written.append(relative)
+
+    backup.prune()
+    for relative in written:
+        if relative in created:
+            layouts.mark_created(result.root, relative)
+        keys = pins.get(relative)
+        if isinstance(keys, list):
+            layouts.save_pins(result.root, relative, [str(k) for k in keys])
+
+    state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+    fresh_registry = layouts.load_registry(result.root)
+    fresh_pins = layouts.load_pins(result.root)
+    return {"ok": True, "collection": key, "files": sorted(written),
+            "profiles": _profile_selector_view(state.cfg_scan, fresh_registry, fresh_pins)}
+
+
 def _rescan(state: State):
     """Re-read the collection from disk, or None if none has been chosen.
 
@@ -1575,6 +2119,72 @@ def _cfg_plugin_toggle(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         "restored": restored, "dropped": len(dropped),
         "changed": True, "backup": session.stamp,
         "lines": found.end_line - found.line + 1,
+    }
+
+
+def _cfg_plugin_set_state(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Jump a toggle/cycle script straight to one of its states.
+
+    "GM" cycling warmup -> 5v5 -> ... is the motivating case: instead of
+    pressing its key through however many steps separate wherever it is now
+    from the one that is actually wanted, this points the dispatcher there
+    directly, so the *next* press lands on it in one.
+
+    Only takes effect the next time the key (or this collection's own
+    apply-saved-settings reload, if it has one) actually runs the dispatcher
+    -- editing the file changes what happens next, not what is already
+    running in a live game.
+    """
+    from . import cfgscan, keys, plugins
+
+    result = _rescan(state)
+    if result is None:
+        return {"ok": False, "error": "scan a configuration folder first"}
+
+    wanted = str(body.get("id") or "")
+    state_name = str(body.get("state") or "")
+
+    found = next((p for p in plugins.find(result) if f"{p.file}:{p.line}" == wanted), None)
+    if found is None:
+        return {"ok": False, "error": "that script is no longer where it was; re-read the list"}
+    if found.kind not in ("toggle", "cycle"):
+        return {"ok": False, "error": f"{found.name} has no states to jump to"}
+    if not found.enabled:
+        return {"ok": False, "error": f"{found.name} is switched off"}
+
+    valid = {s.lower(): s for s in found.states}
+    target = valid.get(state_name.lower())
+    if target is None:
+        return {"ok": False, "error": f'"{state_name}" is not one of {found.name}’s states'}
+
+    current = result.effective_alias(found.entry.lower()) if found.entry else None
+    if current is None:
+        return {"ok": False, "error": f"'{found.entry}' is not a defined alias in this collection"}
+    if current.body.strip().lower() == target.lower():
+        return {"ok": True, "changed": False, "name": found.name, "state": target}
+
+    config = next((c for c in result.files.values() if c.relative == current.file), None)
+    if config is None:
+        return {"ok": False, "error": f"{current.file} is not part of the scan"}
+
+    try:
+        _, new_text = cfgscan.set_dispatcher_state(result, found.entry, target)
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
+
+    session = backup.BackupSession(note=f"{found.name}: jump to {target} (web)")
+    session.add(config.path)
+    cfglang.write_config_text(config.path, new_text, config.document.encoding)
+    backup.prune()
+
+    state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+    apply_info = cfgscan.existing_apply_script(state.cfg_scan)
+    return {
+        "ok": True, "changed": True, "name": found.name, "state": target,
+        "backup": None if session.empty else session.stamp,
+        "bound_to": found.bound_to,
+        "bound_labels": [keys.label(b) for b in found.bound_to],
+        "apply_keys": sorted((apply_info or {}).get("bound_to") or []),
     }
 
 
@@ -3462,6 +4072,7 @@ def make_handler(state: State):
         "/api/cfg/plugins": _cfg_plugins,
         "/api/cfg/plugin/toggle": _cfg_plugin_toggle,
         "/api/cfg/plugin/bind": _cfg_plugin_bind,
+        "/api/cfg/plugin/state": _cfg_plugin_set_state,
         "/api/cfg/keys": _cfg_keys,
         "/api/cfg/key/options": _cfg_key_options,
         "/api/cfg/bind": _cfg_bind,
@@ -3469,6 +4080,16 @@ def make_handler(state: State):
         "/api/cfg/settings/apply": _cfg_settings_apply,
         "/api/cfg/apply-script/status": _cfg_apply_script_status,
         "/api/cfg/apply-script/install": _cfg_apply_script_install,
+        "/api/cfg/layouts/status": _cfg_layouts_status,
+        "/api/cfg/layouts/pin": _cfg_layouts_pin,
+        "/api/cfg/layouts/apply": _cfg_layouts_apply,
+        "/api/cfg/layouts/profiles": _cfg_layouts_profiles,
+        "/api/cfg/layouts/create": _cfg_layouts_create,
+        "/api/cfg/layouts/copy": _cfg_layouts_copy,
+        "/api/cfg/layouts/delete": _cfg_layouts_delete,
+        "/api/cfg/layouts/remove": _cfg_layouts_remove,
+        "/api/cfg/layouts/sync/push": _cfg_layouts_sync_push,
+        "/api/cfg/layouts/sync/pull": _cfg_layouts_sync_pull,
         "/api/cfg/suggest": _cfg_suggest,
         "/api/cfg/browse": _cfg_browse,
         "/api/cfg/source": _cfg_source,

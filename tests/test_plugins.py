@@ -80,6 +80,11 @@ class PluginCase(unittest.TestCase):
     def found(self):
         return {p.name: p for p in plugins.find(self.state.cfg_scan)}
 
+    def toggle(self, name, enable):
+        target = self.found()[name]
+        return webui._cfg_plugin_toggle(
+            self.state, {"id": f"{target.file}:{target.line}", "enable": enable})
+
 
 class TestFinding(PluginCase):
     def test_each_banner_block_becomes_a_feature(self):
@@ -110,13 +115,16 @@ class TestFinding(PluginCase):
     def test_a_healthy_feature_is_not_flagged(self):
         self.assertFalse(self.found()["Game Volume"].broken)
 
+    def test_a_toggle_or_cycle_reports_which_state_it_is_on_now(self):
+        found = self.found()
+        self.assertEqual(found["Game Volume"].current, "!vol_off")
+        self.assertEqual(found["Shooting Styles"].current, "st_1")
+
+    def test_a_hold_has_no_current_state(self):
+        self.assertEqual(self.found()["Better Jump"].current, "")
+
 
 class TestSwitching(PluginCase):
-    def toggle(self, name, enable):
-        target = self.found()[name]
-        return webui._cfg_plugin_toggle(
-            self.state, {"id": f"{target.file}:{target.line}", "enable": enable})
-
     def test_switching_off_comments_the_block_out(self):
         r = self.toggle("Game Volume", False)
         self.assertTrue(r["changed"])
@@ -183,6 +191,65 @@ class TestSwitching(PluginCase):
         styles = self.found()["Shooting Styles"]
         self.assertFalse(styles.enabled)
         self.assertFalse(styles.broken)
+
+
+class TestJumpingToAState(PluginCase):
+    """Setting a toggle/cycle's dispatcher directly to a chosen state --
+    "press the key once and land on the right mode" instead of stepping
+    through however many presses away it currently is."""
+
+    def set_state(self, name, state):
+        target = self.found()[name]
+        return webui._cfg_plugin_set_state(
+            self.state, {"id": f"{target.file}:{target.line}", "state": state})
+
+    def test_jumping_points_the_dispatcher_at_the_chosen_state(self):
+        r = self.set_state("Shooting Styles", "st_2")
+        self.assertTrue(r["ok"], r)
+        self.assertTrue(r["changed"])
+        body = self.scripts.read_bytes().decode("utf-8")
+        self.assertIn('alias "st" "st_2"', body)
+
+    def test_jumping_to_the_current_state_writes_nothing(self):
+        before = self.scripts.read_bytes()
+        r = self.set_state("Shooting Styles", "st_1")
+        self.assertTrue(r["ok"], r)
+        self.assertFalse(r["changed"])
+        self.assertEqual(self.scripts.read_bytes(), before)
+
+    def test_an_unknown_state_is_refused(self):
+        r = self.set_state("Shooting Styles", "st_99")
+        self.assertFalse(r["ok"])
+        self.assertIn("not one of", r["error"])
+
+    def test_a_hold_has_no_states_to_jump_to(self):
+        r = self.set_state("Better Jump", "anything")
+        self.assertFalse(r["ok"])
+        self.assertIn("no states", r["error"])
+
+    def test_a_switched_off_script_cannot_be_jumped(self):
+        self.toggle("Shooting Styles", False)
+        self.rescan()
+        r = self.set_state("Shooting Styles", "st_2")
+        self.assertFalse(r["ok"])
+        self.assertIn("switched off", r["error"])
+
+    def test_an_unknown_script_is_refused(self):
+        r = webui._cfg_plugin_set_state(
+            self.state, {"id": "nope/none.vcfg:1", "state": "st_2"})
+        self.assertFalse(r["ok"])
+        self.assertIn("no longer where it was", r["error"])
+
+    def test_a_backup_is_taken(self):
+        r = self.set_state("Shooting Styles", "st_2")
+        self.assertTrue(r["backup"])
+        self.assertIsNotNone(backup.find_set(r["backup"]))
+
+    def test_the_scan_is_refreshed_so_the_new_state_reads_back(self):
+        self.set_state("Shooting Styles", "st_2")
+        self.rescan()
+        self.assertEqual(
+            self.state.cfg_scan.effective_alias("st").body.strip(), "st_2")
 
 
 if __name__ == "__main__":
