@@ -23,11 +23,13 @@ Two things this deliberately does not do:
 
 from __future__ import annotations
 
+import ctypes
 import subprocess
 import sys
 import time
+from ctypes import wintypes
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 APP_ID = "1366800"
 APP_NAME = "Crosshair X"
@@ -183,3 +185,118 @@ def summary(libraries: List[Path]) -> Dict[str, Any]:
         return {"installed": False, "running": False, "app_id": APP_ID,
                 "name": APP_NAME, "store": f"https://store.steampowered.com/app/{APP_ID}/"}
     return {**found, "running": running()}
+
+
+# ---------------------------------------------------------------------------
+# Waking the overlay broker
+# ---------------------------------------------------------------------------
+
+# Crosshair X almost certainly draws over the game through the same
+# overlay-hook broker Windows uses for the Xbox Game Bar. On a machine where
+# Game Bar has never been opened since boot, that broker has not attached to
+# anything yet, and no third-party overlay sharing it -- Crosshair X
+# included -- draws until it has. Opening Game Bar (Win+G) wakes the broker;
+# a foreground-window change is what then makes Windows re-evaluate which
+# overlays are allowed to draw over which window, which is why alt-tabbing
+# once is what finally makes the crosshair appear. There is no API for
+# either half, so both are reproduced the way they were found: a keystroke,
+# then a focus change on the game's own window.
+_VK_WIN = 0x5B
+_VK_G = 0x47
+_KEYEVENTF_KEYUP = 0x0002
+WARMUP_SECONDS = 6.0
+
+
+class _KeyInput(ctypes.Structure):
+    _fields_ = [("wVk", wintypes.WORD), ("wScan", wintypes.WORD),
+                ("dwFlags", wintypes.DWORD), ("time", wintypes.DWORD),
+                ("dwExtraInfo", wintypes.WPARAM)]
+
+
+class _MouseInput(ctypes.Structure):
+    """Never sent -- declared only because it is the union's largest member.
+
+    SendInput rejects the whole call unless cbSize is exactly sizeof(INPUT),
+    and that size is set by the union's biggest arm, which is this one and
+    not the keyboard arm actually used below.
+    """
+
+    _fields_ = [("dx", wintypes.LONG), ("dy", wintypes.LONG),
+                ("mouseData", wintypes.DWORD), ("dwFlags", wintypes.DWORD),
+                ("time", wintypes.DWORD), ("dwExtraInfo", wintypes.WPARAM)]
+
+
+class _HardwareInput(ctypes.Structure):
+    _fields_ = [("uMsg", wintypes.DWORD), ("wParamL", wintypes.WORD),
+                ("wParamH", wintypes.WORD)]
+
+
+class _InputUnion(ctypes.Union):
+    _fields_ = [("mi", _MouseInput), ("ki", _KeyInput), ("hi", _HardwareInput)]
+
+
+class _Input(ctypes.Structure):
+    _fields_ = [("type", wintypes.DWORD), ("u", _InputUnion)]
+
+
+_INPUT_KEYBOARD = 1
+_INPUT_SIZE = ctypes.sizeof(_Input)
+
+
+def _press_win_g() -> int:
+    """Send Win+G down and up. Returns the Windows error code, 0 on success."""
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+    user32.SendInput.argtypes = (wintypes.UINT, ctypes.c_void_p, ctypes.c_int)
+    user32.SendInput.restype = wintypes.UINT
+
+    sequence = [(_VK_WIN, False), (_VK_G, False), (_VK_G, True), (_VK_WIN, True)]
+    events = []
+    for code, up in sequence:
+        item = _Input(type=_INPUT_KEYBOARD)
+        item.u.ki = _KeyInput(wVk=code, wScan=0,
+                              dwFlags=_KEYEVENTF_KEYUP if up else 0,
+                              time=0, dwExtraInfo=0)
+        events.append(item)
+    block = (_Input * len(events))(*events)
+
+    ctypes.set_last_error(0)
+    sent = user32.SendInput(len(events), ctypes.byref(block), _INPUT_SIZE)
+    if sent == len(events):
+        return 0
+    return ctypes.get_last_error() or -1
+
+
+def wake_overlay(
+    should_stop: Optional[Callable[[], bool]] = None,
+    warmup: float = WARMUP_SECONDS,
+    interval: float = 0.5,
+) -> Dict[str, Any]:
+    """Nudge Windows into attaching the overlay broker to the game window.
+
+    Meant to run once, right after the game window is confirmed up. Sends
+    Win+G to wake Game Bar's broker, waits for it to settle, then minimizes
+    and restores the game window to produce the foreground-change event the
+    broker waits for before it decides what it is allowed to draw over.
+    Cancellable the same way the rest of the launch sequence is: checked
+    between ticks rather than slept through in one call.
+    """
+    if sys.platform != "win32":
+        return {"ok": False, "error": "this is Windows-only"}
+
+    code = _press_win_g()
+    if code:
+        return {"ok": False, "error": f"Windows did not accept the keystroke (error {code})"}
+
+    deadline = time.monotonic() + warmup
+    while time.monotonic() < deadline:
+        if should_stop and should_stop():
+            return {"ok": False, "error": "cancelled"}
+        time.sleep(interval)
+
+    from . import window as windowmod
+
+    target = windowmod.find_game_window()
+    if target is None:
+        return {"ok": False, "error": "the game window was gone by the time the overlay warmed up"}
+    windowmod.nudge_focus(target.hwnd)
+    return {"ok": True, "detail": "woke the overlay broker and refocused the game"}

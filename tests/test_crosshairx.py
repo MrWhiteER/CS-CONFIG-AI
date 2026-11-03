@@ -178,5 +178,63 @@ class TheCardKeepsUp(unittest.TestCase):
         self.assertIn("if (xhairData) renderCrosshairX();", self.page)
 
 
+class WakingTheOverlay(unittest.TestCase):
+    """Automating the fix the user found by hand: Win+G, wait, then a focus
+    change on the game's own window."""
+
+    def test_windows_only(self):
+        with mock.patch.object(crosshairx.sys, "platform", "linux"):
+            out = crosshairx.wake_overlay()
+        self.assertFalse(out["ok"])
+
+    def test_a_rejected_keystroke_is_reported_not_raised(self):
+        with mock.patch.object(crosshairx.sys, "platform", "win32"), \
+             mock.patch.object(crosshairx, "_press_win_g", return_value=5):
+            out = crosshairx.wake_overlay()
+        self.assertFalse(out["ok"])
+        self.assertIn("error", out)
+
+    def test_it_waits_then_refocuses_the_game_window(self):
+        from cs2cfg import window
+
+        fake = window.WindowInfo(hwnd=99, title="Counter-Strike 2",
+                                  process="cs2.exe", rect=(0, 0, 100, 100))
+        with mock.patch.object(crosshairx.sys, "platform", "win32"), \
+             mock.patch.object(crosshairx, "_press_win_g", return_value=0), \
+             mock.patch.object(crosshairx.time, "sleep"), \
+             mock.patch.object(window, "find_game_window", return_value=fake), \
+             mock.patch.object(window, "nudge_focus") as nudge:
+            out = crosshairx.wake_overlay(warmup=0.1, interval=0.1)
+        self.assertTrue(out["ok"])
+        nudge.assert_called_once_with(99)
+
+    def test_cancelling_mid_warmup_skips_the_refocus(self):
+        from cs2cfg import window
+
+        calls = {"n": 0}
+
+        def stop():
+            calls["n"] += 1
+            return calls["n"] > 1
+
+        with mock.patch.object(crosshairx.sys, "platform", "win32"), \
+             mock.patch.object(crosshairx, "_press_win_g", return_value=0), \
+             mock.patch.object(crosshairx.time, "sleep"), \
+             mock.patch.object(window, "nudge_focus") as nudge:
+            out = crosshairx.wake_overlay(should_stop=stop, warmup=10, interval=0.1)
+        self.assertFalse(out["ok"])
+        nudge.assert_not_called()
+
+    def test_the_game_window_disappearing_is_reported_not_raised(self):
+        from cs2cfg import window
+
+        with mock.patch.object(crosshairx.sys, "platform", "win32"), \
+             mock.patch.object(crosshairx, "_press_win_g", return_value=0), \
+             mock.patch.object(crosshairx.time, "sleep"), \
+             mock.patch.object(window, "find_game_window", return_value=None):
+            out = crosshairx.wake_overlay(warmup=0.1, interval=0.1)
+        self.assertFalse(out["ok"])
+
+
 if __name__ == "__main__":
     unittest.main()

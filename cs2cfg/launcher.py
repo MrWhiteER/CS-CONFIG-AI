@@ -641,6 +641,24 @@ def play(
             new_w, new_h = fresh.size
             report("  exclusive fullscreen; the window is left to the game", "dim")
 
+        # 5b. Windows' overlay-hook broker (the thing Xbox Game Bar and
+        #     Crosshair X share) often has not attached to anything yet on a
+        #     fresh boot, so Crosshair X's own overlay silently fails to draw
+        #     until something wakes the broker and the game window loses and
+        #     regains focus. This automates the fix the user found by hand --
+        #     Win+G, wait, then one alt-tab -- so it is not something to
+        #     remember every launch.
+        if start_crosshairx:
+            from . import crosshairx
+            if crosshairx.running():
+                mark("waking overlay")
+                report("  waking the Windows overlay broker for Crosshair X...", "dim")
+                woke = crosshairx.wake_overlay(should_stop=should_stop)
+                if woke.get("ok"):
+                    report("  overlay broker warmed up", "good")
+                elif woke.get("error") != "cancelled":
+                    report(f"  could not warm up the overlay broker: {woke.get('error')}", "warn")
+
         report("", "")
         if stretch_mode == "borderless":
             report("  Alt-tab should now be instant. Waiting for you to quit...", "dim")

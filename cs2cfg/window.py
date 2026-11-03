@@ -62,6 +62,9 @@ SWP_NOACTIVATE = 0x0010
 SWP_FRAMECHANGED = 0x0020
 SWP_SHOWWINDOW = 0x0040
 
+SW_MINIMIZE = 6
+SW_RESTORE = 9
+
 MONITOR_DEFAULTTONEAREST = 2
 
 # --- display modes ---------------------------------------------------------
@@ -266,6 +269,24 @@ def window_pid(hwnd: int) -> int:
 def foreground_hwnd() -> int:
     """Whichever window currently has focus, 0 if none."""
     return int(user32.GetForegroundWindow() or 0)
+
+
+def nudge_focus(hwnd: int, settle: float = 0.2) -> None:
+    """Minimize then restore a window, to manufacture a focus-change event.
+
+    Some third-party overlays (and the Xbox Game Bar broker CS2 shares an
+    overlay-hook mechanism with) only decide which windows they are allowed
+    to draw over when Windows reports a foreground change. A game process
+    starting does not reliably produce one by itself -- a human alt-tabbing
+    does, which is why that is the manual workaround. This reproduces the
+    same signal without depending on whatever else happens to be open to
+    tab to.
+    """
+    handle = wintypes.HWND(hwnd)
+    user32.ShowWindow(handle, SW_MINIMIZE)
+    time.sleep(settle)
+    user32.ShowWindow(handle, SW_RESTORE)
+    user32.SetForegroundWindow(handle)
 
 
 def is_responsive(hwnd: int, timeout_ms: int = 200) -> bool:
