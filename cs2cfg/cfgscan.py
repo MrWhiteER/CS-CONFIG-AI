@@ -1258,6 +1258,35 @@ def apply_profile_overrides(
     return applied, skipped, _write_bind_bodies(result, changes)
 
 
+def profile_missing_defaults(
+    result: ScanResult, profile_file: str, defaults_table: Dict[str, str],
+) -> List[Dict[str, str]]:
+    """Every key CS2 binds to something out of the box that this profile
+    does not set itself -- what a key keeps doing exactly as the standard
+    layout already has it, rather than something this profile chose on
+    purpose, once the profile is switched to.
+
+    ``defaults_table`` is ``defaults.load(cs2_install)``: empty when the game
+    cannot be found, which reads here as "nothing known to be missing" --
+    the same safe-to-be-wrong direction ``defaults.load`` itself takes.
+    """
+    from . import defaults as keydefaults
+
+    chain = startup_chain(result)
+    config = next((c for c in result.files.values() if c.relative == profile_file), None)
+    if config is None or not _is_match_profile(config, chain):
+        return []
+    # A profile may write "w" where the defaults table says "scancode26" for
+    # the same physical key -- both ends have to be read the same way before
+    # "not in own" means anything.
+    own = {keydefaults.normalise(k) for k in _profile_own_binds(result, profile_file)}
+    return [
+        {"key": key, "command": command}
+        for key, command in sorted(defaults_table.items())
+        if key not in own
+    ]
+
+
 def default_restorable(
     result: ScanResult, baseline: Dict[str, Dict[str, str]],
 ) -> List[Dict[str, object]]:

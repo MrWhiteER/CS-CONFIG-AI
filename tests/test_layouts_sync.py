@@ -58,6 +58,7 @@ class SyncCase(unittest.TestCase):
 
         self.state = mock.Mock()
         self.state.cfg_scan = cfgscan.scan(self.collection, cfg_root=self.cfg_root)
+        self.state.cs2_install = None
 
         # write_text() translates "\n" to the platform line ending (CRLF on
         # Windows); the push handler reads raw bytes and keeps whatever is

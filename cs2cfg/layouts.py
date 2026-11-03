@@ -17,7 +17,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from .paths import user_data_dir
 
@@ -121,6 +121,38 @@ def save_pins(root: Path, profile_file: str, keys: List[str]) -> Dict[str, List[
 
 
 # ---------------------------------------------------------------------------
+# Which profile the switcher last pointed at. The Keyboard tab's tabs used to
+# light up by checking whether a profile's own binds happened to match the
+# standard layout -- which lit up every profile sharing those binds (a copy
+# alongside its original) and stayed lit for Default even after switching, as
+# long as nothing had ever been baselined. This is the one explicit pointer
+# that makes the switcher behave like a single choice instead of a guess.
+# ---------------------------------------------------------------------------
+
+def _current_path(root: Path) -> Path:
+    return _store() / f"{_collection_key(root)}.current.json"
+
+
+def load_current(root: Path) -> Optional[str]:
+    """The profile file last switched to, or ``None`` for Default."""
+    try:
+        data = json.loads(_current_path(root).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    file = data.get("file")
+    return str(file) if isinstance(file, str) and file else None
+
+
+def save_current(root: Path, profile_file: Optional[str]) -> None:
+    """Remember ``profile_file`` (or ``None`` for Default) as current."""
+    path = _current_path(root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"file": profile_file}, indent=1), encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
 # Profile registry: which profiles this app made, and which the user has
 # dismissed from the Keyboard tab's selector.
 #
@@ -184,3 +216,5 @@ def forget_profile(root: Path, profile_file: str) -> None:
     if changed:
         _save_registry(root, registry)
     save_pins(root, profile_file, [])
+    if load_current(root) == profile_file:
+        save_current(root, None)

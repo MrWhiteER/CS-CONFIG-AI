@@ -3513,8 +3513,9 @@
   }
 
   /* A key that runs one of your own scripts is the thing you came here to
-     find, so it is the loudest. An ordinary bind is quieter, and a free key
-     stays out of the way entirely. */
+     find, so it is the loudest. Blue says a key is still doing exactly what
+     CS2 ships by default; gold says this collection changed it on purpose;
+     a free key stays out of the way entirely. */
   .kb-key.bound {
     background: linear-gradient(180deg, #2b4d75 0%, #1a2e4d 100%);
     color: #cfe3ff;
@@ -3523,6 +3524,16 @@
       0 calc(var(--u) * 0.1) 0 #0a1729,
       0 calc(var(--u) * 0.15) calc(var(--u) * 0.2) rgba(0, 0, 0, .55),
       0 0 calc(var(--u) * 0.5) rgba(61, 139, 253, .45);
+  }
+  .kb-key.custom {
+    background: linear-gradient(180deg, #8a6412 0%, #5c4108 100%);
+    color: #ffe7ad;
+    box-shadow:
+      inset 0 1px 0 rgba(var(--lift), .14),
+      0 calc(var(--u) * 0.1) 0 #2e2005,
+      0 calc(var(--u) * 0.15) calc(var(--u) * 0.2) rgba(0, 0, 0, .55),
+      0 0 calc(var(--u) * 0.8) rgba(255, 183, 43, .7);
+    text-shadow: 0 0 7px rgba(255, 210, 120, .7);
   }
   .kb-key.script {
     background: linear-gradient(180deg, #7a2159 0%, #4d1136 100%);
@@ -3868,6 +3879,21 @@
     background: var(--warn); box-shadow: 0 0 6px var(--warn);
   }
   .ms-zone.adrift .ms-face { stroke: var(--warn); stroke-width: 2.5; }
+
+  /* A key the active profile leaves at CS2's stock default -- a different
+     corner and a hollow ring rather than adrift's filled one, so the two
+     never read as the same thing when a key happens to be both. */
+  .kb-key.kb-missing::before {
+    content: ""; position: absolute; bottom: 2px; left: 2px;
+    width: 6px; height: 6px; border-radius: 50%;
+    border: 1.5px solid var(--accent-deep); background: transparent;
+  }
+  .ms-zone.kb-missing .ms-face {
+    stroke: var(--accent-deep); stroke-width: 2; stroke-dasharray: 3 2;
+  }
+  .kb-legend .dot.missing {
+    background: transparent; border: 1.5px solid var(--accent-deep);
+  }
   .kb-live { display: inline-flex; align-items: center; gap: 6px; }
   .kb-live .dot.adrift { background: var(--warn); }
   .kb-live .dot.ok { background: var(--accent); }
@@ -3895,14 +3921,52 @@
     .kb-edge { background: var(--panel-2); border-color: var(--warn); }
   }
 
+  .kb-layout-row {
+    display: flex; gap: 14px; align-items: stretch;
+  }
   .kb-scene {
     position: relative; min-height: 430px; overflow: hidden;
+    flex: 1 1 auto; min-width: 0;
     transition: height 120ms ease;
     border-radius: 12px;
     background:
       radial-gradient(120% 90% at 50% 0%, rgba(var(--lift), .03), transparent 70%),
       repeating-linear-gradient(0deg, rgba(var(--lift), .022) 0 1px, transparent 1px 26px),
       repeating-linear-gradient(90deg, rgba(var(--lift), .022) 0 1px, transparent 1px 26px);
+  }
+  /* The panel beside the board for when too many keys are left at their
+     stock CS2 default to mark each one without it turning into noise. */
+  .kb-missing-panel {
+    flex: none; width: 220px; min-height: 430px; max-height: 430px;
+    overflow-y: auto; border-radius: 12px; padding: 12px;
+    background: var(--panel-2); border: 1px solid var(--line);
+  }
+  .kb-missing-head {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 12.5px; font-weight: 700; color: var(--ink);
+    padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--line);
+  }
+  .kb-missing-count {
+    font-size: 11px; font-weight: 700; color: var(--accent-deep);
+    background: rgba(var(--lift), .08); border-radius: 999px;
+    padding: 1px 8px;
+  }
+  .kb-missing-sub { font-size: 11px; color: var(--muted); margin: 0 0 8px; }
+  .kb-missing-row {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 8px; padding: 4px 0; font-size: 11.5px;
+    border-bottom: 1px dashed var(--line);
+  }
+  .kb-missing-row:last-child { border-bottom: 0; }
+  .kb-missing-key { color: var(--ink); font-weight: 600; flex: none; }
+  .kb-missing-cmd {
+    color: var(--muted); font-family: var(--mono); font-size: 10.5px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .kb-missing-note { color: var(--muted); }
+  @media (max-width: 760px) {
+    .kb-layout-row { flex-direction: column; }
+    .kb-missing-panel { width: auto; max-height: 220px; }
   }
   .kb-piece {
     position: absolute; top: 0; left: 0;
@@ -4000,6 +4064,10 @@
   }
   .ms-zone.bound .ms-face { fill: #24446a; }
   .ms-zone.bound .ms-label { fill: #cfe3ff; }
+  .ms-zone.custom .ms-face {
+    fill: #5c4108; filter: drop-shadow(0 0 8px rgba(255, 183, 43, .85));
+  }
+  .ms-zone.custom .ms-label { fill: #ffe7ad; }
   .ms-zone.script .ms-face {
     fill: #6d1e50; filter: drop-shadow(0 0 8px rgba(255, 45, 149, .9));
   }
@@ -4007,6 +4075,7 @@
   .ms-zone.script.off .ms-face { filter: grayscale(.8) brightness(.7); }
   .ms-zone:hover .ms-face { fill: #2b3a58; }
   .ms-zone.bound:hover .ms-face { fill: #2d578a; }
+  .ms-zone.custom:hover .ms-face { fill: #705010; }
   .ms-zone.script:hover .ms-face { fill: #8b2765; }
   .ms-zone.picked .ms-face { stroke: var(--accent); stroke-width: 3; }
 
@@ -4028,6 +4097,7 @@
   .kb-legend .dot { width: 9px; height: 9px; border-radius: 3px; }
   .kb-legend .dot.script { background: #a3286c; box-shadow: 0 0 9px rgba(255, 45, 149, .8); }
   .kb-legend .dot.bound { background: #2b4d75; box-shadow: 0 0 9px rgba(61, 139, 253, .6); }
+  .kb-legend .dot.custom { background: #8a6412; box-shadow: 0 0 9px rgba(255, 183, 43, .8); }
   .kb-legend .dot.free { background: #2b2e39; }
 
   #kb-layouts { margin-top: 22px; }
@@ -5375,8 +5445,9 @@
           <h2>Keyboard</h2>
           <p>
             Every bind in your config, drawn where it sits. Keys running one of
-            your own scripts glow; the rest are ordinary binds, and the dark ones
-            are free. Pick any key to see what it runs.
+            your own scripts glow magenta; a key changed from CS2's own default
+            glows gold; blue keys still do exactly what CS2 ships, and the dark
+            ones are free. Pick any key to see what it runs.
           </p>
         </div>
       </div>
@@ -9502,6 +9573,20 @@ async function loadPlugins(force) {
 let keyData = null;
 let pickedKey = null;
 
+// Which keys the active profile leaves at CS2's stock default -- lit on the
+// board itself when there are only a few, or summed up in a side panel when
+// there are enough that marking every key would just be noise. Populated by
+// renderKeyboard() from the active profile's own "missing_defaults" list, not
+// looked up fresh per key: there can be ~90 of those on one render.
+let kbMissingMap = new Map();
+const KB_MISSING_BOARD_LIMIT = 5;
+
+function kbActiveProfileMissing() {
+  const profile = (profileData && profileData.profiles || [])
+    .find(p => p.active);
+  return profile ? (profile.missing_defaults || []) : [];
+}
+
 // What the picked key could be set to. Fetched per key, because the stock
 // bind and the current bind are both particular to the key being looked at.
 let kbOptions = null;
@@ -9610,15 +9695,26 @@ function kbCap(spec) {
   const hit = kbLookup(code, label);
   const cls = !hit ? "free"
     : hit.script ? (hit.enabled ? "script" : "script off")
+    : hit.is_default === false ? "custom"
     : "bound";
   const picked = pickedKey && pickedKey.code === code ? " picked" : "";
   // The game and the config disagreeing about a key matters more than what
   // either of them says alone, so it is marked where the key is drawn.
   const odd = hit && hit.agrees === false ? " adrift" : "";
+  const missing = kbMissingMap.get(kbBindingFor(code));
+  const missingCls = missing ? " kb-missing" : "";
+  const note = cls === "custom" ? " \u2014 changed from CS2 default"
+    : cls === "bound" && hit.is_default ? " \u2014 same as CS2 default" : "";
+  const title = (hit ? (hit.script || hit.command) : label + " \u2014 free") + note;
+  const fullTitle = missing
+    ? title + " \u2014 CS2 default here is \u201c" + missing.command +
+      "\u201d, not set by this profile"
+    : title;
 
-  return '<button class="kb-key ' + cls + picked + odd + '" style="--w:' + w + '"' +
+  return '<button class="kb-key ' + cls + picked + odd + missingCls +
+    '" style="--w:' + w + '"' +
     ' data-kbcode="' + esc(code) + '" data-kblabel="' + esc(label) + '"' +
-    ' title="' + esc(hit ? (hit.script || hit.command) : label + " \u2014 free") + '">' +
+    ' title="' + esc(fullTitle) + '">' +
     '<span class="kb-cap">' + esc(label) + "</span>" +
     (hit ? '<span class="kb-mark"></span>' : "") + "</button>";
 }
@@ -9641,14 +9737,24 @@ function msZone(code, label, shape, labelAt, extra) {
   const hit = kbLookup(code, label);
   const cls = !hit ? "free"
     : hit.script ? (hit.enabled ? "script" : "script off")
+    : hit.is_default === false ? "custom"
     : "bound";
   const picked = pickedKey && pickedKey.code === code ? " picked" : "";
-  const title = esc(hit ? (hit.script || hit.command) : label + " \u2014 free");
+  const note = cls === "custom" ? " \u2014 changed from CS2 default"
+    : cls === "bound" && hit.is_default ? " \u2014 same as CS2 default" : "";
+  const title = (hit ? (hit.script || hit.command) : label + " \u2014 free") + note;
   // Most disagreements land on the mouse, so it is marked here too.
   const odd = hit && hit.agrees === false ? " adrift" : "";
-  return '<g class="ms-zone ' + cls + picked + odd + '" data-kbcode="' + esc(code) +
+  const missing = kbMissingMap.get(kbBindingFor(code));
+  const missingCls = missing ? " kb-missing" : "";
+  const fullTitle = esc(missing
+    ? title + " \u2014 CS2 default here is \u201c" + missing.command +
+      "\u201d, not set by this profile"
+    : title);
+  return '<g class="ms-zone ' + cls + picked + odd + missingCls +
+    '" data-kbcode="' + esc(code) +
     '" data-kblabel="' + esc(label) + '"' + (extra || "") + ">" +
-    "<title>" + label + " \u2014 " + title + "</title>" +
+    "<title>" + label + " \u2014 " + fullTitle + "</title>" +
     shape +
     '<text class="ms-label" x="' + labelAt[0] + '" y="' + labelAt[1] + '">' +
     esc(label.replace("Mouse ", "M").replace("Wheel ", "")) + "</text></g>";
@@ -9936,9 +10042,47 @@ function kbResetLayout() {
   }, { passive: false });
 })();
 
+// A short line in the legend saying how many stock CS2 binds the active
+// profile leaves untouched -- shown either way, whether they are lit on the
+// board itself or summed up in the panel beside it.
+function kbMissingLegend(activeProfile, missingList, showPanel) {
+  if (!activeProfile || !missingList.length) return "";
+  return '<span class="kb-missing-note"><i class="dot missing"></i>' +
+    missingList.length + " CS2 default" + (missingList.length === 1 ? "" : "s") +
+    " not set in " + esc(activeProfile.label) +
+    (showPanel ? "" : " — lit on the board") + "</span>";
+}
+
+// The panel next to the board, for when there are too many missing binds to
+// mark on the board itself without it turning into noise.
+function kbMissingPanel(activeProfile, missingList, showPanel) {
+  if (!showPanel) return "";
+  const rows = missingList.map(m =>
+    '<div class="kb-missing-row"><span class="kb-missing-key">' + esc(m.label) +
+    '</span><span class="kb-missing-cmd">' + esc(m.command) + "</span></div>")
+    .join("");
+  return '<div class="kb-missing-panel">' +
+    '<div class="kb-missing-head">Not set in ' + esc(activeProfile.label) +
+    '<span class="kb-missing-count">' + missingList.length + "</span></div>" +
+    '<p class="kb-missing-sub">These keys will keep whatever the standard ' +
+    "layout already has when this profile is switched to.</p>" +
+    '<div class="kb-missing-list">' + rows + "</div>" +
+    "</div>";
+}
+
 function renderKeyboard() {
   const box = $("kb-out");
   if (!box || !keyData) return;
+
+  // Fewer than the limit: light the keys themselves up, right on the board.
+  // At or past it, marking every key would be noise instead of a signal, so
+  // a panel next to the board lists them instead and the board stays clean.
+  const activeProfile = (profileData && profileData.profiles || [])
+    .find(p => p.active);
+  const missingList = activeProfile ? (activeProfile.missing_defaults || []) : [];
+  const showPanel = missingList.length >= KB_MISSING_BOARD_LIMIT;
+  kbMissingMap = new Map(
+    (showPanel ? [] : missingList).map(m => [m.key, m]));
 
   const rows = KB_ROWS.map(row =>
     '<div class="kb-row">' + row.map(kbCap).join("") + "</div>").join("");
@@ -9956,6 +10100,7 @@ function renderKeyboard() {
       "Part of this is past the edge, because it is zoomed in. " +
       '<button class="btn ghost small" id="kb-edge-reset">Reset layout</button>' +
     "</p>" +
+    '<div class="kb-layout-row">' +
     '<div class="kb-scene" id="kb-scene">' +
     (kbShown.board || kbShown.mouse ? "" :
       '<div class="kb-none">Both models are switched off.</div>') +
@@ -9970,6 +10115,8 @@ function renderKeyboard() {
       (mouseShape === id) + '">' + label + "</button>").join("") +
     "</div></div>") +
     "</div>" +
+    kbMissingPanel(activeProfile, missingList, showPanel) +
+    "</div>" +
     '<div class="kb-show">' +
     [["board", "Keyboard"], ["mouse", "Mouse"]].map(([name, label]) =>
       '<label class="opt"><input type="checkbox" data-kbshow="' + name + '"' +
@@ -9977,7 +10124,8 @@ function renderKeyboard() {
     "</div>" +
     '<div class="kb-legend">' +
     '<span><i class="dot script"></i>one of your scripts</span>' +
-    '<span><i class="dot bound"></i>bound to something else</span>' +
+    '<span><i class="dot custom"></i>changed from CS2 default</span>' +
+    '<span><i class="dot bound"></i>CS2 default</span>' +
     '<span><i class="dot free"></i>free</span>' +
     (keyData && keyData.live && keyData.live.available
       ? '<span class="kb-live">' +
@@ -9987,6 +10135,7 @@ function renderKeyboard() {
           : '<i class="dot ok"></i>matches CS2') +
         "</span>"
       : "") +
+    kbMissingLegend(activeProfile, missingList, showPanel) +
     "</div>" + kbDetail();
 
   ["board", "mouse"].forEach(kbPlace);
@@ -10111,8 +10260,13 @@ document.addEventListener("contextmenu", e => {
   if (!tab) return;
   e.preventDefault();
   kbswPopover = null;
+  // Anchored to the tab's own box, not the click coordinates: some webviews
+  // (WebView2 under non-100% Windows display scaling, most of all) report
+  // mouse-event coordinates in a different pixel space than CSS layout uses,
+  // which put this menu nowhere near the tab it was opened from.
+  const rect = tab.getBoundingClientRect();
   kbswMenu = { file: tab.dataset.kbsw, label: tab.dataset.kbswLabel,
-              x: e.clientX, y: e.clientY };
+              x: rect.left, y: rect.bottom + 6 };
   renderKbSwitcher();
 });
 
@@ -12477,6 +12631,10 @@ async function loadKeyboard(force) {
     catch (e) { profileData = null; }
   }
   renderKbProfiles();
+  // The board's own "missing CS2 defaults" marks read the active profile out
+  // of profileData, which was not back yet the first time renderKeyboard()
+  // ran above -- render it again now that it is.
+  renderKeyboard();
 }
 
 document.addEventListener("change", e => {

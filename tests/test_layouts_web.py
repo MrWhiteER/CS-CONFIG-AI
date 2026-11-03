@@ -56,6 +56,7 @@ class LayoutsWebCase(unittest.TestCase):
 
         self.state = mock.Mock()
         self.state.cfg_scan = cfgscan.scan(self.collection, cfg_root=self.cfg_root)
+        self.state.cs2_install = None
 
     def status(self):
         return webui._cfg_layouts_status(self.state, {})
@@ -239,6 +240,29 @@ class TestSwitchingProfiles(LayoutsWebCase):
         self.assertFalse(result["changed"])
         self.assertTrue(result["empty"], "nothing to compare, so not the same as already active")
 
+    def test_a_copy_sharing_the_same_binds_does_not_also_read_as_active(self):
+        """Regression: "active" used to mean "the standard layout happens to
+        match this profile's own binds" -- which lit up a copy right
+        alongside the original it was copied from, since both define the
+        exact same overrides. Only the one actually switched to should."""
+        self.copy("mrwhiteer/lan/warmup.vcfg", "Warmup Copy")
+        self.switch("mrwhiteer/lan/warmup.vcfg")
+        found = {p["file"]: p for p in self.profiles()["profiles"]}
+        self.assertTrue(found["mrwhiteer/lan/warmup.vcfg"]["active"])
+        self.assertFalse(found["mrwhiteer/lan/warmup_copy.vcfg"]["active"])
+
+    def test_switching_to_another_profile_deactivates_the_previous_one(self):
+        self.copy("mrwhiteer/lan/warmup.vcfg", "Second")
+        self.switch("mrwhiteer/lan/warmup.vcfg")
+        self.switch("mrwhiteer/lan/second.vcfg")
+        found = {p["file"]: p for p in self.profiles()["profiles"]}
+        self.assertTrue(found["mrwhiteer/lan/second.vcfg"]["active"])
+        self.assertFalse(found["mrwhiteer/lan/warmup.vcfg"]["active"])
+
+    def test_default_stops_reading_as_active_once_something_has_been_switched_to(self):
+        self.switch("mrwhiteer/lan/warmup.vcfg")
+        self.assertFalse(self.profiles()["default_active"])
+
 
 class TestDefault(LayoutsWebCase):
     """Going back to Default: the one way out of a profile that got applied,
@@ -403,6 +427,11 @@ class TestDelete(LayoutsWebCase):
         self.assertFalse((self.cfg_root / "mrwhiteer/lan/competitive.vcfg").exists())
         self.assertNotIn("mrwhiteer/lan/competitive.vcfg",
                          {p["file"] for p in result["profiles"]})
+
+    def test_deleting_the_active_profile_falls_back_to_default(self):
+        self.switch("mrwhiteer/lan/warmup.vcfg")
+        self.delete("mrwhiteer/lan/warmup.vcfg")
+        self.assertTrue(self.profiles()["default_active"])
 
     def test_deleting_unwires_its_switch_key(self):
         self.copy("mrwhiteer/lan/warmup.vcfg", "Competitive")

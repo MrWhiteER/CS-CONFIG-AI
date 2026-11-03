@@ -1089,6 +1089,43 @@ class TestLayoutProfiles(unittest.TestCase):
         self.assertEqual(applied, [])
         self.assertEqual(restored, {})
 
+    def test_profile_missing_defaults_excludes_what_the_profile_overrides(self):
+        table = {"mouse3": "noclip", "mouse4": "bot_place", "w": "+forward"}
+        missing = cfgscan.profile_missing_defaults(
+            self.result, "mrwhiteer/lan/warmup.vcfg", table)
+        self.assertEqual(missing, [{"key": "w", "command": "+forward"}])
+
+    def test_profile_missing_defaults_is_empty_without_a_defaults_table(self):
+        self.assertEqual(
+            cfgscan.profile_missing_defaults(
+                self.result, "mrwhiteer/lan/warmup.vcfg", {}),
+            [])
+
+    def test_profile_missing_defaults_lists_everything_for_a_blank_profile(self):
+        path = self.cfg_root / "mrwhiteer/lan/blank.vcfg"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("", encoding="utf-8")
+        again = self.rescan()
+        table = {"mouse3": "noclip", "w": "+forward"}
+        missing = cfgscan.profile_missing_defaults(
+            again, "mrwhiteer/lan/blank.vcfg", table)
+        self.assertEqual(
+            {(m["key"], m["command"]) for m in missing},
+            {("mouse3", "noclip"), ("w", "+forward")})
+
+    def test_profile_missing_defaults_normalises_key_spellings_first(self):
+        """A profile may bind "w" where the defaults table -- read from the
+        game's own file -- says "scancode26" for the same physical key;
+        comparing them as written would report the key as missing twice
+        over, once under each spelling."""
+        path = self.cfg_root / "mrwhiteer/lan/letters.vcfg"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('bind "w" "+forward"\n', encoding="utf-8")
+        again = self.rescan()
+        missing = cfgscan.profile_missing_defaults(
+            again, "mrwhiteer/lan/letters.vcfg", {"scancode26": "+forward"})
+        self.assertEqual(missing, [])
+
 
 class TestFolderPicking(FixtureCase):
     """Choosing a folder should not require typing a path."""

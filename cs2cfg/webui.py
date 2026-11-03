@@ -1513,6 +1513,11 @@ def _cfg_layouts_apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     profile = profiles.get(profile_file)
     label = profile["label"] if profile else profile_file
 
+    # Clicking a tab is the one explicit choice the switcher now trusts --
+    # see layouts.load_current -- regardless of whether this particular
+    # click changed anything on disk.
+    layouts.save_current(result.root, profile_file)
+
     if not applied:
         empty = not cfgscan._profile_own_binds(result, profile_file)
         return {"ok": True, "changed": False, "empty": empty, "file": profile_file,
@@ -1567,6 +1572,8 @@ def _cfg_layouts_default(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     baseline = layouts.load_baseline(result.root)
     applied, texts = cfgscan.apply_default_layout(result, baseline)
 
+    layouts.save_current(result.root, None)
+
     if not applied:
         return {"ok": True, "changed": False,
                 "empty": not any(baseline.values()),
@@ -1592,33 +1599,60 @@ def _cfg_layouts_default(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
 def _profile_selector_view(
     result, registry: Dict[str, List[str]],
     pins: Optional[Dict[str, List[str]]] = None,
+    current: Optional[str] = None,
+    defaults_table: Optional[Dict[str, str]] = None,
 ) -> List[Dict[str, Any]]:
     """Every match-profile file, for the Keyboard tab's switcher and its
     create/copy/delete list.
 
     Unlike ``_layout_view`` this includes a profile with nothing pinnable yet
     -- a brand new, still-blank one most of all.
+
+    ``active`` is whichever file ``current`` names (see
+    ``layouts.load_current``), not a guess from comparing binds: two
+    profiles sharing the same overrides -- a copy and its source, most of
+    all -- would otherwise both light up at once.
+
+    ``missing_defaults`` is every stock CS2 bind (``defaults_table``, see
+    ``_defaults_table``) this profile leaves untouched -- what a key keeps
+    doing exactly as the standard layout already has it, once the profile is
+    switched to, rather than something the profile set on purpose.
     """
-    from . import cfgscan
+    from . import cfgscan, keys
 
     hidden = set(registry["hidden"])
     created = set(registry["created"])
     pins = pins or {}
+    defaults_table = defaults_table or {}
     out = []
     for profile in cfgscan.match_profiles(result):
         if profile["file"] in hidden:
             continue
         trigger = profile["trigger"]
+        missing = cfgscan.profile_missing_defaults(
+            result, profile["file"], defaults_table)
+        for item in missing:
+            item["label"] = keys.label(item["key"])
         out.append({
             "file": profile["file"],
             "label": profile["label"],
             "override_count": len(profile["overrides"]),
             "trigger_alias": trigger["alias"] if trigger else None,
             "app_created": profile["file"] in created,
-            "active": cfgscan.profile_is_active(
-                result, profile["file"], pins.get(profile["file"], [])),
+            "active": profile["file"] == current,
+            "missing_defaults": missing,
         })
     return out
+
+
+def _defaults_table(state: State) -> Dict[str, str]:
+    """CS2's own stock keybinds, read straight from the game install -- an
+    empty mapping when the game cannot be found, which every caller treats
+    as "nothing known to be missing" rather than an error."""
+    from . import defaults as keydefaults
+
+    state.refresh()
+    return keydefaults.load(state.cs2_install)
 
 
 def _cfg_layouts_profiles(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
@@ -1632,9 +1666,11 @@ def _cfg_layouts_profiles(state: State, _body: Dict[str, Any]) -> Dict[str, Any]
 
     registry = layouts.load_registry(result.root)
     pins = layouts.load_pins(result.root)
-    baseline = layouts.load_baseline(result.root)
-    return {"ok": True, "profiles": _profile_selector_view(result, registry, pins),
-            "default_active": cfgscan.default_is_active(result, baseline)}
+    current = layouts.load_current(result.root)
+    return {"ok": True,
+            "profiles": _profile_selector_view(
+                result, registry, pins, current, _defaults_table(state)),
+            "default_active": current is None}
 
 
 def _cfg_layouts_create(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -1667,8 +1703,10 @@ def _cfg_layouts_create(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
     registry = layouts.load_registry(result.root)
     pins = layouts.load_pins(result.root)
+    current = layouts.load_current(result.root)
     return {"ok": True, "file": relative,
-            "profiles": _profile_selector_view(state.cfg_scan, registry, pins)}
+            "profiles": _profile_selector_view(
+                state.cfg_scan, registry, pins, current, _defaults_table(state))}
 
 
 def _cfg_layouts_copy(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -1706,8 +1744,10 @@ def _cfg_layouts_copy(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
     registry = layouts.load_registry(result.root)
     pins = layouts.load_pins(result.root)
+    current = layouts.load_current(result.root)
     return {"ok": True, "file": relative,
-            "profiles": _profile_selector_view(state.cfg_scan, registry, pins)}
+            "profiles": _profile_selector_view(
+                state.cfg_scan, registry, pins, current, _defaults_table(state))}
 
 
 def _unwire_profile_key(result, trigger: Optional[Dict[str, Any]],
@@ -1768,8 +1808,11 @@ def _cfg_layouts_delete(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
     fresh_registry = layouts.load_registry(result.root)
     fresh_pins = layouts.load_pins(result.root)
+    fresh_current = layouts.load_current(result.root)
     return {"ok": True, "file": file,
-            "profiles": _profile_selector_view(state.cfg_scan, fresh_registry, fresh_pins)}
+            "profiles": _profile_selector_view(
+                state.cfg_scan, fresh_registry, fresh_pins, fresh_current,
+                _defaults_table(state))}
 
 
 def _cfg_layouts_remove(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -1800,11 +1843,16 @@ def _cfg_layouts_remove(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
 
     layouts.hide_profile(result.root, file)
     layouts.save_pins(result.root, file, [])
+    if layouts.load_current(result.root) == file:
+        layouts.save_current(result.root, None)
     state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
     fresh_registry = layouts.load_registry(result.root)
     fresh_pins = layouts.load_pins(result.root)
+    fresh_current = layouts.load_current(result.root)
     return {"ok": True, "file": file,
-            "profiles": _profile_selector_view(state.cfg_scan, fresh_registry, fresh_pins)}
+            "profiles": _profile_selector_view(
+                state.cfg_scan, fresh_registry, fresh_pins, fresh_current,
+                _defaults_table(state))}
 
 
 def _cfg_layouts_export(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -1876,8 +1924,10 @@ def _cfg_layouts_import(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
     registry = layouts.load_registry(result.root)
     pins = layouts.load_pins(result.root)
+    current = layouts.load_current(result.root)
     return {"ok": True, "file": relative,
-            "profiles": _profile_selector_view(state.cfg_scan, registry, pins)}
+            "profiles": _profile_selector_view(
+                state.cfg_scan, registry, pins, current, _defaults_table(state))}
 
 
 def _safe_cloud_relative(cfg_root: Path, relative: object) -> Optional[Path]:
@@ -2019,8 +2069,11 @@ def _cfg_layouts_sync_pull(state: State, _body: Dict[str, Any]) -> Dict[str, Any
     state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
     fresh_registry = layouts.load_registry(result.root)
     fresh_pins = layouts.load_pins(result.root)
+    fresh_current = layouts.load_current(result.root)
     return {"ok": True, "collection": key, "files": sorted(written),
-            "profiles": _profile_selector_view(state.cfg_scan, fresh_registry, fresh_pins)}
+            "profiles": _profile_selector_view(
+                state.cfg_scan, fresh_registry, fresh_pins, fresh_current,
+                _defaults_table(state))}
 
 
 def _rescan(state: State):
@@ -2405,6 +2458,22 @@ def _cfg_keys(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         # board still works from the configs alone -- but swallowing the reason
         # is how a silent failure stays silent, so it is reported.
         live_why = f"{type(exc).__name__}: {exc}"
+
+    # Whether each non-script key is still doing exactly what CS2 ships out of
+    # the box, or something this collection chose on purpose -- the board
+    # colors the two differently. Left unset (not False) when the game cannot
+    # be found, so an unknown stays unknown rather than reading as "custom".
+    from . import defaults as keydefaults
+    from . import live as livecfg
+
+    defaults_table = _defaults_table(state)
+    if defaults_table:
+        for entry in bound.values():
+            if entry["script"]:
+                continue
+            stock = keydefaults.for_key(defaults_table, entry["key"])
+            if stock:
+                entry["is_default"] = livecfg._same_command(entry["command"], stock)
 
     return {
         "bound": bound,

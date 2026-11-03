@@ -1688,14 +1688,15 @@
       "label": "Preferred player colour",
       "control": "select",
       "options": {
-        "0": "Yellow",
-        "1": "Purple",
-        "2": "Green",
-        "3": "Blue",
-        "4": "Orange"
+        "0": "Cyan / Blue",
+        "1": "Green",
+        "2": "Yellow",
+        "3": "Orange",
+        "4": "Purple"
       },
       "range_source": "clamp",
       "default": "0",
+      "help": "Verified in-game one value at a time -- the labels the game itself used to ship (0 Yellow, 1 Purple, 2 Green, 3 Blue, 4 Orange) no longer match what each number actually draws.",
       "subgroup": "markers"
     },
     "cl_spec_follow_grenade_key": {
