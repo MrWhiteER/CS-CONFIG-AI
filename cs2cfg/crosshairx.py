@@ -201,6 +201,15 @@ def summary(libraries: List[Path]) -> Dict[str, Any]:
 # once is what finally makes the crosshair appear. There is no API for
 # either half, so both are reproduced the way they were found: a keystroke,
 # then a focus change on the game's own window.
+#
+# Win+G is a toggle, and opening it is not cosmetically free: it raises
+# Game Bar's own panel UI over the game, with whatever widgets are docked
+# in it -- on a machine with the Crosshair X widget docked, that includes a
+# button of its own sitting there asking to be clicked. The manual workflow
+# this automates never needed that click; alt-tabbing away and back is what
+# closed the panel for them. So the panel gets the same treatment here:
+# Win+G again once the warm-up has had time to land, closing it before the
+# focus change, rather than leaving it on screen for someone to deal with.
 _VK_WIN = 0x5B
 _VK_G = 0x47
 _KEYEVENTF_KEYUP = 0x0002
@@ -273,10 +282,15 @@ def wake_overlay(
 ) -> Dict[str, Any]:
     """Nudge Windows into attaching the overlay broker to the game window.
 
-    Meant to run once, right after the game window is confirmed up. Sends
-    Win+G to wake Game Bar's broker, waits for it to settle, then minimizes
-    and restores the game window to produce the foreground-change event the
-    broker waits for before it decides what it is allowed to draw over.
+    Meant to run once, right after the game window is confirmed up and
+    before it is fitted to the screen -- minimizing and restoring it here
+    can shift it a few pixels, and running before the fit lets that fit
+    correct for it rather than leaving the window off its intended spot.
+
+    Sends Win+G to wake Game Bar's broker, waits for it to settle, presses
+    Win+G again to close the panel it opened, then minimizes and restores
+    the game window to produce the foreground-change event the broker
+    waits for before it decides what it is allowed to draw over.
     Cancellable the same way the rest of the launch sequence is: checked
     between ticks rather than slept through in one call.
     """
@@ -292,6 +306,8 @@ def wake_overlay(
         if should_stop and should_stop():
             return {"ok": False, "error": "cancelled"}
         time.sleep(interval)
+
+    _press_win_g()
 
     from . import window as windowmod
 

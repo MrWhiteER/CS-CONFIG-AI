@@ -208,6 +208,24 @@ class WakingTheOverlay(unittest.TestCase):
         self.assertTrue(out["ok"])
         nudge.assert_called_once_with(99)
 
+    def test_it_closes_the_game_bar_panel_before_refocusing(self):
+        """Win+G toggles Game Bar's panel open; the manual workflow this
+        automates never needed to click anything in it -- alt-tabbing away
+        and back is what closed it for them, so this closes it the same way
+        rather than leaving it sitting over the game."""
+        from cs2cfg import window
+
+        fake = window.WindowInfo(hwnd=1, title="Counter-Strike 2",
+                                  process="cs2.exe", rect=(0, 0, 100, 100))
+        with mock.patch.object(crosshairx.sys, "platform", "win32"), \
+             mock.patch.object(crosshairx, "_press_win_g", return_value=0) as press, \
+             mock.patch.object(crosshairx.time, "sleep"), \
+             mock.patch.object(window, "find_game_window", return_value=fake), \
+             mock.patch.object(window, "nudge_focus"):
+            crosshairx.wake_overlay(warmup=0.1, interval=0.1)
+        self.assertEqual(press.call_count, 2,
+                          "Win+G must be pressed again to close the panel it opened")
+
     def test_cancelling_mid_warmup_skips_the_refocus(self):
         from cs2cfg import window
 

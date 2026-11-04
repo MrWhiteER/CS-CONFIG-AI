@@ -629,25 +629,19 @@ def play(
         report(f"  window   {found.title or GAME_PROCESS}  "
                f"{found.size[0]}x{found.size[1]}", "good")
 
-        # 5. Sit it flush over the screen. With the desktop already at the
-        #    target mode this is usually a no-op, but it corrects CS2 when it
-        #    places the window off-origin or a pixel short.
         time.sleep(1.5)
         fresh = window.find_game_window(GAME_PROCESS) or found
-        if stretch_mode == "borderless":
-            new_w, new_h = window.make_borderless(fresh)
-            report(f"  fitted   {new_w}x{new_h} borderless at the screen origin", "good")
-        else:
-            new_w, new_h = fresh.size
-            report("  exclusive fullscreen; the window is left to the game", "dim")
 
-        # 5b. Windows' overlay-hook broker (the thing Xbox Game Bar and
-        #     Crosshair X share) often has not attached to anything yet on a
-        #     fresh boot, so Crosshair X's own overlay silently fails to draw
-        #     until something wakes the broker and the game window loses and
-        #     regains focus. This automates the fix the user found by hand --
-        #     Win+G, wait, then one alt-tab -- so it is not something to
-        #     remember every launch.
+        # 5. Windows' overlay-hook broker (the thing Xbox Game Bar and
+        #    Crosshair X share) often has not attached to anything yet on a
+        #    fresh boot, so Crosshair X's own overlay silently fails to draw
+        #    until something wakes the broker and the game window loses and
+        #    regains focus. This automates the fix the user found by hand --
+        #    Win+G, wait, then one alt-tab -- so it is not something to
+        #    remember every launch. It runs before the fit below, on
+        #    purpose: minimizing and restoring the window to force that
+        #    focus change can nudge it a few pixels, and the fit is what
+        #    puts it back exactly where it belongs.
         if start_crosshairx:
             from . import crosshairx
             if crosshairx.running():
@@ -658,6 +652,18 @@ def play(
                     report("  overlay broker warmed up", "good")
                 elif woke.get("error") != "cancelled":
                     report(f"  could not warm up the overlay broker: {woke.get('error')}", "warn")
+                fresh = window.find_game_window(GAME_PROCESS) or fresh
+
+        # 6. Sit it flush over the screen. With the desktop already at the
+        #    target mode this is usually a no-op, but it corrects CS2 when it
+        #    places the window off-origin or a pixel short -- and corrects
+        #    for the overlay wake-up above, if that ran.
+        if stretch_mode == "borderless":
+            new_w, new_h = window.make_borderless(fresh)
+            report(f"  fitted   {new_w}x{new_h} borderless at the screen origin", "good")
+        else:
+            new_w, new_h = fresh.size
+            report("  exclusive fullscreen; the window is left to the game", "dim")
 
         report("", "")
         if stretch_mode == "borderless":
