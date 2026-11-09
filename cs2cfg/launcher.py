@@ -638,7 +638,10 @@ def play(
         #    until something wakes the broker and the game window loses and
         #    regains focus. This automates the fix the user found by hand --
         #    Win+G, wait, then one alt-tab -- so it is not something to
-        #    remember every launch. It runs before the fit below, on
+        #    remember every launch. Each step waits on what is actually on
+        #    screen rather than a timer (see crosshairx.wake_overlay), which
+        #    is what keeps Crosshair X's Game Bar widget from being left on
+        #    its loading spinner. It runs before the fit below, on
         #    purpose: minimizing and restoring the window to force that
         #    focus change can nudge it a few pixels, and the fit is what
         #    puts it back exactly where it belongs.
@@ -649,7 +652,7 @@ def play(
                 report("  waking the Windows overlay broker for Crosshair X...", "dim")
                 woke = crosshairx.wake_overlay(should_stop=should_stop)
                 if woke.get("ok"):
-                    report("  overlay broker warmed up", "good")
+                    report(f"  overlay broker warmed up ({woke.get('detail', '')})", "good")
                 elif woke.get("error") != "cancelled":
                     report(f"  could not warm up the overlay broker: {woke.get('error')}", "warn")
                 fresh = window.find_game_window(GAME_PROCESS) or fresh
