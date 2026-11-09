@@ -204,16 +204,32 @@ def summary(libraries: List[Path]) -> Dict[str, Any]:
 #
 # Win+G is a toggle, and opening it is not cosmetically free: it raises
 # Game Bar's own panel UI over the game, with whatever widgets are docked
-# in it -- on a machine with the Crosshair X widget docked, that includes a
-# button of its own sitting there asking to be clicked. The manual workflow
-# this automates never needed that click; alt-tabbing away and back is what
-# closed the panel for them. So the panel gets the same treatment here:
-# Win+G again once the warm-up has had time to land, closing it before the
-# focus change, rather than leaving it on screen for someone to deal with.
+# in it -- including Crosshair X's own widget for anyone who has pinned it.
+# Those widgets only load while the panel is actually on screen, so the
+# panel has to stay up long enough for them to finish, and then be closed.
+#
+# Doing that on a fixed timer is what left the Crosshair X widget stuck on
+# its loading spinner. On a fresh boot Game Bar can take longer than the
+# old six seconds just to appear, so the "close" keystroke either landed
+# while it was still starting (and the panel opened late, over the game)
+# or closed it before the widget had loaded -- and a pinned widget frozen
+# mid-load keeps drawing its spinner where the crosshair should be. So the
+# timing here is driven by what is on screen, not by the clock:
+#
+# * if Game Bar is already running, the broker is already awake: no
+#   keystroke at all, only the focus change;
+# * otherwise Win+G, then wait until Game Bar's panel actually has focus;
+# * hold it there long enough for docked widgets to load;
+# * close it only if it is still the panel in front -- never a blind
+#   second toggle, which would open a panel that was not there;
+# * wait for it to be gone, then the focus change on the game window.
+GAMEBAR_EXE = "GameBar.exe"
+PANEL_TIMEOUT = 20.0     # how long Game Bar gets to appear after Win+G
+WIDGET_SETTLE = 4.0      # how long the panel stays up once it is in front
+CLOSE_TIMEOUT = 3.0      # how long the panel gets to go away after closing
 _VK_WIN = 0x5B
 _VK_G = 0x47
 _KEYEVENTF_KEYUP = 0x0002
-WARMUP_SECONDS = 6.0
 
 
 class _KeyInput(ctypes.Structure):
@@ -275,44 +291,107 @@ def _press_win_g() -> int:
     return ctypes.get_last_error() or -1
 
 
+def _gamebar_running() -> bool:
+    """Whether Game Bar's process is already up (and so its broker awake)."""
+    if sys.platform != "win32":
+        return False
+    try:
+        done = subprocess.run(
+            ["tasklist", "/FI", f"IMAGENAME eq {GAMEBAR_EXE}", "/NH"],
+            capture_output=True, text=True, timeout=15,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return GAMEBAR_EXE.lower() in (done.stdout or "").lower()
+
+
+def _gamebar_in_front() -> bool:
+    """Whether Game Bar's panel is the window that currently has focus."""
+    from . import window as windowmod
+
+    try:
+        return windowmod.foreground_process() == GAMEBAR_EXE.lower()
+    except Exception:
+        return False
+
+
+def _wait_for(
+    condition: Callable[[], bool],
+    timeout: float,
+    interval: float,
+    should_stop: Optional[Callable[[], bool]],
+) -> Optional[bool]:
+    """Poll ``condition`` until it holds or ``timeout`` passes.
+
+    Returns True when it held, False on timeout, None when cancelled.
+    """
+    deadline = time.monotonic() + timeout
+    while True:
+        if should_stop and should_stop():
+            return None
+        if condition():
+            return True
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(interval)
+
+
 def wake_overlay(
     should_stop: Optional[Callable[[], bool]] = None,
-    warmup: float = WARMUP_SECONDS,
-    interval: float = 0.5,
+    panel_timeout: float = PANEL_TIMEOUT,
+    settle: float = WIDGET_SETTLE,
+    close_timeout: float = CLOSE_TIMEOUT,
+    interval: float = 0.25,
 ) -> Dict[str, Any]:
-    """Nudge Windows into attaching the overlay broker to the game window.
+    """Get Game Bar's broker attached to the game and Crosshair X drawing.
 
     Meant to run once, right after the game window is confirmed up and
     before it is fitted to the screen -- minimizing and restoring it here
     can shift it a few pixels, and running before the fit lets that fit
     correct for it rather than leaving the window off its intended spot.
 
-    Sends Win+G to wake Game Bar's broker, waits for it to settle, presses
-    Win+G again to close the panel it opened, then minimizes and restores
-    the game window to produce the foreground-change event the broker
-    waits for before it decides what it is allowed to draw over.
-    Cancellable the same way the rest of the launch sequence is: checked
-    between ticks rather than slept through in one call.
+    See the notes above for why every step waits on what Windows reports
+    rather than on a timer. Cancellable the same way the rest of the
+    launch sequence is: checked between ticks rather than slept through.
     """
     if sys.platform != "win32":
         return {"ok": False, "error": "this is Windows-only"}
 
-    code = _press_win_g()
-    if code:
-        return {"ok": False, "error": f"Windows did not accept the keystroke (error {code})"}
-
-    deadline = time.monotonic() + warmup
-    while time.monotonic() < deadline:
-        if should_stop and should_stop():
-            return {"ok": False, "error": "cancelled"}
-        time.sleep(interval)
-
-    _press_win_g()
-
     from . import window as windowmod
+
+    notes: List[str] = []
+    if _gamebar_running():
+        notes.append("Game Bar was already awake")
+    else:
+        code = _press_win_g()
+        if code:
+            return {"ok": False, "error": f"Windows did not accept the keystroke (error {code})"}
+
+        shown = _wait_for(_gamebar_in_front, panel_timeout, interval, should_stop)
+        if shown is None:
+            return {"ok": False, "error": "cancelled"}
+        if not shown:
+            # Not pressing Win+G again: if the panel is merely slow, a second
+            # toggle now would be the one that opens it over the game.
+            notes.append("Game Bar's panel never came to the front")
+        else:
+            held = _wait_for(lambda: False, settle, interval, should_stop)
+            if held is None:
+                return {"ok": False, "error": "cancelled"}
+            if _gamebar_in_front():
+                _press_win_g()
+                gone = _wait_for(lambda: not _gamebar_in_front(),
+                                 close_timeout, interval, should_stop)
+                if gone is None:
+                    return {"ok": False, "error": "cancelled"}
+                if not gone:
+                    notes.append("Game Bar's panel did not close")
+            notes.append("woke Game Bar and let its widgets load")
 
     target = windowmod.find_game_window()
     if target is None:
         return {"ok": False, "error": "the game window was gone by the time the overlay warmed up"}
     windowmod.nudge_focus(target.hwnd)
-    return {"ok": True, "detail": "woke the overlay broker and refocused the game"}
+    notes.append("refocused the game")
+    return {"ok": True, "detail": "; ".join(notes)}

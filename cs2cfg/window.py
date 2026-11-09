@@ -271,6 +271,14 @@ def foreground_hwnd() -> int:
     return int(user32.GetForegroundWindow() or 0)
 
 
+def foreground_process() -> str:
+    """Lower-case image name of the process owning the focused window, or ''."""
+    hwnd = foreground_hwnd()
+    if not hwnd:
+        return ""
+    return _process_name(window_pid(hwnd))
+
+
 def nudge_focus(hwnd: int, settle: float = 0.2) -> None:
     """Minimize then restore a window, to manufacture a focus-change event.
 

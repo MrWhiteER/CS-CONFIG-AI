@@ -180,7 +180,54 @@ class TheCardKeepsUp(unittest.TestCase):
 
 class WakingTheOverlay(unittest.TestCase):
     """Automating the fix the user found by hand: Win+G, wait, then a focus
-    change on the game's own window."""
+    change on the game's own window -- timed off what is on screen, so the
+    Crosshair X widget is never left frozen on its loading spinner."""
+
+    def setUp(self):
+        from cs2cfg import window
+
+        self.window = window
+        self.game = window.WindowInfo(hwnd=99, title="Counter-Strike 2",
+                                      process="cs2.exe", rect=(0, 0, 100, 100))
+        # A fake Game Bar: Win+G toggles its panel, and the panel shows up
+        # ``delay`` polls after the keystroke that opened it.
+        self.panel = {"open": False, "pending": None, "delay": 0}
+        self.presses = 0
+        patches = [
+            mock.patch.object(crosshairx.sys, "platform", "win32"),
+            mock.patch.object(crosshairx.time, "sleep"),
+            mock.patch.object(crosshairx, "_press_win_g", side_effect=self._press),
+            mock.patch.object(crosshairx, "_gamebar_in_front", side_effect=self._in_front),
+            mock.patch.object(crosshairx, "_gamebar_running", return_value=False),
+            mock.patch.object(window, "find_game_window", return_value=self.game),
+        ]
+        self.mocks = [p.start() for p in patches]
+        self.addCleanup(mock.patch.stopall)
+        self.gamebar_running = self.mocks[4]
+        self.nudge = mock.patch.object(window, "nudge_focus").start()
+
+    def _press(self):
+        self.presses += 1
+        if self.panel["open"]:
+            self.panel["open"] = False
+        else:
+            self.panel["pending"] = self.panel["delay"]
+        return 0
+
+    def _in_front(self):
+        if self.panel["pending"] is not None:
+            if self.panel["pending"] <= 0:
+                self.panel["open"], self.panel["pending"] = True, None
+            else:
+                self.panel["pending"] -= 1
+        return self.panel["open"]
+
+    def _wake(self, **kw):
+        kw.setdefault("panel_timeout", 5)
+        kw.setdefault("settle", 1)
+        kw.setdefault("close_timeout", 1)
+        kw.setdefault("interval", 0.01)
+        return crosshairx.wake_overlay(**kw)
 
     def test_windows_only(self):
         with mock.patch.object(crosshairx.sys, "platform", "linux"):
@@ -188,70 +235,139 @@ class WakingTheOverlay(unittest.TestCase):
         self.assertFalse(out["ok"])
 
     def test_a_rejected_keystroke_is_reported_not_raised(self):
-        with mock.patch.object(crosshairx.sys, "platform", "win32"), \
-             mock.patch.object(crosshairx, "_press_win_g", return_value=5):
-            out = crosshairx.wake_overlay()
+        with mock.patch.object(crosshairx, "_press_win_g", return_value=5):
+            out = self._wake()
         self.assertFalse(out["ok"])
         self.assertIn("error", out)
+        self.nudge.assert_not_called()
 
-    def test_it_waits_then_refocuses_the_game_window(self):
-        from cs2cfg import window
+    def test_it_opens_lets_widgets_load_closes_then_refocuses(self):
+        out = self._wake()
+        self.assertTrue(out["ok"], out)
+        self.assertEqual(self.presses, 2)
+        self.assertFalse(self.panel["open"], "Game Bar's panel was left over the game")
+        self.nudge.assert_called_once_with(99)
 
-        fake = window.WindowInfo(hwnd=99, title="Counter-Strike 2",
-                                  process="cs2.exe", rect=(0, 0, 100, 100))
-        with mock.patch.object(crosshairx.sys, "platform", "win32"), \
-             mock.patch.object(crosshairx, "_press_win_g", return_value=0), \
-             mock.patch.object(crosshairx.time, "sleep"), \
-             mock.patch.object(window, "find_game_window", return_value=fake), \
-             mock.patch.object(window, "nudge_focus") as nudge:
-            out = crosshairx.wake_overlay(warmup=0.1, interval=0.1)
+    def test_a_slow_game_bar_is_waited_for_not_raced(self):
+        """The bug behind the stuck spinner: on a cold boot the panel took
+        longer to appear than the fixed warm-up, so the close keystroke
+        landed before it was up. The close must follow the panel, not the
+        clock."""
+        self.panel["delay"] = 50   # far longer than ``settle`` alone
+        clock = {"t": 0.0}
+
+        def tick(seconds):
+            clock["t"] += seconds
+
+        with mock.patch.object(crosshairx.time, "sleep", side_effect=tick), \
+             mock.patch.object(crosshairx.time, "monotonic", side_effect=lambda: clock["t"]):
+            out = self._wake(panel_timeout=5, settle=0.1, interval=0.01)
+        self.assertTrue(out["ok"], out)
+        self.assertEqual(self.presses, 2)
+        self.assertFalse(self.panel["open"])
+
+    def test_the_panel_stays_up_long_enough_for_widgets_to_load(self):
+        clock = {"t": 0.0}
+        closed_at = {}
+
+        def tick(seconds):
+            clock["t"] += seconds
+
+        def press():
+            if self.panel["open"]:
+                closed_at["t"] = clock["t"]
+            return self._press()
+
+        with mock.patch.object(crosshairx.time, "sleep", side_effect=tick), \
+             mock.patch.object(crosshairx.time, "monotonic", side_effect=lambda: clock["t"]), \
+             mock.patch.object(crosshairx, "_press_win_g", side_effect=press):
+            self._wake(settle=3, interval=0.25)
+        self.assertGreaterEqual(closed_at["t"], 3)
+
+    def test_a_panel_that_never_appears_is_not_toggled_again(self):
+        """Pressing Win+G a second time with no panel in front would be the
+        press that opens it -- late, over the game."""
+        self.panel["delay"] = 10_000
+        clock = {"t": 0.0}
+        with mock.patch.object(crosshairx.time, "sleep",
+                               side_effect=lambda s: clock.__setitem__("t", clock["t"] + s)), \
+             mock.patch.object(crosshairx.time, "monotonic", side_effect=lambda: clock["t"]):
+            out = self._wake(panel_timeout=1, interval=0.25)
+        self.assertEqual(self.presses, 1)
         self.assertTrue(out["ok"])
-        nudge.assert_called_once_with(99)
+        self.assertIn("never came to the front", out["detail"])
+        self.nudge.assert_called_once_with(99)
 
-    def test_it_closes_the_game_bar_panel_before_refocusing(self):
-        """Win+G toggles Game Bar's panel open; the manual workflow this
-        automates never needed to click anything in it -- alt-tabbing away
-        and back is what closed it for them, so this closes it the same way
-        rather than leaving it sitting over the game."""
-        from cs2cfg import window
+    def test_a_panel_closed_by_the_player_is_not_reopened(self):
+        def in_front():
+            # Up when first checked, gone (closed by hand) by the time the
+            # settle is over.
+            in_front.calls += 1
+            return in_front.calls == 1
+        in_front.calls = 0
+        with mock.patch.object(crosshairx, "_gamebar_in_front", side_effect=in_front):
+            out = self._wake()
+        self.assertTrue(out["ok"])
+        self.assertEqual(self.presses, 1)
 
-        fake = window.WindowInfo(hwnd=1, title="Counter-Strike 2",
-                                  process="cs2.exe", rect=(0, 0, 100, 100))
-        with mock.patch.object(crosshairx.sys, "platform", "win32"), \
-             mock.patch.object(crosshairx, "_press_win_g", return_value=0) as press, \
-             mock.patch.object(crosshairx.time, "sleep"), \
-             mock.patch.object(window, "find_game_window", return_value=fake), \
-             mock.patch.object(window, "nudge_focus"):
-            crosshairx.wake_overlay(warmup=0.1, interval=0.1)
-        self.assertEqual(press.call_count, 2,
-                          "Win+G must be pressed again to close the panel it opened")
+    def test_an_awake_game_bar_gets_no_keystroke_at_all(self):
+        """Game Bar already running means the broker is already attached;
+        opening its panel again would only risk the same stuck widget."""
+        self.gamebar_running.return_value = True
+        out = self._wake()
+        self.assertTrue(out["ok"])
+        self.assertEqual(self.presses, 0)
+        self.nudge.assert_called_once_with(99)
 
-    def test_cancelling_mid_warmup_skips_the_refocus(self):
-        from cs2cfg import window
-
+    def test_cancelling_while_waiting_for_the_panel_skips_the_refocus(self):
+        self.panel["delay"] = 10_000
         calls = {"n": 0}
 
         def stop():
             calls["n"] += 1
-            return calls["n"] > 1
+            return calls["n"] > 3
 
-        with mock.patch.object(crosshairx.sys, "platform", "win32"), \
-             mock.patch.object(crosshairx, "_press_win_g", return_value=0), \
-             mock.patch.object(crosshairx.time, "sleep"), \
-             mock.patch.object(window, "nudge_focus") as nudge:
-            out = crosshairx.wake_overlay(should_stop=stop, warmup=10, interval=0.1)
-        self.assertFalse(out["ok"])
-        nudge.assert_not_called()
+        out = self._wake(should_stop=stop)
+        self.assertEqual(out.get("error"), "cancelled")
+        self.nudge.assert_not_called()
+
+    def test_cancelling_mid_settle_leaves_no_refocus(self):
+        calls = {"n": 0}
+
+        def stop():
+            calls["n"] += 1
+            return calls["n"] > 2
+
+        out = self._wake(should_stop=stop, settle=10)
+        self.assertEqual(out.get("error"), "cancelled")
+        self.nudge.assert_not_called()
 
     def test_the_game_window_disappearing_is_reported_not_raised(self):
+        with mock.patch.object(self.window, "find_game_window", return_value=None):
+            out = self._wake()
+        self.assertFalse(out["ok"])
+
+
+class GameBarProbes(unittest.TestCase):
+    def test_not_running_off_windows(self):
+        with mock.patch.object(crosshairx.sys, "platform", "linux"):
+            self.assertFalse(crosshairx._gamebar_running())
+
+    def test_running_reads_tasklist(self):
+        done = mock.Mock(stdout="GameBar.exe   1234 Console  1  50,000 K\n")
+        with mock.patch.object(crosshairx.sys, "platform", "win32"), \
+             mock.patch.object(crosshairx.subprocess, "run", return_value=done):
+            self.assertTrue(crosshairx._gamebar_running())
+
+    def test_in_front_compares_the_focused_process(self):
         from cs2cfg import window
 
-        with mock.patch.object(crosshairx.sys, "platform", "win32"), \
-             mock.patch.object(crosshairx, "_press_win_g", return_value=0), \
-             mock.patch.object(crosshairx.time, "sleep"), \
-             mock.patch.object(window, "find_game_window", return_value=None):
-            out = crosshairx.wake_overlay(warmup=0.1, interval=0.1)
-        self.assertFalse(out["ok"])
+        with mock.patch.object(window, "foreground_process", return_value="gamebar.exe"):
+            self.assertTrue(crosshairx._gamebar_in_front())
+        with mock.patch.object(window, "foreground_process", return_value="cs2.exe"):
+            self.assertFalse(crosshairx._gamebar_in_front())
+        with mock.patch.object(window, "foreground_process", side_effect=OSError):
+            self.assertFalse(crosshairx._gamebar_in_front())
 
 
 if __name__ == "__main__":
