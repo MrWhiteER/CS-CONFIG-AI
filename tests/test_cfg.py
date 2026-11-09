@@ -687,6 +687,21 @@ class TestRecommendedSettings(unittest.TestCase):
         for name in cfgscan.recommended_settings():
             self.assertIn(name, specs, f"{name!r} is recommended but has no spec")
 
+    def test_cl_color_labels_match_what_the_game_draws(self):
+        """Checked in-game one value at a time on 2026-11-03. The labels the
+        game used to ship (0 Yellow, 1 Purple, 2 Green, 3 Blue, 4 Orange) no
+        longer match, and a picker built from them silently writes the wrong
+        number for the colour the player asked for."""
+        spec = cfgscan._load_setting_specs()["settings"]["cl_color"]
+        self.assertEqual(spec["control"], "select")
+        self.assertEqual(spec["options"], {
+            "0": "Cyan / Blue",
+            "1": "Green",
+            "2": "Yellow",
+            "3": "Orange",
+            "4": "Purple",
+        })
+
     def test_an_empty_knowledge_base_recommends_nothing(self):
         with mock.patch.object(cfgscan, "_load_setting_specs", return_value={}):
             self.assertEqual(cfgscan.recommended_settings(), [])
