@@ -1,0 +1,41 @@
+const fs=require('fs'),cp=require('child_process'),assert=require('assert');
+const path=require('path'),url=require('url');
+const root=path.resolve(__dirname,'..');process.chdir(root);
+const work=path.join(require('os').tmpdir(),'cs-config-home-'+require('crypto').createHash('sha1').update(root).digest('hex').slice(0,8));fs.mkdirSync(work,{recursive:true});
+const s=fs.readFileSync('cs2cfg/web/index.html','utf8');
+for(const x of s.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g))new (require('vm').Script)(x[1]);
+const slice=(a,b)=>s.slice(s.indexOf(a),s.indexOf(b,s.indexOf(a)));
+let code=`const $=id=>document.getElementById(id); const esc=x=>String(x??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');let intent='balanced',planned={},prefs=0,previews=0;const INTENTS=['competitive','balanced','quality'];function paintModeBadge(){} function rememberPrefs(){prefs++} function noteChange(){} function requestBody(){return {intent,target_fps:240}};async function api(url,b){return {intent:b.intent,estimated_fps:{competitive:410,balanced:340,quality:230}[b.intent]}};const tempAlarm={};function status(){};`;
+code+=slice('/* Launcher motion:','function renderPlan(');
+code+=slice('/* Every card uses','async function previewPlan()');
+code+=slice('function ring(value','function meter(');
+code+=slice('// Horizontal thermal strips','// --- live system readout');
+code+=`document.documentElement.dataset.boot='ready';document.querySelector('.boot-screen').remove();$('preview').addEventListener('click',()=>previews++);
+const checks=[];function check(name,ok){checks.push({name,ok});if(!ok)throw Error(name)}
+(async()=>{try{
+check('hero controls remain inside hero', $('home-hero').contains($('play')) && $('home-hero').contains($('launch-modes')));
+$('intents').querySelector('[data-intent="quality"]').click();check('card selection saves and previews',intent==='quality'&&prefs===1&&previews===1);
+$('intents').dispatchEvent(new KeyboardEvent('keydown',{key:'Home',bubbles:true}));check('keyboard selects competitive',intent==='competitive'&&prefs===2&&previews===2);
+const markup=n=>ring(n,'CPU',null)+ring(42,'GPU','56—C')+ring(55,'RAM','16 / 32 GB')+ring(null,'VRAM',null);
+homePatchReadouts($('live-gauges'),markup(25));const node=$('live-gauges').firstElementChild;homePatchReadouts($('live-gauges'),markup(80));check('gauge nodes persist',node===$('live-gauges').firstElementChild);check('unknown reading remains unknown',$('live-gauges').lastElementChild.querySelector('.val').textContent==='—');
+renderScores({headroom:1.4,target_fps:240,cpu_score:88,gpu_score:75,cpu_ceiling:500,gpu_ceiling:450},70,'var(--good)');
+renderTemps({parts:[{part:'gpu',label:'GPU',known:true,celsius:56,state:'fine'},{part:'board',label:'System',known:false,unavailable:'needs administrator'}],can_elevate:true});check('administrator state and unlock preserved',!!$('temps-unlock')&&$('live-temps').textContent.includes('needs administrator'));
+homeChart('spark-cpu',[10,25,12,50,25,60],'var(--accent)');homeChart('spark-gpu',[30,20,35,40,28,42],'var(--good)');
+setBandFigures({intent:'competitive',estimated_fps:410});await new Promise(r=>setTimeout(r,30));check('all mode estimates use backend result',Array.from(document.querySelectorAll('[data-mode-fps]')).every(el=>homeMotion.jobs.has(el)||Number(el.textContent)>0));
+$('history-stats').innerHTML='<div class="stat"><b>16</b><span>sessions</span></div><div class="stat"><b>5.5</b><span>hours played</span></div><div class="stat"><b>7.41s</b><span>alt-tab back</span></div>';
+$('hw').innerHTML='<div class="row"><span class="k">CPU</span><span class="v">Intel Core i9-12900K — 16 cores / 24 threads</span></div><div class="row"><span class="k">GPU</span><span class="v">NVIDIA GeForce RTX 3090 Ti — 24 GB</span></div><div class="row"><span class="k">Display</span><span class="v">2560 — 1440 @ 240 Hz</span></div>';
+$('assessment-out').innerHTML='<div class="assess"><div class="subcat">Assessment</div><div class="stats"><div class="stat"><b>A</b><span>tier</span></div><div class="stat"><b>~410</b><span>est. fps</span></div><div class="stat"><b>1.7—</b><span>of 240 Hz</span></div><div class="stat"><b>CPU</b><span>limited by</span></div></div></div>';
+homeFrame(performance.now()+2200);check('gauge reaches its target',node.querySelector('.val').textContent==='80');check('curved area chart with leading point',!!$('spark-cpu').querySelector('.chart-tip')&&$('spark-cpu').querySelector('.chart-line').getAttribute('d').includes(' C'));
+const errors=[...document.images].filter(i=>!i.complete||!i.naturalWidth);check('all home image assets load',errors.length===0);
+check('no horizontal overflow',document.documentElement.scrollWidth<=innerWidth);
+const media=homeMotion.reduced;homeMotion.reduced={matches:true};homeNumber(node.querySelector('.val'),31);check('reduced motion sets final reading immediately',node.querySelector('.val').textContent==='31');homeMotion.reduced=media;
+const panel=document.querySelector('[data-panel="launcher"]');panel.classList.add('hidden');homePause();check('hidden Launcher pauses animation scheduler',!homeMotion.raf && document.documentElement.classList.contains('home-paused'));panel.classList.remove('hidden');homePause();
+for(const theme of ['violet','ember','carbon','acid','daylight','paper','pro']){if(theme==='violet')delete document.documentElement.dataset.theme;else document.documentElement.dataset.theme=theme;check('theme '+theme+' keeps controls visible',getComputedStyle($('play')).display!=='none' && getComputedStyle(node.querySelector('.val')).fill!=='none');}delete document.documentElement.dataset.theme;
+$('status').remove();document.querySelector('.scroll').scrollTop=0;
+
+}catch(e){checks.push({error:e.stack})}document.body.insertAdjacentHTML('beforeend','<pre id="checks">'+JSON.stringify(checks)+'</pre>')})();`;
+let html=s.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'');html=html.replace('<head>','<head><base href="'+url.pathToFileURL(path.join(root,'cs2cfg/web/')).href+'">');html=html.replace('</body>','<script>'+code+'</script></body>');
+fs.writeFileSync(path.join(work,'preview.html'),html);
+const chrome=process.env.CHROME_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe';const args=['--headless','--no-sandbox','--disable-gpu','--allow-file-access-from-files','--user-data-dir='+path.join(work,'chrome'),'--window-size='+(process.env.HOME_VIEWPORT||'1440,1100'),'--virtual-time-budget=4000',url.pathToFileURL(path.join(work,'preview.html')).href];
+const out=cp.execFileSync(chrome,[...args,'--dump-dom'],{maxBuffer:4e6,stdio:['ignore','pipe','ignore']}).toString();fs.writeFileSync(path.join(work,'dom.html'),out);const result=[...out.matchAll(/<pre id="checks">(.*?)<\/pre>/gs)].at(-1);console.log(result?result[1]:'NO TEST RESULTS');assert(result&& !result[1].includes('false')&&!result[1].includes('"error"'));
+cp.execFileSync(chrome,[...args,'--screenshot='+path.join(work,'preview.png')],{stdio:'ignore'});

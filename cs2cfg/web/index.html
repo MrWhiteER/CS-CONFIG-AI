@@ -107,198 +107,6 @@
   select { width: auto; }
 
 
-  /* "Optimise for" as one ball on a track.
-
-     Three stops, because there are three profiles -- a continuous slider would
-     imply blends that do not exist. Dragging settles on the nearest.
-
-     Each profile carries its own colour, and the whole control is lit by it:
-     the ball, the bar behind it, the label, and a wash across the panel. The
-     point is that the mode is readable from across the room without reading a
-     word -- amber runs hot for frames, green is the house default, violet is
-     the expensive one. Colour alone is never the only signal: the ball's
-     position and the lit label say the same thing for anyone who cannot
-     separate the hues.
-  */
-  .dial {
-    --neon: var(--accent);
-    --neon-ink: #0b1017;
-    position: relative;
-    padding: 20px 4px 4px;
-    outline: none;
-    transition: --neon .25s ease;
-  }
-  .dial[data-intent="competitive"] { --neon: var(--neon-competitive); }
-  .dial[data-intent="balanced"]    { --neon: var(--neon-balanced); }
-  .dial[data-intent="quality"]     { --neon: var(--neon-quality); }
-
-  /* There used to be an ambient wash here -- a radial gradient on a box of
-     its own, sized 120% tall so it still had colour where its box ended. A
-     gradient cut off by its own edge is a rectangle, and that rectangle sat
-     right across the band, which is what made the colours look boxed in.
-     The band throws far more light than the wash ever did, so it goes. */
-
-  /* The band. Two things being traded, drawn as one shape.
-
-     The total is fixed -- it is the same hardware whichever way you go -- so
-     all the control does is move the line between them. Cyan above it is the
-     frames you are keeping; violet below is the picture you are buying.
-
-     The colour dissolving away from that line, rather than filling to a hard
-     rectangle, is done by using the line itself as the mask: stroked wide and
-     blurred, so opacity falls off at right angles to it. That matters because
-     the line is a curve -- a top-to-bottom gradient would cut straight across
-     it and leave a hard edge exactly where the shape bends most. */
-  /* The band runs wider than the panel that holds it, and its light is not
-     allowed to stop at the panel's edge. An SVG clips to its own box by
-     default, which is what was cutting the glow off square; and the band used
-     to end 25px inside the panel, so the colour visibly stopped rather than
-     carrying on past the frame. */
-  .dial-track {
-    position: relative; height: 96px;
-    margin: 0 calc(-1 * var(--panel-pad, 17px) - 14px);
-  }
-  .band-svg {
-    position: absolute; inset: 0; width: 100%; height: 100%;
-    overflow: visible;          /* let the band's own glyphs leave the box */
-    pointer-events: none;
-  }
-  .dial.dragging .dial-ball { transition: none; }
-
-  /* A third of the band each, so the whole control is the target rather than
-     a dot. Invisible on purpose: the band already says where the stops are. */
-  .dial-stop {
-    position: absolute; top: 0; bottom: 0; width: 33.34%; padding: 0;
-    border: 0; background: none; cursor: pointer;
-  }
-  .dial-stop:nth-of-type(1) { left: 0; }
-  .dial-stop:nth-of-type(2) { left: 33.33%; }
-  .dial-stop:nth-of-type(3) { left: 66.66%; }
-
-  /* The bead rides the dividing line and carries the figure it selects.
-
-     Dark glass rather than a lit disc, because the number has to glow and
-     something glowing needs something dark to glow against -- ink on a bright
-     sphere reads as printed, not lit. The rim and the halo carry the mode's
-     colour instead. Its top comes from the curve, not from CSS. */
-  .dial-ball {
-    position: absolute; left: 50%; top: 50%;
-    width: 58px; height: 58px; margin: -29px 0 0 -29px;
-    border-radius: 50%; padding: 0; border: 0;
-    display: grid; place-items: center; line-height: 1;
-    isolation: isolate;
-    background:
-      radial-gradient(circle at 42% 32%,
-        color-mix(in srgb, var(--neon) 34%, #16102b) 0%,
-        #0c0718 72%);
-    color: #fff;
-    font-family: var(--mono); font-size: 19px; font-weight: 700;
-    text-shadow:
-      0 0 7px color-mix(in srgb, var(--neon) 90%, transparent),
-      0 0 18px var(--neon),
-      0 0 36px color-mix(in srgb, var(--neon) 65%, transparent);
-    box-shadow:
-      0 0 0 1.5px color-mix(in srgb, var(--neon) 75%, transparent),
-      inset 0 0 20px color-mix(in srgb, var(--neon) 28%, transparent),
-      0 0 26px var(--neon),
-      0 0 58px color-mix(in srgb, var(--neon) 50%, transparent),
-      0 5px 16px rgba(0, 0, 0, .6);
-    cursor: grab; touch-action: none;
-    transition: left .2s cubic-bezier(.2, .9, .3, 1),
-                top .2s cubic-bezier(.2, .9, .3, 1),
-                background .28s ease, box-shadow .28s ease, transform .12s ease;
-  }
-  /* The figure stays dead centre of the sphere; the unit hangs under it,
-     inside, positioned rather than stacked so it cannot push the number off
-     the middle. */
-  .dial-ball b { grid-area: 1 / 1; font: inherit; }
-  /* 70% clears the digits: the number is 19px on a 54px sphere, so centred it
-     reaches ~36px down, and 63% put the unit straight through its feet. */
-  .dial-ball i {
-    position: absolute; left: 50%; top: 70%; transform: translateX(-50%);
-    font-style: normal; font-family: var(--mono);
-    font-size: 7.5px; font-weight: 700; letter-spacing: .18em; text-indent: .18em;
-    color: color-mix(in srgb, var(--neon) 75%, #fff);
-    text-shadow: 0 0 8px color-mix(in srgb, var(--neon) 70%, transparent);
-  }
-  .dial-ball:empty { width: 19px; height: 19px; margin: -9.5px 0 0 -9.5px; }
-  @supports not (color: color-mix(in srgb, red 50%, blue)) {
-    .dial-ball i { color: var(--neon); text-shadow: none; }
-  }
-  @supports not (color: color-mix(in srgb, red 50%, blue)) {
-    .dial-ball {
-      background: #16102b;
-      box-shadow: 0 0 0 1.5px var(--neon), 0 0 22px var(--neon),
-                  0 5px 16px rgba(0, 0, 0, .6);
-      text-shadow: 0 0 14px var(--neon);
-    }
-  }
-
-  .dial-labels { display: flex; justify-content: space-between; margin: 11px 4px 0; }
-  .dial-labels > span {
-    flex: 1; text-align: center; cursor: pointer;
-    color: var(--muted);
-    transition: color .22s ease, text-shadow .22s ease;
-  }
-  /* All three centred, including the outer two.
-     The sphere stops at the centre of each label's column, so a label pushed
-     to the edge of its column sits to one side of where the sphere lands --
-     which is what made the outer two look unrelated to it. Centred, the text
-     is directly under the stop. */
-  .dial-labels strong {
-    display: block; font-size: 13px; font-weight: 700; letter-spacing: .2px;
-    color: inherit;
-  }
-  .dial-labels > span > span {
-    display: block; color: var(--muted); font-size: 11px; opacity: .8;
-  }
-  .dial-labels > span[aria-pressed="true"] {
-    color: var(--neon);
-    text-shadow: 0 0 14px color-mix(in srgb, var(--neon) 75%, transparent);
-  }
-  .dial-labels > span[aria-pressed="true"] > span { color: var(--neon); opacity: .75; }
-
-  /* Everything above leans on colour-mix. Where that is unsupported the neon
-     simply renders flat instead of glowing -- the control still works, and the
-     position and lit label still say which mode is selected. */
-  @supports not (color: color-mix(in srgb, red 50%, blue)) {
-    .dial-ball { background: var(--neon); }
-  }
-
-
-
-  /* Temperatures: the same footprint as the load gauges, shaped as the sign. */
-  .temps { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
-  .temp-gauge { --t: var(--accent); }
-  .temp-gauge.warm    { --t: var(--warn); }
-  .temp-gauge.hot     { --t: var(--bad); }
-  .temp-gauge.unknown { --t: var(--line); opacity: .55; }
-
-  .temp-gauge .t-glass { fill: rgba(var(--lift), .045); stroke: none; }
-  .temp-gauge .t-rim { fill: none; stroke: var(--line); stroke-width: 2; }
-  .temp-gauge .t-ticks line {
-    /* --line is almost invisible at this size, and a scale you cannot see is
-       just noise in the markup. */
-    stroke: rgba(var(--lift), .22); stroke-width: 1.6; stroke-linecap: round;
-  }
-  /* y and height animate as CSS properties, which is why the nodes are
-     patched rather than rebuilt: a fresh element cannot transition from
-     anything, and the column would jump between readings. */
-  .temp-gauge .t-fill {
-    fill: var(--t);
-    transition: y .6s ease, height .6s ease, fill .4s ease;
-  }
-  .temp-gauge.hot .t-fill { animation: temp-pulse 1.4s ease-in-out infinite; }
-  .temp-gauge .t-read { font-family: var(--mono); }
-  @keyframes temp-pulse {
-    0%, 100% { opacity: 1; }
-    50%      { opacity: .4; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .temp-gauge .t-fill { transition: none; }
-    .temp-gauge.hot .t-fill { animation: none; }
-  }
-
   /* Fix It, as a toolbox rather than a document.
 
      A column of prose panels reads as documentation. A wall of tiles with an
@@ -2122,6 +1930,7 @@
   .hidden { display: none !important; }
   .spin { display: inline-block; animation: sp 1s linear infinite; }
   @keyframes sp { to { transform: rotate(360deg); } }
+
 </style>
 <style>
   /* ------------------------------------------------------------------------
@@ -5468,13 +5277,92 @@
     #account-card *, #account-card *::before, #account-card *::after { animation: none !important; transition: none !important; }
     #account-card :is(.way, .btn):hover:not(:disabled) { transform: none; }
   }
+/* Job A: image-led Launcher. Scope visual changes to the home surface. */
+.config-mark { display:inline-block; flex:none; width:42px; height:42px; background:var(--accent); -webkit-mask:url('assets/brand/config-mark.svg') center/contain no-repeat; mask:url('assets/brand/config-mark.svg') center/contain no-repeat; }
+.rail .brand { display:flex; align-items:center; gap:10px; padding:20px 16px; font-size:17px; line-height:1.1; }
+.rail .brand > .config-mark { display:block; width:34px; height:34px; }
+.rail .brand div > span { margin-top:6px; font-size:8px; letter-spacing:.14em; }
+.app.rail-tight .rail .brand > .config-mark { display:block; }
+.app.rail-tight .rail .brand > div { display:none; }
+.boot-content .boot-mark { width:82px; height:82px; }
+[data-panel="launcher"] { --home-cut:polygon(0 0,calc(100% - 20px) 0,100% 20px,100% 100%,20px 100%,0 calc(100% - 20px)); }
+[data-panel="launcher"] .home-hero { position:relative; isolation:isolate; min-height:370px; display:flex; align-items:center; overflow:hidden; padding:32px 38px; border:1px solid var(--line); border-radius:4px; margin-bottom:30px; background:var(--panel); }
+.hero-art { transition:transform .6s ease-out; position:absolute; inset:0; z-index:-2; overflow:hidden; pointer-events:none; }
+.hero-art img { width:100%; height:100%; object-fit:cover; object-position:70% 52%; transform-origin:76% 60%; animation:home-breathe 12s ease-in-out infinite alternate; }
+.home-hero::after { content:''; position:absolute; inset:0; z-index:-1; background:linear-gradient(90deg,var(--panel) 0%,color-mix(in srgb,var(--panel) 96%,transparent) 24%,color-mix(in srgb,var(--panel) 65%,transparent) 43%,transparent 69%); pointer-events:none; }
+.home-hero .hero-copy { width:48%; max-width:580px; position:relative; }
+.hero-brand { display:flex; align-items:center; gap:10px; font:600 11px var(--mono); letter-spacing:.18em; color:var(--muted); margin-bottom:24px; }
+.hero-brand .config-mark { width:32px; height:32px; }
+.home-hero .eyebrow { color:var(--accent); letter-spacing:.15em; font-size:10px; }
+[data-panel="launcher"] .home-hero h2 { font-size:clamp(26px,3vw,44px); line-height:1.05; margin:8px 0 14px; letter-spacing:-.04em; }
+.home-hero .hero-copy p { font-size:12px; max-width:390px; line-height:1.65; margin-bottom:20px; }
+.home-hero .hero-play { width:100%; max-width:460px; }
+.home-hero .btn-play { min-height:62px; width:100%; border-radius:2px; font-size:19px; clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,0 100%); }
+.home-hero .fix-row { flex-wrap:wrap; gap:8px; margin-top:12px; }
+.home-hero #play-fix { font-size:10px; padding:8px 10px; }
+.home-hero #launch-modes { min-width:0; }
+.home-hero #launch-modes .seg-item { font-size:10px; padding:7px 9px; }
+.home-hero #launch-modes .why { font-size:8px; }
+.monitor-light { position:absolute; left:40%; top:18%; width:35%; height:45%; background:radial-gradient(ellipse,var(--accent),transparent 70%); opacity:.08; mix-blend-mode:screen; clip-path:polygon(0 0,100% 8%,97% 91%,0 100%); animation:home-flicker 7s linear infinite; }
+.desk-light { position:absolute; left:36%; top:85%; width:34%; height:3px; background:var(--accent); box-shadow:0 0 20px 4px var(--accent); transform:rotate(-8deg); animation:home-rgb 5s ease-in-out infinite alternate; }
+[data-panel="launcher"] > .panel:has(.mode-cards) { padding:0; background:none; border:0; box-shadow:none; margin-bottom:28px; }
+[data-panel="launcher"] > .panel:has(.mode-cards)::before { display:none; }
+.mode-cards { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; padding-top:5px; }
+.mode-card { position:relative; isolation:isolate; min-width:0; height:200px; text-align:left; padding:20px; background:var(--panel); color:var(--ink); border:0; border-radius:0; cursor:pointer; clip-path:var(--home-cut); transition:transform .3s; }
+.mode-card img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transform:scale(1.08); animation:home-pan 22s ease-in-out infinite alternate; z-index:-3; }
+.mode-card:nth-child(2) img { animation-delay:-7s; }.mode-card:nth-child(3) img { animation-delay:-14s; }
+.mode-shade { position:absolute; inset:0; z-index:-2; background:linear-gradient(180deg,rgba(0,0,0,.38),rgba(0,0,0,.05) 30%,rgba(0,0,0,.88)); }
+.mode-card::after { content:''; position:absolute; inset:0; pointer-events:none; border:2px solid transparent; clip-path:var(--home-cut); transition:border-color .3s; }
+.mode-card::before { content:''; position:absolute; inset:-30% -60%; pointer-events:none; background:linear-gradient(110deg,transparent 45%,rgba(var(--lift),.18) 50%,transparent 55%); transform:translateX(-55%); animation:home-sweep 9s ease-in-out infinite; }
+.mode-card[aria-pressed="true"] { transform:translateY(-5px); }.mode-card[aria-pressed="true"]::after { border-color:var(--accent); box-shadow:inset 0 -32px 35px -30px var(--accent); }
+.mode-card:hover { transform:translateY(-5px); }.mode-card:focus-visible { outline:0; }.mode-card:focus-visible::after { border:3px solid var(--accent); }
+.mode-index { position:absolute; left:18px; top:16px; font:600 10px var(--mono); color:#fff; letter-spacing:.1em; }
+.mode-fps { position:absolute; top:12px; right:20px; display:flex; flex-direction:column; align-items:flex-end; color:#fff; }
+.mode-fps b { font:700 27px var(--mono); text-shadow:0 2px 12px #000; }.mode-fps small { font:8px var(--mono); letter-spacing:.12em; }
+.mode-copy { position:absolute; left:20px; bottom:20px; right:22px; display:flex; flex-direction:column; color:#fff; gap:5px; }
+.mode-copy strong { font-size:21px; font-weight:700; letter-spacing:-.025em; }.mode-copy > span { font-size:11px; color:#ddd; }
+.mode-selected { position:absolute; bottom:23px; right:18px; color:var(--accent); opacity:0; }.mode-card[aria-pressed="true"] .mode-selected { opacity:1; }
+.mode-note { margin:12px 0 0; font-size:10px; }
+[data-panel="launcher"] .grid2 { gap:20px; }
+[data-panel="launcher"] :is(#live-card,#hw-card,#net-card) { background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:22px; box-shadow:none; }
+[data-panel="launcher"] .panel > h2 { font-size:12px; margin-bottom:20px; letter-spacing:.08em; }
+[data-panel="launcher"] .gauges { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px; }
+[data-panel="launcher"] .gauge { width:auto; min-width:0; }.gauge .ring-fg { transition:none; }
+[data-panel="launcher"] .gauge .val { font-size:20px; }.gauge .cap { font-size:10px; }
+[data-panel="launcher"] .gauge .sub2 { font-size:10px; }
+[data-panel="launcher"] .temps { display:grid; grid-template-columns:repeat(auto-fit,minmax(115px,1fr)); gap:16px; margin:22px 0; }
+[data-panel="launcher"] .temp-gauge { width:auto; opacity:1; text-align:left; }
+.heat-heading { display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:9px; }.heat-heading .cap { color:var(--muted); font-size:10px; }.heat-heading .t-read { font:11px var(--mono); color:var(--ink); text-align:right; }
+.heat-track { height:5px; overflow:hidden; background:var(--line); border-radius:1px; }.temp-gauge .heat-track .t-fill { display:block; height:100%; width:100%; transform-origin:left; background:linear-gradient(90deg,var(--accent),var(--warn) 70%,var(--bad)); transition:none; animation:none; }
+.temp-gauge.unknown .heat-track { background:repeating-linear-gradient(110deg,var(--line) 0 4px,transparent 4px 8px); }.temp-gauge.unknown .t-read { color:var(--muted); font-size:10px; }
+[data-panel="launcher"] .stats { gap:9px; }[data-panel="launcher"] .stat { padding:14px 12px; background:rgba(var(--lift),.035); border:0; border-left:2px solid var(--accent); border-radius:0; min-width:0; }
+[data-panel="launcher"] .stat b { font-size:20px; overflow-wrap:anywhere; }[data-panel="launcher"] .stat span { font-size:9px; letter-spacing:.06em; }
+[data-panel="launcher"] #history-stats .stat:nth-child(1)::before { content:'\25f7'; }[data-panel="launcher"] #history-stats .stat:nth-child(2)::before { content:'h'; }[data-panel="launcher"] #history-stats .stat:nth-child(3)::before { content:'\2194'; }
+[data-panel="launcher"] #history-stats .stat::before { float:right; font-size:17px; color:var(--muted); }
+[data-panel="launcher"] #hw .row { padding:6px 0; border-bottom:1px solid var(--line); }[data-panel="launcher"] #hw .k { font-size:10px; }[data-panel="launcher"] #hw .v { font-size:11px; overflow-wrap:anywhere; }
+[data-panel="launcher"] .assess { margin-top:22px; padding-top:16px; border-top:1px solid var(--line); }[data-panel="launcher"] .assess .stats { grid-template-columns:repeat(2,minmax(0,1fr)); display:grid; }
+[data-panel="launcher"] .spark { height:78px; overflow:hidden; background:repeating-linear-gradient(0deg,var(--line) 0 1px,transparent 1px 25%); }.chart-tip { filter:drop-shadow(0 0 4px currentColor); }
+[data-panel="launcher"] #net-card { margin-top:20px; border-left:3px solid var(--accent); }[data-panel="launcher"] #net-card > p { max-width:900px; line-height:1.7; }
+.topbar .chip i { box-shadow:0 0 calc(2px + var(--chip-load,0)*8px) var(--accent); }
+.topbar .chip { position:relative; overflow:hidden; }.topbar .chip::after { content:''; position:absolute; inset:auto 0 0; height:2px; background:var(--accent); transform:scaleX(var(--chip-load,0)); transform-origin:left; }
+.score-fg { transition:none; }
+@keyframes home-pan { from { transform:scale(1.08) translateX(-1%); } to { transform:scale(1.15) translateX(1%); } }
+@keyframes home-breathe { from { transform:scale(1.025) translateY(0); } to { transform:scale(1.045) translateY(-3px); } }
+@keyframes home-flicker { 0%,100% { opacity:.06; } 21%,24%,70% { opacity:.12; } 22%,72% { opacity:.04; } }
+@keyframes home-rgb { from { opacity:.35; transform:rotate(-8deg) scaleX(.95); } to { opacity:.8; transform:rotate(-8deg) scaleX(1.04); } }
+@keyframes home-sweep { 0%,65% { transform:translateX(-55%); } 100% { transform:translateX(55%); } }
+.home-paused .mode-card::before, .home-paused :is(.hero-art img,.monitor-light,.desk-light,.mode-card img) { animation-play-state:paused; }
+@media(max-width:1150px) { [data-panel="launcher"] .home-hero { padding:26px; min-height:365px; }.home-hero .hero-copy { width:58%; }.home-hero .fix-row { display:flex; flex-direction:column; align-items:flex-start; }.mode-card { height:180px; padding:15px; }.mode-copy strong { font-size:18px; }[data-panel="launcher"] .grid2 { grid-template-columns:1fr; } }
+@media(max-width:700px) { .home-hero .hero-copy { width:100%; }.home-hero::after { background:color-mix(in srgb,var(--panel) 84%,transparent); }.mode-cards { gap:8px; }.mode-card { height:190px; }.mode-copy { left:12px; bottom:15px; }.mode-copy strong { font-size:15px; }.mode-copy > span { font-size:10px; }.mode-fps { top:40px; right:12px; }.mode-index { left:12px; font-size:8px; }[data-panel="launcher"] :is(#live-card,#hw-card,#net-card) { padding:16px; } }
+@media(prefers-reduced-motion:reduce) { .mode-card::before, :is(.hero-art img,.monitor-light,.desk-light,.mode-card img) { animation:none; }.mode-card { transition:none; }.mode-card:hover,.mode-card[aria-pressed="true"] { transform:none; } }
+
 </style>
 </head>
 <body>
 <!-- Startup readiness dismisses this veil; independent JS/CSS deadlines always uncover it. -->
 <div class="boot-screen" aria-hidden="true">
   <div class="boot-content">
-    <svg class="boot-mark" viewBox="0 0 16 16" focusable="false"><path fill="currentColor" d="M12 3H6L3 6V10L6 13H12V11H7L5 9V7L7 5H12Z"/><path fill="var(--ink)" d="M10 5H12V7H14V9H12V11H10V9H8V7H10Z"/></svg>
+    <span class="boot-mark config-mark" aria-label="CS CONFIG AI"></span>
     <div class="boot-name">CS CONFIG AI</div>
     <div class="boot-track"></div>
     <p class="boot-tip">Keep your crosshair at head height.</p>
@@ -5601,7 +5489,7 @@ const startup = (() => {
 
   <aside class="rail">
     <div class="rail-head">
-      <div class="brand">CS2<span>CONFIG AI</span></div>
+      <div class="brand"><span class="config-mark" aria-hidden="true"></span><div>CS CONFIG<span>AI / PLAY YOUR WAY</span></div></div>
       <div class="rail-label">Workspace</div>
     </div>
 
@@ -5699,16 +5587,16 @@ const startup = (() => {
     <div class="scroll">
 
     <div class="tab-panel" data-panel="launcher">
-      <div class="hero">
+      <div class="hero home-hero" id="home-hero">
+        <div class="hero-art" aria-hidden="true"><img src="assets/home/hero.webp" alt="" fetchpriority="high"><div class="monitor-light"></div><div class="desk-light"></div></div>
         <div class="hero-copy">
-          <div class="eyebrow">Ready to play</div>
+          <div class="hero-brand"><span class="config-mark" aria-hidden="true"></span><span>CS CONFIG AI</span></div><div class="eyebrow">Ready to play</div>
           <h2>Counter-Strike <em>2</em></h2>
           <p>
             Starts the game <strong>through Steam</strong>, so your launch options, the
             overlay, VAC and inventory all work exactly as normal. Runs it borderless
             windowed, which is what stops alt-tab going black.
           </p>
-        </div>
         <div class="hero-play">
           <div class="play-row">
             <button class="btn-play" id="play">
@@ -5741,27 +5629,16 @@ const startup = (() => {
             <span class="sub" id="stop-hint">running</span>
           </div>
         </div>
+        </div>
       </div>
 
       <section class="panel">
         <h2>Optimise for</h2>
-        <div class="dial" id="intents" role="slider" tabindex="0"
-             aria-label="Optimise for" aria-valuemin="0" aria-valuemax="2" aria-valuenow="1"
-             aria-valuetext="Balanced">
-          <div class="dial-track" id="band-stage">
-            <!-- The band is drawn once by paintBand; only the bead and the two
-                 figures move afterwards. -->
-            <button class="dial-stop" data-intent="competitive" type="button" tabindex="-1"></button>
-            <button class="dial-stop" data-intent="balanced" type="button" tabindex="-1"></button>
-            <button class="dial-stop" data-intent="quality" type="button" tabindex="-1"></button>
-            <div class="dial-ball" id="dial-ball"></div>
-          </div>
-          <div class="dial-labels">
-            <span data-for="competitive"><strong>Competitive</strong><span>frames &amp; clarity</span></span>
-            <span data-for="balanced"><strong>Balanced</strong><span>the default</span></span>
-            <span data-for="quality"><strong>Quality</strong><span>best picture</span></span>
-          </div>
-        </div>
+        <div class="mode-cards" id="intents" role="group" aria-label="Optimise for">
+          <button class="mode-card" data-intent="competitive" type="button" aria-pressed="false" title="Choose Competitive"><img src="assets/home/mode-competitive.webp" alt="Competitive rendering of a Mediterranean training courtyard"><span class="mode-shade"></span><span class="mode-index">01 / FPS</span><span class="mode-fps"><b data-mode-fps="competitive">—</b><small>EST. FPS</small></span><span class="mode-copy"><strong>Competitive</strong><span>Maximum frames. Clear sightlines.</span></span><span class="mode-selected" aria-hidden="true">&#10003;</span></button>
+          <button class="mode-card" data-intent="balanced" type="button" aria-pressed="true" title="Choose Balanced"><img src="assets/home/mode-balanced.webp" alt="Balanced rendering of a Mediterranean training courtyard"><span class="mode-shade"></span><span class="mode-index">02 / BALANCE</span><span class="mode-fps"><b data-mode-fps="balanced">—</b><small>EST. FPS</small></span><span class="mode-copy"><strong>Balanced</strong><span>Clarity meets atmosphere.</span></span><span class="mode-selected" aria-hidden="true">&#10003;</span></button>
+          <button class="mode-card" data-intent="quality" type="button" aria-pressed="false" title="Choose Quality"><img src="assets/home/mode-quality.webp" alt="Quality rendering of a Mediterranean training courtyard"><span class="mode-shade"></span><span class="mode-index">03 / DETAIL</span><span class="mode-fps"><b data-mode-fps="quality">—</b><small>EST. FPS</small></span><span class="mode-copy"><strong>Quality</strong><span>Every detail. Every shadow.</span></span><span class="mode-selected" aria-hidden="true">&#10003;</span></button>
+        </div><p class="mode-note sub">FPS estimates use your hardware and current settings; actual performance varies.</p>
 
       </section>
 
@@ -6879,6 +6756,134 @@ function paintModeBadge(name) {
   badge.title = MODE_WORD[name] || name;
 }
 
+/* Launcher motion: one scheduler, persistent instruments, no synthetic readings. */
+const homeMotion = { jobs: new Map(), raf: 0, reduced: matchMedia('(prefers-reduced-motion: reduce)') };
+function homeVisible() { return !document.hidden && document.querySelector('[data-panel="launcher"]')?.classList.contains('hidden') !== true; }
+function homeCancel(el) { homeMotion.jobs.delete(el); }
+function homeTween(el, key, target, paint, duration = 850) {
+  if (!el || !Number.isFinite(Number(target))) return;
+  target = Number(target);
+  const from = Number(el.dataset['home' + key]) || 0;
+  const draw = v => { el.dataset['home' + key] = v; paint(v); };
+  if (homeMotion.reduced.matches || !homeVisible()) { homeCancel(el); draw(target); return; }
+  homeMotion.jobs.set(el, { from, target, draw, start: performance.now(), duration });
+  homeSchedule();
+}
+function homeNumber(el, value, suffix = '') {
+  homeTween(el, 'value', value, v => { el.textContent = Math.round(v) + suffix; });
+}
+function homeSchedule() {
+  if (!homeMotion.raf && homeVisible() && homeMotion.jobs.size) homeMotion.raf = requestAnimationFrame(homeFrame);
+}
+function homeFrame(now) {
+  homeMotion.raf = 0;
+  if (!homeVisible()) return;
+  for (const [el, job] of homeMotion.jobs) {
+    if (!el.isConnected) { homeMotion.jobs.delete(el); continue; }
+    const p = homeMotion.reduced.matches ? 1 : Math.min(1, (now - job.start) / job.duration);
+    job.draw(job.from + (job.target - job.from) * (1 - Math.pow(1 - p, 3)));
+    if (p === 1) homeMotion.jobs.delete(el);
+  }
+  homeSchedule();
+}
+function homePause() {
+  document.documentElement.classList.toggle('home-paused', !homeVisible());
+  if (!homeVisible()) { cancelAnimationFrame(homeMotion.raf); homeMotion.raf = 0; }
+  else homeSchedule();
+}
+document.addEventListener('visibilitychange', homePause);
+homeMotion.reduced.addEventListener('change', homePause);
+const homeHero = document.getElementById('home-hero');
+if (homeHero) {
+  homeHero.addEventListener('pointermove', e => {
+    if (homeMotion.reduced.matches || !homeVisible()) return;
+    const r = homeHero.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width - .5;
+    const y = (e.clientY - r.top) / r.height - .5;
+    homeHero.querySelector('.hero-art').style.transform = 'translate(' + x * 7 + 'px,' + y * 5 + 'px) scale(1.02)';
+  });
+  homeHero.addEventListener('pointerleave', () => { homeHero.querySelector('.hero-art').style.transform = ''; });
+}
+new MutationObserver(homePause).observe(document.querySelector('[data-panel="launcher"]'), { attributes: true, attributeFilter: ['class'] });
+function homePatchReadouts(host, markup) {
+  if (!host) return;
+  const template = document.createElement('template'); template.innerHTML = markup;
+  if (host.children.length !== template.content.children.length) host.replaceChildren(template.content);
+  else [...host.children].forEach((el, i) => {
+    const fresh = template.content.children[i];
+    el.title = fresh.title;
+    const oldSub = el.querySelector('.sub2'), nextSub = fresh.querySelector('.sub2');
+    if (oldSub && nextSub) oldSub.textContent = nextSub.textContent;
+    else if (nextSub) el.append(nextSub.cloneNode(true));
+    else if (oldSub) oldSub.remove();
+    const oldArc = el.querySelector('.ring-fg, .score-fg'), newArc = fresh.querySelector('.ring-fg, .score-fg');
+    if (oldArc && newArc) {
+      oldArc.setAttribute('stroke', newArc.getAttribute('stroke'));
+      for (const attr of ['stroke-dasharray', 'stroke-dashoffset']) if (newArc.hasAttribute(attr)) oldArc.dataset['target' + attr.replaceAll('-', '')] = newArc.getAttribute(attr);
+    }
+    const val = el.querySelector('.val, .score-text b'), newVal = fresh.querySelector('.val, .score-text b');
+    if (val && newVal) val.dataset.targetValue = newVal.textContent;
+    const unit = el.querySelector('.unit'), newUnit = fresh.querySelector('.unit');
+    if (unit && !newUnit) unit.remove(); else if (!unit && newUnit) el.querySelector('svg').append(newUnit.cloneNode(true));
+  });
+  host.querySelectorAll('.gauge, .score').forEach(el => {
+    const arc = el.querySelector('.ring-fg, .score-fg');
+    const val = el.querySelector('.val, .score-text b');
+    const raw = val.dataset.targetValue ?? val.textContent;
+    delete val.dataset.targetValue;
+    if (raw === '—') { homeCancel(val); val.textContent = raw; }
+    else homeNumber(val, Number(raw));
+    const circumference = 2 * Math.PI * Number(arc.getAttribute('r'));
+    const offset = arc.dataset.targetstrokedashoffset ?? arc.getAttribute('stroke-dashoffset');
+    const dash = arc.dataset.targetstrokedasharray ?? arc.getAttribute('stroke-dasharray');
+    const share = el.classList.contains('score') ? Number(dash.split(' ')[0]) / circumference : 1 - Number(offset) / circumference;
+    homeTween(arc, 'arc', share, v => {
+      arc.setAttribute('stroke-dasharray', circumference + ' ' + circumference);
+      arc.setAttribute('stroke-dashoffset', circumference * (1 - v));
+      arc.style.filter = 'drop-shadow(0 0 ' + (1 + v * 7) + 'px ' + arc.getAttribute('stroke') + ')';
+    });
+  });
+}
+function homeSmoothPath(points) {
+  if (!points.length) return '';
+  let path = 'M' + points[0].join(' ');
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1], b = points[i], mid = (a[0] + b[0]) / 2;
+    path += ' C' + mid + ' ' + a[1] + ' ' + mid + ' ' + b[1] + ' ' + b.join(' ');
+  }
+  return path;
+}
+function homeChart(id, series, colour) {
+  const el = $(id); if (!el) return;
+  const samples = (series || []).slice(-40);
+  if (samples.filter(v => Number.isFinite(v)).length < 2) {
+    homeCancel(el); el.innerHTML = '<text x="6" y="26" fill="var(--muted)" font-size="11">no samples yet</text>'; return;
+  }
+  const points = samples.map(v => Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : null);
+  const previous = el.homeSamples || points;
+  el.homeSamples = points;
+  const gid = 'home-gradient-' + id;
+  if (!el.querySelector('.chart-line')) el.innerHTML = '<defs><linearGradient id="' + gid + '" x2="0" y2="1"><stop stop-color="' + colour + '" stop-opacity=".4"/><stop offset="1" stop-color="' + colour + '" stop-opacity="0"/></linearGradient></defs><path class="chart-area" fill="url(#' + gid + ')"/><path class="chart-line" fill="none" stroke="' + colour + '" stroke-width="1.8"/><circle class="chart-tip" r="2.6" fill="' + colour + '"/>';
+  el.setAttribute('role', 'img'); el.setAttribute('aria-label', id.replace('spark-', '').toUpperCase() + ' load history; latest ' + (points.at(-1) ?? 'unavailable') + '%');
+  el.dataset.homescroll = 0;
+  homeTween(el, 'scroll', 1, progress => {
+    const count = points.length, step = 240 / (count - 1), segments = []; let segment = [];
+    // Slide the old window left while the newest measured point enters from right.
+    const values = [...previous.slice(-count), points.at(-1)];
+    for (let i = 0; i < values.length; i++) {
+      const v = values[i];
+      if (v === null) { if (segment.length) segments.push(segment); segment = []; continue; }
+      segment.push([(i - progress) * step, 43 - v * .4]);
+    }
+    if (segment.length) segments.push(segment);
+    el.querySelector('.chart-line').setAttribute('d', segments.map(homeSmoothPath).join(' '));
+    el.querySelector('.chart-area').setAttribute('d', segments.map(p => homeSmoothPath(p) + ' L' + p.at(-1)[0] + ' 46 L' + p[0][0] + ' 46 Z').join(' '));
+    const latest = values.at(-2), next = values.at(-1), tip = el.querySelector('.chart-tip');
+    tip.style.opacity = latest === null || next === null ? 0 : 1;
+    tip.setAttribute('cx', 240); tip.setAttribute('cy', 43 - ((latest ?? 0) + ((next ?? 0) - (latest ?? 0)) * progress) * .4);
+  }, 1900);
+}
+
 function scoreRing(value, cap, label, detail, tone) {
   const share = Math.max(0, Math.min(1, value / cap));
   const r = 13, track = 2 * Math.PI * r;
@@ -6898,7 +6903,7 @@ function scoreRing(value, cap, label, detail, tone) {
 function renderScores(p, headroomPct, hue) {
   const box = $("scorebar");
   if (!box || !p) return;
-  box.innerHTML =
+  homePatchReadouts(box,
     scoreRing(headroomPct, 100, "Headroom",
               p.headroom + "× of " + p.target_fps + " Hz", hue) +
     scoreRing(p.cpu_score, 105, "CPU",
@@ -6906,7 +6911,7 @@ function renderScores(p, headroomPct, hue) {
               "var(--warn)") +
     scoreRing(p.gpu_score, 135, "GPU",
               "score " + p.gpu_score + ", ceiling ~" + p.gpu_ceiling + " fps",
-              "var(--accent)");
+              "var(--accent)"));
 }
 
 function renderPlan(p) {
@@ -7524,184 +7529,42 @@ async function runNetCheck() {
 
 if ($("net-run")) $("net-run").addEventListener("click", runNetCheck);
 
-/* The optimise-for dial.
-
-   Three stops rather than a free slider: there are three profiles, and a
-   continuous track would promise blends between them that do not exist. The
-   ball follows the pointer while dragging and settles on the nearest stop when
-   released, so it reads as one control rather than three buttons.
-
-   Pointer capture is taken on the ball so a drag that leaves the track keeps
-   working, and released on pointerup -- the same shape the rail divider uses.
-*/
+/* Three scene cards share the existing preference and plan-preview flow. */
 const INTENTS = ["competitive", "balanced", "quality"];
 
-/* The band behind the Optimise-for control.
-
-   Drawn once. The boundary is a smoothstep from low-left to high-right, which
-   is the only honest shape for it: the trade is gradual, not stepped, and the
-   ends flatten because there is nothing beyond them to trade for.
-*/
-const BAND_W = 620, BAND_H = 96;
-const BAND_SPREAD = 56, BAND_BLUR = 13;          // the G1 falloff
-// How far past the band's own box the light is allowed to go. The falloff
-// from the line reaches about 54px, so anything less cuts it off square.
-const BAND_PAD = 70;
-
-function bandBoundary() {
-  const pts = [];
-  for (let x = 0; x <= BAND_W; x += 2) {
-    const p = x / BAND_W;
-    const e = p * p * (3 - 2 * p);
-    pts.push([x, (BAND_H - 10) - e * (BAND_H - 20)]);
-  }
-  return pts;
-}
-const BAND_PTS = bandBoundary();
-const BAND_D = BAND_PTS.map((q, i) =>
-  (i ? "L" : "M") + q[0] + " " + q[1].toFixed(1)).join("");
-
-/* Where the line is, as a percentage of the band's height, at a percentage
-   across -- so the bead rides the curve rather than a straight line. */
-function bandY(pct) {
-  const x = Math.min(BAND_W, Math.max(0, (pct / 100) * BAND_W));
-  return (BAND_PTS[Math.round(x / 2)][1] / BAND_H) * 100;
-}
-
-/* Where each profile sits across the band.
-
-   Over the middle of its own label, measured from the labels themselves. Two
-   earlier answers were both wrong in the same way -- they were fractions of
-   the band, and the band is deliberately wider than the panel so its light can
-   run past the frame. A fixed 8% put the bead outside the panel; matching the
-   panel's content edge was worse again, because the outer labels are aligned
-   to those edges and the travel stretched the full width.
-
-   Anchoring to the labels makes the rule obvious instead: the bead stands on
-   the thing it has selected, and the travel is however far apart those are.
-*/
-function bandStops() {
-  const stage = $("band-stage");
-  const labels = document.querySelectorAll(".dial-labels > span");
-  const box = stage ? stage.getBoundingClientRect() : null;
-  if (!box || !box.width || labels.length !== 3) return [19, 50, 81];
-  return [...labels].map(el => {
-    const r = el.getBoundingClientRect();
-    return ((r.left + r.width / 2) - box.left) / box.width * 100;
+/* Every card uses the backend's existing plan estimate, with a request snapshot
+   so a late response cannot overwrite estimates for newer settings. */
+let modeEstimateRevision = 0;
+let modeEstimateKey = "";
+function setBandFigures(plan) {
+  const body = requestBody();
+  const key = JSON.stringify({...body, intent: null});
+  const selected = document.querySelector('[data-mode-fps="' + plan.intent + '"]');
+  if (selected) homeNumber(selected, plan.estimated_fps);
+  if (key === modeEstimateKey) return;
+  const revision = ++modeEstimateRevision;
+  modeEstimateKey = key;
+  document.querySelectorAll('[data-mode-fps]').forEach(el => { el.textContent = "—"; });
+  INTENTS.forEach(async name => {
+    try {
+      const p = name === plan.intent ? plan : await api("/api/plan", {...body, intent: name});
+      if (revision !== modeEstimateRevision) return;
+      const el = document.querySelector('[data-mode-fps="' + name + '"]');
+      if (el) homeNumber(el, p.estimated_fps);
+    } catch (_) { if (revision === modeEstimateRevision) modeEstimateKey = ""; }
   });
 }
-
-function paintBand() {
-  const stage = $("band-stage");
-  if (!stage || stage.querySelector(".band-svg")) return;
-  const svg =
-    '<svg class="band-svg" viewBox="0 0 ' + BAND_W + " " + BAND_H +
-      '" preserveAspectRatio="none" aria-hidden="true">' +
-      "<defs>" +
-        '<linearGradient id="band-up" x1="0" y1="0" x2="0" y2="1">' +
-          '<stop offset="0" stop-color="var(--neon-frames, #22e6ff)" stop-opacity=".95"/>' +
-          '<stop offset="1" stop-color="var(--neon-frames, #22e6ff)" stop-opacity=".45"/>' +
-        "</linearGradient>" +
-        '<linearGradient id="band-down" x1="0" y1="1" x2="0" y2="0">' +
-          '<stop offset="0" stop-color="var(--neon)" stop-opacity=".95"/>' +
-          '<stop offset="1" stop-color="var(--neon)" stop-opacity=".45"/>' +
-        "</linearGradient>" +
-        // The mask IS the line, stroked wide and blurred: opacity falls away
-        // at right angles to it, which follows the curve.
-        // Every region here is spelled out in user space. Left to their
-        // defaults, a filter is clipped to 110% of its input and a mask to
-        // 120% of the object -- both of which cut the falloff off flat.
-        '<filter id="band-soft" filterUnits="userSpaceOnUse"' +
-          ' x="-60" y="' + (-BAND_PAD - 20) + '" width="' + (BAND_W + 120) +
-          '" height="' + (BAND_H + 2 * BAND_PAD + 40) + '">' +
-          '<feGaussianBlur stdDeviation="' + BAND_BLUR + '"/></filter>' +
-        '<mask id="band-near" maskUnits="userSpaceOnUse"' +
-          ' x="-60" y="' + (-BAND_PAD) + '" width="' + (BAND_W + 120) +
-          '" height="' + (BAND_H + 2 * BAND_PAD) + '">' +
-          '<path d="' + BAND_D + '" fill="none" stroke="#fff"' +
-          ' stroke-width="' + BAND_SPREAD + '" filter="url(#band-soft)"/></mask>' +
-        // ...and the ends go, so it reads as a section of something longer.
-        '<linearGradient id="band-ends-g" x1="0" x2="1">' +
-          '<stop offset="0" stop-color="#000"/><stop offset=".17" stop-color="#fff"/>' +
-          '<stop offset=".83" stop-color="#fff"/><stop offset="1" stop-color="#000"/>' +
-        "</linearGradient>" +
-        '<mask id="band-ends" maskUnits="userSpaceOnUse"' +
-          ' x="0" y="' + (-BAND_PAD) + '" width="' + BAND_W +
-          '" height="' + (BAND_H + 2 * BAND_PAD) + '">' +
-          '<rect y="' + (-BAND_PAD) + '" width="' + BAND_W +
-          '" height="' + (BAND_H + 2 * BAND_PAD) +
-          '" fill="url(#band-ends-g)"/></mask>' +
-      "</defs>" +
-      '<g mask="url(#band-ends)">' +
-        '<g mask="url(#band-near)">' +
-          '<path d="' + BAND_D + "L" + BAND_W + " " + (-BAND_PAD) + "L0 " +
-            (-BAND_PAD) + 'Z" fill="url(#band-up)"/>' +
-          '<path d="' + BAND_D + "L" + BAND_W + " " + (BAND_H + BAND_PAD) +
-            "L0 " + (BAND_H + BAND_PAD) + 'Z" fill="url(#band-down)"/>' +
-        "</g>" +
-        '<path class="band-line" d="' + BAND_D + '" fill="none" stroke="#fff"' +
-          ' stroke-opacity=".9" stroke-width="1.5"/>' +
-      "</g></svg>";
-  stage.insertAdjacentHTML("afterbegin", svg);
-}
-
-/* The figure, from the plan the preview already worked out. Blank until there
-   is one: inventing a number here would be worse than showing none. */
-let bandFps = "";
-
-function setBandFigures(plan) {
-  bandFps = plan && plan.estimated_fps ? String(plan.estimated_fps) : "";
-  paintBandFigures();
-}
-
-function paintBandFigures() {
-  const at = Math.max(0, INTENTS.indexOf(intent));
-  const pct = bandStops()[at];
-  const ball = $("dial-ball");
-  if (!ball) return;
-  // Empty until a preview has run: a number invented to fill the sphere would
-  // be worse than an empty one, and the sphere shrinks back to a plain bead.
-  ball.innerHTML = bandFps
-    ? "<b>" + esc(bandFps) + "</b><i>FPS</i>" : "";
-  ball.title = bandFps ? "Estimated " + bandFps + " fps at this profile" : "";
-}
-
-function paintIntent(name, live) {
-  paintBand();
-  const at = Math.max(0, INTENTS.indexOf(name));
-  const pct = bandStops()[at];
-  const where = live === undefined ? pct : live;
-  const ball = $("dial-ball");
-  ball.style.left = where + "%";
-  // On the line, not through the middle of the box.
-  ball.style.top = bandY(where) + "%";
-
-  const dial = $("intents");
-  // Everything below describes which profile is lit, and a drag fires a
-  // pointermove per frame while crossing only two boundaries. Doing this work
-  // every frame is what made the window judder: #mode-glow is a fixed,
-  // full-viewport element under a 58px blur with a 0.65s colour transition,
-  // and setting its trigger again each frame restarted that transition on a
-  // full-screen blurred layer ~60 times a second. Rebuilding the title bar's
-  // notch -- an SVG with two masks, three gradients and two drop-shadows --
-  // was being redone just as often. So it happens when the answer changes,
-  // and not otherwise.
-  if (dial.dataset.intent !== name) {
-    dial.dataset.intent = name;
-    // The whole window takes the mode's colour, not just the control.
-    document.body.dataset.intent = name;
-    // ...and so does the drop in the title bar, which shows the same choice.
-    // Driven from here rather than from the plan so it moves with the dial
-    // instead of waiting for the next preview to come back.
-    paintModeBadge(name);
-    dial.setAttribute("aria-valuenow", String(at));
-    dial.setAttribute("aria-valuetext", name);
-    dial.querySelectorAll(".dial-labels > span").forEach(el =>
-      el.setAttribute("aria-pressed", el.dataset.for === name));
-    dial.querySelectorAll(".dial-stop").forEach(el =>
-      el.setAttribute("aria-pressed", el.dataset.intent === name));
-  }
-  if (live === undefined) paintBandFigures();
+function paintIntent(name) {
+  if (!INTENTS.includes(name)) return;
+  const cards = $("intents");
+  cards.dataset.intent = name;
+  document.body.dataset.intent = name;
+  paintModeBadge(name);
+  cards.querySelectorAll(".mode-card").forEach(el => {
+    const selected = el.dataset.intent === name;
+    el.setAttribute("aria-pressed", String(selected));
+    el.tabIndex = selected ? 0 : -1;
+  });
 }
 
 function chooseIntent(name, quiet) {
@@ -7718,73 +7581,22 @@ function chooseIntent(name, quiet) {
   }
 }
 
-(function wireDial() {
-  const dial = $("intents");
-  const track = $("band-stage");
-  const ball = $("dial-ball");
-  let dragging = false;
-
-  const nearest = pct => {
-    const stops = bandStops();
-    let best = 0;
-    stops.forEach((at, i) => {
-      if (Math.abs(pct - at) < Math.abs(pct - stops[best])) best = i;
-    });
-    return INTENTS[best];
-  };
-  // Clamped to the outer stops, not to the track. The track runs wider than
-  // the panel and its ends are faded out, so 0% and 100% are off the edge of
-  // the control -- the bead would leave the box and sit over nothing.
-  const pctFor = event => {
-    const box = track.getBoundingClientRect();
-    const stops = bandStops();
-    if (!box.width) return stops[1];
-    const raw = ((event.clientX - box.left) / box.width) * 100;
-    return Math.min(stops[2], Math.max(stops[0], raw));
-  };
-
-  ball.addEventListener("pointerdown", e => {
-    dragging = true;
-    dial.classList.add("dragging");
-    ball.setPointerCapture(e.pointerId);
-    e.preventDefault();
+(function wireModeCards() {
+  const cards = $("intents");
+  cards.addEventListener("click", e => {
+    const card = e.target.closest(".mode-card");
+    if (card) chooseIntent(card.dataset.intent);
   });
-  ball.addEventListener("pointermove", e => {
-    if (!dragging) return;
-    // Paint the stop being dragged towards, not the one still selected, so the
-    // colour answers "where am I about to land" while the ball is moving.
-    // Nothing is committed until pointerup.
-    const where = pctFor(e);
-    paintIntent(nearest(where), where);
+  cards.addEventListener("keydown", e => {
+    let at = INTENTS.indexOf(intent);
+    if (["ArrowLeft", "ArrowUp"].includes(e.key)) at = Math.max(0, at - 1);
+    else if (["ArrowRight", "ArrowDown"].includes(e.key)) at = Math.min(2, at + 1);
+    else if (e.key === "Home") at = 0;
+    else if (e.key === "End") at = 2;
+    else return;
+    e.preventDefault(); chooseIntent(INTENTS[at]);
+    cards.querySelectorAll(".mode-card")[at].focus();
   });
-  ball.addEventListener("pointerup", e => {
-    if (!dragging) return;
-    dragging = false;
-    dial.classList.remove("dragging");
-    try { ball.releasePointerCapture(e.pointerId); } catch (_) { /* already gone */ }
-    chooseIntent(nearest(pctFor(e)));
-  });
-
-  // Clicking the track, a stop, or a label jumps there.
-  dial.addEventListener("click", e => {
-    if (dragging) return;
-    const stop = e.target.closest("[data-intent]");
-    if (stop) { chooseIntent(stop.dataset.intent); return; }
-    const label = e.target.closest(".dial-labels > span");
-    if (label) { chooseIntent(label.dataset.for); return; }
-    if (e.target.closest(".dial-track")) chooseIntent(nearest(pctFor(e)));
-  });
-
-  dial.addEventListener("keydown", e => {
-    const at = INTENTS.indexOf(intent);
-    if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
-      chooseIntent(INTENTS[Math.max(0, at - 1)]); e.preventDefault();
-    } else if (e.key === "ArrowRight" || e.key === "ArrowUp") {
-      chooseIntent(INTENTS[Math.min(2, at + 1)]); e.preventDefault();
-    } else if (e.key === "Home") { chooseIntent(INTENTS[0]); e.preventDefault(); }
-    else if (e.key === "End") { chooseIntent(INTENTS[2]); e.preventDefault(); }
-  });
-
   paintIntent(intent);
 })();
 
@@ -8084,45 +7896,10 @@ function meter(label, value, max, text, tone) {
 }
 
 function sparkline(id, series, colour) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  const points = (series || []).filter(v => v !== null && v !== undefined);
-  if (points.length < 2) {
-    el.innerHTML = '<text x="6" y="26" fill="var(--muted)" font-size="11">no samples yet</text>';
-    return;
-  }
-  const w = 240, h = 46, pad = 3;
-  const max = Math.max(100, ...points);
-  const step = w / (points.length - 1);
-  const y = v => h - pad - (v / max) * (h - pad * 2);
-  const line = points.map((v, i) => (i ? "L" : "M") + (i * step).toFixed(1) + " " + y(v).toFixed(1)).join(" ");
-  const area = line + " L" + w + " " + h + " L0 " + h + " Z";
-  const gid = "g-" + id;
-  el.innerHTML =
-    "<defs><linearGradient id=\"" + gid + "\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">" +
-    '<stop offset="0%" stop-color="' + colour + '" stop-opacity=".38"/>' +
-    '<stop offset="100%" stop-color="' + colour + '" stop-opacity="0"/>' +
-    "</linearGradient></defs>" +
-    '<path d="' + area + '" fill="url(#' + gid + ')"/>' +
-    '<path d="' + line + '" fill="none" stroke="' + colour + '" stroke-width="1.6"' +
-    ' stroke-linejoin="round" stroke-linecap="round"/>';
+  homeChart(id, series, colour);
 }
 
-/* Temperatures, drawn the way the load gauges are.
-
-   Same 92px ring as CPU and GPU, so the row reads as one set of instruments
-   rather than a gauge next to a badge. Inside sits a thermometer whose level
-   rises and falls with the reading -- the shape people already know, doing the
-   thing it is shaped to do.
-
-   The ring is filled against the part's own limit rather than against 100
-   degrees. A GPU is in trouble at 87 and a drive at 70, so one shared scale
-   would leave every gauge sitting near empty and say nothing.
-
-   Rebuilt only when the set of parts changes; otherwise the existing nodes are
-   patched in place. That is what lets the level slide between readings instead
-   of jumping -- a fresh element every second cannot transition from anything.
-*/
+/* Sensor availability, elevation and alarm handling are shared by thermal strips. */
 const tempAlarm = {};
 
 /* Turning the locked gauges into something answerable.
@@ -8777,68 +8554,21 @@ document.addEventListener("click", e => {
   if (button) runFix(button);
 });
 
-// One outline for the glass, used three times per gauge: the empty body, the
-// clip that shapes the mercury, and the rim drawn back over the top. Written
-// once so they cannot drift apart -- a clip that disagrees with the outline by
-// a couple of pixels is exactly how a bulb ends up not filling.
-const THERMO_PATH =
-  "M46 12 a9 9 0 0 1 9 9 v33.5 a15 15 0 1 1 -18 0 V21 a9 9 0 0 1 9 -9 z";
-
+// Horizontal thermal strips preserve the sensor's own floor and hot limit.
 function thermoGauge(part) {
-  // Sized to the load gauges beside it so the row reads as one set of
-  // instruments, but shaped as a thermometer rather than wrapped in a ring --
-  // the symbol people already know, doing the thing it is shaped to do.
-  const id = "tc-" + String(part.part + "-" + part.label).replace(/[^a-z0-9-]/gi, "");
-  return '<div class="gauge temp-gauge" data-label="' + esc(part.label) + '">' +
-    '<svg width="92" height="92" viewBox="0 0 92 92" aria-hidden="true">' +
-      '<defs><clipPath id="' + id + '"><path d="' + THERMO_PATH + '"/></clipPath></defs>' +
-      '<path class="t-glass" d="' + THERMO_PATH + '"/>' +
-      '<g class="t-ticks">' +
-        '<line x1="58" y1="26" x2="65" y2="26"/>' +
-        '<line x1="58" y1="34" x2="62" y2="34"/>' +
-        '<line x1="58" y1="42" x2="65" y2="42"/>' +
-        '<line x1="58" y1="50" x2="62" y2="50"/>' +
-      "</g>" +
-      // What moves. One rectangle, clipped to the glass, so the bulb is filled
-      // by the very shape that draws it -- there is no second circle to line
-      // up, and the bottom cannot come out short.
-      '<rect class="t-fill" x="28" y="54" width="36" height="38"' +
-      ' clip-path="url(#' + id + ')"/>' +
-      // The rim, back over the top, so the mercury does not swallow the glass.
-      '<path class="t-rim" d="' + THERMO_PATH + '"/>' +
-    "</svg>" +
-    '<span class="cap">' + esc(part.label) + "</span>" +
-    '<span class="sub2 t-read">' +
-      (part.known ? Math.round(part.celsius) + "°C"
-                  : esc(part.unavailable || "—")) +
-    "</span></div>";
+  return '<div class="temp-gauge" data-label="' + esc(part.label) + '"><div class="heat-heading"><span class="cap">' + esc(part.label) + '</span><b class="t-read">—</b></div><div class="heat-track"><span class="t-fill"></span></div></div>';
 }
-
 function paintTempGauge(el, part) {
   const known = !!part.known;
   const floor = part.floor != null ? part.floor : 25;
   const hot = part.hot != null ? part.hot : 90;
-  const span = Math.max(1, hot - floor);
-  const level = known
-    ? Math.max(0, Math.min(1, (part.celsius - floor) / span)) : 0;
-
-  // Only the top of the column moves. It always runs past the bottom of the
-  // frame and the clip shapes it, so the bulb is solid at every reading -- an
-  // empty bulb reads as a broken thermometer, not as a cold one.
-  const top = 18, bottom = 54;
-  const y = bottom - level * (bottom - top);
-
-  el.className = "gauge temp-gauge " + (known ? part.state : "unknown");
+  const level = known ? Math.max(0, Math.min(1, (part.celsius - floor) / Math.max(1, hot - floor))) : 0;
+  el.className = "temp-gauge " + (known ? part.state : "unknown");
   const fill = el.querySelector(".t-fill");
-  if (fill) {
-    fill.setAttribute("y", y.toFixed(1));
-    fill.setAttribute("height", (92 - y).toFixed(1));
-  }
+  homeTween(fill, "heat", level, v => { fill.style.transform = "scaleX(" + v + ")"; });
   const read = el.querySelector(".t-read");
-  if (read) {
-    read.textContent = known ? Math.round(part.celsius) + "°C"
-                             : (part.unavailable || "—");
-  }
+  if (known) homeNumber(read, part.celsius, "\u00b0C");
+  else { homeCancel(read); read.textContent = part.unavailable || "—"; }
 }
 
 function renderTemps(data) {
@@ -8899,7 +8629,7 @@ async function pollLive() {
     const gpu = d.gpu || {};
     const ram = d.ram || {};
 
-    document.getElementById("live-gauges").innerHTML =
+    homePatchReadouts(document.getElementById("live-gauges"),
       ring(d.cpu ? d.cpu.percent : null, "CPU", null) +
       ring(gpu.percent, "GPU",
            gpu.temperature != null ? Math.round(gpu.temperature) + "°C" : null) +
@@ -8908,10 +8638,10 @@ async function pollLive() {
       ring(gpu.vram_percent, "VRAM",
            gpu.vram_used_mb != null
              ? Math.round(gpu.vram_used_mb / 1024 * 10) / 10 + " / " +
-               Math.round(gpu.vram_total_mb / 1024) + " GB" : null);
+               Math.round(gpu.vram_total_mb / 1024) + " GB" : null));
 
-    sparkline("spark-cpu", d.history.cpu, "#e4002b");
-    sparkline("spark-gpu", d.history.gpu, "#3d8bfd");
+    sparkline("spark-cpu", (d.history || {}).cpu, "var(--accent)");
+    sparkline("spark-gpu", (d.history || {}).gpu, "var(--good)");
     renderTemps(d.temps);
 
     const note = [];
@@ -8929,7 +8659,7 @@ async function pollLive() {
 function startLive() {
   if (liveTimer) return;
   const first = pollLive();
-  liveTimer = setInterval(() => { if (activeTab === "launcher") pollLive(); }, 2000);
+  liveTimer = setInterval(() => { if (activeTab === "launcher" && !document.hidden) pollLive(); }, 2000);
   return first;
 }
 
@@ -15631,6 +15361,7 @@ $("rescan").addEventListener("click", () => scan(true));
       const n = Number(reading);
       chip.querySelector("b").textContent =
         reading === undefined || reading === "—" ? "—" : reading + "%";
+      chip.style.setProperty("--chip-load", Number.isFinite(n) ? Math.max(0,Math.min(1,n/100)) : 0);
       chip.classList.toggle("warn", Number.isFinite(n) && n >= 70 && n < 90);
       chip.classList.toggle("bad", Number.isFinite(n) && n >= 90);
     }
