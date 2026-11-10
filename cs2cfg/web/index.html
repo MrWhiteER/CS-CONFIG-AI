@@ -2145,7 +2145,7 @@
     /* The rail's own surface. A variable rather than a literal because it was
        the one panel in the window with a colour of its own, and on a light
        theme that meant dark text on a dark bar -- the navigation, invisible. */
-    --rail-bg: rgba(9, 9, 13, .74);
+    --rail-bg: rgba(13, 8, 22, .86);
 
     /* Shape, not just colour. A theme that can only change hue cannot show
        you a different kind of interface, and the difference between this
@@ -2163,14 +2163,8 @@
     --glow: .75;
 
     --ink:        #ece8f7;
-    /* Not dimmer than this, in any theme. Every one of the seven was between
-       3.86 and 4.28 against its own background, and 4.5 is the line for
-       readable text -- this is the colour of every explanation in the
-       application, so it is the one that most needs to be read. Measured, not
-       guessed: the minimum that passes is .48 on the dark themes and .60 on
-       the light ones, and these sit above that because most of this text is
-       on a panel a shade lighter again. */
-    --muted:      rgba(236, 232, 247, .52);
+    /* Secondary text keeps enough opacity to read over raised glass surfaces. */
+    --muted:      rgba(236, 232, 247, .68);
     /* Hairlines are a dim violet rather than a neutral white. That single
        change does most of the work: a grey rule reads as a box drawn around
        something, a violet one reads as the surface being lit. */
@@ -2179,9 +2173,9 @@
 
     --bg:         #07050d;
     --bg-2:       rgba(10, 6, 20, .34);
-    --panel:      rgba(19, 12, 31, .62);
-    --panel-2:    rgba(26, 17, 42, .72);
-    --chip:       rgba(34, 22, 53, .74);
+    --panel:      rgba(19, 12, 31, .82);
+    --panel-2:    rgba(26, 17, 42, .88);
+    --chip:       rgba(34, 22, 53, .86);
 
     --accent:      #8b5cf6;              /* selection, focus, "you are here" */
     --accent-deep: #6d28d9;
@@ -2195,9 +2189,9 @@
     --warn:        #ffb43a;
     --bad:         #ff5468;
 
-    --ink-dim: rgba(238, 241, 246, .62);
-    --faint:   rgba(238, 241, 246, .22);
-    --glass-3: rgba(28, 28, 37, .74);
+    --ink-dim: rgba(236, 232, 247, .76);
+    --faint:   rgba(236, 232, 247, .46);
+    --glass-3: rgba(28, 18, 44, .86);
     --sunk:    rgba(0, 0, 0, .30);
 
     /* The stage gradient, overridden per section below. */
@@ -2217,6 +2211,16 @@
     --neon-competitive: #ff9d2e;
     --neon-balanced:    #17e3a1;
     --neon-quality:     #a56bff;
+
+    /* Shared category identities; light themes override these for contrast. */
+    --cat-apply:   var(--neon-balanced);
+    --cat-sound:   var(--neon-competitive);
+    --cat-config:  #4d94ff;
+    --cat-editing: #ff5cb8;
+    --cat-account: var(--neon-balanced);
+    --cat-apps:    var(--neon-quality);
+    --cat-look:    var(--neon-cyan);
+    --cat-logs:    #8ea2c0;
   }
 
   /* ---------------------------------------------------------------------
@@ -2240,47 +2244,50 @@
   /* Ember -- the warm one. Amber on a near-black brown, which is where the
      hardware-dashboard look people picture usually lands. */
   :root[data-theme="ember"] {
-    --ink: #f8efe3; --muted: rgba(248, 239, 227, .52);
+    --ink: #f8efe3; --muted: rgba(248, 239, 227, .68);
     --line: rgba(245, 165, 36, .20); --line-soft: rgba(245, 165, 36, .11);
     --bg: #0a0704; --bg-2: rgba(16, 10, 5, .34);
     --panel: rgba(30, 19, 9, .62); --panel-2: rgba(42, 27, 13, .72);
     --chip: rgba(54, 35, 16, .74);
     --accent: #f5a524; --accent-deep: #b4740f; --accent-dim: rgba(245, 165, 36, .16);
     --violet: #f5a524; --violet-soft: #ffc46b;
-    --ink-dim: rgba(248, 239, 227, .62); --faint: rgba(248, 239, 227, .22);
+    --ink-dim: rgba(248, 239, 227, .76); --faint: rgba(248, 239, 227, .46);
     --glass-3: rgba(38, 25, 12, .74);
     --neon-cyan: #ffd48a;
+    --rail-bg: var(--panel);
   }
 
   /* Carbon -- silver and steel, almost no hue. For somebody who wants the
      instrument and not the light show. The one loud colour is kept for Play,
      because on a monochrome panel it is the only thing that needs to shout. */
   :root[data-theme="carbon"] {
-    --ink: #eaeef4; --muted: rgba(234, 238, 244, .52);
+    --ink: #eaeef4; --muted: rgba(234, 238, 244, .68);
     --line: rgba(196, 211, 229, .16); --line-soft: rgba(196, 211, 229, .09);
     --bg: #060709; --bg-2: rgba(12, 14, 17, .34);
     --panel: rgba(19, 22, 27, .66); --panel-2: rgba(28, 32, 39, .74);
     --chip: rgba(38, 43, 51, .74);
     --accent: #c3d0de; --accent-deep: #8d9cad; --accent-dim: rgba(195, 208, 222, .14);
     --violet: #c3d0de; --violet-soft: #dbe4ee;
-    --ink-dim: rgba(234, 238, 244, .62); --faint: rgba(234, 238, 244, .20);
+    --ink-dim: rgba(234, 238, 244, .76); --faint: rgba(234, 238, 244, .46);
     --glass-3: rgba(24, 27, 33, .76);
     --neon-cyan: #9fb4cc;
+    --rail-bg: var(--panel);
   }
 
   /* Acid -- green on black. The oldest look in this game, and the only one
      here that is a reference rather than a palette. */
   :root[data-theme="acid"] {
-    --ink: #e2f7e7; --muted: rgba(226, 247, 231, .52);
+    --ink: #e2f7e7; --muted: rgba(226, 247, 231, .68);
     --line: rgba(57, 255, 136, .18); --line-soft: rgba(57, 255, 136, .09);
     --bg: #040706; --bg-2: rgba(6, 14, 10, .34);
     --panel: rgba(9, 22, 14, .64); --panel-2: rgba(13, 32, 20, .72);
     --chip: rgba(18, 44, 28, .74);
     --accent: #39ff88; --accent-deep: #15a34a; --accent-dim: rgba(57, 255, 136, .14);
     --violet: #39ff88; --violet-soft: #8dffbb;
-    --ink-dim: rgba(226, 247, 231, .62); --faint: rgba(226, 247, 231, .20);
+    --ink-dim: rgba(226, 247, 231, .76); --faint: rgba(226, 247, 231, .46);
     --glass-3: rgba(11, 26, 17, .76);
     --neon-cyan: #7dffc0;
+    --rail-bg: var(--panel);
   }
 
   /* Daylight -- the light one. White and silver, with the accent darkened
@@ -2290,19 +2297,21 @@
   :root[data-theme="daylight"] {
     color-scheme: light;
     --lift: 0, 0, 0;
-    --ink: #14161b; --muted: rgba(20, 22, 27, .64);
+    --ink: #14161b; --muted: rgba(20, 22, 27, .68);
     --line: rgba(20, 22, 27, .14); --line-soft: rgba(20, 22, 27, .08);
     --bg: #eef0f4; --bg-2: rgba(255, 255, 255, .5);
     --panel: rgba(255, 255, 255, .78); --panel-2: rgba(255, 255, 255, .92);
     --chip: rgba(20, 22, 27, .07);
     --accent: #6d28d9; --accent-deep: #4c1d95; --accent-dim: rgba(109, 40, 217, .12);
     --violet: #6d28d9; --violet-soft: #8b5cf6;
-    --ink-dim: rgba(20, 22, 27, .66); --faint: rgba(20, 22, 27, .30);
+    --ink-dim: rgba(20, 22, 27, .76); --faint: rgba(20, 22, 27, .46);
     --glass-3: rgba(255, 255, 255, .86);
     --sunk: rgba(0, 0, 0, .10);
     --rail-bg: rgba(255, 255, 255, .82);
     --good: #0f8a4d; --warn: #a66200; --bad: #c62337;
     --neon-cyan: #0b7c92;
+    --neon-competitive: #965000; --neon-balanced: #087443; --neon-quality: #7539be;
+    --cat-config: #245bb5; --cat-editing: #ae246e; --cat-logs: #53647d;
   }
 
   /* Paper -- light, warm and almost colourless. The same idea as Daylight
@@ -2319,7 +2328,7 @@
     --r: 4px;
     --panel-blur: none;
     --panel-edge: 0;
-    --ink: #f1f1f1; --muted: rgba(241, 241, 241, .52);
+    --ink: #f1f1f1; --muted: rgba(241, 241, 241, .68);
     --line: rgba(241, 241, 241, .09); --line-soft: rgba(241, 241, 241, .05);
     --bg: #121212; --bg-2: rgba(241, 241, 241, .02);
     --panel: rgba(241, 241, 241, .05); --panel-2: rgba(241, 241, 241, .08);
@@ -2327,7 +2336,7 @@
     --rail-bg: #0a0a0a;
     --accent: #ff5500; --accent-deep: #cc4400; --accent-dim: rgba(255, 85, 0, .14);
     --violet: #ff5500; --violet-soft: #ff8f5c;
-    --ink-dim: rgba(241, 241, 241, .62); --faint: rgba(241, 241, 241, .22);
+    --ink-dim: rgba(241, 241, 241, .76); --faint: rgba(241, 241, 241, .46);
     --glass-3: #1d1d1d;
     --sunk: rgba(0, 0, 0, .35);
     --neon-cyan: #ffa26b;
@@ -2339,36 +2348,25 @@
   :root[data-theme="paper"] {
     color-scheme: light;
     --lift: 0, 0, 0;
-    --ink: #1c1a17; --muted: rgba(28, 26, 23, .64);
+    --ink: #1c1a17; --muted: rgba(28, 26, 23, .68);
     --line: rgba(28, 26, 23, .15); --line-soft: rgba(28, 26, 23, .08);
     --bg: #f4f1ea; --bg-2: rgba(255, 253, 248, .55);
     --panel: rgba(255, 253, 248, .8); --panel-2: rgba(255, 254, 251, .93);
     --chip: rgba(28, 26, 23, .07);
     --accent: #9a5b00; --accent-deep: #6f4100; --accent-dim: rgba(154, 91, 0, .12);
     --violet: #9a5b00; --violet-soft: #c87f14;
-    --ink-dim: rgba(28, 26, 23, .66); --faint: rgba(28, 26, 23, .30);
+    --ink-dim: rgba(28, 26, 23, .76); --faint: rgba(28, 26, 23, .46);
     --glass-3: rgba(255, 253, 248, .88);
     --sunk: rgba(0, 0, 0, .09);
     --rail-bg: rgba(255, 253, 248, .85);
     --good: #2f7a33; --warn: #9a5b00; --bad: #b3261e;
     --neon-cyan: #39607a;
 
-    /* One per settings category. Borrowed from what the app already uses for
-       the same idea rather than picked fresh: sound is the amber the Fix It
-       sound tile carries, editing is the pink of the Scripts rail entry, and
-       apply is the house accent, which everywhere else means go. Config files
-       takes blue because the obvious amber is already sound's, and two warm
-       neighbours would be the two hardest of the four to tell apart. */
-    --cat-apply:   #17e3a1;
-    --cat-sound:   #ff9d2e;
-    --cat-config:  #4d94ff;
-    --cat-editing: #ff2d95;
-    /* Logs take the slate the Settings rail entry uses: a record of what
-       happened is the one category here that is not an action. */
-    --cat-account: #17e3a1;
-    --cat-apps:    #a56bff;
-    --cat-look:    #22e6ff;
-    --cat-logs:    #8ea2c0;
+    --neon-competitive: #925000; --neon-balanced: #326d37; --neon-quality: #74429b;
+    --cat-apply: var(--neon-balanced); --cat-sound: var(--neon-competitive);
+    --cat-config: #315e9f; --cat-editing: #a32c65;
+    --cat-account: var(--neon-balanced); --cat-apps: var(--neon-quality);
+    --cat-look: var(--neon-cyan); --cat-logs: #625d52;
   }
 
   /* ------------------------------------------------------------- the stage */
@@ -4581,10 +4579,18 @@
        lineage is why it reads as signage rather than as a document. The
        fallbacks walk down to a condensed grotesque and then to whatever the
        system has, so a machine without it degrades rather than breaks. */
-    --display: "Bahnschrift", "Oswald", "Franklin Gothic Medium",
+    --display: "Bahnschrift SemiCondensed", "Bahnschrift", "Franklin Gothic Medium",
                "Segoe UI Variable Display", "Segoe UI", sans-serif;
     --body: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
-    --mono: "Cascadia Mono", Consolas, ui-monospace, "JetBrains Mono", monospace;
+    --mono: "Cascadia Mono", Consolas, ui-monospace, monospace;
+    /* Shared across every palette, including Daylight and Paper. */
+    --body-size: 13.5px;
+    --body-leading: 1.55;
+    --heading-weight: 600;
+    --heading-tracking: .08em;
+    --heading-stretch: condensed;
+    --heading-case: uppercase;
+    --figure-style: tabular-nums;
 
     /* The notch. One number, because every cut surface in the window has to
        agree -- a panel notched 14px beside a button notched 6px reads as two
@@ -4610,25 +4616,33 @@
   /* ---------------------------------------------------------------------
      Type.
 
-     Three faces doing three jobs: the condensed one names things, the mono
-     one carries anything that is a measurement, and the body face carries
-     sentences. The rule is that a number never appears in the body face --
-     a frame rate that changes width as it ticks is a frame rate you cannot
-     read.
+     Condensed headings name things, mono carries measurements, and the body
+     face carries sentences. Tabular figures keep numbers steady in every face.
      --------------------------------------------------------------------- */
 
-  body { font-family: var(--body); }
+  body {
+    font-family: var(--body);
+    font-size: var(--body-size);
+    line-height: var(--body-leading);
+  }
+  body, button, input, select, textarea {
+    font-variant-numeric: var(--figure-style);
+  }
+  h1, h2, h3 {
+    font-stretch: var(--heading-stretch);
+    text-transform: var(--heading-case);
+  }
 
   h1, h2, h3, .brand, .tab .tx, .btn, .seg-item, .panel > h2 {
     font-family: var(--display);
-    font-weight: 600;
-    letter-spacing: .06em;
+    font-weight: var(--heading-weight);
+    letter-spacing: var(--heading-tracking);
   }
 
   .panel > h2, .card h2, .editor > h2 {
     font-size: 11px;
     text-transform: uppercase;
-    letter-spacing: .18em;
+    letter-spacing: var(--heading-tracking);
     color: var(--ink);
     opacity: .74;
     display: flex; align-items: center; gap: var(--s3);
