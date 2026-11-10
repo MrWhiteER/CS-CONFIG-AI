@@ -5357,6 +5357,7 @@
 @media(prefers-reduced-motion:reduce) { .mode-card::before, :is(.hero-art img,.monitor-light,.desk-light,.mode-card img) { animation:none; }.mode-card { transition:none; }.mode-card:hover,.mode-card[aria-pressed="true"] { transform:none; } }
 
 </style>
+<link rel="stylesheet" href="assets/devices/workspace.css">
 </head>
 <body>
 <!-- Startup readiness dismisses this veil; independent JS/CSS deadlines always uncover it. -->
@@ -5368,6 +5369,7 @@
     <p class="boot-tip">Keep your crosshair at head height.</p>
   </div>
 </div>
+<script src="assets/devices/workspace.js"></script>
 <script>
 /* Each first load settles only after its loader has rendered success or error.
    The fixed list keeps progress honest, including work started after prefs. */
@@ -5905,13 +5907,11 @@ const startup = (() => {
     <div class="tab-panel hidden" data-panel="keyboard">
       <div class="hero">
         <div class="hero-copy">
-          <div class="eyebrow">Your board</div>
-          <h2>Keyboard</h2>
+          <div class="eyebrow">Your controls, your way</div>
+          <h2>Keyboard &amp; mouse</h2>
           <p>
-            Every bind in your config, drawn where it sits. Keys running one of
-            your own scripts glow magenta; a key changed from CS2's own default
-            glows gold; blue keys still do exactly what CS2 ships, and the dark
-            ones are free. Pick any key to see what it runs.
+            A place for every command. Select a key or mouse button to inspect its
+            binding, or drag a command from the library onto your device.
           </p>
         </div>
       </div>
@@ -9921,36 +9921,36 @@ let kbBusy = false;
 const KB_ROWS = [
   ["Escape:Esc", "gap:::1", "F1:F1", "F2:F2", "F3:F3", "F4:F4", "gap:::0.5",
    "F5:F5", "F6:F6", "F7:F7", "F8:F8", "gap:::0.5",
-   "F9:F9", "F10:F10", "F11:F11", "F12:F12", "gap:::0.4",
+   "F9:F9", "F10:F10", "F11:F11", "F12:F12", "gap:::0.5",
    "PrintScreen:PrtSc", "ScrollLock:ScrLk", "Pause:Pause"],
 
   ["Backquote:`", "Digit1:1", "Digit2:2", "Digit3:3", "Digit4:4", "Digit5:5",
    "Digit6:6", "Digit7:7", "Digit8:8", "Digit9:9", "Digit0:0",
-   "Minus:-", "Equal:=", "Backspace:Backspace::2", "gap:::0.4",
-   "Insert:Ins", "Home:Home", "PageUp:PgUp", "gap:::0.4",
+   "Minus:-", "Equal:=", "Backspace:Backspace::2", "gap:::0.5",
+   "Insert:Ins", "Home:Home", "PageUp:PgUp", "gap:::0.5",
    "NumLock:Num", "NumpadDivide:/", "NumpadMultiply:*", "NumpadSubtract:-"],
 
   ["Tab:Tab::1.5", "KeyQ:Q", "KeyW:W", "KeyE:E", "KeyR:R", "KeyT:T", "KeyY:Y",
    "KeyU:U", "KeyI:I", "KeyO:O", "KeyP:P", "BracketLeft:[", "BracketRight:]",
-   "Backslash:\\\\::1.5", "gap:::0.4",
-   "Delete:Del", "End:End", "PageDown:PgDn", "gap:::0.4",
+   "Backslash:\\\\::1.5", "gap:::0.5",
+   "Delete:Del", "End:End", "PageDown:PgDn", "gap:::0.5",
    "Numpad7:7", "Numpad8:8", "Numpad9:9", "NumpadAdd:+"],
 
   ["CapsLock:Caps::1.75", "KeyA:A", "KeyS:S", "KeyD:D", "KeyF:F", "KeyG:G",
    "KeyH:H", "KeyJ:J", "KeyK:K", "KeyL:L", "Semicolon:;", "Quote:'",
-   "Enter:Enter::2.25", "gap:::0.4", "gap:::3.4", "gap:::0.4",
+   "Enter:Enter::2.25", "gap:::0.5", "gap:::3", "gap:::0.5",
    "Numpad4:4", "Numpad5:5", "Numpad6:6"],
 
   ["ShiftLeft:Shift::2.25", "KeyZ:Z", "KeyX:X", "KeyC:C", "KeyV:V", "KeyB:B",
    "KeyN:N", "KeyM:M", "Comma:,", "Period:.", "Slash:/",
-   "ShiftRight:Shift::2.75", "gap:::0.4",
-   "gap:::1.1", "ArrowUp:↑", "gap:::1.1", "gap:::0.4",
+   "ShiftRight:Shift::2.75", "gap:::0.5",
+   "gap:::1", "ArrowUp:↑", "gap:::1", "gap:::0.5",
    "Numpad1:1", "Numpad2:2", "Numpad3:3", "NumpadEnter:Ent"],
 
   ["ControlLeft:Ctrl::1.25", "MetaLeft:Win::1.25", "AltLeft:Alt::1.25",
    "Space:Space::6.25", "AltRight:Alt::1.25", "MetaRight:Win::1.25",
-   "ContextMenu:Menu::1.25", "ControlRight:Ctrl::1.25", "gap:::0.4",
-   "ArrowLeft:←", "ArrowDown:↓", "ArrowRight:→", "gap:::0.4",
+   "ContextMenu:Menu::1.25", "ControlRight:Ctrl::1.25", "gap:::0.5",
+   "ArrowLeft:←", "ArrowDown:↓", "ArrowRight:→", "gap:::0.5",
    "Numpad0:0::2", "NumpadDecimal:."],
 ];
 
@@ -10019,7 +10019,8 @@ function kbCap(spec) {
     : hit.script ? (hit.enabled ? "script" : "script off")
     : hit.is_default === false ? "custom"
     : "bound";
-  const picked = pickedKey && pickedKey.code === code ? " picked" : "";
+  const picked = (pickedKey && pickedKey.code === code ? " picked" : "") +
+    (["NumpadAdd", "NumpadEnter"].includes(code) ? " kb-tall" : "");
   // The game and the config disagreeing about a key matters more than what
   // either of them says alone, so it is marked where the key is drawn.
   const odd = hit && hit.agrees === false ? " adrift" : "";
@@ -10036,159 +10037,86 @@ function kbCap(spec) {
   return '<button class="kb-key ' + cls + picked + odd + missingCls +
     '" style="--w:' + w + '"' +
     ' data-kbcode="' + esc(code) + '" data-kblabel="' + esc(label) + '"' +
-    ' title="' + esc(fullTitle) + '">' +
+    ' aria-pressed="' + !!(pickedKey && pickedKey.code === code) + '"' +
+    ' aria-label="' + esc(label + ': ' + fullTitle) + '" data-kbpreview="' + esc(fullTitle) + '">' +
     '<span class="kb-cap">' + esc(label) + "</span>" +
     (hit ? '<span class="kb-mark"></span>' : "") + "</button>";
 }
 
-const MS_SHELL =
-  "M100 4 L132 12 L152 34 L164 66 L173 104 L180 148 " +
-  "L181 192 L173 238 L157 280 L133 312 L110 330 L100 332 " +
-  "L90 330 L67 312 L43 280 L27 238 L19 192 L20 148 " +
-  "L27 104 L36 66 L48 34 L68 12 Z";
-
-// The divide between the click area and the palm, angled like the shell.
-const MS_SPLIT = "M23 138 L62 158 L138 158 L177 138";
-// The seam between the two main buttons.
-const MS_SEAM = "M100 6 L100 158";
-// The lit strips down each flank, which is what the reference is really about.
-const MS_GLOW_L = "M36 66 L27 104 L20 148 L19 192 L27 238 L43 280";
-const MS_GLOW_R = "M164 66 L173 104 L180 148 L181 192 L173 238 L157 280";
+const MS_SHELL = "M100 7 C51 7 28 47 24 104 C17 161 19 227 43 276 C57 306 79 322 103 322 C137 322 163 296 174 256 C186 214 179 160 175 106 C172 46 148 7 100 7 Z";
+let mouseShape = "two";
 
 function msZone(code, label, shape, labelAt, extra) {
   const hit = kbLookup(code, label);
-  const cls = !hit ? "free"
-    : hit.script ? (hit.enabled ? "script" : "script off")
-    : hit.is_default === false ? "custom"
-    : "bound";
+  const cls = !hit ? "free" : hit.script ? (hit.enabled ? "script" : "script off")
+    : hit.is_default === false ? "custom" : "bound";
   const picked = pickedKey && pickedKey.code === code ? " picked" : "";
-  const note = cls === "custom" ? " \u2014 changed from CS2 default"
-    : cls === "bound" && hit.is_default ? " \u2014 same as CS2 default" : "";
-  const title = (hit ? (hit.script || hit.command) : label + " \u2014 free") + note;
-  // Most disagreements land on the mouse, so it is marked here too.
   const odd = hit && hit.agrees === false ? " adrift" : "";
   const missing = kbMissingMap.get(kbBindingFor(code));
-  const missingCls = missing ? " kb-missing" : "";
-  const fullTitle = esc(missing
-    ? title + " \u2014 CS2 default here is \u201c" + missing.command +
-      "\u201d, not set by this profile"
-    : title);
-  return '<g class="ms-zone ' + cls + picked + odd + missingCls +
-    '" data-kbcode="' + esc(code) +
-    '" data-kblabel="' + esc(label) + '"' + (extra || "") + ">" +
-    "<title>" + label + " \u2014 " + fullTitle + "</title>" +
-    shape +
-    '<text class="ms-label" x="' + labelAt[0] + '" y="' + labelAt[1] + '">' +
-    esc(label.replace("Mouse ", "M").replace("Wheel ", "")) + "</text></g>";
+  const title = (hit ? (hit.script || hit.command) : "Free — no assignment") +
+    (missing ? " — CS2 default: " + missing.command + ", not set by this profile" : "");
+  return '<g role="button" tabindex="0" class="ms-zone ' + cls + picked + odd +
+    (missing ? ' kb-missing' : '') + '" data-kbcode="' + esc(code) +
+    '" data-kblabel="' + esc(label) + '" aria-pressed="' + !!(pickedKey && pickedKey.code === code) + '" aria-label="' + esc(label + ': ' + title) +
+    '" data-kbpreview="' + esc(title) + '"' + (extra || '') + '>' +
+    shape + '<text class="ms-label" x="' + labelAt[0] + '" y="' + labelAt[1] + '">' +
+    esc(label.replace('Mouse ', 'M')) + '</text></g>';
 }
 
-// "two" is the ordinary gaming shell; "four" is the one with a thumb cluster.
-let mouseShape = "two";
+function msCallout(code, label, shape, point, at) {
+  const right = at[0] > point[0];
+  return msZone(code, label, shape +
+    '<path class="ms-leader" d="M' + point.join(' ') + ' L' +
+    (right ? at[0] - 12 : at[0] + 42) + ' ' + (at[1] - 4) + ' H' + at[0] + '"/>' +
+    '<circle class="ms-point" cx="' + point[0] + '" cy="' + point[1] + '" r="2"/>' +
+    '<rect class="ms-callout" x="' + (at[0] - 4) + '" y="' + (at[1] - 15) +
+    '" width="76" height="23"/>', at);
+}
 
 function mouseSideButtons() {
-  if (mouseShape === "four") {
-    // Four in a block, the way a thumb cluster is actually laid out: two
-    // columns of two rather than a single long column no thumb could reach.
-    return [
-      ["mouse4", "Mouse 4", 2, 128], ["mouse6", "Mouse 6", 2, 172],
-      ["mouse5", "Mouse 5", 38, 128], ["mouse7", "Mouse 7", 38, 172],
-    ].map(([code, label, x, y]) =>
-      msZone(code, label,
-             '<rect class="ms-face side" x="' + x + '" y="' + y +
-             '" width="32" height="38" rx="9"/>',
-             [x + 16, y + 24])).join("");
-  }
-  return [
-    ["mouse4", "Mouse 4", 132], ["mouse5", "Mouse 5", 176],
-  ].map(([code, label, y]) =>
-    msZone(code, label,
-           '<rect class="ms-face side" x="2" y="' + y +
-           '" width="34" height="38" rx="11"/>',
-           [19, y + 23])).join("");
+  const sides = mouseShape === 'four'
+    ? [['mouse4','Mouse 4',26,145],['mouse5','Mouse 5',45,145],
+       ['mouse6','Mouse 6',26,180],['mouse7','Mouse 7',45,180]]
+    : [['mouse4','Mouse 4',26,145],['mouse5','Mouse 5',26,184]];
+  return sides.map(([code,label,x,y],i) => msCallout(code,label,
+    '<rect class="ms-face" x="' + x + '" y="' + y + '" width="' +
+    (mouseShape === 'four' ? 16 : 23) + '" height="28" rx="7"/>',
+    [x+8,y+12],[-70,155+i*29])).join('');
 }
 
 function mouseModel() {
-  // Ribs on the thumb panel, the way a textured grip is moulded.
-  const ribs = [0, 1, 2, 3, 4, 5].map(i =>
-    '<line class="ms-rib" x1="30" x2="52" y1="' + (176 + i * 13) +
-    '" y2="' + (170 + i * 13) + '"/>').join("");
-  const tread = [0, 1, 2, 3].map(i =>
-    '<line class="ms-tread" x1="89" x2="111" y1="' + (42 + i * 8) +
-    '" y2="' + (42 + i * 8) + '"/>').join("");
-
-  return '<svg class="ms-svg" viewBox="-20 -12 240 372" role="img" ' +
-    'aria-label="Mouse buttons and what they are bound to">' +
-    "<defs>" +
-    '<clipPath id="ms-clip"><path d="' + MS_SHELL + '"/></clipPath>' +
-    '<linearGradient id="ms-body" x1="0.1" y1="0" x2="0.9" y2="1">' +
-    '<stop offset="0" stop-color="#26364f"/>' +
-    '<stop offset="0.5" stop-color="#16203a"/>' +
-    '<stop offset="1" stop-color="#0a1020"/></linearGradient>' +
-    '<linearGradient id="ms-gloss" x1="0" y1="0" x2="0.75" y2="1">' +
-    '<stop offset="0" stop-color="#8fbaff" stop-opacity="0.18"/>' +
-    '<stop offset="0.4" stop-color="#8fbaff" stop-opacity="0.04"/>' +
-    '<stop offset="1" stop-color="#8fbaff" stop-opacity="0"/></linearGradient>' +
-    '<linearGradient id="ms-rgb" x1="0" y1="0" x2="0" y2="1">' +
-    '<stop offset="0" stop-color="#5b8cff"/>' +
-    '<stop offset="0.5" stop-color="#c04cff"/>' +
-    '<stop offset="1" stop-color="#ff2d95"/></linearGradient>' +
-    "</defs>" +
-
-    '<ellipse class="ms-shadow" cx="100" cy="340" rx="80" ry="12"/>' +
+  return '<svg class="ms-svg" viewBox="-85 -8 410 350" aria-label="Interactive gaming mouse">' +
+    '<defs><radialGradient id="device-body" cx=".38" cy=".25" r=".8" gradientTransform="translate(0 -.1) scale(1 1.25)">' +
+    '<stop class="ms-material-top"/><stop offset=".48" class="ms-material-mid"/>' +
+    '<stop offset=".88" class="ms-material-bottom"/><stop offset="1" class="ms-material-mid"/>' +
+    '</radialGradient><radialGradient id="device-button" cx=".3" cy=".2" r="1">' +
+    '<stop class="ms-material-top"/><stop offset=".7" class="ms-material-mid"/><stop offset="1" class="ms-material-bottom"/></radialGradient>' +
+    '<pattern id="device-grain" width="3" height="3" patternUnits="userSpaceOnUse">' +
+    '<circle cx="1" cy="1" r=".4" fill="currentColor"/></pattern></defs>' +
+    '<ellipse class="ms-shadow" cx="102" cy="306" rx="80" ry="22"/>' +
+    '<path d="' + MS_SHELL + '" transform="translate(0 5)" fill="var(--device-wall)"/>' +
     '<path class="ms-shell" d="' + MS_SHELL + '"/>' +
-
-    // The lit flanks sit under the shell edge so they read as light escaping
-    // from beneath the panels rather than as a drawn outline.
-    '<path class="ms-rgb" d="' + MS_GLOW_L + '"/>' +
-    '<path class="ms-rgb" d="' + MS_GLOW_R + '"/>' +
-
-    '<g clip-path="url(#ms-clip)">' +
-    msZone("mouse1", "Mouse 1",
-           '<path class="ms-face" d="M0 0 L97 0 L97 158 L58 158 L20 138 L0 60 Z"/>',
-           [55, 96]) +
-    msZone("mouse2", "Mouse 2",
-           '<path class="ms-face" d="M103 0 L200 0 L200 60 L180 138 L142 158 L103 158 Z"/>',
-           [145, 96]) +
-    '<polygon class="ms-panel" points="20,150 62,168 138,168 180,150 178,250 100,300 22,250"/>' +
-    '<path class="ms-gloss" d="' + MS_SHELL + '"/>' +
-    "</g>" +
-
-    '<path class="ms-seam" d="' + MS_SEAM + '"/>' +
-    '<path class="ms-split" d="' + MS_SPLIT + '"/>' +
-
-    // The wheel, sunk into a well and lit round the rim.
-    '<rect class="ms-wheel-well" x="81" y="26" width="38" height="98" rx="8"/>' +
-    msZone("mwheelup", "Wheel \u2191",
-           '<rect class="ms-face wheel" x="86" y="32" width="28" height="26" rx="10"/>',
-           [100, 49]) +
-    msZone("mouse3", "Mouse 3",
-           '<rect class="ms-face wheel" x="86" y="59" width="28" height="30" rx="4"/>',
-           [100, 78]) +
-    msZone("mwheeldown", "Wheel \u2193",
-           '<rect class="ms-face wheel" x="86" y="90" width="28" height="26" rx="10"/>',
-           [100, 107]) +
-    '<g class="ms-treads">' + tread + "</g>" +
-
-    // Not bindable in game: the mouse resolves it before the engine sees it.
-    '<g class="ms-inert"><title>DPI \u2014 handled by the mouse itself, ' +
-    'not something the game can bind</title>' +
-    '<rect x="91" y="128" width="18" height="8" rx="4"/>' +
-    '<text class="ms-tiny" x="100" y="147">DPI</text></g>' +
-
-    // The ribbed thumb grip the reference has down its left flank.
-    '<polygon class="ms-grip" points="26,164 56,176 56,254 30,244 20,206"/>' +
-    '<g class="ms-ribs">' + ribs + "</g>" +
-
-    '<polygon class="ms-logo" points="100,232 112,244 100,256 88,244"/>' +
-
-    mouseSideButtons() +
-    '<path class="ms-edge" d="' + MS_SHELL + '"/>' +
-    "</svg>";
+    '<path d="M37 245 C60 330 142 340 166 253" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity=".65"/>' +
+    '<path class="ms-palm-texture" d="M31 148 Q100 174 173 145 L167 252 Q146 314 101 315 Q49 308 33 251 Z"/>' +
+    msCallout('mouse1','Mouse 1','<path class="ms-face" d="M96 9 C55 10 31 46 28 102 L27 130 Q62 149 96 143 Z"/>',[57,72],[-70,42]) +
+    msCallout('mouse2','Mouse 2','<path class="ms-face" d="M104 9 C148 12 169 48 172 102 L174 130 Q144 150 104 143 Z"/>',[145,72],[224,42]) +
+    '<rect x="88" y="33" width="24" height="73" rx="11" fill="var(--device-wall)"/>' +
+    msCallout('mwheelup','Wheel ↑','<rect class="ms-face" x="92" y="38" width="16" height="20" rx="5"/>',[100,45],[224,83]) +
+    msCallout('mouse3','Mouse 3','<rect class="ms-face" x="92" y="60" width="16" height="20" rx="3"/>',[100,69],[224,113]) +
+    msCallout('mwheeldown','Wheel ↓','<rect class="ms-face" x="92" y="82" width="16" height="20" rx="5"/>',[100,91],[224,143]) +
+    '<path class="ms-wheel-ridges" d="M94 42h12 M94 47h12 M94 52h12 M94 64h12 M94 69h12 M94 74h12 M94 86h12 M94 91h12 M94 96h12"/>' +
+    '<path class="ms-body-highlight" d="M32 102 C36 50 54 20 84 15 M119 17 C150 26 163 58 167 103 M35 241 C47 290 68 308 94 311"/>' +
+    '<g class="ms-inert"><title>DPI is handled by the mouse hardware; CS2 cannot bind it.</title>' +
+    '<rect x="93" y="119" width="14" height="19" rx="5"/>' +
+    '<path class="ms-leader" d="M100 130 L206 175 H224" stroke="var(--muted)"/>' +
+    '<text class="ms-label" x="224" y="179">DPI · hardware</text></g>' +
+    mouseSideButtons() + '<path d="M86 242 L98 230 H116 L105 241 H95 L89 250 H108" fill="none" stroke="var(--accent)" stroke-width="3" opacity=".65"/>' +
+    '</svg>';
 }
 
 // Where each piece sits and how big it is. Kept in one place so saving it is
 // one call and resetting it is one assignment.
-const KB_HOME = { board: { x: 10, y: 46, s: 1 }, mouse: { x: 720, y: 20, s: 1 } };
+const KB_HOME = { board: { x: 10, y: 65, s: 1 }, mouse: { x: 340, y: 310, s: 1 } };
 let kbLayout = JSON.parse(JSON.stringify(KB_HOME));
 let kbShown = { board: true, mouse: true };
 
@@ -10228,7 +10156,7 @@ function kbGrow() {
     const el = scene.querySelector('.kb-piece[data-piece="' + name + '"]');
     if (el) low = Math.max(low, kbLayout[name].y + el.offsetHeight * kbLayout[name].s);
   });
-  scene.style.height = Math.max(430, Math.round(low) + KB_EDGE) + "px";
+  scene.style.height = Math.max(610, Math.round(low) + KB_EDGE) + "px";
 }
 
 function kbPlace(name) {
@@ -10272,7 +10200,7 @@ function kbResetLayout() {
   kbLayout = JSON.parse(JSON.stringify(KB_HOME));
   // The mouse belongs to the right of whatever width the panel happens to be.
   const scene = $("kb-scene");
-  if (scene) kbLayout.mouse.x = Math.max(320, scene.clientWidth - 300);
+  if (scene) kbFitLayout(scene);
   ["board", "mouse"].forEach(kbPlace);
   kbSaveLayout();
 }
@@ -10304,7 +10232,7 @@ function kbResetLayout() {
       return;
     }
     const piece = e.target.closest(".kb-piece");
-    if (piece) begin(e, piece, piece.dataset.piece, "move");
+    if (piece && !e.target.closest("[data-kbcode], button")) begin(e, piece, piece.dataset.piece, "move");
   }, true);
 
   document.addEventListener("pointermove", e => {
@@ -10408,42 +10336,36 @@ function renderKeyboard() {
 
   const rows = KB_ROWS.map(row =>
     '<div class="kb-row">' + row.map(kbCap).join("") + "</div>").join("");
-  const scene0 = $("kb-scene");
-  if (!renderKeyboard.placed) {
-    renderKeyboard.placed = true;
-    if (kbLayout.mouse.x === KB_HOME.mouse.x) {
-      const wide = (scene0 || box).clientWidth || 900;
-      kbLayout.mouse.x = Math.max(320, wide - 300);
-    }
-  }
+  const fitInitially = !renderKeyboard.placed && kbLayout.mouse.x === KB_HOME.mouse.x;
+  renderKeyboard.placed = true;
 
   box.innerHTML =
     '<p class="kb-edge" id="kb-edge" hidden>' +
       "Part of this is past the edge, because it is zoomed in. " +
       '<button class="btn ghost small" id="kb-edge-reset">Reset layout</button>' +
     "</p>" +
-    '<div class="kb-layout-row">' +
+    '<div class="kb-workspace"><div class="kb-devices"><div class="kb-layout-row">' +
     '<div class="kb-scene" id="kb-scene">' +
+    '<div class="kb-desk-label"><b>Full-size keyboard</b><span>104 keys · per-key assignments</span></div>' +
+    '<div class="kb-desk-help"><b>Make it muscle memory.</b>Select a control to inspect it. Drag a command onto a key to assign it.<br><br>Drag the case to move. Scroll over a device to zoom.</div>' +
     (kbShown.board || kbShown.mouse ? "" :
       '<div class="kb-none">Both models are switched off.</div>') +
     kbPiece("board",
       '<div class="kb-stage"><div class="kb-board">' + rows + "</div></div>") +
     kbPiece("mouse", '<div class="kb-mouse">' + mouseModel() +
     '<div class="ms-pick">' +
-    ['["two", "2 side buttons"]', '["four", "4 side buttons"]']
-      .map(() => "").join("") +
     [["two", "2 side"], ["four", "4 side"]].map(([id, label]) =>
       '<button data-mouseshape="' + id + '" aria-pressed="' +
       (mouseShape === id) + '">' + label + "</button>").join("") +
     "</div></div>") +
     "</div>" +
-    kbMissingPanel(activeProfile, missingList, showPanel) +
     "</div>" +
     '<div class="kb-show">' +
     [["board", "Keyboard"], ["mouse", "Mouse"]].map(([name, label]) =>
       '<label class="opt"><input type="checkbox" data-kbshow="' + name + '"' +
       (kbShown[name] ? " checked" : "") + "> " + label + "</label>").join("") +
     "</div>" +
+    '</div><aside class="kb-inspector" aria-label="Assignment inspector"><h3 class="kb-inspector-title">Assignment inspector</h3>' + kbDetail() +
     '<div class="kb-legend">' +
     '<span><i class="dot script"></i>one of your scripts</span>' +
     '<span><i class="dot custom"></i>changed from CS2 default</span>' +
@@ -10458,7 +10380,10 @@ function renderKeyboard() {
         "</span>"
       : "") +
     kbMissingLegend(activeProfile, missingList, showPanel) +
-    "</div>" + kbDetail();
+    "</div>" + kbMissingPanel(activeProfile, missingList, showPanel) + "</aside></div>";
+
+  if (fitInitially) kbFitLayout($("kb-scene"));
+  kbDecorateWorkspace();
 
   ["board", "mouse"].forEach(kbPlace);
 }
@@ -10483,7 +10408,7 @@ function renderKbSwitcher() {
     '<button class="kbsw-tab kbsw-default' + (defaultActive ? " active" : "") +
     (defaultBusy ? " busy" : "") + '" data-kbsw-default ' +
     'title="Put every key back to what it was before any profile touched it">' +
-    '<span class="kbsw-dot"></span><span class="kbsw-label">Default</span></button>';
+    kbIcon("crosshair") + '<span class="kbsw-label">Default</span></button>';
 
   const profileTabs = profiles.map(p => {
     const busy = kbSwitchBusy === p.file;
@@ -10495,7 +10420,7 @@ function renderKbSwitcher() {
     return '<button class="kbsw-tab' + (p.active ? " active" : "") +
       (busy ? " busy" : "") + '" data-kbsw="' + esc(p.file) +
       '" data-kbsw-label="' + esc(p.label) + '" title="' + esc(title) + '">' +
-      '<span class="kbsw-dot"></span>' +
+      kbIcon(/warm|practice/i.test(p.label) ? 'zap' : 'board') +
       '<span class="kbsw-label">' + esc(p.label) + "</span>" +
       (p.override_count
         ? '<span class="kbsw-count">' + p.override_count + "</span>" : "") +
@@ -10581,6 +10506,7 @@ document.addEventListener("contextmenu", e => {
   const tab = e.target.closest("[data-kbsw]");
   if (!tab) return;
   e.preventDefault();
+  if (kbBusy) return;
   kbswPopover = null;
   // Anchored to the tab's own box, not the click coordinates: some webviews
   // (WebView2 under non-100% Windows display scaling, most of all) report
@@ -10596,6 +10522,7 @@ document.addEventListener("click", async e => {
   // Clicking anywhere outside an open menu or popover closes it -- but not
   // the clicks that open one in the first place, handled below.
   const insideMenu = e.target.closest(".kbsw-menu");
+  if (kbBusy && e.target.closest("#kb-switcher")) return;
   const insidePopover = e.target.closest(".kbsw-popover");
   const opener = e.target.closest("[data-kbsw-add], [data-kbsw-menu]");
   if (!insideMenu && !insidePopover && !opener && (kbswMenu || kbswPopover)) {
@@ -10885,8 +10812,8 @@ document.addEventListener("click", async e => {
 
 function kbDetail() {
   if (!pickedKey) {
-    return '<div class="kb-detail empty">Pick a key to see what it runs. ' +
-      keyData.count + " keys bound, " + keyData.scripted + " of them your own scripts.</div>";
+    return '<div class="kb-detail empty"><b>Select a key or button</b><p>Inspect its command, source and CS2 default. Your command library opens here.</p>' +
+      keyData.count + " keys bound · " + keyData.scripted + " scripts</div>";
   }
   const hit = kbLookup(pickedKey.code, pickedKey.label);
   if (!hit) {
@@ -10896,7 +10823,7 @@ function kbDetail() {
       kbPicker() + "</div>";
   }
   return '<div class="kb-detail"><div class="kb-detail-key">' +
-    esc(hit.label) + "</div><div class=\"kb-detail-body\">" +
+    esc(pickedKey.label) + "</div><div class=\"kb-detail-body\">" +
     '<div class="row"><span class="k">Runs</span><span class="v"><code>' +
     esc(hit.command) + "</code></span></div>" +
     (hit.agrees === false
@@ -11067,7 +10994,7 @@ function kbPicker() {
   return '<div class="kb-pick">' +
     '<div class="kb-pick-head">' +
     "<h4>Assign something to " + esc(pickedKey.label) + "</h4>" +
-    '<input class="kb-search" id="kb-search" type="search" placeholder="Search commands" value="' +
+    '<input class="kb-search" id="kb-search" type="search" aria-label="Search commands" placeholder="Search commands" value="' +
     esc(kbFind) + '">' +
     "</div>" +
     '<div class="kb-cats">' + tabs + "</div>" +
@@ -12983,13 +12910,15 @@ document.addEventListener("change", e => {
 document.addEventListener("click", e => {
   const shape = e.target.closest("[data-mouseshape]");
   if (shape) {
+    if (kbBusy) return;
     mouseShape = shape.dataset.mouseshape;
     api("/api/prefs", { mouse_shape: mouseShape }).catch(() => {});
     renderKeyboard();
     return;
   }
   const cap = e.target.closest("[data-kbcode]");
-  if (!cap) return;
+  if (!cap || kbBusy) return;
+  kbOpenInspector = true;
   pickedKey = { code: cap.dataset.kbcode, label: cap.dataset.kblabel };
   kbOptions = null;
   kbFind = "";
@@ -13009,6 +12938,7 @@ async function loadKeyOptions() {
       kbGroup = answer.groups[0].id;
     }
   } catch (err) {
+    if (!pickedKey || pickedKey.code !== want) return;
     kbOptions = { error: String(err && err.message || err) };
   }
   renderKeyboard();
@@ -13043,6 +12973,7 @@ async function kbAssign(payload, describe) {
                                "recognise that command" : ""));
       await loadKeyboard(true);
       await loadKeyOptions();
+      kbAssignedCode = payload.code;
     }
   } finally {
     kbBusy = false;
@@ -14531,6 +14462,13 @@ function applyPrefs(ui) {
   }
   if (ui.kb_layout && ui.kb_layout.board && ui.kb_layout.mouse) {
     kbLayout = ui.kb_layout;
+    // Re-fit the previous view's untouched default arrangement to this desk.
+    // Deliberately arranged positions and zoom levels still survive upgrades.
+    if (kbLayout.board.y === 46 && kbLayout.mouse.y === 20 &&
+        kbLayout.board.s === 1 && kbLayout.mouse.s === 1) {
+      kbLayout = JSON.parse(JSON.stringify(KB_HOME));
+      renderKeyboard.placed = false;
+    }
   }
   if (ui.kb_shown && typeof ui.kb_shown.board === "boolean") {
     kbShown = ui.kb_shown;

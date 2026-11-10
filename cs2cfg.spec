@@ -34,6 +34,7 @@ datas = collect_data_files("webview") + [
     ("cs2cfg/web/*", "cs2cfg/web"),
     ("cs2cfg/web/assets/brand/*", "cs2cfg/web/assets/brand"),
     ("cs2cfg/web/assets/home/*", "cs2cfg/web/assets/home"),
+    ("cs2cfg/web/assets/devices/*", "cs2cfg/web/assets/devices"),
 ]
 
 # tkinter is imported lazily by the `gui` command, so the analyser never sees
