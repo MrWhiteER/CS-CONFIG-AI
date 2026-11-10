@@ -14,7 +14,7 @@
 .kb-workspace { display:grid; grid-template-columns:minmax(0,1fr) 330px; gap:22px; align-items:start; }
 .kb-devices { min-width:0; }
 [data-panel="keyboard"] .kb-layout-row { display:block; }
-[data-panel="keyboard"] .kb-scene { min-height:610px; border-radius:0; background:radial-gradient(ellipse at 45% 25%,rgba(var(--lift),.055),transparent 65%); }
+[data-panel="keyboard"] .kb-scene { min-height:300px; transition:none; border-radius:0; background:radial-gradient(ellipse at 45% 25%,rgba(var(--lift),.055),transparent 65%); }
 .kb-desk-label { position:absolute; top:8px; left:12px; pointer-events:none; }
 .kb-desk-label b { display:block; font-size:13px; letter-spacing:.12em; text-transform:uppercase; }
 .kb-desk-label span { color:var(--muted); font-size:11px; }
@@ -60,7 +60,7 @@
 [data-panel="keyboard"] .ms-inert { --key-rgb:var(--muted); }
 [data-panel="keyboard"] .ms-pick { margin-top:-6px; }
 [data-panel="keyboard"] .ms-pick button[aria-pressed="true"] { background:var(--accent-dim); border-color:var(--accent); color:var(--ink); }
-.kb-desk-help { position:absolute; left:20px; top:370px; width:210px; color:var(--muted); font-size:12px; line-height:1.7; pointer-events:none; }
+.kb-desk-help { position:static; padding:16px 12px; color:var(--muted); font-size:12px; line-height:1.7; }
 .kb-desk-help b { color:var(--ink); display:block; margin-bottom:8px; font-size:16px; }
 [data-panel="keyboard"] .kb-show { justify-content:flex-start; border-top:1px solid var(--line); padding:14px 0; margin:0; }
 .kb-inspector { border-left:1px solid var(--line); padding-left:20px; min-width:0; position:sticky; top:14px; }
@@ -99,7 +99,9 @@
 .kb-inspector.is-opening { animation:kb-inspector-in 230ms ease-out; }
 @keyframes kb-assigned { from { transform:scale(.85); opacity:1; } to { transform:scale(1.6); opacity:0; } }
 @keyframes kb-inspector-in { from { transform:translateX(16px); opacity:.2; } to { transform:translateX(0); opacity:1; } }
-@media(max-width:1100px) { .kb-workspace { grid-template-columns:minmax(0,1fr) 290px; gap:14px; } .kb-inspector { padding-left:14px; } .kb-desk-help { top:320px; width:150px; font-size:11px; } }
-@media(max-width:850px) { .kb-workspace { grid-template-columns:minmax(0,1fr); } .kb-inspector { position:static; border-left:0; border-top:1px solid var(--line); padding:20px 0 0; } [data-panel="keyboard"] .kb-cmds { grid-template-columns:1fr 1fr; } .kb-desk-help { width:190px; } }
+/* Give both devices the full desk on laptop-sized windows. The inspector
+   follows in normal flow rather than squeezing a full keyboard into a sliver. */
+@media(max-width:1600px) { .kb-workspace { grid-template-columns:minmax(0,1fr); } .kb-inspector { position:static; border-left:0; border-top:1px solid var(--line); padding:20px 0 0; } [data-panel="keyboard"] .kb-cmds { grid-template-columns:1fr 1fr; } }
+@media(max-width:850px) { [data-panel="keyboard"] .kb-cmds { grid-template-columns:1fr; } }
 @media(prefers-reduced-motion:reduce) { [data-panel="keyboard"] *,[data-panel="keyboard"] *::before,[data-panel="keyboard"] *::after, .kb-drag-ghost { animation:none!important; transition:none!important; } }
 [data-panel="keyboard"].hidden *,[data-panel="keyboard"].hidden *::after,html.kb-motion-paused [data-panel="keyboard"] *,html.kb-motion-paused [data-panel="keyboard"] *::after { animation-play-state:paused!important; }

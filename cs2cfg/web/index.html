@@ -10116,6 +10116,7 @@ function mouseModel() {
 
 // Where each piece sits and how big it is. Kept in one place so saving it is
 // one call and resetting it is one assignment.
+const KB_LAYOUT_VERSION = 2;
 const KB_HOME = { board: { x: 10, y: 65, s: 1 }, mouse: { x: 340, y: 310, s: 1 } };
 let kbLayout = JSON.parse(JSON.stringify(KB_HOME));
 let kbShown = { board: true, mouse: true };
@@ -10144,7 +10145,7 @@ function kbClamp(name, el) {
     ? Math.min(room, Math.max(KB_EDGE, at.x))
     : Math.min(KB_EDGE, Math.max(room, at.x));
   // Downwards there is no ceiling to fight: the desk grows to follow.
-  at.y = Math.max(KB_EDGE, at.y);
+  at.y = Math.max(65, at.y);
 }
 
 // Fit the desk to what is on it, so the lowest piece is never cut in half.
@@ -10156,17 +10157,31 @@ function kbGrow() {
     const el = scene.querySelector('.kb-piece[data-piece="' + name + '"]');
     if (el) low = Math.max(low, kbLayout[name].y + el.offsetHeight * kbLayout[name].s);
   });
-  scene.style.height = Math.max(610, Math.round(low) + KB_EDGE) + "px";
+  scene.style.height = Math.max(300, Math.ceil(low) + KB_EDGE) + "px";
 }
 
 function kbPlace(name) {
   const el = document.querySelector('.kb-piece[data-piece="' + name + '"]');
-  if (!el) return;
+  if (!el || !$("kb-scene")?.clientWidth) return;
   kbClamp(name, el);
   const at = kbLayout[name];
   el.style.setProperty("--x", at.x + "px");
   el.style.setProperty("--y", at.y + "px");
   el.style.setProperty("--s", at.s);
+  // Keep the complete callout gutters clear even during a manual move/zoom.
+  // The desk can grow downwards, so make room for the other device there.
+  const otherName = name === "board" ? "mouse" : "board";
+  const other = document.querySelector('.kb-piece[data-piece="' + otherName + '"]');
+  if (other) {
+    const b = kbLayout[otherName];
+    if (at.x < b.x + other.offsetWidth * b.s + 8 &&
+        at.x + el.offsetWidth * at.s + 8 > b.x &&
+        at.y < b.y + other.offsetHeight * b.s + 8 &&
+        at.y + el.offsetHeight * at.s + 8 > b.y) {
+      b.y = Math.ceil(at.y + el.offsetHeight * at.s + 24);
+      other.style.setProperty("--y", b.y + "px");
+    }
+  }
   kbGrow();
   kbEdgeNote();
 }
@@ -10193,6 +10208,7 @@ function kbEdgeNote() {
 }
 
 function kbSaveLayout() {
+  kbLayout.version = KB_LAYOUT_VERSION;
   api("/api/prefs", { kb_layout: kbLayout, kb_shown: kbShown }).catch(() => {});
 }
 
@@ -10336,8 +10352,7 @@ function renderKeyboard() {
 
   const rows = KB_ROWS.map(row =>
     '<div class="kb-row">' + row.map(kbCap).join("") + "</div>").join("");
-  const fitInitially = !renderKeyboard.placed && kbLayout.mouse.x === KB_HOME.mouse.x;
-  renderKeyboard.placed = true;
+  const fitInitially = !renderKeyboard.placed;
 
   box.innerHTML =
     '<p class="kb-edge" id="kb-edge" hidden>' +
@@ -10347,7 +10362,6 @@ function renderKeyboard() {
     '<div class="kb-workspace"><div class="kb-devices"><div class="kb-layout-row">' +
     '<div class="kb-scene" id="kb-scene">' +
     '<div class="kb-desk-label"><b>Full-size keyboard</b><span>104 keys · per-key assignments</span></div>' +
-    '<div class="kb-desk-help"><b>Make it muscle memory.</b>Select a control to inspect it. Drag a command onto a key to assign it.<br><br>Drag the case to move. Scroll over a device to zoom.</div>' +
     (kbShown.board || kbShown.mouse ? "" :
       '<div class="kb-none">Both models are switched off.</div>') +
     kbPiece("board",
@@ -10360,6 +10374,7 @@ function renderKeyboard() {
     "</div></div>") +
     "</div>" +
     "</div>" +
+    '<div class="kb-desk-help"><b>Make it muscle memory.</b>Select a control to inspect it. Drag a command onto a key to assign it.<br>Drag the case to move. Scroll over a device to zoom.</div>' +
     '<div class="kb-show">' +
     [["board", "Keyboard"], ["mouse", "Mouse"]].map(([name, label]) =>
       '<label class="opt"><input type="checkbox" data-kbshow="' + name + '"' +
@@ -10382,7 +10397,7 @@ function renderKeyboard() {
     kbMissingLegend(activeProfile, missingList, showPanel) +
     "</div>" + kbMissingPanel(activeProfile, missingList, showPanel) + "</aside></div>";
 
-  if (fitInitially) kbFitLayout($("kb-scene"));
+  if (fitInitially) kbEnsureLayout($("kb-scene"), true);
   kbDecorateWorkspace();
 
   ["board", "mouse"].forEach(kbPlace);
@@ -12903,6 +12918,7 @@ document.addEventListener("change", e => {
   const box = e.target.closest("[data-kbshow]");
   if (!box) return;
   kbShown[box.dataset.kbshow] = box.checked;
+  renderKeyboard.placed = false;
   kbSaveLayout();
   renderKeyboard();
 });
@@ -14460,16 +14476,7 @@ function applyPrefs(ui) {
   if (ui.mouse_shape === "two" || ui.mouse_shape === "four") {
     mouseShape = ui.mouse_shape;
   }
-  if (ui.kb_layout && ui.kb_layout.board && ui.kb_layout.mouse) {
-    kbLayout = ui.kb_layout;
-    // Re-fit the previous view's untouched default arrangement to this desk.
-    // Deliberately arranged positions and zoom levels still survive upgrades.
-    if (kbLayout.board.y === 46 && kbLayout.mouse.y === 20 &&
-        kbLayout.board.s === 1 && kbLayout.mouse.s === 1) {
-      kbLayout = JSON.parse(JSON.stringify(KB_HOME));
-      renderKeyboard.placed = false;
-    }
-  }
+  kbLoadLayout(ui.kb_layout);
   if (ui.kb_shown && typeof ui.kb_shown.board === "boolean") {
     kbShown = ui.kb_shown;
   }
