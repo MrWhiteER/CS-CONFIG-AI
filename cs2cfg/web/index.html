@@ -4995,93 +4995,9 @@
     .led.on { animation: none; }
     * { transition-duration: .01ms !important; }
   }
-
-  /* ---------------------------------------------------------------------
-     Redesign, phase 1: feel.
-
-     Buttons answer the pointer (a lift, an inner glow, a press), cards light
-     their edge under the pointer, and a tab's cards rise in one after another
-     when it opens. Everything is drawn from the theme tokens, so every theme
-     in the picker gets the same behaviour in its own colour. The boot screen
-     is pure CSS and never takes a click, so a script that fails to load can
-     never leave it covering the app.
-     --------------------------------------------------------------------- */
-
-  .btn {
-    transition: background .16s ease, border-color .16s ease, color .16s ease,
-                box-shadow .18s ease, transform .12s ease;
-  }
-  .btn:hover:not(:disabled) {
-    transform: translateY(-1px);
-    box-shadow: inset 0 0 14px var(--accent-dim), inset 0 0 0 1px var(--accent);
-  }
-  .btn:active:not(:disabled) { transform: translateY(0) scale(.98); }
-  .btn-play { transition: transform .14s ease, filter .18s ease; }
-  .btn-play:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.08) saturate(1.1); }
-  .btn-play:active:not(:disabled) { transform: scale(.99); }
-
-  .card { transition: border-color .2s ease, box-shadow .2s ease; }
-  .card:hover { border-color: color-mix(in srgb, var(--accent) 38%, var(--line)); }
-
-  .tab-panel:not(.hidden) > .card,
-  .tab-panel:not(.hidden) > * > .card {
-    animation: card-rise .32s cubic-bezier(.2, .7, .2, 1) both;
-  }
-  .tab-panel:not(.hidden) > .card:nth-child(2), .tab-panel:not(.hidden) > * > .card:nth-child(2) { animation-delay: .04s; }
-  .tab-panel:not(.hidden) > .card:nth-child(3), .tab-panel:not(.hidden) > * > .card:nth-child(3) { animation-delay: .08s; }
-  .tab-panel:not(.hidden) > .card:nth-child(4), .tab-panel:not(.hidden) > * > .card:nth-child(4) { animation-delay: .12s; }
-  .tab-panel:not(.hidden) > .card:nth-child(n+5), .tab-panel:not(.hidden) > * > .card:nth-child(n+5) { animation-delay: .16s; }
-  @keyframes card-rise {
-    from { opacity: 0; transform: translateY(8px); }
-    to   { opacity: 1; transform: none; }
-  }
-
-  #boot {
-    position: fixed; inset: 0; z-index: 2147483000;
-    display: grid; place-items: center; align-content: center; gap: 18px;
-    background: radial-gradient(600px 360px at 50% 45%, var(--accent-dim), transparent 70%), var(--bg);
-    pointer-events: none;
-    animation: boot-out .45s ease 1.25s forwards;
-  }
-  #boot .boot-mark {
-    font-family: var(--display); font-weight: 700; font-size: 28px;
-    letter-spacing: .32em; text-transform: uppercase; color: var(--ink);
-    text-shadow: 0 0 24px var(--accent);
-    animation: boot-glow 1.2s ease both;
-  }
-  #boot .boot-mark span { color: var(--accent); }
-  #boot .boot-bar {
-    width: 220px; height: 2px; background: var(--line); overflow: hidden;
-  }
-  #boot .boot-bar::after {
-    content: ""; display: block; height: 100%; background: var(--accent);
-    box-shadow: 0 0 10px var(--accent);
-    animation: boot-fill 1.2s cubic-bezier(.4, 0, .2, 1) forwards;
-    transform-origin: left; transform: scaleX(0);
-  }
-  #boot .boot-tip {
-    font-family: var(--mono); font-size: 11px; letter-spacing: .14em;
-    text-transform: uppercase; color: var(--muted);
-  }
-  @keyframes boot-glow { from { opacity: 0; letter-spacing: .6em; } to { opacity: 1; } }
-  @keyframes boot-fill { to { transform: scaleX(1); } }
-  @keyframes boot-out  { to { opacity: 0; visibility: hidden; } }
-
-  @media (prefers-reduced-motion: reduce) {
-    .btn, .btn-play, .card { transition: none; }
-    .btn:hover:not(:disabled), .btn-play:hover:not(:disabled) { transform: none; }
-    .tab-panel:not(.hidden) > .card, .tab-panel:not(.hidden) > * > .card { animation: none; }
-    #boot { animation: boot-out .01s linear .4s forwards; }
-    #boot .boot-mark, #boot .boot-bar::after { animation: none; transform: none; }
-  }
 </style>
 </head>
 <body>
-<div id="boot" aria-hidden="true">
-  <div class="boot-mark">CS2 <span>Launcher</span></div>
-  <div class="boot-bar"></div>
-  <div class="boot-tip">Loading your setup</div>
-</div>
 <!-- One icon per setting. Stroke icons on a 24 grid, drawn in currentColor so
      a row's icon takes the colour of its state rather than its own. Referenced
      by name from OPT_ICONS below -- add an icon here and there, nowhere else. -->
