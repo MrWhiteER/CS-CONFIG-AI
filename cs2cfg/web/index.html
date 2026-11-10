@@ -5358,6 +5358,113 @@
 @media(prefers-reduced-motion:reduce) { .mode-card::before, :is(.hero-art img,.monitor-light,.desk-light,.mode-card img) { animation:none; }.mode-card { transition:none; }.mode-card:hover,.mode-card[aria-pressed="true"] { transform:none; } }
 
 </style>
+<style>
+/* Graphics workspace. Every surface and illustration follows the active theme. */
+/* Unused physical screen pixels remain dark even in a light UI theme. */
+[data-panel="gpu"] { --gfx-radius:var(--card-radius,12px); --gfx-unlit:#050507; }
+[data-panel="gpu"] .gfx-heading { display:flex; align-items:center; justify-content:space-between; gap:24px; min-height:0; padding-bottom:24px; }
+[data-panel="gpu"] .gfx-heading p { max-width:650px; }
+[data-panel="gpu"] .gfx-heading .btn { flex-shrink:0; }
+#gpu-out { color:var(--ink); }
+#gpu-out h3 { font-size:16px; letter-spacing:0; text-transform:none; margin:0 0 16px; color:var(--ink); }
+#gpu-out .gfx-section { margin:0 0 30px; }
+#gpu-out .gfx-note { color:var(--muted); font-size:12px; line-height:1.65; margin:12px 0; }
+#gpu-out .gfx-monitors { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+#gpu-out .gfx-monitor { border:1px solid var(--line); border-radius:var(--gfx-radius); padding:18px; background:linear-gradient(145deg,var(--panel-2),var(--panel)); min-width:0; }
+#gpu-out .gfx-monitor header { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:0; border:0; background:none; }
+#gpu-out .gfx-monitor header b { font-size:13px; }
+#gpu-out .gfx-monitor header .sub { margin-left:auto; font-size:10px; }
+#gpu-out .gfx-monitor-body { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(0,1fr); gap:22px; align-items:center; margin:22px 0 12px; }
+#gpu-out .gfx-hardware { min-width:0; padding:5px 5px 0; border:1px solid var(--faint); border-radius:5px; background:var(--sunk); position:relative; margin-bottom:20px; }
+#gpu-out .gfx-scene { display:block; width:100%; height:auto; aspect-ratio:16/9; overflow:hidden; }
+#gpu-out .gfx-stand { height:8px; border-top:1px solid var(--line); }
+#gpu-out .gfx-stand::before { content:''; position:absolute; width:12%; height:13px; bottom:-13px; left:44%; background:var(--faint); }
+#gpu-out .gfx-stand::after { content:''; position:absolute; width:45%; height:4px; bottom:-17px; left:27.5%; background:var(--faint); border-radius:2px; }
+#gpu-out .gfx-readout { display:flex; flex-direction:column; gap:5px; }
+#gpu-out .gfx-readout strong { color:var(--accent); font-size:clamp(28px,3vw,48px); line-height:1.05; font-variant-numeric:tabular-nums; letter-spacing:-2px; }
+#gpu-out .gfx-readout strong small { font-size:15px; letter-spacing:0; color:var(--ink); }
+#gpu-out .gfx-readout>b { font-size:14px; font-variant-numeric:tabular-nums; }
+#gpu-out .gfx-readout .sub { font-size:10px; }
+#gpu-out .gfx-adapter { font-size:12px; margin:14px 0; overflow-wrap:anywhere; }
+#gpu-out .gfx-adapter small { display:block; color:var(--muted); font:10px var(--mono); margin-top:4px; }
+#gpu-out .gfx-rate { display:flex; align-items:end; gap:10px; padding:12px 0 15px; border-top:1px solid var(--line); }
+#gpu-out .gfx-rate label { display:flex; align-items:center; gap:12px; flex:1; font-size:12px; color:var(--muted); }
+#gpu-out .gfx-rate select { flex:1; min-width:0; max-width:190px; padding:8px; }
+#gpu-out .gfx-rate .btn { min-height:35px; }
+#gpu-out .gfx-motion { padding-top:10px; border-top:1px solid var(--line); }
+#gpu-out .gfx-motion-lane { display:grid; grid-template-columns:94px minmax(0,1fr) 80px; align-items:center; gap:8px; height:27px; color:var(--muted); font-size:10px; }
+#gpu-out .gfx-motion-lane:nth-child(2) { color:var(--accent); }
+#gpu-out .gfx-motion-lane small { font:9px var(--mono); text-align:right; }
+#gpu-out .gfx-track { position:relative; height:18px; border-bottom:1px solid var(--line); margin-right:8px; }
+#gpu-out .gfx-track i { position:absolute; top:7px; width:3px; height:3px; border-radius:50%; background:currentColor; opacity:.35; }
+#gpu-out .gfx-mover { display:block; position:absolute; top:3px; width:9px; height:9px; border:1px solid currentColor; background:var(--panel); animation:gfx-step 12s steps(var(--gfx-steps),end) infinite; }
+#gpu-out .gfx-motion p { margin:9px 0 0; font-size:10px; color:var(--muted); line-height:1.5; }
+@keyframes gfx-step { from { transform:translateX(0); } to { transform:translateX(var(--gfx-distance,100px)); } }
+#gpu-out .gfx-scaling-guide { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:24px; padding:18px 22px; background:var(--panel); border:1px solid var(--line); border-radius:var(--gfx-radius); }
+#gpu-out .gfx-scaling-guide figure { margin:0; display:grid; grid-template-columns:minmax(70px,1fr) minmax(0,1fr); align-items:center; gap:14px; }
+#gpu-out .gfx-scaling-guide .gfx-scene { border:3px solid var(--faint); border-radius:4px; }
+#gpu-out figcaption b { display:block; font-size:12px; margin-bottom:6px; }
+#gpu-out figcaption span { font-size:11px; line-height:1.5; color:var(--muted); display:block; }
+#gpu-out .gfx-scaling-row { display:flex; align-items:center; gap:14px; padding:18px 4px; border-bottom:1px solid var(--line); }
+#gpu-out .gfx-scaling-row>div:nth-child(2) { flex:1; min-width:0; }
+#gpu-out .gfx-policy-preview { width:96px; flex:0 0 96px; border:3px solid var(--faint); border-radius:4px; }
+#gpu-out .gfx-scaling-row b { font-size:12px; }
+#gpu-out .gfx-scaling-row p { font-size:12px; color:var(--muted); margin:5px 0; line-height:1.5; }
+#gpu-out .gfx-scaling-state { display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
+#gpu-out .gfx-icon { color:var(--accent); width:30px; height:30px; flex:0 0 30px; display:inline-flex; align-items:center; justify-content:center; }
+#gpu-out .gfx-icon svg { width:24px; height:24px; }
+#gpu-out .gfx-driver { border-top:1px solid var(--line); padding-top:24px; }
+#gpu-out .gfx-driver-heading { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+#gpu-out .gfx-driver-heading h3 { margin:0; }
+#gpu-out .gfx-driver-heading>strong { margin-left:auto; font:18px var(--mono); }
+#gpu-out .gfx-driver-meta { font-size:12px; color:var(--muted); }
+#gpu-out .gfx-driver-meta .mono { margin-left:10px; font-size:10px; }
+#gpu-out .gfx-filter { margin:16px 0; font-size:12px; }
+#gpu-out .gfx-profile { border:1px solid var(--line); border-radius:var(--gfx-radius); background:var(--panel); margin:10px 0; overflow:hidden; }
+#gpu-out .gfx-profile>summary { padding:16px 18px; cursor:pointer; color:var(--ink); font-size:13px; font-weight:650; }
+#gpu-out .gfx-profile>summary span { display:inline; }
+#gpu-out .gfx-profile>summary small { font-size:10px; font-weight:400; color:var(--muted); margin-left:16px; }
+#gpu-out .gfx-profile[open]>summary { background:var(--accent-dim); border-bottom:1px solid var(--line); }
+#gpu-out .gfx-profile-body { padding:0 18px; }
+#gpu-out .gfx-profile-body>p { margin:16px 0; }
+#gpu-out .gfx-setting { display:grid; grid-template-columns:30px minmax(0,1fr) auto 76px; gap:12px; padding:15px 0; align-items:start; border-bottom:1px solid var(--line); }
+#gpu-out .gfx-setting:last-child { border-bottom:0; }
+#gpu-out .gfx-setting-copy { min-width:0; }
+#gpu-out .gfx-setting-copy b { font-size:12px; overflow-wrap:anywhere; }
+#gpu-out .gfx-setting-copy p { font-size:11px; line-height:1.55; color:var(--muted); margin:5px 0 0; }
+#gpu-out .gfx-setting>.flag { white-space:nowrap; margin:1px 0 0; }
+#gpu-out .gfx-raw { font-size:11px; min-width:0; color:var(--muted); overflow-wrap:anywhere; }
+#gpu-out .gfx-raw summary { cursor:pointer; color:var(--accent); padding:3px 0; }
+#gpu-out .gfx-setting>.gfx-raw[open] { grid-column:2/-1; }
+#gpu-out .gfx-raw dl { display:grid; grid-template-columns:100px minmax(0,1fr); gap:8px; background:var(--sunk); padding:12px; margin:10px 0; border-radius:var(--control-radius); }
+#gpu-out .gfx-raw dd { margin:0; color:var(--ink); }
+#gpu-out .gfx-raw code { white-space:pre-wrap; }
+#gpu-out :is(summary,button,select):focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.gfx-paused #gpu-out .gfx-mover, [data-panel="gpu"].hidden #gpu-out .gfx-mover { animation-play-state:paused; }
+@media(prefers-reduced-motion:reduce) { #gpu-out .gfx-mover { animation:none; transform:translateX(50px); } }
+@media(max-width:1150px) {
+  #gpu-out .gfx-scaling-guide figure { display:block; }
+  #gpu-out .gfx-scaling-guide .gfx-scene { margin-bottom:12px; }
+  #gpu-out .gfx-monitor-body { gap:12px; }
+  #gpu-out .gfx-motion-lane { grid-template-columns:80px minmax(0,1fr) 70px; }
+}
+@media(max-width:850px) {
+  #gpu-out .gfx-monitors { grid-template-columns:1fr; }
+  #gpu-out .gfx-monitor-body { grid-template-columns:1fr 1fr; }
+  #gpu-out .gfx-hardware { max-width:300px; }
+  #gpu-out .gfx-scaling-row { flex-wrap:wrap; }
+  #gpu-out .gfx-scaling-state { margin-left:44px; justify-content:flex-start; }
+  #gpu-out .gfx-profile>summary small { display:block; margin:6px 0 0 16px; }
+}
+@media(max-width:540px) {
+  #gpu-out .gfx-scaling-guide { gap:14px; padding:12px; }
+  #gpu-out .gfx-setting { grid-template-columns:26px minmax(0,1fr) auto; gap:8px; }
+  #gpu-out .gfx-setting>.gfx-raw { grid-column:2/-1; }
+  #gpu-out .gfx-rate label { flex-direction:column; align-items:stretch; }
+  #gpu-out .gfx-rate select { max-width:none; }
+}
+</style>
+
 <link rel="stylesheet" href="assets/devices/workspace.css">
 </head>
 <body>
@@ -5981,26 +6088,18 @@ const startup = (() => {
     </div>
 
     <div class="tab-panel hidden" data-panel="gpu">
-      <div class="hero">
+      <div class="hero gfx-heading">
         <div class="hero-copy">
           <div class="eyebrow">Display &amp; driver</div>
           <h2>Graphics</h2>
           <p>
-            Refresh rate is a Windows display mode, so it can be set here on any GPU
-            and is the only thing on this page that changes anything. The driver
-            profile below is shown read-only: writing to it would mean editing a
-            system-wide database as an administrator, and the driver does not publish
-            what its setting values mean.
+            See your display. Understand your settings. Set your refresh rate,
+            check stretched scaling, and explore your driver profiles.
           </p>
         </div>
+        <button class="btn" id="gpu-reload">Re-read</button>
       </div>
-      <section class="panel">
-        <h2>Graphics</h2>
-        <div class="actions" style="margin-top:0">
-          <button class="btn" id="gpu-reload">Re-read</button>
-        </div>
-        <div id="gpu-out" style="margin-top:10px"><span class="sub">Loading&hellip;</span></div>
-      </section>
+      <div id="gpu-out" aria-live="polite"><span class="sub">Loading&hellip;</span></div>
     </div>
 
     <div class="tab-panel hidden" data-panel="settings">
@@ -6372,173 +6471,176 @@ let gpuData = null;
 
 function hz(n) { return n + " Hz"; }
 
-function renderDisplays(d) {
-  if (!d || !d.displays || !d.displays.length) {
-    return '<span class="sub">No displays reported.</span>';
-  }
-  return d.displays.map(s => {
-    const rates = (s.rates || []);
-    const options = rates.map(r =>
-      '<option value="' + r + '"' + (r === s.refresh ? " selected" : "") + ">" +
-      esc(hz(r)) + "</option>").join("");
-    const state = s.at_best
-      ? '<span class="flag">at this panel’s maximum</span>'
-      : '<span class="flag warn">' + esc(hz(s.best)) + " available</span>";
-    return '<div class="setting" id="disp-' + esc(s.device) + '">' +
-      '<div class="top"><div class="name"><b>' + esc(s.name) + "</b>" +
-      (s.primary ? '<span class="flag">primary</span>' : "") + state +
-      '<br><span class="sub mono">' + esc(s.device) + " · " +
-      esc(s.width + "×" + s.height) + "</span></div>" +
-      '<div class="ctl">' +
-      (rates.length > 1
-        ? '<select data-display="' + esc(s.device) + '">' + options + "</select>" +
-          '<button class="btn small" data-apply-display="' + esc(s.device) + '">Apply</button>'
-        : '<span class="sub">' + esc(hz(s.refresh)) + "</span>") +
-      "</div></div>" +
-      '<div class="src">Refresh rate is a Windows display mode, not a driver setting. ' +
-      "Applying one keeps the resolution as it is and survives a restart.</div></div>";
-  }).join("");
+// Original vector scene: no downloaded game art. All colours inherit theme tokens.
+function gfxScene(mode = 'native') {
+  const inner = mode === 'bars' ? '<svg x="30" y="0" width="180" height="135" viewBox="0 0 240 135" preserveAspectRatio="none">' : '<svg width="240" height="135" viewBox="0 0 240 135" preserveAspectRatio="none">';
+  return '<svg class="gfx-scene" viewBox="0 0 240 135" role="img" aria-label="' +
+    esc(mode === 'bars' ? '4:3 picture with side bars' : mode === 'stretch' ? '4:3 picture widened to fill 16:9' : '16:9 picture with original proportions') + '">' +
+    '<rect width="240" height="135" fill="var(--gfx-unlit)"/>' + inner +
+    '<path d="M0 0H240V135H0Z" fill="var(--panel-2)"/>' +
+    '<g fill="none" stroke="var(--line)" stroke-width="1"><path d="M0 0L75 45H165L240 0M0 135L75 90H165L240 135M75 45V90M165 45V90M0 68H75M165 68H240M35 0L90 45M205 0L150 45M35 135L90 90M205 135L150 90"/></g>' +
+    '<path d="M24 88L54 80L73 88V116H24Z M178 73H207V99H178Z" fill="var(--accent-dim)" stroke="var(--accent)"/>' +
+    '<g transform="translate(120 68) scale(' + (mode === 'stretch' ? '1.333 1' : mode === 'bars' ? '1.333 1' : '1 1') + ')" fill="none" stroke="var(--accent)" stroke-width="1.5"><circle r="13"/><path d="M-20 0H-8M8 0H20M0-20V-8M0 8V20"/></g></svg></svg>';
 }
+function gfxMotion(rate) {
+  const n = Math.max(1, Number(rate) || 60);
+  // Slow time by 12x: 60 illustrative steps in 12 seconds, selected Hz steps likewise.
+  // The browser cannot demonstrate refresh above the physical screen's own rate.
+  const lane = (value, selected) => '<div class="gfx-motion-lane"><span>' + (selected ? 'Selected ' : '') + esc(hz(value)) +
+    '</span><div class="gfx-track" style="--gfx-steps:' + value + '">' +
+    Array.from({length: Math.min(48, Math.max(2, Math.round(value / 6)))}, (_,i) => '<i style="left:' + (i / Math.max(1,Math.min(48,Math.max(2,Math.round(value/6)))-1)*94) + '%"></i>').join('') +
+    '<b class="gfx-mover"></b></div><small>' + (1000/value).toFixed(2) + ' ms/frame</small></div>';
+  return '<div class="gfx-motion">' + lane(60,false) + lane(n,true) +
+    '<p>Frame-step illustration · 12× slower. Not a screen test or an FPS estimate.</p></div>';
+}
+function renderDisplays(d) {
+  if (!d || !d.displays || !d.displays.length) return '<p class="sub">No displays reported. Re-read to try again.</p>';
+  return '<div class="gfx-monitors">' + d.displays.map((s,i) => {
+    const rates = (s.rates || []).filter(r=>Number(r)>0);
+    const options = rates.map(r => '<option value="' + Number(r) + '"' + (r === s.refresh ? ' selected' : '') + '>' + esc(hz(r)) + '</option>').join('');
+    const reported = s.width > 0 && s.height > 0;
+    return '<article class="gfx-monitor" id="disp-' + esc(s.device) + '">' +
+      '<header><b>Display ' + (i+1) + '</b>' + (s.primary ? '<span class="flag">Primary</span>' : '') +
+      '<span class="sub">' + (s.at_best ? 'Highest offered at this resolution' : s.best ? esc(hz(s.best)) + ' available' : 'Available rates not reported') + '</span></header>' +
+      '<div class="gfx-monitor-body"><div class="gfx-hardware">' + gfxScene() + '<div class="gfx-stand"></div></div>' +
+      '<div class="gfx-readout"><strong>' + (s.refresh > 0 ? esc(s.refresh) + '<small> Hz</small>' : '—') + '</strong><b>' +
+      (reported ? esc(s.width + ' × ' + s.height) : 'Mode unavailable') + '</b><span class="sub">Current Windows mode</span></div></div>' +
+      '<p class="gfx-adapter">' + esc(s.name || 'Display adapter') + '<small>' + esc(s.device) + '</small></p>' +
+      '<div class="gfx-rate"><label>Refresh rate <select aria-label="Refresh rate for display ' + (i+1) + '" data-display="' + esc(s.device) + '"' + (!rates.length ? ' disabled' : '') + '>' +
+      (rates.length ? (!rates.includes(s.refresh) ? '<option selected disabled value="' + Number(s.refresh||0) + '">Current rate not listed</option>' : '') + options : '<option>No rates reported</option>') + '</select></label>' +
+      '<button class="btn small" data-apply-display="' + esc(s.device) + '"' + (!reported || !rates.length ? ' disabled' : '') + '>Apply</button></div>' +
+      '<div class="gfx-motion-slot">' + (s.refresh > 0 ? gfxMotion(s.refresh) : '<p class="sub">Motion comparison needs a reported refresh rate.</p>') + '</div></article>';
+  }).join('') + '</div><p class="gfx-note">Refresh rate controls how often Windows updates the picture. Apply keeps your resolution and saves the rate across restarts. Close CS2 before applying.</p>';
+}
+// Update only the illustration: changing the picker never changes Windows until Apply.
+document.addEventListener('change', e => {
+  if (!e.target.matches('select[data-display]')) return;
+  e.target.closest('.gfx-monitor').querySelector('.gfx-motion-slot').innerHTML = gfxMotion(e.target.value);
+  gfxObserveMotion();
+});
+// CSS handles hidden tabs. Visibility also pauses motion when the app is minimised.
+const gfxMotionResize = new ResizeObserver(entries=>{
+  for (const {target} of entries) target.style.setProperty('--gfx-distance', Math.max(0,target.clientWidth-9)+'px');
+});
+function gfxObserveMotion() { gfxMotionResize.disconnect(); document.querySelectorAll('#gpu-out .gfx-track').forEach(e=>gfxMotionResize.observe(e)); }
+function gfxPauseMotion() { document.documentElement.classList.toggle('gfx-paused', document.hidden); }
+document.addEventListener('visibilitychange', gfxPauseMotion);
+gfxPauseMotion();
 
 function renderScaling(d) {
+  const comparisons = '<div class="gfx-scaling-guide">' + [
+    ['bars','Black bars','4:3 keeps its shape, with unused space at the sides.'],
+    ['stretch','Stretched','4:3 widens to fill 16:9. Shapes look wider.'],
+    ['native','Native proportions','A matching 16:9 picture fills the screen without widening.']
+  ].map(([mode,title,text])=>'<figure>' + gfxScene(mode) + '<figcaption><b>' + title + '</b><span>' + text + '</span></figcaption></figure>').join('') + '</div>';
+  let rows = '';
   if (!d || !d.available) {
-    return '<div class="subcat">Stretched resolution</div>' +
-      '<span class="sub">' + esc(d && d.reason || "Scaling could not be read.") +
-      " On AMD or Intel the same setting lives in the driver’s own control " +
-      "panel, under scaling or display options.</span>";
-  }
-  const rows = (d.displays || []).map(s => {
-    const state = s.fills
-      ? '<span class="flag">fills the screen</span>'
-      : '<span class="flag warn">' + esc(s.name) + "</span>";
-    const control = s.fills
-      ? '<span class="sub">no black bars</span>'
-      : '<button class="btn small" data-fill-display="' + esc(s.id) + '">Fix</button>';
-    return '<div class="setting"><div class="top"><div class="name"><b>' +
-      esc(s.width + "×" + s.height + " @ " + s.refresh + " Hz") + "</b>" +
-      (s.primary ? '<span class="flag">primary</span>' : "") + state +
-      '<br><span class="sub mono">' + esc(s.id) + "</span></div>" +
-      '<div class="ctl">' + control + "</div></div>" +
-      '<div class="src">' + (s.fills
-        ? "A narrow mode is scaled out to the whole panel, which is what makes a " +
-          "stretched resolution actually stretch."
-        : "A mode narrower than this panel is letterboxed: the picture sits in the " +
-          "middle with a black bar down each side. Launching stretched from here " +
-          "fixes this automatically and puts it back on exit — Fix makes it " +
-          "permanent.") + "</div></div>";
-  }).join("");
-  return '<div class="subcat">Stretched resolution</div>' + rows;
+    rows = '<p class="sub">' + esc(d && d.reason || 'Scaling could not be read.') + ' On AMD or Intel, check scaling in your GPU control panel.</p>';
+  } else if (!(d.displays || []).length) rows = '<p class="sub">No scaling displays reported.</p>';
+  else rows = d.displays.map(s=>{
+    const mode = Number(s.scaling);
+    // Only the published enum establishes aspect/centred/integer behaviour. DEFAULT,
+    // CUSTOM and future modes must not be labelled black bars merely because !fills.
+    const explained = s.fills ? 'A narrower CS2 mode will widen to fill the panel.' : [5,6].includes(mode) ? 'A narrower CS2 mode keeps its proportions, leaving side bars.' : [3,7].includes(mode) ? 'A smaller CS2 picture stays centred, with unused space around it.' : mode === 8 ? 'CS2 pixels scale in whole steps; unused space may remain.' : 'The effect on a narrower CS2 mode is not reported. Check the driver control panel.';
+    const state = s.fills ? 'Stretched scaling ready' : [5,6].includes(mode) ? 'Preserve proportions' : [3,7].includes(mode) ? 'Centred · no scaling' : mode === 8 ? 'Integer scaling' : 'Scaling effect unknown';
+    const preview = s.fills || [5,6].includes(mode)
+      ? '<div class="gfx-policy-preview" title="Illustration of this policy with a narrower CS2 picture">' + gfxScene(s.fills ? 'stretch' : 'bars') + '</div>'
+      : '<span class="gfx-icon" aria-hidden="true">' + gfxIcon('screen') + '</span>';
+    return '<div class="gfx-scaling-row">' + preview + '<div><b>' + esc(s.width + ' × ' + s.height + ' · ' + s.refresh + ' Hz') + '</b>' +
+      (s.primary ? '<span class="flag">Primary</span>' : '') + '<p>' + esc(explained) + '</p><small class="sub">Reported policy: ' + esc(s.name) + '</small>' +
+      '<details class="gfx-raw"><summary>Display details</summary><code>' + esc(s.id) + '</code></details></div><div class="gfx-scaling-state"><span class="flag">' + state + '</span>' +
+      (s.fills ? '' : '<button class="btn small" data-fill-display="' + esc(s.id) + '">Fix</button>') + '</div></div>';
+  }).join('');
+  return '<section class="gfx-section"><h3>Stretched resolution</h3><p class="gfx-note">Same target, three ways to show it. Illustrations use a 16:9 panel; your native panel size is not reported.</p>' + comparisons + rows +
+    '<p class="gfx-note">These rows show the driver’s current scaling policy, not CS2’s live resolution. Fix saves full-screen scaling permanently. The launcher also fixes scaling for stretched play and restores it on exit.</p></section>';
 }
-
-function renderProfile(p, caption) {
-  if (!p) return "";
-  const named = p.settings.filter(s => s.known);
-  const internal = p.settings.length - named.length;
-
-  let head = '<div class="subcat">' + esc(caption) + "</div>";
-  if (p.error) {
-    return head + '<span class="sub warn">' + esc(p.error) + "</span>";
-  }
-  if (!p.settings.length) {
-    return head + '<span class="sub">Nothing overridden here — every setting is at ' +
-      "the driver’s own default.</span>";
-  }
-
-  const rows = named.map(s =>
-    '<div class="row"><span class="k">' + esc(s.name) + "</span>" +
-    '<span class="v"><code>' + esc(s.value) + "</code>" +
-    (s.predefined ? '<span class="flag">NVIDIA default</span>'
-                  : '<span class="flag warn">changed</span>') +
-    "</span></div>").join("");
-
-  // NVIDIA's own game profiles lean on ids the driver does not name. Saying so
-  // is more honest than captioning them with a guess.
-  const tail = internal
-    ? '<div class="sub2" style="margin-top:7px">' + internal +
-      " further setting" + (internal === 1 ? "" : "s") +
-      " in this profile use internal ids the driver does not publish names for." +
-      "</div>"
-    : "";
-  return head + rows + tail;
+function gfxIcon(kind) {
+  const paths = {screen:'M3 4H21V16H3ZM9 20H15M12 16V20',frames:'M3 5H15V15H3ZM8 2H20V12M7 19H20',image:'M3 3H21V21H3ZM3 17L9 11L13 15L17 10L21 14M7 7H8',power:'M12 2V11M6 5A9 9 0 1 0 18 5',chip:'M6 6H18V18H6ZM9 1V6M15 1V6M9 18V23M15 18V23M1 9H6M1 15H6M18 9H23M18 15H23',info:'M12 10V17M12 6V7M12 2A10 10 0 1 0 12 22A10 10 0 1 0 12 2'};
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="' + (paths[kind] || paths.info) + '"/></svg>';
 }
-
-// Start on the handful that have been changed rather than all ~130. The rest
-// are read-only rows the driver will not explain -- worth having, not worth
-// opening on.
+// Names stay sourced from the installed driver. These explanations describe a feature,
+// never decode a raw value or promise that a legacy override affects CS2.
+// Reference: NVIDIA Control Panel Help, Manage 3D Settings (Reference).
+function gfxSettingInfo(name) {
+  const n = String(name || '').toLowerCase();
+  if (/predefined|behavior flags|behaviour flags|streamline|shim|compatibility|optimus|do not display/.test(n)) {
+    if (/optimus/.test(n)) return ['chip','Laptop GPU routing','A hybrid-graphics routing option. Its value and effect in CS2 are not decoded.'];
+    if (/ansel/.test(n)) return ['image','NVIDIA photo-mode compatibility','An internal photo-mode profile option; its effect in CS2 is not published.'];
+    if (/streamline/.test(n)) return ['chip','Streamline compatibility override','An internal driver integration option; its effect in CS2 is not published.'];
+    if (/do not display/.test(n)) return ['info','Control Panel profile visibility','Controls profile visibility in NVIDIA Control Panel, rather than game image quality.'];
+    return ['info',name,'A driver compatibility option. Its effect in CS2 is not published.'];
+  }
+  if (/maximum pre-rendered frames/.test(n)) return ['frames','Frames prepared ahead','Limits CPU frames queued ahead of GPU work in supported DirectX games. CS2 support is not reported.'];
+  if (/low latency/.test(n)) return ['frames','Render queue latency','Adjusts the render queue in supported games. This does not report CS2’s Reflex setting.'];
+  if (/frame rate|frame limiter/.test(n)) return ['frames',/background/.test(n) ? 'Background FPS limit' : 'Driver FPS limit','Caps rendered frames in supported applications. The raw value is not decoded here.'];
+  if (/vertical sync|vsync/.test(n)) return ['screen','Frame synchronisation','Coordinates frame delivery with refresh in supported games; can affect tearing and latency.'];
+  if (/power management/.test(n)) return ['power','GPU power behaviour','Controls how GPU performance levels change while running supported 3D applications.'];
+  if (/texture filtering|anisotropic/.test(n)) return ['image',name,'Controls texture sampling in supported games; can trade surface detail for rendering speed.'];
+  if (/antialias|multi-frame sampled/.test(n)) return ['image',name,'Controls edge smoothing in supported games. Compatibility depends on the rendering path.'];
+  if (/shader cache/.test(n)) return ['chip',name,'Caches compiled shader work in supported games to reduce repeated compilation.'];
+  if (/ambient occlusion/.test(n)) return ['image',name,'Adds contact shading in supported games. This profile does not confirm support in CS2.'];
+  if (/triple buffering/.test(n)) return ['frames',name,'Adds a buffer for OpenGL vertical sync. This is not a CS2 graphics control.'];
+  if (/opengl/.test(n)) return ['chip',name,'Applies to OpenGL applications. CS2 on Windows uses a different rendering path.'];
+  if (/sli|multi.gpu/.test(n)) return ['chip',name,'A multi-GPU driver option; this does not establish multi-GPU support in CS2.'];
+  if (/cuda/.test(n)) return ['chip',name,'Controls GPU compute resources for supported applications, rather than CS2 image quality.'];
+  return ['info',name || 'Unnamed driver setting','The driver reports this option, but its effect in CS2 is not published.'];
+}
+function gfxSetting(s, changed) {
+  const [kind,title,help] = gfxSettingInfo(s.name);
+  return '<div class="gfx-setting"><span class="gfx-icon" aria-hidden="true">' + gfxIcon(kind) + '</span><div class="gfx-setting-copy"><b>' + esc(title) + '</b><p>' + esc(help) + '</p></div>' +
+    '<span class="flag' + (changed ? ' warn' : '') + '">' + (changed ? 'Changed' : 'NVIDIA default') + '</span>' +
+    '<details class="gfx-raw"><summary>Details</summary><dl><dt>Driver name</dt><dd>' + esc(s.name || 'Not published') + '</dd><dt>Setting ID</dt><dd><code>' + esc(s.id) + '</code></dd><dt>Stored value</dt><dd><code>' + esc(s.value || 'Not published · driver default') + '</code></dd></dl><p>Raw driver data; no enabled/disabled meaning is inferred.</p></details></div>';
+}
 let show3dAll = false;
-
+// Preserve accordion state across filter changes and re-reads.
+const gfxOpenGroups = new Map();
+document.addEventListener('toggle', e=>{
+  if (e.target.isConnected && e.target.matches('details[data-gfx-group]')) gfxOpenGroups.set(e.target.dataset.gfxGroup,e.target.open);
+},true);
+function gfxGroup(key,title,subtitle,body,open=false) {
+  return '<details class="gfx-profile" data-gfx-group="' + esc(key) + '"' + ((gfxOpenGroups.has(key) ? gfxOpenGroups.get(key) : open) ? ' open' : '') + '><summary><span>' + esc(title) + '<small>' + esc(subtitle) + '</small></span></summary><div class="gfx-profile-body">' + body + '</div></details>';
+}
+function renderProfile(p, caption, key = caption) {
+  if (!p) return gfxGroup(key,caption,'Not found','<p class="sub">No application profile was reported by this driver.</p>');
+  const settings = p.settings || [];
+  const named = settings.filter(s=>s.known);
+  const internal = settings.length - named.length;
+  const changed = settings.filter(s=>!s.predefined).length;
+  let body = p.error ? '<p class="sub warn">' + esc(p.error) + '</p>' :
+    named.filter(s=>show3dAll || !s.predefined).map(s=>gfxSetting(s,!s.predefined)).join('') ||
+    '<p class="sub">' + (!settings.length ? 'No overrides reported. This profile uses NVIDIA defaults.' : show3dAll ? 'No named settings in this profile. Internal values are under Details below.' : 'No named changed settings in this profile. Uncheck the filter to explore defaults.') + '</p>';
+  if (internal) body += '<p class="gfx-note">' + internal + ' unnamed internal settings. NVIDIA does not publish their purpose.</p><details class="gfx-raw"><summary>Internal setting details</summary>' +
+    settings.filter(s=>!s.known && (show3dAll || !s.predefined)).map(s=>gfxSetting(s,!s.predefined)).join('') + '</details>';
+  return gfxGroup(key,caption,settings.length + ' stored settings · ' + changed + ' changed',body,key === 'cs2.exe');
+}
 function render3d(nv) {
   const list = nv.catalogue_3d || [];
-  if (!list.length) return renderProfile(nv["global"], "Global 3D settings");
-
-  const changed = nv.overridden_count || 0;
-  let html = '<div class="subcat">Manage 3D settings &nbsp;·&nbsp; ' +
-    list.length + " settings, " + changed + " changed from default</div>";
-
-  html += '<label class="opt" style="margin:2px 0 8px">' +
-    '<input type="checkbox" id="gpu-only-changed"' + (show3dAll ? "" : " checked") +
-    "> Only the ones that have been changed</label>";
-
-  const rows = list.filter(x => show3dAll || x.overridden);
-  if (!rows.length) {
-    return html + '<span class="sub">Nothing has been changed from the driver’s ' +
-      "defaults.</span>";
-  }
-  // The driver's own id for each setting is carried as a tooltip rather than
-  // printed: it is how you look one up, not something to read past 130 times.
-  html += rows.map(x =>
-    '<div class="row" title="' + esc(x.name + "  \u00b7  " + x.id) + '">' +
-    '<span class="k">' + esc(x.name) + "</span>" +
-    '<span class="v">' +
-    (x.overridden
-      ? '<code>' + esc(x.value) + '</code><span class="flag warn">changed</span>'
-      : '<span class="sub">driver default</span>') +
-    "</span></div>").join("");
-
-  // The driver names every setting but will not say what its values mean, so
-  // the raw number is shown rather than a label invented here.
-  html += '<div class="sub2" style="margin-top:8px">' +
-    "Values are shown as the driver stores them. It publishes the setting names " +
-    "but not what each value means, so nothing here is translated into a guess." +
-    "</div>";
-  return html;
+  if (!list.length) return renderProfile(nv.global,'Global 3D settings','global');
+  const globalSettings = new Map(((nv.global && nv.global.settings) || []).map(s=>[s.id,s]));
+  const isChanged = s => globalSettings.has(s.id) ? !globalSettings.get(s.id).predefined : !!s.overridden;
+  const rows = list.filter(s=>show3dAll || isChanged(s));
+  const body = (nv.global && nv.global.error ? '<p class="sub warn">' + esc(nv.global.error) + '</p>' : '') + (rows.length ? rows.map(s=>gfxSetting(s,isChanged(s))).join('') : '<p class="sub">Nothing has been changed from the driver’s defaults.</p>');
+  return gfxGroup('global','Global 3D settings',list.length + ' named settings · ' + list.filter(isChanged).length + ' changed',body,true);
 }
-
 function renderGpu() {
-  const box = $("gpu-out");
+  const box = $('gpu-out');
   if (!box || !gpuData) return;
+  // Capture current state before replacing DOM; detached toggle events are ignored.
+  box.querySelectorAll('details[data-gfx-group]').forEach(d=>gfxOpenGroups.set(d.dataset.gfxGroup,d.open));
   const nv = gpuData.nvidia || {};
-
-  let html = '<div class="subcat">Displays</div>' + renderDisplays(gpuData.displays) +
-    renderScaling(gpuData.scaling);
-
-  if (!nv.available) {
-    html += '<div class="subcat">Graphics driver</div>' +
-      '<span class="sub">' + esc(nv.reason || "No NVIDIA driver found.") +
-      " Display settings above still apply.</span>";
-    box.innerHTML = html;
-    return;
+  let html = '<section class="gfx-section"><h3>Your displays</h3>' + renderDisplays(gpuData.displays) + '</section>' + renderScaling(gpuData.scaling);
+  html += '<section class="gfx-section gfx-driver"><div class="gfx-driver-heading"><span class="gfx-icon" aria-hidden="true">' + gfxIcon('chip') + '</span><h3>NVIDIA driver</h3>' + (nv.available ? '<strong>' + esc(nv.driver || 'Version not reported') + '</strong>' : '') + '</div>';
+  if (!nv.available) html += '<p class="sub">' + esc(nv.reason || 'No NVIDIA driver found.') + ' Display refresh controls still work with AMD and Intel GPUs. Driver profiles require a readable NVIDIA driver.</p>';
+  else {
+    html += '<p class="gfx-driver-meta">' + esc(String(nv.profiles ?? 0)) + ' profiles known to the driver · ' + esc(String(nv.catalogue ?? 0)) + ' named settings <span class="mono">' + esc(nv.branch || '') + '</span></p>' +
+      '<p class="gfx-note">Read-only · Explore NVIDIA’s saved profiles here. To edit, use NVIDIA Control Panel. Details keeps undecoded values out of your way.</p>' +
+      '<label class="opt gfx-filter"><input type="checkbox" id="gpu-only-changed"' + (show3dAll ? '' : ' checked') + '> Only the ones that have been changed</label>' + render3d(nv);
+    const apps = nv.apps || {};
+    for (const [exe,caption] of [['cs2.exe','Counter-Strike 2'],['csgo.exe','Counter-Strike: Global Offensive']]) html += renderProfile(apps[exe],caption + ' · ' + exe,exe);
+    for (const [exe,prof] of Object.entries(apps)) if (!['cs2.exe','csgo.exe'].includes(exe)) html += renderProfile(prof,prof.name + ' · ' + exe,exe);
   }
-
-  html += '<div class="subcat">Driver</div>' +
-    '<div class="row"><span class="k">Version</span><span class="v mono">' +
-    esc(nv.driver) + " " + esc(nv.branch) + "</span></div>" +
-    '<div class="row"><span class="k">Profiles</span><span class="v mono">' +
-    esc(String(nv.profiles)) + " known to the driver</span></div>" +
-    '<div class="row"><span class="k">Settings</span><span class="v mono">' +
-    esc(String(nv.catalogue)) + " named settings</span></div>";
-
-  html += render3d(nv);
-  for (const [exe, prof] of Object.entries(nv.apps || {})) {
-    html += renderProfile(prof, prof.name + "  ·  " + exe);
-  }
-  html += '<div class="sub2" style="margin-top:10px">' +
-    "This panel reads the driver only. Changing these would mean writing to a " +
-    "system-wide driver database as an administrator, and the driver does not " +
-    "publish what its values mean — so the app does not do it." +
-    "</div>";
-
-  box.innerHTML = html;
+  box.innerHTML = html + '</section>';
+  gfxObserveMotion();
 }
 
 async function loadGpu() {
