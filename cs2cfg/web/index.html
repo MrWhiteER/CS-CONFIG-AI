@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>cs2-autoconfig</title>
+<link rel="stylesheet" href="assets/faceit/dashboard.css">
 <!-- The same mark the application, the window and the notification area
      icon use, inline so the page carries it without a second request. -->
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3.52' fill='%23130c1f'/><path fill='%23a78bfa' d='M12 3H6L3 6V10L6 13H12V11H7L5 9V7L7 5H12Z'/><path fill='%23ececec' d='M10 5H12V7H14V9H12V11H10V9H8V7H10Z'/></svg>">
@@ -5498,13 +5499,9 @@ const startup = (() => {
     <div class="tabs" role="tablist" aria-label="Main navigation" aria-orientation="vertical">
       <button class="tab" data-tab="launcher" role="tab" aria-selected="true" title="Launcher">
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg></i><span class="tx">Launcher</span></button>
-      <!-- An "F" this application built out of three rectangles -- not
-           FACEIT's own mark, which is an orange square with a white
-           triangle. A monogram reads as the service without reproducing
-           the logo that belongs to it, the same principle as Crosshair X's
-           icon: drawn here, never borrowed. -->
+      <!-- Stable brand asset slot; see assets/faceit/README.txt before release. -->
       <button class="tab" data-tab="faceit" role="tab" aria-selected="false" title="FACEIT">
-        <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5.5" y="4" width="3" height="16"/><rect x="5.5" y="4" width="12.5" height="3"/><rect x="5.5" y="10.5" width="9.5" height="3"/></svg></i><span class="tx">FACEIT</span></button>
+        <i class="ic"><span class="fc-logo" aria-hidden="true"></span></i><span class="tx">FACEIT</span></button>
       <!-- A crate, for what is in it. -->
       <button class="tab" data-tab="inventory" role="tab" aria-selected="false" title="Inventory">
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8l9-4.5L21 8v8l-9 4.5L3 16z"/><path d="M3 8l9 4.5L21 8M12 12.5V21"/></svg></i><span class="tx">Inventory</span></button>
@@ -5711,41 +5708,23 @@ const startup = (() => {
 
     </div>
 
-    <!-- FACEIT, pulled out of the Launcher into a tab of its own: a page
-         you check between matches as much as one you pass through on the
-         way to playing. The badge below is drawn by this application --
-         a trophy, not FACEIT's own mark -- the same rule the Crosshair X
-         card follows: the shape the category obviously uses, never a logo
-         that belongs to someone else. -->
+    <!-- FACEIT account, recent performance, match scoreboards and local replays. -->
     <div class="tab-panel hidden" data-panel="faceit">
-      <div class="hero">
-        <div class="hero-copy">
-          <div class="eyebrow">Matches &amp; demos</div>
-          <h2><span class="fc-mark"><b>FACEIT</b></span></h2>
-          <p>
-            Follow your account and your recent matches turn up here on their own, with
-            stats and a one-click demo &mdash; or paste any match link below. <b>Watch</b>
-            starts CS2 with the demo already playing, no console, no filenames.
-          </p>
-        </div>
+      <div class="fc-top">
+        <span class="fc-logo" aria-hidden="true"></span>
+        <div><div class="eyebrow">Your competitive record</div><h2>FACEIT</h2>
+        <p>Your form. Your matches. Your next review.</p></div>
       </div>
-
+      <div id="fc-wrap" aria-live="polite"><div class="fc-empty fc-surface">Loading your account&hellip;</div></div>
       <section class="panel" id="demo-card">
-        <h2>Match demos</h2>
-        <p class="sub" style="margin:0 0 12px">
-          Your recent matches are below. Open one for the full scoreboard, get its
-          demo, and <b>Watch</b> starts CS2 with the demo playing on its own &mdash;
-          no console, no filenames. You can also paste any match link.
-        </p>
+        <h3>Replay library</h3>
+        <p>Watch starts CS2 with your demo playing. Choose saves it for your next launch. Paste a match link to get another replay.</p>
         <div class="demo-get">
-          <input id="demo-link" type="text" spellcheck="false"
+          <input id="demo-link" type="text" spellcheck="false" aria-label="FACEIT match link"
                  placeholder="https://www.faceit.com/en/cs2/room/1-&hellip;">
           <button class="btn" id="demo-fetch">Get demo</button>
         </div>
         <div id="demo-note"></div>
-        <!-- The followed account and its recent matches. Filled by loadFaceit;
-             hidden entirely until an account is linked. -->
-        <div id="fc-wrap"></div>
         <div class="demo-prog hidden" id="demo-prog">
           <div class="demo-bar"><i id="demo-bar-fill"></i></div>
           <span class="sub2" id="demo-prog-say">starting&hellip;</span>
@@ -6322,6 +6301,7 @@ const startup = (() => {
   </div>
 </div>
 <script src="skin-viewer.js"></script>
+<script src="assets/faceit/dashboard.js"></script>
 <script>
 const TOKEN = "__CS2CFG_TOKEN__";
 const $ = (id) => document.getElementById(id);
@@ -11079,68 +11059,12 @@ function startFaceitWatch() {
     // Only while the FACEIT tab is actually on screen. Polling a tab nobody
     // is looking at is just someone else's bandwidth.
     const pane = document.querySelector('.tab-panel[data-panel="faceit"]');
-    if (pane && !pane.classList.contains("hidden")) loadFaceit();
+    if (!document.hidden && pane && !pane.classList.contains("hidden")) loadFaceit();
   }, 60000);
 }
 
 function renderFaceit() {
-  const wrap = $("fc-wrap");
-  if (!wrap) return;
-  if (!fcData || fcData.linked === false) {
-    // A poll landing mid-typing must not replace the box and throw away the
-    // half-typed nickname, so an existing form is left exactly as it is.
-    if ($("fc-nick")) return;
-    wrap.innerHTML =
-      '<div class="fc-me"><span class="who"><b>Follow your FACEIT matches</b>' +
-      "<span>Your recent games appear here on their own, with stats and a " +
-      "one-click demo.</span></span>" +
-      '<span class="actions"><input id="fc-nick" type="text" spellcheck="false" ' +
-      'placeholder="FACEIT nickname" style="width:170px">' +
-      '<button class="btn small" id="fc-link">Follow</button></span></div>';
-    return;
-  }
-  if (fcData.ok === false || (!fcData.player && fcData.error)) {
-    wrap.innerHTML = '<p class="sub2" style="margin:12px 0 0;color:var(--bad)">' +
-      esc(fcData.error || "could not read that account") +
-      '</p><div class="actions"><button class="btn small" id="fc-forget">Use another name</button></div>';
-    return;
-  }
-
-  const p = fcData.player || {};
-  const have = new Set((demoData && demoData.demos || []).map(d => d.name));
-  const head =
-    '<div class="fc-me">' +
-      (p.avatar ? '<img class="fc-av" src="' + esc(p.avatar) + '" alt="">'
-                : '<span class="fc-av"></span>') +
-      '<span class="who"><b>' + esc(p.nickname || "") + "</b><span>" +
-        (p.elo ? p.elo + " elo" : "") +
-        (fcData.stale ? " &middot; showing the last good read" : "") +
-      "</span></span>" +
-      (p.level ? '<span class="fc-lvl">' + p.level + "</span>" : "") +
-      '<span class="actions">' +
-        '<button class="btn small" id="fc-refresh">Refresh</button>' +
-        '<button class="btn small" id="fc-forget">Unfollow</button>' +
-      "</span>" +
-    "</div>";
-
-  const rows = (fcData.matches || []).map(m => {
-    const got = have.has(demoNameFor(m));
-    return '<div class="fc-row ' + (m.won ? "won" : "lost") + '">' +
-      '<span class="map">' + esc(m.map || "?") + "</span>" +
-      '<span class="sc">' + esc(m.score) + "</span>" +
-      '<span class="line">' + m.kills + "/" + m.deaths + "/" + m.assists +
-        " &middot; " + m.adr.toFixed(1) + " adr &middot; " + ago(m.played_at) +
-        (got ? ' &middot; <span class="fc-have">DOWNLOADED</span>' : "") +
-      "</span>" +
-      '<span class="delta ' + (m.elo_delta >= 0 ? "up" : "down") + '">' +
-        (m.elo_delta >= 0 ? "+" : "") + m.elo_delta + "</span>" +
-      '<span class="actions"><button class="btn small" data-match="' +
-        esc(m.match_id) + '">Stats</button></span>' +
-    "</div>";
-  }).join("");
-
-  wrap.innerHTML = head + (rows ||
-    '<p class="sub2" style="margin:10px 0 0">No CS2 matches on that account yet.</p>');
+  fcRenderDashboard();
 }
 
 /* What a match's demo is called once downloaded. Mirrors the server's naming
@@ -11381,9 +11305,11 @@ async function loadDemos() {
     demoData = await api("/api/demos", {});
   } catch (err) {
     demoData = null;
+    $("demo-list").innerHTML = '<p class="fc-caption" role="status">Could not read the replay library. Reopen this tab to retry.</p>';
     return;
   }
   renderDemos();
+  if (fcData) renderFaceit();
   // A download already in flight -- after a page reload, say -- is picked
   // back up rather than left running invisibly.
   if (demoData.job && demoData.job.active) watchDemoJob();
@@ -11393,23 +11319,25 @@ function renderDemos() {
   const list = $("demo-list");
   if (!list || !demoData) return;
   const picked = demoData.picked || "";
-  if (!demoData.demos.length) {
+  const demos = Array.isArray(demoData.demos) ? demoData.demos : [];
+  if (!demos.length) {
     list.innerHTML = '<p class="sub2" style="margin:12px 0 0">' +
       (demoData.folder ? "No demos in the replay folder yet."
                        : "CS2's install was not found, so there is nowhere to put one.") +
       "</p>";
     return;
   }
-  list.innerHTML = demoData.demos.map(d =>
+  list.innerHTML = demos.map(d =>
     '<div class="demo-row' + (d.name === picked ? " picked" : "") + '">' +
+      '<span class="fc-replay-icon" aria-hidden="true">&#9654;</span>' +
       '<span class="who"><b>' + esc(d.name) + "</b><span>" +
-        bytes(d.size) + " &middot; " + ago(d.when) +
+        bytes(d.size) + " &middot; " + esc(fcWhen({ played_at: d.when })) +
         (d.name === picked ? ' &middot; <span class="demo-key">NEXT LAUNCH</span>' : "") +
       "</span></span>" +
       '<span class="actions">' +
-        '<button class="btn small" data-watch="' + esc(d.name) + '">Watch</button>' +
+        '<button class="btn small fc-watch" data-watch="' + esc(d.name) + '">Watch</button>' +
         '<button class="btn small" data-pick="' + esc(d.name) + '">' +
-        (d.name === picked ? "Chosen" : "Choose") + "</button>" +
+        (d.name === picked ? "Clear choice" : "Choose") + "</button>" +
       "</span>" +
     "</div>").join("");
 }
