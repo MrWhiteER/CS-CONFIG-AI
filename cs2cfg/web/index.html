@@ -2283,6 +2283,46 @@
     --neon-cyan: #7dffc0;
   }
 
+  /* Crimson, Frost and Neon -- the three palettes from the gaming-software
+     research: a hard red on black, an icy cyan on navy, and a violet-to-pink
+     night look. Same variables as every other theme. */
+  :root[data-theme="crimson"] {
+    --ink: #f7e9ea; --muted: rgba(247, 233, 234, .52);
+    --line: rgba(227, 24, 55, .19); --line-soft: rgba(227, 24, 55, .10);
+    --bg: #080405; --bg-2: rgba(16, 6, 8, .34);
+    --panel: rgba(28, 10, 13, .62); --panel-2: rgba(40, 14, 18, .72);
+    --chip: rgba(52, 18, 23, .74);
+    --accent: #e31837; --accent-deep: #9e0f26; --accent-dim: rgba(227, 24, 55, .15);
+    --violet: #e31837; --violet-soft: #ff6b7f;
+    --ink-dim: rgba(247, 233, 234, .62); --faint: rgba(247, 233, 234, .21);
+    --glass-3: rgba(34, 12, 15, .76);
+    --neon-cyan: #ff9aa8;
+  }
+  :root[data-theme="frost"] {
+    --ink: #e6f4fb; --muted: rgba(230, 244, 251, .52);
+    --line: rgba(0, 184, 252, .19); --line-soft: rgba(0, 184, 252, .10);
+    --bg: #04080d; --bg-2: rgba(6, 12, 20, .34);
+    --panel: rgba(10, 20, 32, .62); --panel-2: rgba(14, 28, 44, .72);
+    --chip: rgba(18, 36, 56, .74);
+    --accent: #00b8fc; --accent-deep: #0080b3; --accent-dim: rgba(0, 184, 252, .15);
+    --violet: #00b8fc; --violet-soft: #6fd8ff;
+    --ink-dim: rgba(230, 244, 251, .62); --faint: rgba(230, 244, 251, .21);
+    --glass-3: rgba(12, 24, 38, .76);
+    --neon-cyan: #7fe3ff;
+  }
+  :root[data-theme="neon"] {
+    --ink: #f3e8f7; --muted: rgba(243, 232, 247, .52);
+    --line: rgba(236, 72, 153, .19); --line-soft: rgba(236, 72, 153, .10);
+    --bg: #0b0614; --bg-2: rgba(14, 6, 24, .34);
+    --panel: rgba(24, 10, 38, .62); --panel-2: rgba(34, 14, 52, .72);
+    --chip: rgba(44, 18, 64, .74);
+    --accent: #ec4899; --accent-deep: #a21c66; --accent-dim: rgba(236, 72, 153, .15);
+    --violet: #ec4899; --violet-soft: #f9a8d4;
+    --ink-dim: rgba(243, 232, 247, .62); --faint: rgba(243, 232, 247, .21);
+    --glass-3: rgba(28, 12, 44, .76);
+    --neon-cyan: #a78bfa;
+  }
+
   /* Daylight -- the light one. White and silver, with the accent darkened
      because a colour that reads well on black is usually too pale on white:
      the violet above fails contrast against a white panel, this one does not.
@@ -2448,6 +2488,9 @@
   :root[data-theme="ember"]    body { --g1: #7a3c05; --g2: #b4740f; --g3: #3d1f03; }
   :root[data-theme="carbon"]   body { --g1: #2b3340; --g2: #49566a; --g3: #171c24; }
   :root[data-theme="acid"]     body { --g1: #0a5c2e; --g2: #15a34a; --g3: #042d16; }
+  :root[data-theme="crimson"]  body { --g1: #6b0a18; --g2: #a3122a; --g3: #33050c; }
+  :root[data-theme="frost"]    body { --g1: #0a4a6b; --g2: #0080b3; --g3: #06263a; }
+  :root[data-theme="neon"]     body { --g1: #5b21b6; --g2: #a21c66; --g3: #2a0f4a; }
   :root[data-theme="daylight"] body { --g1: #c3b5e8; --g2: #ddd3f2; --g3: #a593dd; }
   :root[data-theme="paper"]    body { --g1: #e0cfae; --g2: #efe3cd; --g3: #c9b48c; }
 
@@ -12133,7 +12176,7 @@ document.addEventListener("click", async e => {
   }
 });
 
-/* The five looks.
+/* The looks.
 
    Each one is the same twenty-odd CSS variables with different values, so the
    whole of this is setting one attribute on <html>. Violet is the default and
@@ -12149,6 +12192,9 @@ const THEMES = [
   ["ember",    "Ember",    "warm, amber",        "#0a0704", "#1e1309", "#f5a524"],
   ["carbon",   "Carbon",   "silver, almost grey","#060709", "#131619", "#c3d0de"],
   ["acid",     "Acid",     "green on black",     "#040706", "#09160e", "#39ff88"],
+  ["crimson",  "Crimson",  "red on black",       "#080405", "#1c0a0d", "#e31837"],
+  ["frost",    "Frost",    "icy cyan, navy",     "#04080d", "#0a1420", "#00b8fc"],
+  ["neon",     "Neon",     "violet and pink",    "#0b0614", "#180a26", "#ec4899"],
   ["daylight", "Daylight", "light, cool",        "#eef0f4", "#ffffff", "#6d28d9"],
   ["paper",    "Paper",    "light, warm",        "#f4f1ea", "#fffdf8", "#9a5b00"],
   ["pro",      "Pro",      "flat, square, matte","#121212", "#1d1d1d", "#ff5500"],

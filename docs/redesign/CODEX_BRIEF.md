@@ -15,7 +15,8 @@ such as [GamerVerse](https://dribbble.com/shots/26443606-GamerVerse-Game-Dashboa
 - Styling is token-based. The default theme's tokens sit in `:root` around line 2160 (`--bg`,
   `--panel`, `--panel-2`, `--ink`, `--muted`, `--line`, `--accent`, `--good`, `--warn`, `--bad`,
   `--neon-*`, `--cat-*`). Alternate themes override them through `:root[data-theme="…"]`:
-  `ember`, `carbon`, `acid`, `daylight`, `pro`.
+  `ember`, `carbon`, `acid`, `crimson`, `frost`, `neon`, `daylight`, `paper`, `pro`. The
+  picker list is `const THEMES` in the JS, and `tests/test_themes.py` must list the same names.
 - Fonts (around line 4584): `--display` is Bahnschrift/Oswald, `--body` is Segoe UI Variable,
   and `--mono` is Cascadia Mono.
 - Brand (`docs/brand/README.md`): violet `#A78BFA`, dark tile `#130C1F`, background `#07050D`,
@@ -38,7 +39,9 @@ look. Push it toward a modern esports dashboard:
 - **Colour:** base `#07050D`, cards `#130C1F` with glass (semi-transparent fill +
   `backdrop-filter: blur`), violet `#8B5CF6` to `#A78BFA` accent, and an optional violet-to-pink
   `#EC4899` gradient for hero elements only. Keep `--good`/`--warn`/`--bad` for ratings,
-  Leetify-style. Every existing `data-theme` must keep working with the new components.
+  Leetify-style. Every theme in the picker must keep working with the new components: the user switches
+  between them in Settings, so the redesign must style through tokens only and never hard-code
+  a colour.
 - **Typography:** condensed uppercase headings (keep Bahnschrift, with Rajdhani or Oxanium as an
   option) at 0.05 to 0.1em tracking. Body text in Segoe UI Variable at 13 to 14px. All numbers use
   tabular figures.
