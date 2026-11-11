@@ -3438,6 +3438,14 @@ def _faceit_forget(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     return {"ok": True, "linked": False}
 
 
+def _demo_identities(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import demos
+    try:
+        return {"ok": True, **demos.identities(str(body.get("link") or ""))}
+    except demos.DemoError as exc:
+        return {"ok": False, "error": str(exc)}
+
+
 def _demo_stats(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     """The scoreboard for a pasted match. Independent of the demo.
 
@@ -4310,6 +4318,7 @@ def make_handler(state: State):
         "/api/demos": _demos,
         "/api/demos/resolve": _demo_resolve,
         "/api/demos/stats": _demo_stats,
+        "/api/demos/identities": _demo_identities,
         "/api/faceit": _faceit,
         "/api/faceit/forget": _faceit_forget,
         "/api/demos/get": _demo_get,

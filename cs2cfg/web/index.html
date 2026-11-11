@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>cs2-autoconfig</title>
 <link rel="stylesheet" href="assets/faceit/dashboard.css">
+<link rel="stylesheet" href="assets/faceit/scoreboard.css">
 <!-- The same mark the application, the window and the notification area
      icon use, inline so the page carries it without a second request. -->
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3.52' fill='%23130c1f'/><path fill='%23a78bfa' d='M12 3H6L3 6V10L6 13H12V11H7L5 9V7L7 5H12Z'/><path fill='%23ececec' d='M10 5H12V7H14V9H12V11H10V9H8V7H10Z'/></svg>">
@@ -1571,6 +1572,8 @@
 
   .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
   .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    text-align: center; vertical-align: middle; box-sizing: border-box;
     padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line);
     background: var(--bg-2); color: var(--ink); font: inherit; cursor: pointer;
     transition: border-color .15s ease, color .15s ease;
@@ -6379,8 +6382,11 @@ const startup = (() => {
 <div class="modal-back hidden" id="mstat-back">
   <div class="mstat" role="dialog" aria-modal="true" aria-labelledby="mstat-title">
     <header class="mstat-head">
+      <img class="mstat-map" id="mstat-map" alt="">
+      <span class="mstat-mark" aria-hidden="true"></span>
       <div>
         <div class="eyebrow" id="mstat-when">Match</div>
+        <div class="mstat-result" id="mstat-result"></div>
         <h3 id="mstat-title">Scoreboard</h3>
       </div>
       <div class="mstat-actions">
@@ -11208,72 +11214,113 @@ function demoNameFor(m) {
    Shown whenever a match link is looked up, and deliberately not tied to the
    download: FACEIT keeps the numbers long after it has thrown the demo away,
    so a match too old to rewatch can still be read. */
-function showStats(s) {
-  const back = $("mstat-back");
-  if (!back || !s) return;
-  const when = s.played_at ? new Date(s.played_at * 1000).toLocaleString() : "";
-  $("mstat-title").textContent = (s.map || "Match") + "  " + (s.score || "");
-  $("mstat-when").textContent =
-    [s.mode, s.region, s.rounds ? s.rounds + " rounds" : "", when]
-      .filter(Boolean).join(" · ");
-  const page = $("mstat-page");
-  if (page) page.href = s.page || "#";
-
-  const cols = [
-    ["K", "kills"], ["D", "deaths"], ["A", "assists"],
-    ["ADR", "adr"], ["K/D", "kd"], ["K/R", "kr"],
-    ["HS", "headshots"], ["HS%", "hs_percent"],
-    ["5K", "penta"], ["4K", "quadro"], ["3K", "triple"], ["2K", "double"],
-    ["MVP", "mvps"],
-  ];
-  const optional = new Set(["headshots", "penta", "quadro", "triple", "double"]);
-  // Which row is yours. The Steam persona and the FACEIT nickname are not the
-  // same string -- "MrWhiteER" against "MrWhiteE_R" -- so both are reduced to
-  // letters and digits before comparing. A wrong match only mislabels a row,
-  // and no match just leaves the badge off.
-  const plain = t => String(t || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-  const mine = (whoData && whoData.accounts || []).find(a => a.active);
-  const me = plain(mine && mine.name);
-
-  $("mstat-body").innerHTML = s.teams.map(t => {
-    const head =
-      '<div class="mstat-team ' + (t.won ? "won" : "lost") + '">' +
-        '<span class="score">' + t.score + "</span><b>" + esc(t.name) + "</b>" +
-        '<span class="halves">first half ' + t.first_half +
-        " &middot; second half " + t.second_half + "</span></div>";
-    const header = "<tr><th>Player</th>" + cols.map(([label, key]) =>
-      '<th class="' + (optional.has(key) ? "opt-col" : "") + '">' + label + "</th>").join("") + "</tr>";
-    const rows = t.players.map(p => {
-      const you = me && plain(p.nickname) === me
-        ? ' <span class="mstat-you">YOU</span>' : "";
-      return "<tr><td><span class=\"mstat-who\"><b>" + esc(p.nickname) + "</b>" + you + "</span></td>" +
-        cols.map(([, key]) => {
-          const v = p[key];
-          let cls = optional.has(key) ? "opt-col" : "";
-          if (key === "kd") cls += v >= 1 ? " kd-good" : " kd-bad";
-          if (!v && key !== "kd") cls += " zero";
-          // Ratios keep their decimals; counts do not grow any by having them.
-          const shown = (key === "kd" || key === "kr") ? v.toFixed(2)
-            : key === "adr" ? v.toFixed(1)
-            : key === "hs_percent" ? Math.round(v) + "%"
-            : String(Math.round(v));
-          return '<td class="' + cls.trim() + '">' + shown + "</td>";
-        }).join("") + "</tr>";
-    }).join("");
-    return head + '<table class="mstat-grid"><thead>' + header +
-           "</thead><tbody>" + rows + "</tbody></table>";
-  }).join("") +
-  '<div class="mstat-get" id="mstat-get"></div>' +
-  '<p class="mstat-note">Numbers are FACEIT&rsquo;s own, from the match&rsquo;s ' +
-  "scoreboard. Damage per round differs by about a point from the figure on " +
-  "their newer stats tab &mdash; both are theirs, and they disagree.</p>";
-
-  statsShown = s;
-  statsWaiting = null;
-  paintGetRow();
-  checkWaiting(false);      // a copy may already be sitting in Downloads
-  back.classList.remove("hidden");
+/* Stats and identities have independent lifetimes. Closing invalidates late replies. */
+let statsRequest = 0;
+let statsFocus = null;
+function statsIsYou(p) {
+  const profile = fcData && fcData.player;
+  if (profile && profile.player_id && p.player_id) return profile.player_id === p.player_id;
+  const plain = t => String(t || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const active = (whoData && whoData.accounts || []).find(a => a.active);
+  const name = plain(profile && profile.nickname || active && active.name);
+  return !!name && plain(p.nickname) === name;
 }
+function statsBadge(name, avatar, cls) {
+  const initials = String(name || '?').replace(/^team_/i, '').slice(0, 2).toUpperCase();
+  const safe = /^https?:\/\//i.test(avatar || '') ? avatar : '';
+  return '<span class="mstat-avatar '+cls+'"><span>'+esc(initials)+'</span>' +
+    (safe ? '<img src="'+esc(safe)+'" alt="" referrerpolicy="no-referrer" onerror="this.remove()">' : '')+'</span>';
+}
+function renderStatsTeams(s) {
+  const cols = [['K','kills'],['D','deaths'],['A','assists'],['ADR','adr'],['K/D','kd'],['K/R','kr'],['HS','headshots'],['HS%','hs_percent'],['5K','penta'],['4K','quadro'],['3K','triple'],['2K','double'],['MVP','mvps']];
+  const multi = new Set(['penta','quadro','triple','double']);
+  const all = s.teams.flatMap(t => t.players);
+  const numeric = v => typeof v === 'number' && Number.isFinite(v);
+  const best = Object.fromEntries(cols.map(([,k]) => {
+    const values=all.map(p=>p[k]).filter(numeric);
+    return [k, values.length ? (k==='deaths'?Math.min(...values):Math.max(...values)) : null];
+  }));
+  let index=0;
+  return s.teams.map(t => '<section class="mstat-side" aria-label="'+esc(t.name)+'">'+
+    '<div class="mstat-team '+(t.won?'won':'lost')+'">'+statsBadge(t.name,t.avatar,'team-avatar')+
+    '<b>'+esc(t.name)+'</b><span class="score">'+t.score+'</span><span class="halves">First half <strong>'+t.first_half+'</strong><span> / </span>Second half <strong>'+t.second_half+'</strong></span></div>'+
+    '<div class="mstat-scroll" tabindex="0" role="region" aria-label="'+esc(t.name)+' player statistics"><table class="mstat-grid"><thead><tr><th scope="col">Player</th>'+cols.map(([label])=>'<th scope="col">'+label+'</th>').join('')+'</tr></thead><tbody>'+
+    t.players.map(p=>{
+      const you=statsIsYou(p), level=Number(p.level), known=Number.isInteger(level)&&level>=1&&level<=10;
+      return '<tr class="'+(you?'is-you':'')+'" style="--row:'+index+++'"><th scope="row"><span class="mstat-who">'+statsBadge(p.nickname,p.avatar,'player-avatar')+
+        '<span class="mstat-name">'+esc(p.nickname)+'</span>'+(you?'<span class="mstat-you">YOU</span>':'')+
+        '<span class="mstat-level" style="--level:'+(known?FC_LEVEL_COLORS[level]:'var(--faint)')+'" title="'+(known?'FACEIT level '+level:'FACEIT level unavailable')+'">'+(known?level:'?')+'</span></span></th>'+
+      cols.map(([,key])=>{
+        const v=p[key], valid=numeric(v);
+        const leader=valid && v===best[key];
+        let shown=!valid?'—':key==='kd'||key==='kr'?v.toFixed(2):key==='adr'?v.toFixed(1):key==='hs_percent'?Math.round(v)+'%':String(Math.round(v));
+        if(multi.has(key)) shown=valid&&v>0?'<span class="mstat-kill">'+shown+'</span>':'<span class="mstat-empty" aria-label="0">—</span>';
+        if(key==='mvps' && valid) shown=v>0?'<span aria-label="'+v+' MVP stars">★ '+shown+'</span>':'<span aria-label="0 MVP stars">—</span>';
+        const bar=valid&&(key==='adr'||key==='kd')?'<span class="mstat-bar" aria-hidden="true"><i style="transform:scaleX('+Math.max(0,Math.min(1,v/Math.max(1,best[key])))+')"></i></span>':'';
+        return '<td data-stat="'+key+'" class="'+(leader?'mstat-best':'')+'"'+(leader?' title="Match best'+(key==='deaths'?' · lowest deaths':'')+' (ties included)"':'')+'><span class="mstat-value">'+shown+'</span>'+bar+'</td>';
+      }).join('')+'</tr>';
+    }).join('')+'</tbody></table></div></section>').join('');
+}
+function paintStatsHeader(s) {
+  const team=s.teams.find(t=>t.players.some(statsIsYou));
+  $('mstat-map').src=fcMapAsset(s.map);
+  $('mstat-title').textContent=fcMapName(s.map)+'  '+(team?[team.score,...s.teams.filter(t=>t!==team).map(t=>t.score)].join(' : '):s.score||'');
+  $('mstat-result').textContent=team?(team.won?'WIN':'LOSS'):'MATCH';
+  $('mstat-result').className='mstat-result '+(team?(team.won?'won':'lost'):'');
+  $('mstat-when').textContent=[s.mode,s.region,s.rounds?s.rounds+' rounds':'',s.played_at?new Date(s.played_at*1000).toLocaleString():''].filter(Boolean).join(' · ');
+  $('mstat-page').href=s.page||'#';
+  $('mstat-page').hidden=!s.page;
+}
+function showStats(s) {
+  if(!s) return;
+  paintStatsHeader(s);
+  $('mstat-body').innerHTML='<div id="mstat-teams">'+renderStatsTeams(s)+'</div><div class="mstat-get" id="mstat-get"></div>'+
+    '<p class="mstat-note"><span class="mstat-gold-key">✦ Gold = match best, ties included.</span> FACEIT scoreboard data; ADR may differ slightly from their newer stats tab.</p>';
+  statsShown=s; statsWaiting=null;
+  paintGetRow(); checkWaiting(false);
+  $('mstat-back').classList.remove('hidden');
+}
+async function openStats(link) {
+  const request=++statsRequest;
+  statsFocus=document.activeElement;
+  stopWaitingWatch(); statsShown=null;
+  paintStatsHeader({map:'',teams:[]});
+  $('mstat-title').textContent='Loading match';
+  $('mstat-body').innerHTML='<div class="mstat-skeleton" role="status" aria-label="Loading match statistics">'+Array.from({length:10},()=>'<div></div>').join('')+'</div>';
+  $('mstat-back').classList.remove('hidden');
+  $('mstat-close').focus();
+  try {
+    const s=await api('/api/demos/stats',{link});
+    if(request!==statsRequest) return;
+    showStats(s);
+    // Cosmetic data cannot hold up the table or disturb the download watcher.
+    api('/api/demos/identities',{link}).then(details=>{
+      if(request!==statsRequest || statsShown!==s) return;
+      s.teams.forEach(t=>{
+        const side=(details.teams||[]).find(d=>d.players.some(p=>p.player_id&&t.players.some(row=>row.player_id===p.player_id))) || (details.teams||[]).find(d=>d.name===t.name);
+        if(!side) return;
+        t.avatar=side.avatar;
+        t.players.forEach(p=>{const identity=side.players.find(d=>d.player_id&&d.player_id===p.player_id);if(identity) Object.assign(p,{avatar:identity.avatar,level:identity.level});});
+      });
+      const region=$('mstat-teams');if(region) {region.classList.add('identities-ready');region.innerHTML=renderStatsTeams(s);}
+    }).catch(()=>{});
+  } catch(err) {
+    if(request!==statsRequest) return;
+    $('mstat-title').textContent='Match unavailable';
+    $('mstat-body').innerHTML='<p role="alert">'+esc(err.message)+'</p><button class="btn" id="mstat-retry">Try again</button>';
+    $('mstat-retry').onclick=()=>openStats(link);
+  }
+}
+document.addEventListener('visibilitychange',()=>{
+  $('mstat-back').classList.toggle('motion-paused',document.hidden);
+});
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Tab'||$('mstat-back').classList.contains('hidden')) return;
+  const items=[...$('mstat-back').querySelectorAll('a[href],button,[tabindex="0"]')].filter(el=>!el.disabled&&!el.hidden);
+  const first=items[0],last=items[items.length-1];
+  if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+  else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+});
 
 /* The download strip at the foot of the scoreboard: one of three states, and
    never more than one. Not downloaded, downloading, or ready to watch. */
@@ -11364,10 +11411,7 @@ function paintGetRow() {
     return;
   }
   row.innerHTML =
-    '<span class="say"><b>Demo not downloaded</b><span>FACEIT only hands demos ' +
-    "to a signed-in browser, so <b>Get it</b> opens the download in yours. " +
-    "Save it anywhere &mdash; this watches your Downloads folder and takes it " +
-    "from there.</span></span>" +
+    '<span class="say"><b>Demo not downloaded</b><span>Get it opens FACEIT in your signed-in browser; download the demo to Downloads and this app will import it automatically.</span></span>' +
     '<span class="actions">' +
       '<button class="btn small" data-getdemo="1">Try direct</button>' +
       '<button class="btn" id="demo-openpage">Get it</button>' +
@@ -11381,8 +11425,11 @@ let waitTimer = null;
 
 async function checkWaiting(andImport) {
   if (!statsShown) return;
+  const match = statsShown.match_id;
   try {
-    statsWaiting = await api("/api/demos/waiting", { link: statsShown.match_id });
+    const waiting = await api("/api/demos/waiting", { link: match });
+    if (!statsShown || statsShown.match_id !== match) return;
+    statsWaiting = waiting;
   } catch (err) { return; }
   if (statsWaiting && statsWaiting.waiting && !statsWaiting.waiting.pending
       && andImport) {
@@ -11413,7 +11460,11 @@ function stopWaitingWatch() {
 
 function hideStats() {
   const back = $("mstat-back");
+  if (!back || back.classList.contains("hidden")) return;
   if (back) back.classList.add("hidden");
+  ++statsRequest;
+  if (statsFocus && statsFocus.isConnected) statsFocus.focus();
+  statsFocus = null;
   stopWaitingWatch();
   statsShown = null;
 }
@@ -11545,7 +11596,7 @@ document.addEventListener("click", async e => {
     openMatch.disabled = true;
     try {
       if (!whoData) await loadWho();
-      showStats(await api("/api/demos/stats", { link: id }));
+      await openStats(id);
     } catch (err) {
       status("Could not read that match: " + esc(err.message), true);
     }
@@ -11634,7 +11685,7 @@ document.addEventListener("click", async e => {
       // Who you are decides which row gets marked, and the profile loads late
       // in startup -- late enough to lose the race against a quick paste.
       if (!whoData) await loadWho();
-      showStats(await api("/api/demos/stats", { link }));
+      await openStats(link);
     } catch (err) { /* the download below reports what went wrong */ }
 
     try {
