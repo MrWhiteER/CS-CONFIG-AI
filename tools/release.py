@@ -381,8 +381,16 @@ def main() -> int:
     # it all back. Nothing here is committed until step 6.
     written = {path: path.read_bytes()
                for path in (INIT, UPDATES, ISS) if path.is_file()}
+    # What step 6 has already done. Once the release commit exists, the files
+    # above *are* the commit, so putting the old bytes back would not undo
+    # anything -- it would leave a stray edit setting the version backwards,
+    # and a re-run would then step past a version that was never published.
+    done: dict = {}
 
     def undo(why: str) -> None:
+        if done.get("committed"):
+            finish_later(version, notes, done)
+            return
         for path, before in written.items():
             if path.read_bytes() != before:
                 path.write_bytes(before)
@@ -390,7 +398,7 @@ def main() -> int:
         print(f"\n  nothing was published. {why}\n")
 
     try:
-        return _publish(args, repo, previous, version, notes)
+        return _publish(args, repo, previous, version, notes, done)
     except Stop:
         undo("The working tree is back as it was.")
         raise
@@ -399,8 +407,45 @@ def main() -> int:
         raise
 
 
-def _publish(args, repo: str, previous: str, version: str, notes: str) -> int:
+def finish_later(version: str, notes: str, done: dict) -> None:
+    """Say how to finish a release that stopped after its commit.
+
+    The commit (and maybe the tag and the push) already happened, so the
+    working tree is left exactly as committed, and what remains is printed
+    as commands. Running this script again would not finish it: it would
+    see the new version as current and step past it.
+    """
+    tag = f"v{version}"
+    steps = []
+    if not done.get("tagged"):
+        steps.append(f'git tag -a {tag} -m "Release {version}"')
+    if not done.get("pushed_head"):
+        steps.append("git push origin HEAD")
+    if not done.get("pushed_tag"):
+        steps.append(f"git push origin {tag}")
+    archive = done.get("archive", f"dist/cs2-autoconfig-{version}-win64.zip")
+    setup = done.get("setup", f"dist/cs2-autoconfig-{version}-Setup.exe")
+    notes_file = DIST / f"release-notes-{version}.txt"
+    try:
+        DIST.mkdir(parents=True, exist_ok=True)
+        notes_file.write_text(notes, encoding="utf-8")
+    except OSError:
+        pass
+    steps.append(f'gh release create {tag} "{archive}" "{setup}" '
+                 f'--title {version} --notes-file "{notes_file}"')
+    say(f"\n  {version} is committed but not published. The working tree is "
+        "left as committed.\n  Do NOT run this script again for it -- it "
+        f"would release the next version instead.\n  To finish {version}, "
+        "run from the project folder:\n")
+    for step in steps:
+        say(f"    {step}")
+    print()
+
+
+def _publish(args, repo: str, previous: str, version: str, notes: str,
+             done: dict | None = None) -> int:
     """The steps that change things. Wrapped by main so they can be undone."""
+    done = {} if done is None else done
     print("\n  [1/6] pointing the updater at the release repository")
     if point_updater_at(repo):
         print(f"    DEFAULT_REPO = {repo!r}")
@@ -424,11 +469,16 @@ def _publish(args, repo: str, previous: str, version: str, notes: str) -> int:
     setup = build_installer(version)
 
     print("\n  [6/6] publishing")
+    done["archive"], done["setup"] = str(archive), str(setup)
     run(["git", "add", "-A"])
     run(["git", "commit", "-m", f"Release {version}"])
+    done["committed"] = True
     run(["git", "tag", "-a", f"v{version}", "-m", f"Release {version}"])
+    done["tagged"] = True
     run(["git", "push", "origin", "HEAD"])
+    done["pushed_head"] = True
     run(["git", "push", "origin", f"v{version}"])
+    done["pushed_tag"] = True
     run([find_gh(), "release", "create", f"v{version}", str(archive), str(setup),
          "--title", f"{version}", "--notes", notes])
 
