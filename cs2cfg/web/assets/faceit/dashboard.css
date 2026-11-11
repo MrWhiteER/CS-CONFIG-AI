@@ -1,5 +1,5 @@
 /* FACEIT workspace: theme controls the UI; orange is reserved for the brand. */
-.fc-logo { display:inline-block; width:24px; height:24px; background:currentColor; -webkit-mask:url('faceit-logo.svg') center/contain no-repeat; mask:url('faceit-logo.svg') center/contain no-repeat; }
+.fc-logo { display:inline-block; width:24px; height:24px; background:currentColor; -webkit-mask:url('faceit-mark.svg') center/contain no-repeat; mask:url('faceit-mark.svg') center/contain no-repeat; }
 [data-panel="faceit"] { position:relative; isolation:isolate; container-type:inline-size; }
 [data-panel="faceit"]::before { content:""; position:absolute; z-index:-1; pointer-events:none; top:200px; left:25%; width:60%; height:560px; background:#ff5500; opacity:.045; -webkit-mask:url('faceit-logo.svg') center/contain no-repeat; mask:url('faceit-logo.svg') center/contain no-repeat; }
 [data-panel="faceit"] .fc-top { display:flex; align-items:center; gap:14px; margin-bottom:22px; }
