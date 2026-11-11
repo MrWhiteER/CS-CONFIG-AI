@@ -3,17 +3,25 @@ from pathlib import Path
 import json
 import shutil
 import subprocess
+import unittest
 
-import pytest
+PAGE = Path(__file__).resolve().parent.parent / "cs2cfg" / "web" / "index.html"
 
 
-def test_scoreboard_rendering_and_async_lifetime():
-    node = shutil.which("node")
-    if not node:
-        pytest.skip("Node is needed to exercise the scoreboard renderer")
-    page = Path("cs2cfg/web/index.html").read_text(encoding="utf-8")
-    source = page[page.index("let statsRequest = 0;"):page.index("/* The download strip")]
-    harness = r'''
+class ScoreboardWeb(unittest.TestCase):
+
+    def test_scoreboard_rendering_and_async_lifetime(self):
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("Node is needed to exercise the scoreboard renderer")
+        page = PAGE.read_text(encoding="utf-8")
+        source = page[page.index("let statsRequest = 0;"):page.index("/* The download strip")]
+        result = subprocess.run([node, "-e", HARNESS.replace("SOURCE", json.dumps(source))],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+
+HARNESS = r'''
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const elements = new Map();
@@ -77,6 +85,7 @@ assert.ok(!context.renderStatsTeams(missing).includes('NaN'));
   assert.ok($('mstat-body').innerHTML.includes('mstat-retry'));
 })().catch(e=>{console.error(e);process.exitCode=1;});
 '''
-    result = subprocess.run([node, "-e", harness.replace("SOURCE", json.dumps(source))],
-                            capture_output=True, text=True)
-    assert result.returncode == 0, result.stdout + result.stderr
+
+
+if __name__ == "__main__":
+    unittest.main()
