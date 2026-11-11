@@ -3,7 +3,7 @@
    Only APIs and launching CS2 are stubbed; no user data is read or written. */
 const fs=require('fs'),cp=require('child_process'),assert=require('assert'),vm=require('vm'),path=require('path'),url=require('url');
 const root=path.resolve(__dirname,'..');process.chdir(root);
-const work=path.join(root,'tmp','faceit-check');fs.mkdirSync(work,{recursive:true});
+const work=fs.mkdtempSync(path.join(require('os').tmpdir(),'cs2-faceit-'));
 const html=fs.readFileSync('cs2cfg/web/index.html','utf8');
 for(const script of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g))new vm.Script(script[1]);
 const renderer=fs.readFileSync('cs2cfg/web/assets/faceit/dashboard.js','utf8');new vm.Script(renderer);
@@ -69,8 +69,10 @@ check('reduced motion CSS present',[...document.styleSheets].some(s=>{try{return
 if(matchMedia('(prefers-reduced-motion: reduce)').matches)check('reduced motion removes chart animation',getComputedStyle(document.querySelector('.fc-draw')).animationName==='none');
 Object.defineProperty(document,'hidden',{configurable:true,value:true});fcPauseMotion();check('hidden window pauses chart animation',getComputedStyle(document.querySelector('.fc-draw')).animationPlayState==='paused');delete document.hidden;fcPauseMotion();
 for(const name of [...FC_MAPS,'fallback']){await new Promise(resolve=>{const i=new Image();i.onload=()=>{check(name+' WebP loads',i.naturalWidth===560);resolve()};i.onerror=()=>{check(name+' WebP loads',false);resolve()};i.src='assets/maps/'+name+'.webp';});}
-check('mask references replaceable logo',getComputedStyle(document.querySelector('.fc-top .fc-logo')).maskImage.includes('faceit-logo.svg'));
-check('stamp uses logo mask',getComputedStyle(panel,'::before').maskImage.includes('faceit-logo.svg'));
+check('mask references official mark',getComputedStyle(document.querySelector('.fc-top .fc-logo')).maskImage.includes('faceit-mark.svg'));
+check('stamp uses official mask',getComputedStyle(panel,'::before').maskImage.includes('faceit-mark.svg'));
+check('stamp visible above opaque cards',Number(getComputedStyle(panel,'::before').zIndex)>0&&Number(getComputedStyle(panel,'::before').opacity)>0&&Number(getComputedStyle(panel,'::before').opacity)<.1);
+check('stamp never blocks tools',getComputedStyle(panel,'::before').pointerEvents==='none');
 // Final screenshot has a small realistic library and one expanded match.
 disk.demos=[{name:'faceit_00000000_demirage.dem',size:184549376,when:Math.floor(Date.now()/1000)-3600}];await loadDemos();document.querySelector('[data-fc-expand]').click();document.querySelector('.scroll').scrollTop=0;
 }catch(e){checks.push({error:e.stack})}document.body.insertAdjacentHTML('beforeend','<pre id="checks">'+JSON.stringify(checks)+'</pre>');})();`;

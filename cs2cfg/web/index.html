@@ -5466,6 +5466,7 @@
 </style>
 
 <link rel="stylesheet" href="assets/devices/workspace.css">
+<link rel="stylesheet" href="assets/fixit/toolbox.css">
 </head>
 <body>
 <!-- Startup readiness dismisses this veil; independent JS/CSS deadlines always uncover it. -->
@@ -6073,17 +6074,23 @@ const startup = (() => {
     </div>
 
     <div class="tab-panel hidden" data-panel="fix">
-      <div class="hero">
+      <div class="hero fix-hero">
         <div class="hero-copy">
-          <div class="eyebrow">When something has gone wrong</div>
-          <h2>Fix <em>It</em></h2>
-          <p>
-            The things people restart the whole machine for, done one at a time. Each
-            says what it will do before it does it, nothing runs while a match is on
-            that it could interrupt, and anything taken down is put straight back.
-          </p>
+          <div class="eyebrow">Diagnostics / repair bench</div>
+          <h2>Back in <em>the game.</em></h2>
+          <p>One problem. One tool. Repair a connection, picture or device without restarting your PC.</p>
+          <span class="fix-hero-note">Choose a tool below. Nothing runs automatically.</span>
         </div>
+        <svg class="fix-wallpaper" viewBox="0 0 420 200" aria-hidden="true">
+          <path class="fix-wire" d="M0 130h70l25-25h80m60 0h85l30-30h70M80 180h65l30-30h180M190 20v30m100 90v50"/>
+          <rect x="92" y="38" width="234" height="126" rx="12" class="fix-console"/>
+          <path class="fix-wire" d="M110 62h64m-64 13h36m-36 63h48m-48 10h72m98-10h28"/>
+          <g class="fix-gear"><path d="M229 58l8 3 8-5 10 10-5 8 3 8 9 2v14l-9 2-3 8 5 8-10 10-8-5-8 3-2 9h-14l-2-9-8-3-8 5-10-10 5-8-3-8-9-2V84l9-2 3-8-5-8 10-10 8 5 8-3 2-9h14z"/><circle cx="220" cy="91" r="15"/></g>
+          <path class="fix-wrench" d="M285 76a20 20 0 0 0-25 25l-38 38a8 8 0 0 0 12 12l38-38a20 20 0 0 0 25-25l-15 15-12-12z"/>
+          <g class="fix-scan"><path d="M105 96h208"/><circle cx="113" cy="96" r="3"/></g>
+        </svg>
       </div>
+      <div class="fix-toolbar"><span>YOUR TOOLBOX <small>16 focused tools</small></span><button class="btn" id="fix-refresh">Check current settings</button></div>
       <div id="fix-out"><span class="sub"><span class="spin"></span> Looking&hellip;</span></div>
     </div>
 
@@ -8250,18 +8257,83 @@ document.addEventListener("click", e => {
    this page, and must hold whoever calls it.
    --------------------------------------------------------------------------- */
 let fixData = null;
+const fixStates = new Map(); // Session outcomes survive surveys and tab changes.
+let fixSurveyPending = false;
+let fixFilter = "all";
+const FIX_COPY = {
+  "net.restart": ["Reconnect an adapter that drops packets.", "Every connection briefly drops.", "Restarting the selected connection"],
+  "net.flush": ["Clear stale addresses that stop servers connecting.", "", "Clearing the DNS resolver cache"],
+  "gpu.restart": ["Reset a frozen, black or glitching picture.", "The screen will blink briefly.", "Sending the Windows graphics reset shortcut"],
+  "display.restore": ["Restore the desktop after a stretched launch.", "", "Checking and restoring the saved desktop mode"],
+  "device.restart": ["Reconnect an unresponsive mouse, keyboard or headset.", "The selected device briefly disconnects.", "Restarting the selected device"],
+  "steam.restart": ["Recover a stuck Steam client or lost sign-in.", "Closes Steam and interrupts downloads; close CS2 first.", "Restarting Steam; waiting for the client and sign-in"],
+  "sound.apps": ["Choose CS2’s own input and output in Windows.", "", "Opening Windows app volume and device preferences"],
+  "sound.restart": ["Bring back silent or crackling Windows audio.", "All audio briefly stops.", "Restarting Windows audio services"],
+  "mic.privacy": ["Review the permissions that can block your mic.", "", "Opening Windows microphone permissions"],
+  "shader.clear": ["Rebuild stale shaders after game or driver updates.", "Expect temporary stutter while CS2 rebuilds shaders.", "Clearing the graphics shader caches"],
+  "steam.zombie": ["End a leftover CS2 process with no game window.", "", "Checking for and ending a leftover CS2 process"],
+  "steam.verify": ["Ask Steam to check missing or damaged game files.", "", "Opening Steam’s CS2 file verification"],
+  "defender.exclude": ["Toggle real-time scanning of CS2’s folder.", "Excluded files will no longer be scanned in real time.", "Updating the Windows Security exclusion"],
+  "fullscreen.exclusive": ["Toggle Windows’ Fullscreen Optimizations for CS2.", "", "Updating CS2’s compatibility setting"],
+  "power.performance": ["Switch performance power on, or restore your plan.", "", "Switching the Windows power plan"],
+  "startup.apps": ["Review apps that slow boot and run in the background.", "", "Opening Windows startup apps"]
+};
+const FIX_OPENERS = new Set(["sound.apps", "mic.privacy", "startup.apps", "steam.verify"]);
+function fixCurrent(id) {
+  const d = fixData || {};
+  if (id === "net.restart") return "Target: " + ($("fix-adapter")?.selectedOptions[0]?.textContent || "No connected adapter reported");
+  if (id === "device.restart") return "Target: " + ($("fix-device")?.selectedOptions[0]?.textContent || "Choose a restartable device");
+  if (id === "sound.apps" || id === "sound.restart") return "Detected: " + ((d.sound?.devices || []).map(a => a.name).join(", ") || "No sound devices reported") + ". CS2 routing is not reported.";
+  if (id === "steam.zombie") return "Current: " + (d.zombie_cs2 ? "Leftover process detected" : "No stuck process reported");
+  if (id === "defender.exclude" && d.defender?.supported) return "Current: CS2 folder " + (d.defender.excluded ? "excluded from scanning" : "not excluded");
+  if (id === "fullscreen.exclusive" && d.fullscreen?.supported) return "Current: Fullscreen Optimizations " + (d.fullscreen.disabled ? "off" : "on");
+  if (id === "power.performance" && d.power?.supported) return "Current: " + (d.power.boosted ? "App performance boost active" : "App performance boost inactive") + (d.power.plan ? " · " + d.power.plan : "");
+  return "Current setting not reported by Windows survey";
+}
+function paintFixState(id) {
+  const tile = document.querySelector('[data-tool="' + id + '"]');
+  if (!tile) return;
+  const state = fixSurveyPending ? {phase:"checking"} : fixStates.get(id) || {phase:"idle"};
+  tile.dataset.state = state.phase;
+  tile.setAttribute("aria-busy", String(state.phase === "fixing" || state.phase === "checking"));
+  tile.querySelector(".fix-state").textContent = state.phase === "fixed" ? (state.label || (FIX_OPENERS.has(id) ? "Opened" : "Fixed")) + " · " + new Date(state.at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"}) : state.phase === "checking" ? "Checking · reading current settings" : state.phase === "fixing" ? "Fixing · waiting for Windows" : state.phase === "failed" ? "Failed · retry available" : "Idle · ready when you are";
+  tile.querySelector(".fix-current").textContent = fixCurrent(id);
+  const said = $(fixSaidId(id));
+  said.textContent = state.text || "";
+  if (state.steps?.length) {
+    const details = document.createElement("details");
+    const summary = document.createElement("summary"); summary.textContent = "Reported steps"; details.append(summary);
+    const list = document.createElement("ol"); state.steps.forEach(step => { const li = document.createElement("li"); li.textContent = step; list.append(li); }); details.append(list); said.append(details);
+  }
+  const button = tile.querySelector("[data-fix]");
+  if (id === "device.restart") button.dataset.unavailable = String(!$("fix-device")?.selectedOptions[0] || $("fix-device").selectedOptions[0].disabled);
+  if (id === "defender.exclude") button.dataset.label = fixData.defender?.excluded ? "Remove the exclusion" : "Exclude it";
+  if (id === "fullscreen.exclusive") button.dataset.label = fixData.fullscreen?.disabled ? "Turn it back on" : "Turn it off";
+  if (id === "power.performance") button.dataset.label = fixData.power?.boosted ? "Put the previous plan back" : "Switch to it";
+  button.disabled = button.dataset.unavailable === "true" || state.phase === "fixing" || state.phase === "checking";
+  button.textContent = state.phase === "failed" ? "Retry · " + button.dataset.label : state.phase === "fixing" ? "Working..." : button.dataset.label;
+  tile.querySelectorAll("select,input").forEach(el => { el.disabled = state.phase === "fixing" || state.phase === "checking"; });
+}
+function fixPauseMotion() { document.documentElement.classList.toggle("fix-paused", document.hidden); }
+document.addEventListener("visibilitychange", fixPauseMotion);
+fixPauseMotion();
+$("fix-refresh").addEventListener("click", () => loadFixes(true));
 
 async function loadFixes(force) {
   const box = $("fix-out");
+  if (fixSurveyPending || [...fixStates.values()].some(s => s.phase === "fixing")) return;
   if (fixData && !force) { renderFixes(); return; }
-  if (box) box.innerHTML = '<span class="sub"><span class="spin"></span> Looking&hellip;</span>';
+  fixSurveyPending = true;
+  (fixData?.fixes || []).forEach(f => paintFixState(f.id));
+  $("fix-refresh").disabled = true;
+  $("fix-refresh").textContent = "Checking...";
+  if (box && !fixData) box.innerHTML = '<div class="fix-banner" role="status">Checking...  reading devices and current settings...</div>';
   try {
     fixData = await api("/api/fix/survey", {});
     renderFixes();
   } catch (err) {
-    if (box) box.innerHTML = '<span class="sub warn">Could not read the machine: ' +
-      esc(String(err && err.message || err)) + "</span>";
-  }
+    if (box) { box.querySelector(".fix-survey-error")?.remove(); box.insertAdjacentHTML("afterbegin", '<p class="fix-banner fix-survey-error" role="alert">Could not read the machine: ' + esc(String(err && err.message || err)) + '. Use Check current settings to retry.</p>'); }
+  } finally { fixSurveyPending = false; $("fix-refresh").disabled = false; $("fix-refresh").textContent = "Check current settings"; (fixData?.fixes || []).forEach(f => paintFixState(f.id)); }
 }
 
 /* Each repair gets a face.
@@ -8272,65 +8344,22 @@ async function loadFixes(force) {
    the colour is never the only signal -- every tile still says what it is.
 */
 const FIX_ART = {
-  "net.restart":
-    '<path d="M2.5 9.5a15 15 0 0119 0M6 13a10 10 0 0112 0M9.5 16.5a5 5 0 015 0"/>' +
-    '<circle cx="12" cy="20" r="1.4" fill="currentColor" stroke="none"/>',
-  "net.flush":
-    '<path d="M5 6h14M9 6V4.5h6V6M7 6l1 13.5a1.5 1.5 0 001.5 1.4h5a1.5 1.5 0 001.5-1.4L17 6"/>' +
-    '<path d="M10.5 10v7M13.5 10v7"/>',
-  "gpu.restart":
-    '<rect x="3" y="6" width="18" height="12" rx="2.2"/>' +
-    '<rect x="8.5" y="10" width="7" height="4.5" rx="1"/>' +
-    '<path d="M7 3.5v2.5M17 3.5v2.5M7 18v2.5M17 18v2.5"/>',
-  "device.restart":
-    '<rect x="8" y="2.8" width="8" height="18.4" rx="4"/><path d="M12 6.5v3.5"/>',
-  "sound.apps":
-    '<path d="M11 5L6.5 9H3.5v6h3L11 19z"/><path d="M15.5 9.2a4 4 0 010 5.6"/>' +
-    '<path d="M18.2 6.5a8 8 0 010 11"/>',
-  "sound.restart":
-    '<path d="M4 13a8 8 0 0116 0"/><path d="M4 13v3.5a2 2 0 002 2h1.5V13z"/>' +
-    '<path d="M20 13v3.5a2 2 0 01-2 2h-1.5V13z"/>',
-  // A monitor with an arrow striking out to each corner: the shape everything
-  // else uses for "back to full size", so it reads before it is thought about.
-  "display.restore":
-    '<rect x="2.5" y="4" width="19" height="13" rx="2.2"/>' +
-    '<path d="M9 20.5h6M12 17v3.5"/>' +
-    // Short strokes with a gap left in the middle. Run to the centre and the
-    // four of them meet in an X, which at 24 pixels reads as a cross rather
-    // than as four arrows.
-    '<path d="M10.1 9.9L6.7 6.6M13.9 9.9L17.3 6.6' +
-    'M10.1 11.6L6.7 14.9M13.9 11.6L17.3 14.9"/>' +
-    '<path d="M6.7 6.6h2.7M6.7 6.6v2.7M17.3 6.6h-2.7M17.3 6.6v2.7' +
-    'M6.7 14.9h2.7M6.7 14.9v-2.7M17.3 14.9h-2.7M17.3 14.9v-2.7"/>',
-  // Not Steam's mark, which is theirs: the restart arrow everything uses.
-  "steam.restart":
-    '<path d="M20 11a8 8 0 10-2.2 6.3"/>' +
-    '<path d="M20 4.8V11h-6"/>',
-  // A shader: three overlapping panes catching light, the shape used
-  // elsewhere in this file for "picture".
-  "shader.clear":
-    '<rect x="3" y="4" width="18" height="14" rx="2"/>' +
-    '<circle cx="8.5" cy="9" r="1.5"/><path d="M3 16l5-4 4 3 3-2 6 5"/>',
-  // A process that stopped answering: a window with an X instead of content.
-  "steam.zombie":
-    '<rect x="3" y="4" width="18" height="16" rx="1.5"/>' +
-    '<path d="M3 9h18M9 13l6 6M15 13l-6 6"/>',
-  // A checkmark inside a shield -- verification, not a repair.
-  "steam.verify":
-    '<path d="M12 3l7 3v5c0 5-3.2 8-7 10-3.8-2-7-5-7-10V6z"/>' +
-    '<path d="M9 12l2 2 4-4"/>',
-  "mic.privacy":
-    '<rect x="9" y="3" width="6" height="11" rx="3"/>' +
-    '<path d="M6 11a6 6 0 0012 0M12 17v3.5M9 20.5h6"/>',
-  "startup.apps":
-    '<rect x="3" y="4" width="18" height="16" rx="1.5"/>' +
-    '<path d="M3 10h18M7 14h4"/>',
-  "defender.exclude":
-    '<path d="M12 3l7 3v5c0 5-3.2 8-7 10-3.8-2-7-5-7-10V6z"/>',
-  "fullscreen.exclusive":
-    '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
-  "power.performance":
-    '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
+  "net.restart": "<path d=\"M5 3v4m5-4v4M3 7h9v4l-3 3v4H6v-4l-3-3M15 6a7 7 0 0 1 5 12m-4 1h5v-5M8 22h8\"/>",
+  "net.flush": "<path d=\"M3 4h11M3 8h8M3 12h6M3 16h4m14-13-8 11m-2-2 5 3-3 6-7-5zM8 17l3 2m-1-4 3 2\"/>",
+  "gpu.restart": "<path d=\"M2 6h15v13H2zM5 19v2m4-2v2m4-2v2M17 14h4v4h-4\"/><circle cx=\"9\" cy=\"12\" r=\"3\"/><path d=\"M16 3a5 5 0 0 1 6 7m0-4v4h-4\"/>",
+  "device.restart": "<path d=\"M4 8a5 5 0 0 1 10 0v9a5 5 0 0 1-10 0zM9 5v6m8-8a6 6 0 0 1 5 8m0-4v4h-4m0 4a6 6 0 0 1-1 6\"/>",
+  "sound.apps": "<path d=\"M9 5 5 9H2v6h3l4 4zM14 4v16M20 4v16M12 9h4m2 6h4\"/>",
+  "sound.restart": "<path d=\"M9 5 5 9H2v6h3l4 4zM12 12h2l2-5 3 10 2-5h2\"/>",
+  "display.restore": "<rect x=\"2.5\" y=\"4\" width=\"19\" height=\"13\" rx=\"2.2\"/><path d=\"M9 20.5h6M12 17v3.5\"/><path d=\"M10.1 9.9L6.7 6.6M13.9 9.9L17.3 6.6M10.1 11.6L6.7 14.9M13.9 11.6L17.3 14.9\"/><path d=\"M6.7 6.6h2.7M6.7 6.6v2.7M17.3 6.6h-2.7M17.3 6.6v2.7M6.7 14.9h2.7M6.7 14.9v-2.7M17.3 14.9h-2.7M17.3 14.9v-2.7\"/>",
+  "steam.restart": "<path d=\"M5 16a5 5 0 0 1-1-10 7 7 0 0 1 13-1 5 5 0 0 1 4 7M9 14a6 6 0 1 0 10 6m1-5v5h-5\"/>",
+  "shader.clear": "<path d=\"m2 6 8-4 8 4-8 4zM2 10l8 4 4-2M2 14l8 4m12-9-7 7m-2-2 5 3-3 5-6-4zM11 19l3 2\"/>",
+  "steam.zombie": "<rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"1.5\"/><path d=\"M3 9h18M9 13l6 6M15 13l-6 6\"/>",
+  "steam.verify": "<path d=\"M4 2h10l6 6v14H4zM14 2v6h6M8 15l3 3 6-7\"/>",
+  "mic.privacy": "<rect x=\"4\" y=\"2\" width=\"6\" height=\"12\" rx=\"3\"/><path d=\"M1 10a6 6 0 0 0 12 0M7 16v5M3 21h8m7-13 5 2v5c0 3-3 5-5 6-2-1-5-3-5-6v-5zM16 14l2 2 3-4\"/>",
+  "startup.apps": "<path d=\"M2 5h20v17H2zM2 10h20m10 9v-6m-3 3 3-3 3 3M5 7h1m3 0h1\"/>",
+  "defender.exclude": "<path d=\"m12 2 9 4v6c0 5-5 8-9 10-4-2-9-5-9-10V6zM7 12h10\"/>",
+  "fullscreen.exclusive": "<path d=\"M3 8V3h5m8 0h5v5M3 16v5h5m8 0h5v-5M7 7h10v10H7zM10 10l4 4m0-4-4 4\"/>",
+  "power.performance": "<path d=\"M15 2 6 13h6l-3 9 10-12h-6zM3 5h4M1 9h3m14 10h4m-2-4h3\"/>"
 };
 
 const FIX_FAMILY_NAME = {
@@ -8353,31 +8382,24 @@ function fixProgId(id) { return "fix-prog-" + id.split(".").join("-"); }
 
 function fixTile(fix, inner) {
   if (!fix) return "";
-  const tags =
-    (fix.needs_admin ? '<span class="flag warn">administrator</span>' : "") +
-    (fix.disruptive && !fix.allowed_in_game
-      ? '<span class="flag warn">not during a match</span>' : "");
-  return '<section class="fix-tile" data-family="' + esc(fix.family) + '">' +
-    '<div class="fix-head">' + fixIcon(fix) +
-      '<div class="fix-title"><span class="fix-fam">' +
-        esc(FIX_FAMILY_NAME[fix.family] || fix.family) + "</span>" +
-        "<h3>" + esc(fix.title) + "</h3>" + tags +
-      "</div>" +
-    "</div>" +
-    '<p class="fix-blurb">' + esc(fix.blurb) + "</p>" +
-    (fix.danger
-      ? '<p class="fix-danger">' + esc(fix.danger) + "</p>"
-      : "") +
-    '<div class="fix-body">' + inner + "</div>" +
-    '<div class="fix-prog" id="' + fixProgId(fix.id) + '" hidden>' +
-      '<div class="fix-track"><i></i></div>' +
-      '<p class="fix-step"><span class="what"></span><span class="secs"></span></p>' +
-    "</div>" +
-    '<div class="fix-said" id="' + fixSaidId(fix.id) + '"></div></section>';
+  const copy = FIX_COPY[fix.id] || [fix.blurb, fix.danger, "Working"];
+  const shield = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6zM12 8v5m0 3v1"/></svg>';
+  const pause = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7v10M16 7v10"/><circle cx="12" cy="12" r="10"/></svg>';
+  const tags = (fix.needs_admin ? '<span class="fix-chip">' + shield + 'Administrator</span>' : '') +
+    (fix.disruptive && !fix.allowed_in_game ? '<span class="fix-chip">' + pause + 'Close CS2 first</span>' : '');
+  return '<section class="fix-tile" data-tool="' + esc(fix.id) + '" data-family="' + esc(fix.family) + '">' +
+    '<div class="fix-head">' + fixIcon(fix) + '<div class="fix-title"><span class="fix-fam">' + esc(FIX_FAMILY_NAME[fix.family] || fix.family) + '</span><h3>' + esc(fix.title) + '</h3></div></div>' +
+    '<p class="fix-blurb">' + esc(copy[0]) + '</p><div class="fix-chips">' + tags + '</div>' +
+    (copy[1] ? '<p class="fix-danger">Caution: ' + esc(copy[1]) + '</p>' : '') +
+    '<details class="fix-details"><summary>Details</summary><p>' + esc(fix.blurb) + '</p>' + (fix.danger ? '<p>' + esc(fix.danger) + '</p>' : '') + '</details>' +
+    '<p class="fix-current"></p><div class="fix-body">' + inner + '</div>' +
+    '<div class="fix-state" role="status" aria-live="polite"></div>' +
+    '<div class="fix-prog" id="' + fixProgId(fix.id) + '" hidden><div class="fix-track"><i></i></div><p class="fix-step"><span class="what"></span><span class="secs"></span></p></div>' +
+    '<div class="fix-said" role="status" id="' + fixSaidId(fix.id) + '"></div></section>';
 }
 
 function fixButton(id, label, disabled) {
-  return '<button class="btn primary" data-fix="' + esc(id) + '"' +
+  return '<button class="btn primary" data-fix="' + esc(id) + '" data-label="' + esc(label) + '" data-unavailable="' + !!disabled + '"' +
     (disabled ? " disabled" : "") + ">" + esc(label) + "</button>";
 }
 
@@ -8402,7 +8424,7 @@ function renderFixes() {
     (a.wireless ? " · Wi-Fi" : " · wired") + "</option>").join("");
   html += fixTile(by["net.restart"],
     (adapters.length
-      ? '<select id="fix-adapter">' + options + "</select>"
+      ? '<label class="fix-select-label" for="fix-adapter">Connection to restart</label><select id="fix-adapter">' + options + "</select>"
       : '<span class="sub">no connected adapter found</span>') +
     '<div class="actions">' + fixButton("net.restart", "Restart it", !adapters.length) +
     "</div>");
@@ -8423,7 +8445,7 @@ function renderFixes() {
     esc(d.class) + " · " + esc(d.name) +
     (d.restartable ? "" : "  (the only one)") + "</option>").join("");
   html += fixTile(by["device.restart"],
-    '<select id="fix-device">' + listFor(false) + "</select>" +
+    '<label class="fix-select-label" for="fix-device">Device to restart</label><select id="fix-device">' + listFor(false) + "</select>" +
     '<label class="opt"><input type="checkbox" id="fix-all-devices"> ' +
     "Everything, not just the usual (" + devices.length + ")</label>" +
     '<div class="actions">' + fixButton("device.restart", "Restart it", !devices.length) +
@@ -8442,13 +8464,7 @@ function renderFixes() {
   const sound = fixData.sound || {};
   const special = sound.special || [];
   html += fixTile(by["sound.apps"],
-    (special.length
-      ? '<p class="fix-danger">Audio here runs through ' + esc(special.join(", ")) +
-        ". Changing the Windows default would move everything with it, streams " +
-        "included — so this gives CS2 its own device instead. The app will not " +
-        "write that routing for you: the interface behind it is undocumented, and " +
-        "guessing at a mixer somebody streams through is not a small mistake.</p>"
-      : "") +
+    (special.length ? '<p class="fix-danger">Caution: Keep your mixer routing intact; choose CS2’s device in Windows.</p><details class="fix-details"><summary>Detected mixers</summary><p>' + esc(special.join(", ")) + '. Changing the Windows default also moves other apps and streams. This tool opens per-app settings; select the routing there.</p></details>' : '') +
     '<div class="actions">' + fixButton("sound.apps", "Open the mixer", false) + "</div>");
 
   html += fixTile(by["sound.restart"],
@@ -8509,7 +8525,23 @@ function renderFixes() {
     '<div class="actions">' + fixButton("startup.apps", "Open the list", false) + "</div>");
 
   html += "</div>";
+  // Keep controls across refreshes and returning to this tab.
+  const held = {};
+  box.querySelectorAll("select,input").forEach(el => { held[el.id] = {value:el.value,checked:el.checked}; });
   box.innerHTML = html;
+  const grid = box.querySelector(".fix-grid");
+  const nav = document.createElement("div"); nav.className = "fix-categories"; nav.setAttribute("aria-label", "Tool categories");
+  [["all","All tools"], ...Object.entries(FIX_FAMILY_NAME)].forEach(([key,label]) => {
+    const button = document.createElement("button"); button.className = "btn"; button.textContent = label; button.setAttribute("aria-pressed", String(fixFilter === key));
+    button.onclick = () => { fixFilter = key; nav.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b === button))); grid.querySelectorAll(".fix-tile").forEach(t => { t.hidden = key !== "all" && t.dataset.family !== key; }); }; nav.append(button);
+  });
+  grid.before(nav);
+  grid.querySelectorAll(".fix-tile").forEach(t => { t.hidden = fixFilter !== "all" && t.dataset.family !== fixFilter; });
+  Object.entries(held).forEach(([id,state]) => { const el = $(id); if (el && el.type === "checkbox") el.checked = state.checked; });
+  if (held["fix-all-devices"]?.checked) $("fix-device").innerHTML = listFor(true);
+  Object.entries(held).forEach(([id,state]) => { const el = $(id); if (el?.tagName === "SELECT" && [...el.options].some(o => o.value === state.value && !o.disabled)) el.value = state.value; });
+  (fixData.fixes || []).forEach(f => paintFixState(f.id));
+  box.querySelectorAll("select").forEach(el => el.addEventListener("change", () => paintFixState(el.closest("[data-tool]").dataset.tool)));
 
   const toggle = $("fix-all-devices");
   if (toggle) {
@@ -8518,7 +8550,8 @@ function renderFixes() {
       if (!select) return;
       const held = select.value;
       select.innerHTML = listFor(toggle.checked);
-      select.value = held;
+      if ([...select.options].some(o => o.value === held && !o.disabled)) select.value = held;
+      paintFixState("device.restart");
     });
   }
 }
@@ -8526,10 +8559,9 @@ function renderFixes() {
 async function runFix(button) {
   const id = button.dataset.fix;
   const fix = ((fixData && fixData.fixes) || []).find(f => f.id === id);
-  if (!fix) return;
+  if (!fix || fixSurveyPending || fixStates.get(id)?.phase === "fixing" || button.disabled) return;
   if (fix.danger && !confirm(fix.title + "\n\n" + fix.danger + "\n\nGo ahead?")) return;
 
-  const said = $(fixSaidId(id));
   const body = { id: id };
   if (id === "net.restart" && $("fix-adapter")) body.adapter = $("fix-adapter").value;
   if (id === "device.restart" && $("fix-device")) body.device = $("fix-device").value;
@@ -8538,25 +8570,21 @@ async function runFix(button) {
   }
 
   button.disabled = true;
-  const label = button.textContent;
-  button.textContent = "Working…";
-  if (said) said.innerHTML = "";
-  const bar = fixProgress(id,
-    fix.needs_admin ? "Waiting for the administrator prompt" : "Working");
+  fixStates.set(id, {phase:"fixing"}); paintFixState(id);
+  const bar = fixProgress(id, (FIX_COPY[id] || [,,"Working"])[2] + (fix.needs_admin ? " · administrator approval may be required" : ""));
   try {
     const r = await api("/api/fix/run", body);
     const good = !!r.ok;
     const text = r.detail || r.error || (good ? "Done." : "Nothing changed.");
     bar.finish(good ? "done" : r.declined ? "stopped" : "failed", text);
-    if (said) {
-      said.innerHTML = '<span style="color:' +
-        (good ? "var(--good)" : r.declined ? "var(--muted)" : "var(--bad)") + '">' +
-        esc(text) + "</span>";
-    }
+    fixStates.set(id, {phase: good ? "fixed" : r.declined ? "idle" : "failed", at:Date.now(), text:(r.declined ? "Cancelled · " : "") + text, steps:r.steps, label:id === "steam.restart" && r.signed_in === false ? "Restarted · sign-in pending" : undefined});
+    // Only response fields establish a new setting; a later survey confirms it.
+    if (good && id === "defender.exclude" && typeof r.excluded === "boolean") fixData.defender.excluded = r.excluded;
+    if (good && id === "fullscreen.exclusive" && typeof r.disabled === "boolean") fixData.fullscreen.disabled = r.disabled;
+    if (good && id === "power.performance" && typeof r.boosted === "boolean") { fixData.power.boosted = r.boosted; fixData.power.plan = r.plan; }
+    if (good && id === "steam.zombie" && r.ended) fixData.zombie_cs2 = false;
+    paintFixState(id);
     status(text, !good && !r.declined);
-    // Re-surveying rebuilds the tiles, which throws away the bar that has just
-    // finished. Let it be read first: the moment it reports success is the one
-    // the bar exists for, and the survey is not urgent.
     if (good && id !== "sound.apps") setTimeout(() => loadFixes(true), 2700);
     // Steam is back and signed in, and the launch was asked for. Handed to
     // the ordinary Play button rather than launched from here, so the game
@@ -8569,11 +8597,10 @@ async function runFix(button) {
   } catch (err) {
     const text = String(err && err.message || err);
     bar.finish("failed", text);
-    if (said) said.innerHTML = '<span style="color:var(--bad)">' + esc(text) + "</span>";
+    fixStates.set(id, {phase:"failed", at:Date.now(), text}); paintFixState(id);
     status("Could not run that: " + text, true);
   } finally {
-    button.disabled = false;
-    button.textContent = label;
+    paintFixState(id);
   }
 }
 
@@ -8585,9 +8612,9 @@ async function runFix(button) {
    creeps to 90% and waits is the thing everyone has learnt to distrust. It
    sweeps instead, which says "still going" without claiming to know how far.
 
-   What it does know it shows: whether it is waiting on a UAC prompt rather
-   than on the work, and how long it has been going. The seconds are the part
-   that tells you whether to keep waiting.
+   The action text describes the known operation, not a live backend phase.
+   Administrator approval may be required; the response does not tell us when
+   UAC ends. Elapsed seconds and the sweep indicate an outstanding request.
 */
 function fixProgress(id, what) {
   const box = $(fixProgId(id));
@@ -8604,10 +8631,9 @@ function fixProgress(id, what) {
   const tick = setInterval(() => {
     const gone = Math.round((Date.now() - began) / 1000);
     if (secs) secs.textContent = gone >= 1 ? gone + "s" : "";
-    // A fix that is still going after this long is usually one where Windows
-    // is taking its time rather than one that has hung, and saying so beats
-    // leaving somebody to wonder.
-    if (gone === 12 && step) step.textContent = what + "… Windows is taking a while";
+    // There is no heartbeat or intermediate phase from this endpoint.
+    // Report only that the result has not arrived.
+    if (gone === 12 && step) step.textContent = what + "… Still waiting for the result";
   }, 250);
 
   return {
