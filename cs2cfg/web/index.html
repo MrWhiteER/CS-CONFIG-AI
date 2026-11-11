@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>cs2-autoconfig</title>
+<link rel="stylesheet" href="assets/faceit/dashboard.css">
+<link rel="stylesheet" href="assets/faceit/scoreboard.css">
 <!-- The same mark the application, the window and the notification area
      icon use, inline so the page carries it without a second request. -->
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3.52' fill='%23130c1f'/><path fill='%23a78bfa' d='M12 3H6L3 6V10L6 13H12V11H7L5 9V7L7 5H12Z'/><path fill='%23ececec' d='M10 5H12V7H14V9H12V11H10V9H8V7H10Z'/></svg>">
@@ -106,198 +108,6 @@
   input[type=number] { width: 92px; }
   select { width: auto; }
 
-
-  /* "Optimise for" as one ball on a track.
-
-     Three stops, because there are three profiles -- a continuous slider would
-     imply blends that do not exist. Dragging settles on the nearest.
-
-     Each profile carries its own colour, and the whole control is lit by it:
-     the ball, the bar behind it, the label, and a wash across the panel. The
-     point is that the mode is readable from across the room without reading a
-     word -- amber runs hot for frames, green is the house default, violet is
-     the expensive one. Colour alone is never the only signal: the ball's
-     position and the lit label say the same thing for anyone who cannot
-     separate the hues.
-  */
-  .dial {
-    --neon: var(--accent);
-    --neon-ink: #0b1017;
-    position: relative;
-    padding: 20px 4px 4px;
-    outline: none;
-    transition: --neon .25s ease;
-  }
-  .dial[data-intent="competitive"] { --neon: var(--neon-competitive); }
-  .dial[data-intent="balanced"]    { --neon: var(--neon-balanced); }
-  .dial[data-intent="quality"]     { --neon: var(--neon-quality); }
-
-  /* There used to be an ambient wash here -- a radial gradient on a box of
-     its own, sized 120% tall so it still had colour where its box ended. A
-     gradient cut off by its own edge is a rectangle, and that rectangle sat
-     right across the band, which is what made the colours look boxed in.
-     The band throws far more light than the wash ever did, so it goes. */
-
-  /* The band. Two things being traded, drawn as one shape.
-
-     The total is fixed -- it is the same hardware whichever way you go -- so
-     all the control does is move the line between them. Cyan above it is the
-     frames you are keeping; violet below is the picture you are buying.
-
-     The colour dissolving away from that line, rather than filling to a hard
-     rectangle, is done by using the line itself as the mask: stroked wide and
-     blurred, so opacity falls off at right angles to it. That matters because
-     the line is a curve -- a top-to-bottom gradient would cut straight across
-     it and leave a hard edge exactly where the shape bends most. */
-  /* The band runs wider than the panel that holds it, and its light is not
-     allowed to stop at the panel's edge. An SVG clips to its own box by
-     default, which is what was cutting the glow off square; and the band used
-     to end 25px inside the panel, so the colour visibly stopped rather than
-     carrying on past the frame. */
-  .dial-track {
-    position: relative; height: 96px;
-    margin: 0 calc(-1 * var(--panel-pad, 17px) - 14px);
-  }
-  .band-svg {
-    position: absolute; inset: 0; width: 100%; height: 100%;
-    overflow: visible;          /* let the band's own glyphs leave the box */
-    pointer-events: none;
-  }
-  .dial.dragging .dial-ball { transition: none; }
-
-  /* A third of the band each, so the whole control is the target rather than
-     a dot. Invisible on purpose: the band already says where the stops are. */
-  .dial-stop {
-    position: absolute; top: 0; bottom: 0; width: 33.34%; padding: 0;
-    border: 0; background: none; cursor: pointer;
-  }
-  .dial-stop:nth-of-type(1) { left: 0; }
-  .dial-stop:nth-of-type(2) { left: 33.33%; }
-  .dial-stop:nth-of-type(3) { left: 66.66%; }
-
-  /* The bead rides the dividing line and carries the figure it selects.
-
-     Dark glass rather than a lit disc, because the number has to glow and
-     something glowing needs something dark to glow against -- ink on a bright
-     sphere reads as printed, not lit. The rim and the halo carry the mode's
-     colour instead. Its top comes from the curve, not from CSS. */
-  .dial-ball {
-    position: absolute; left: 50%; top: 50%;
-    width: 58px; height: 58px; margin: -29px 0 0 -29px;
-    border-radius: 50%; padding: 0; border: 0;
-    display: grid; place-items: center; line-height: 1;
-    isolation: isolate;
-    background:
-      radial-gradient(circle at 42% 32%,
-        color-mix(in srgb, var(--neon) 34%, #16102b) 0%,
-        #0c0718 72%);
-    color: #fff;
-    font-family: var(--mono); font-size: 19px; font-weight: 700;
-    text-shadow:
-      0 0 7px color-mix(in srgb, var(--neon) 90%, transparent),
-      0 0 18px var(--neon),
-      0 0 36px color-mix(in srgb, var(--neon) 65%, transparent);
-    box-shadow:
-      0 0 0 1.5px color-mix(in srgb, var(--neon) 75%, transparent),
-      inset 0 0 20px color-mix(in srgb, var(--neon) 28%, transparent),
-      0 0 26px var(--neon),
-      0 0 58px color-mix(in srgb, var(--neon) 50%, transparent),
-      0 5px 16px rgba(0, 0, 0, .6);
-    cursor: grab; touch-action: none;
-    transition: left .2s cubic-bezier(.2, .9, .3, 1),
-                top .2s cubic-bezier(.2, .9, .3, 1),
-                background .28s ease, box-shadow .28s ease, transform .12s ease;
-  }
-  /* The figure stays dead centre of the sphere; the unit hangs under it,
-     inside, positioned rather than stacked so it cannot push the number off
-     the middle. */
-  .dial-ball b { grid-area: 1 / 1; font: inherit; }
-  /* 70% clears the digits: the number is 19px on a 54px sphere, so centred it
-     reaches ~36px down, and 63% put the unit straight through its feet. */
-  .dial-ball i {
-    position: absolute; left: 50%; top: 70%; transform: translateX(-50%);
-    font-style: normal; font-family: var(--mono);
-    font-size: 7.5px; font-weight: 700; letter-spacing: .18em; text-indent: .18em;
-    color: color-mix(in srgb, var(--neon) 75%, #fff);
-    text-shadow: 0 0 8px color-mix(in srgb, var(--neon) 70%, transparent);
-  }
-  .dial-ball:empty { width: 19px; height: 19px; margin: -9.5px 0 0 -9.5px; }
-  @supports not (color: color-mix(in srgb, red 50%, blue)) {
-    .dial-ball i { color: var(--neon); text-shadow: none; }
-  }
-  @supports not (color: color-mix(in srgb, red 50%, blue)) {
-    .dial-ball {
-      background: #16102b;
-      box-shadow: 0 0 0 1.5px var(--neon), 0 0 22px var(--neon),
-                  0 5px 16px rgba(0, 0, 0, .6);
-      text-shadow: 0 0 14px var(--neon);
-    }
-  }
-
-  .dial-labels { display: flex; justify-content: space-between; margin: 11px 4px 0; }
-  .dial-labels > span {
-    flex: 1; text-align: center; cursor: pointer;
-    color: var(--muted);
-    transition: color .22s ease, text-shadow .22s ease;
-  }
-  /* All three centred, including the outer two.
-     The sphere stops at the centre of each label's column, so a label pushed
-     to the edge of its column sits to one side of where the sphere lands --
-     which is what made the outer two look unrelated to it. Centred, the text
-     is directly under the stop. */
-  .dial-labels strong {
-    display: block; font-size: 13px; font-weight: 700; letter-spacing: .2px;
-    color: inherit;
-  }
-  .dial-labels > span > span {
-    display: block; color: var(--muted); font-size: 11px; opacity: .8;
-  }
-  .dial-labels > span[aria-pressed="true"] {
-    color: var(--neon);
-    text-shadow: 0 0 14px color-mix(in srgb, var(--neon) 75%, transparent);
-  }
-  .dial-labels > span[aria-pressed="true"] > span { color: var(--neon); opacity: .75; }
-
-  /* Everything above leans on colour-mix. Where that is unsupported the neon
-     simply renders flat instead of glowing -- the control still works, and the
-     position and lit label still say which mode is selected. */
-  @supports not (color: color-mix(in srgb, red 50%, blue)) {
-    .dial-ball { background: var(--neon); }
-  }
-
-
-
-  /* Temperatures: the same footprint as the load gauges, shaped as the sign. */
-  .temps { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
-  .temp-gauge { --t: var(--accent); }
-  .temp-gauge.warm    { --t: var(--warn); }
-  .temp-gauge.hot     { --t: var(--bad); }
-  .temp-gauge.unknown { --t: var(--line); opacity: .55; }
-
-  .temp-gauge .t-glass { fill: rgba(var(--lift), .045); stroke: none; }
-  .temp-gauge .t-rim { fill: none; stroke: var(--line); stroke-width: 2; }
-  .temp-gauge .t-ticks line {
-    /* --line is almost invisible at this size, and a scale you cannot see is
-       just noise in the markup. */
-    stroke: rgba(var(--lift), .22); stroke-width: 1.6; stroke-linecap: round;
-  }
-  /* y and height animate as CSS properties, which is why the nodes are
-     patched rather than rebuilt: a fresh element cannot transition from
-     anything, and the column would jump between readings. */
-  .temp-gauge .t-fill {
-    fill: var(--t);
-    transition: y .6s ease, height .6s ease, fill .4s ease;
-  }
-  .temp-gauge.hot .t-fill { animation: temp-pulse 1.4s ease-in-out infinite; }
-  .temp-gauge .t-read { font-family: var(--mono); }
-  @keyframes temp-pulse {
-    0%, 100% { opacity: 1; }
-    50%      { opacity: .4; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .temp-gauge .t-fill { transition: none; }
-    .temp-gauge.hot .t-fill { animation: none; }
-  }
 
   /* Fix It, as a toolbox rather than a document.
 
@@ -1762,6 +1572,8 @@
 
   .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
   .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    text-align: center; vertical-align: middle; box-sizing: border-box;
     padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line);
     background: var(--bg-2); color: var(--ink); font: inherit; cursor: pointer;
     transition: border-color .15s ease, color .15s ease;
@@ -2122,6 +1934,7 @@
   .hidden { display: none !important; }
   .spin { display: inline-block; animation: sp 1s linear infinite; }
   @keyframes sp { to { transform: rotate(360deg); } }
+
 </style>
 <style>
   /* ------------------------------------------------------------------------
@@ -5511,18 +5324,207 @@
     #account-card *, #account-card *::before, #account-card *::after { animation: none !important; transition: none !important; }
     #account-card :is(.way, .btn):hover:not(:disabled) { transform: none; }
   }
+/* Job A: image-led Launcher. Scope visual changes to the home surface. */
+.config-mark { display:inline-block; flex:none; width:42px; height:42px; background:var(--accent); -webkit-mask:url('assets/brand/config-mark.svg') center/contain no-repeat; mask:url('assets/brand/config-mark.svg') center/contain no-repeat; }
+.rail .brand { display:flex; align-items:center; gap:10px; padding:20px 16px; font-size:17px; line-height:1.1; }
+.rail .brand > .config-mark { display:block; width:34px; height:34px; }
+.rail .brand div > span { margin-top:6px; font-size:8px; letter-spacing:.14em; }
+.app.rail-tight .rail .brand > .config-mark { display:block; }
+.app.rail-tight .rail .brand > div { display:none; }
+.boot-content .boot-mark { width:82px; height:82px; }
+[data-panel="launcher"] { --home-cut:polygon(0 0,calc(100% - 20px) 0,100% 20px,100% 100%,20px 100%,0 calc(100% - 20px)); }
+[data-panel="launcher"] .home-hero { position:relative; isolation:isolate; min-height:370px; display:flex; align-items:center; overflow:hidden; padding:32px 38px; border:1px solid var(--line); border-radius:4px; margin-bottom:30px; background:var(--panel); }
+.hero-art { transition:transform .6s ease-out; position:absolute; inset:0; z-index:-2; overflow:hidden; pointer-events:none; }
+.hero-art img { width:100%; height:100%; object-fit:cover; object-position:70% 52%; transform-origin:76% 60%; animation:home-breathe 12s ease-in-out infinite alternate; }
+.home-hero::after { content:''; position:absolute; inset:0; z-index:-1; background:linear-gradient(90deg,var(--panel) 0%,color-mix(in srgb,var(--panel) 96%,transparent) 24%,color-mix(in srgb,var(--panel) 65%,transparent) 43%,transparent 69%); pointer-events:none; }
+.home-hero .hero-copy { width:48%; max-width:580px; position:relative; }
+.hero-brand { display:flex; align-items:center; gap:10px; font:600 11px var(--mono); letter-spacing:.18em; color:var(--muted); margin-bottom:24px; }
+.hero-brand .config-mark { width:32px; height:32px; }
+.home-hero .eyebrow { color:var(--accent); letter-spacing:.15em; font-size:10px; }
+[data-panel="launcher"] .home-hero h2 { font-size:clamp(26px,3vw,44px); line-height:1.05; margin:8px 0 14px; letter-spacing:-.04em; }
+.home-hero .hero-copy p { font-size:12px; max-width:390px; line-height:1.65; margin-bottom:20px; }
+.home-hero .hero-play { width:100%; max-width:460px; }
+.home-hero .btn-play { min-height:62px; width:100%; border-radius:2px; font-size:19px; clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,0 100%); }
+.home-hero .fix-row { flex-wrap:wrap; gap:8px; margin-top:12px; }
+.home-hero #play-fix { font-size:10px; padding:8px 10px; }
+.home-hero #launch-modes { min-width:0; }
+.home-hero #launch-modes .seg-item { font-size:10px; padding:7px 9px; }
+.home-hero #launch-modes .why { font-size:8px; }
+.monitor-light { position:absolute; left:40%; top:18%; width:35%; height:45%; background:radial-gradient(ellipse,var(--accent),transparent 70%); opacity:.08; mix-blend-mode:screen; clip-path:polygon(0 0,100% 8%,97% 91%,0 100%); animation:home-flicker 7s linear infinite; }
+.desk-light { position:absolute; left:36%; top:85%; width:34%; height:3px; background:var(--accent); box-shadow:0 0 20px 4px var(--accent); transform:rotate(-8deg); animation:home-rgb 5s ease-in-out infinite alternate; }
+[data-panel="launcher"] > .panel:has(.mode-cards) { padding:0; background:none; border:0; box-shadow:none; margin-bottom:28px; }
+[data-panel="launcher"] > .panel:has(.mode-cards)::before { display:none; }
+.mode-cards { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; padding-top:5px; }
+.mode-card { position:relative; isolation:isolate; min-width:0; height:200px; text-align:left; padding:20px; background:var(--panel); color:var(--ink); border:0; border-radius:0; cursor:pointer; clip-path:var(--home-cut); transition:transform .3s; }
+.mode-card img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transform:scale(1.08); animation:home-pan 22s ease-in-out infinite alternate; z-index:-3; }
+.mode-card:nth-child(2) img { animation-delay:-7s; }.mode-card:nth-child(3) img { animation-delay:-14s; }
+.mode-shade { position:absolute; inset:0; z-index:-2; background:linear-gradient(180deg,rgba(0,0,0,.38),rgba(0,0,0,.05) 30%,rgba(0,0,0,.88)); }
+.mode-card::after { content:''; position:absolute; inset:0; pointer-events:none; border:2px solid transparent; clip-path:var(--home-cut); transition:border-color .3s; }
+.mode-card::before { content:''; position:absolute; inset:-30% -60%; pointer-events:none; background:linear-gradient(110deg,transparent 45%,rgba(var(--lift),.18) 50%,transparent 55%); transform:translateX(-55%); animation:home-sweep 9s ease-in-out infinite; }
+.mode-card[aria-pressed="true"] { transform:translateY(-5px); }.mode-card[aria-pressed="true"]::after { border-color:var(--accent); box-shadow:inset 0 -32px 35px -30px var(--accent); }
+.mode-card:hover { transform:translateY(-5px); }.mode-card:focus-visible { outline:0; }.mode-card:focus-visible::after { border:3px solid var(--accent); }
+.mode-index { position:absolute; left:18px; top:16px; font:600 10px var(--mono); color:#fff; letter-spacing:.1em; }
+.mode-fps { position:absolute; top:12px; right:20px; display:flex; flex-direction:column; align-items:flex-end; color:#fff; }
+.mode-fps b { font:700 27px var(--mono); text-shadow:0 2px 12px #000; }.mode-fps small { font:8px var(--mono); letter-spacing:.12em; }
+.mode-copy { position:absolute; left:20px; bottom:20px; right:22px; display:flex; flex-direction:column; color:#fff; gap:5px; }
+.mode-copy strong { font-size:21px; font-weight:700; letter-spacing:-.025em; }.mode-copy > span { font-size:11px; color:#ddd; }
+.mode-selected { position:absolute; bottom:23px; right:18px; color:var(--accent); opacity:0; }.mode-card[aria-pressed="true"] .mode-selected { opacity:1; }
+.mode-note { margin:12px 0 0; font-size:10px; }
+[data-panel="launcher"] .grid2 { gap:20px; }
+[data-panel="launcher"] :is(#live-card,#hw-card,#net-card) { background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:22px; box-shadow:none; }
+[data-panel="launcher"] .panel > h2 { font-size:12px; margin-bottom:20px; letter-spacing:.08em; }
+[data-panel="launcher"] .gauges { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px; }
+[data-panel="launcher"] .gauge { width:auto; min-width:0; }.gauge .ring-fg { transition:none; }
+[data-panel="launcher"] .gauge .val { font-size:20px; }.gauge .cap { font-size:10px; }
+[data-panel="launcher"] .gauge .sub2 { font-size:10px; }
+[data-panel="launcher"] .temps { display:grid; grid-template-columns:repeat(auto-fit,minmax(115px,1fr)); gap:16px; margin:22px 0; }
+[data-panel="launcher"] .temp-gauge { width:auto; opacity:1; text-align:left; }
+.heat-heading { display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:9px; }.heat-heading .cap { color:var(--muted); font-size:10px; }.heat-heading .t-read { font:11px var(--mono); color:var(--ink); text-align:right; }
+.heat-track { height:5px; overflow:hidden; background:var(--line); border-radius:1px; }.temp-gauge .heat-track .t-fill { display:block; height:100%; width:100%; transform-origin:left; background:linear-gradient(90deg,var(--accent),var(--warn) 70%,var(--bad)); transition:none; animation:none; }
+.temp-gauge.unknown .heat-track { background:repeating-linear-gradient(110deg,var(--line) 0 4px,transparent 4px 8px); }.temp-gauge.unknown .t-read { color:var(--muted); font-size:10px; }
+[data-panel="launcher"] .stats { gap:9px; }[data-panel="launcher"] .stat { padding:14px 12px; background:rgba(var(--lift),.035); border:0; border-left:2px solid var(--accent); border-radius:0; min-width:0; }
+[data-panel="launcher"] .stat b { font-size:20px; overflow-wrap:anywhere; }[data-panel="launcher"] .stat span { font-size:9px; letter-spacing:.06em; }
+[data-panel="launcher"] #history-stats .stat:nth-child(1)::before { content:'\25f7'; }[data-panel="launcher"] #history-stats .stat:nth-child(2)::before { content:'h'; }[data-panel="launcher"] #history-stats .stat:nth-child(3)::before { content:'\2194'; }
+[data-panel="launcher"] #history-stats .stat::before { float:right; font-size:17px; color:var(--muted); }
+[data-panel="launcher"] #hw .row { padding:6px 0; border-bottom:1px solid var(--line); }[data-panel="launcher"] #hw .k { font-size:10px; }[data-panel="launcher"] #hw .v { font-size:11px; overflow-wrap:anywhere; }
+[data-panel="launcher"] .assess { margin-top:22px; padding-top:16px; border-top:1px solid var(--line); }[data-panel="launcher"] .assess .stats { grid-template-columns:repeat(2,minmax(0,1fr)); display:grid; }
+[data-panel="launcher"] .spark { height:78px; overflow:hidden; background:repeating-linear-gradient(0deg,var(--line) 0 1px,transparent 1px 25%); }.chart-tip { filter:drop-shadow(0 0 4px currentColor); }
+[data-panel="launcher"] #net-card { margin-top:20px; border-left:3px solid var(--accent); }[data-panel="launcher"] #net-card > p { max-width:900px; line-height:1.7; }
+.topbar .chip i { box-shadow:0 0 calc(2px + var(--chip-load,0)*8px) var(--accent); }
+.topbar .chip { position:relative; overflow:hidden; }.topbar .chip::after { content:''; position:absolute; inset:auto 0 0; height:2px; background:var(--accent); transform:scaleX(var(--chip-load,0)); transform-origin:left; }
+.score-fg { transition:none; }
+@keyframes home-pan { from { transform:scale(1.08) translateX(-1%); } to { transform:scale(1.15) translateX(1%); } }
+@keyframes home-breathe { from { transform:scale(1.025) translateY(0); } to { transform:scale(1.045) translateY(-3px); } }
+@keyframes home-flicker { 0%,100% { opacity:.06; } 21%,24%,70% { opacity:.12; } 22%,72% { opacity:.04; } }
+@keyframes home-rgb { from { opacity:.35; transform:rotate(-8deg) scaleX(.95); } to { opacity:.8; transform:rotate(-8deg) scaleX(1.04); } }
+@keyframes home-sweep { 0%,65% { transform:translateX(-55%); } 100% { transform:translateX(55%); } }
+.home-paused .mode-card::before, .home-paused :is(.hero-art img,.monitor-light,.desk-light,.mode-card img) { animation-play-state:paused; }
+@media(max-width:1150px) { [data-panel="launcher"] .home-hero { padding:26px; min-height:365px; }.home-hero .hero-copy { width:58%; }.home-hero .fix-row { display:flex; flex-direction:column; align-items:flex-start; }.mode-card { height:180px; padding:15px; }.mode-copy strong { font-size:18px; }[data-panel="launcher"] .grid2 { grid-template-columns:1fr; } }
+@media(max-width:700px) { .home-hero .hero-copy { width:100%; }.home-hero::after { background:color-mix(in srgb,var(--panel) 84%,transparent); }.mode-cards { gap:8px; }.mode-card { height:190px; }.mode-copy { left:12px; bottom:15px; }.mode-copy strong { font-size:15px; }.mode-copy > span { font-size:10px; }.mode-fps { top:40px; right:12px; }.mode-index { left:12px; font-size:8px; }[data-panel="launcher"] :is(#live-card,#hw-card,#net-card) { padding:16px; } }
+@media(prefers-reduced-motion:reduce) { .mode-card::before, :is(.hero-art img,.monitor-light,.desk-light,.mode-card img) { animation:none; }.mode-card { transition:none; }.mode-card:hover,.mode-card[aria-pressed="true"] { transform:none; } }
+
 </style>
+<style>
+/* Graphics workspace. Every surface and illustration follows the active theme. */
+/* Unused physical screen pixels remain dark even in a light UI theme. */
+[data-panel="gpu"] { --gfx-radius:var(--card-radius,12px); --gfx-unlit:#050507; }
+[data-panel="gpu"] .gfx-heading { display:flex; align-items:center; justify-content:space-between; gap:24px; min-height:0; padding-bottom:24px; }
+[data-panel="gpu"] .gfx-heading p { max-width:650px; }
+[data-panel="gpu"] .gfx-heading .btn { flex-shrink:0; }
+#gpu-out { color:var(--ink); }
+#gpu-out h3 { font-size:16px; letter-spacing:0; text-transform:none; margin:0 0 16px; color:var(--ink); }
+#gpu-out .gfx-section { margin:0 0 30px; }
+#gpu-out .gfx-note { color:var(--muted); font-size:12px; line-height:1.65; margin:12px 0; }
+#gpu-out .gfx-monitors { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+#gpu-out .gfx-monitor { border:1px solid var(--line); border-radius:var(--gfx-radius); padding:18px; background:linear-gradient(145deg,var(--panel-2),var(--panel)); min-width:0; }
+#gpu-out .gfx-monitor header { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:0; border:0; background:none; }
+#gpu-out .gfx-monitor header b { font-size:13px; }
+#gpu-out .gfx-monitor header .sub { margin-left:auto; font-size:10px; }
+#gpu-out .gfx-monitor-body { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(0,1fr); gap:22px; align-items:center; margin:22px 0 12px; }
+#gpu-out .gfx-hardware { min-width:0; padding:5px 5px 0; border:1px solid var(--faint); border-radius:5px; background:var(--sunk); position:relative; margin-bottom:20px; }
+#gpu-out .gfx-scene { display:block; width:100%; height:auto; aspect-ratio:16/9; overflow:hidden; }
+#gpu-out .gfx-stand { height:8px; border-top:1px solid var(--line); }
+#gpu-out .gfx-stand::before { content:''; position:absolute; width:12%; height:13px; bottom:-13px; left:44%; background:var(--faint); }
+#gpu-out .gfx-stand::after { content:''; position:absolute; width:45%; height:4px; bottom:-17px; left:27.5%; background:var(--faint); border-radius:2px; }
+#gpu-out .gfx-readout { display:flex; flex-direction:column; gap:5px; }
+#gpu-out .gfx-readout strong { color:var(--accent); font-size:clamp(28px,3vw,48px); line-height:1.05; font-variant-numeric:tabular-nums; letter-spacing:-2px; }
+#gpu-out .gfx-readout strong small { font-size:15px; letter-spacing:0; color:var(--ink); }
+#gpu-out .gfx-readout>b { font-size:14px; font-variant-numeric:tabular-nums; }
+#gpu-out .gfx-readout .sub { font-size:10px; }
+#gpu-out .gfx-adapter { font-size:12px; margin:14px 0; overflow-wrap:anywhere; }
+#gpu-out .gfx-adapter small { display:block; color:var(--muted); font:10px var(--mono); margin-top:4px; }
+#gpu-out .gfx-rate { display:flex; align-items:end; gap:10px; padding:12px 0 15px; border-top:1px solid var(--line); }
+#gpu-out .gfx-rate label { display:flex; align-items:center; gap:12px; flex:1; font-size:12px; color:var(--muted); }
+#gpu-out .gfx-rate select { flex:1; min-width:0; max-width:190px; padding:8px; }
+#gpu-out .gfx-rate .btn { min-height:35px; }
+#gpu-out .gfx-motion { padding-top:10px; border-top:1px solid var(--line); }
+#gpu-out .gfx-motion-lane { display:grid; grid-template-columns:94px minmax(0,1fr) 80px; align-items:center; gap:8px; height:27px; color:var(--muted); font-size:10px; }
+#gpu-out .gfx-motion-lane:nth-child(2) { color:var(--accent); }
+#gpu-out .gfx-motion-lane small { font:9px var(--mono); text-align:right; }
+#gpu-out .gfx-track { position:relative; height:18px; border-bottom:1px solid var(--line); margin-right:8px; }
+#gpu-out .gfx-track i { position:absolute; top:7px; width:3px; height:3px; border-radius:50%; background:currentColor; opacity:.35; }
+#gpu-out .gfx-mover { display:block; position:absolute; top:3px; width:9px; height:9px; border:1px solid currentColor; background:var(--panel); animation:gfx-step 12s steps(var(--gfx-steps),end) infinite; }
+#gpu-out .gfx-motion p { margin:9px 0 0; font-size:10px; color:var(--muted); line-height:1.5; }
+@keyframes gfx-step { from { transform:translateX(0); } to { transform:translateX(var(--gfx-distance,100px)); } }
+#gpu-out .gfx-scaling-guide { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:24px; padding:18px 22px; background:var(--panel); border:1px solid var(--line); border-radius:var(--gfx-radius); }
+#gpu-out .gfx-scaling-guide figure { margin:0; display:grid; grid-template-columns:minmax(70px,1fr) minmax(0,1fr); align-items:center; gap:14px; }
+#gpu-out .gfx-scaling-guide .gfx-scene { border:3px solid var(--faint); border-radius:4px; }
+#gpu-out figcaption b { display:block; font-size:12px; margin-bottom:6px; }
+#gpu-out figcaption span { font-size:11px; line-height:1.5; color:var(--muted); display:block; }
+#gpu-out .gfx-scaling-row { display:flex; align-items:center; gap:14px; padding:18px 4px; border-bottom:1px solid var(--line); }
+#gpu-out .gfx-scaling-row>div:nth-child(2) { flex:1; min-width:0; }
+#gpu-out .gfx-policy-preview { width:96px; flex:0 0 96px; border:3px solid var(--faint); border-radius:4px; }
+#gpu-out .gfx-scaling-row b { font-size:12px; }
+#gpu-out .gfx-scaling-row p { font-size:12px; color:var(--muted); margin:5px 0; line-height:1.5; }
+#gpu-out .gfx-scaling-state { display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
+#gpu-out .gfx-icon { color:var(--accent); width:30px; height:30px; flex:0 0 30px; display:inline-flex; align-items:center; justify-content:center; }
+#gpu-out .gfx-icon svg { width:24px; height:24px; }
+#gpu-out .gfx-driver { border-top:1px solid var(--line); padding-top:24px; }
+#gpu-out .gfx-driver-heading { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+#gpu-out .gfx-driver-heading h3 { margin:0; }
+#gpu-out .gfx-driver-heading>strong { margin-left:auto; font:18px var(--mono); }
+#gpu-out .gfx-driver-meta { font-size:12px; color:var(--muted); }
+#gpu-out .gfx-driver-meta .mono { margin-left:10px; font-size:10px; }
+#gpu-out .gfx-filter { margin:16px 0; font-size:12px; }
+#gpu-out .gfx-profile { border:1px solid var(--line); border-radius:var(--gfx-radius); background:var(--panel); margin:10px 0; overflow:hidden; }
+#gpu-out .gfx-profile>summary { padding:16px 18px; cursor:pointer; color:var(--ink); font-size:13px; font-weight:650; }
+#gpu-out .gfx-profile>summary span { display:inline; }
+#gpu-out .gfx-profile>summary small { font-size:10px; font-weight:400; color:var(--muted); margin-left:16px; }
+#gpu-out .gfx-profile[open]>summary { background:var(--accent-dim); border-bottom:1px solid var(--line); }
+#gpu-out .gfx-profile-body { padding:0 18px; }
+#gpu-out .gfx-profile-body>p { margin:16px 0; }
+#gpu-out .gfx-setting { display:grid; grid-template-columns:30px minmax(0,1fr) auto 76px; gap:12px; padding:15px 0; align-items:start; border-bottom:1px solid var(--line); }
+#gpu-out .gfx-setting:last-child { border-bottom:0; }
+#gpu-out .gfx-setting-copy { min-width:0; }
+#gpu-out .gfx-setting-copy b { font-size:12px; overflow-wrap:anywhere; }
+#gpu-out .gfx-setting-copy p { font-size:11px; line-height:1.55; color:var(--muted); margin:5px 0 0; }
+#gpu-out .gfx-setting>.flag { white-space:nowrap; margin:1px 0 0; }
+#gpu-out .gfx-raw { font-size:11px; min-width:0; color:var(--muted); overflow-wrap:anywhere; }
+#gpu-out .gfx-raw summary { cursor:pointer; color:var(--accent); padding:3px 0; }
+#gpu-out .gfx-setting>.gfx-raw[open] { grid-column:2/-1; }
+#gpu-out .gfx-raw dl { display:grid; grid-template-columns:100px minmax(0,1fr); gap:8px; background:var(--sunk); padding:12px; margin:10px 0; border-radius:var(--control-radius); }
+#gpu-out .gfx-raw dd { margin:0; color:var(--ink); }
+#gpu-out .gfx-raw code { white-space:pre-wrap; }
+#gpu-out :is(summary,button,select):focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.gfx-paused #gpu-out .gfx-mover, [data-panel="gpu"].hidden #gpu-out .gfx-mover { animation-play-state:paused; }
+@media(prefers-reduced-motion:reduce) { #gpu-out .gfx-mover { animation:none; transform:translateX(50px); } }
+@media(max-width:1150px) {
+  #gpu-out .gfx-scaling-guide figure { display:block; }
+  #gpu-out .gfx-scaling-guide .gfx-scene { margin-bottom:12px; }
+  #gpu-out .gfx-monitor-body { gap:12px; }
+  #gpu-out .gfx-motion-lane { grid-template-columns:80px minmax(0,1fr) 70px; }
+}
+@media(max-width:850px) {
+  #gpu-out .gfx-monitors { grid-template-columns:1fr; }
+  #gpu-out .gfx-monitor-body { grid-template-columns:1fr 1fr; }
+  #gpu-out .gfx-hardware { max-width:300px; }
+  #gpu-out .gfx-scaling-row { flex-wrap:wrap; }
+  #gpu-out .gfx-scaling-state { margin-left:44px; justify-content:flex-start; }
+  #gpu-out .gfx-profile>summary small { display:block; margin:6px 0 0 16px; }
+}
+@media(max-width:540px) {
+  #gpu-out .gfx-scaling-guide { gap:14px; padding:12px; }
+  #gpu-out .gfx-setting { grid-template-columns:26px minmax(0,1fr) auto; gap:8px; }
+  #gpu-out .gfx-setting>.gfx-raw { grid-column:2/-1; }
+  #gpu-out .gfx-rate label { flex-direction:column; align-items:stretch; }
+  #gpu-out .gfx-rate select { max-width:none; }
+}
+</style>
+
+<link rel="stylesheet" href="assets/devices/workspace.css">
+<link rel="stylesheet" href="assets/fixit/toolbox.css">
 </head>
 <body>
 <!-- Startup readiness dismisses this veil; independent JS/CSS deadlines always uncover it. -->
 <div class="boot-screen" aria-hidden="true">
   <div class="boot-content">
-    <svg class="boot-mark" viewBox="0 0 16 16" focusable="false"><path fill="currentColor" d="M12 3H6L3 6V10L6 13H12V11H7L5 9V7L7 5H12Z"/><path fill="var(--ink)" d="M10 5H12V7H14V9H12V11H10V9H8V7H10Z"/></svg>
+    <span class="boot-mark config-mark" aria-label="CS CONFIG AI"></span>
     <div class="boot-name">CS CONFIG AI</div>
     <div class="boot-track"></div>
     <p class="boot-tip">Keep your crosshair at head height.</p>
   </div>
 </div>
+<script src="assets/devices/workspace.js"></script>
 <script>
 /* Each first load settles only after its loader has rendered success or error.
    The fixed list keeps progress honest, including work started after prefs. */
@@ -5644,20 +5646,16 @@ const startup = (() => {
 
   <aside class="rail">
     <div class="rail-head">
-      <div class="brand">CS2<span>CONFIG AI</span></div>
+      <div class="brand"><span class="config-mark" aria-hidden="true"></span><div>CS CONFIG<span>AI / PLAY YOUR WAY</span></div></div>
       <div class="rail-label">Workspace</div>
     </div>
 
     <div class="tabs" role="tablist" aria-label="Main navigation" aria-orientation="vertical">
       <button class="tab" data-tab="launcher" role="tab" aria-selected="true" title="Launcher">
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg></i><span class="tx">Launcher</span></button>
-      <!-- An "F" this application built out of three rectangles -- not
-           FACEIT's own mark, which is an orange square with a white
-           triangle. A monogram reads as the service without reproducing
-           the logo that belongs to it, the same principle as Crosshair X's
-           icon: drawn here, never borrowed. -->
+      <!-- Stable brand asset slot; see assets/faceit/README.txt before release. -->
       <button class="tab" data-tab="faceit" role="tab" aria-selected="false" title="FACEIT">
-        <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5.5" y="4" width="3" height="16"/><rect x="5.5" y="4" width="12.5" height="3"/><rect x="5.5" y="10.5" width="9.5" height="3"/></svg></i><span class="tx">FACEIT</span></button>
+        <i class="ic"><span class="fc-logo" aria-hidden="true"></span></i><span class="tx">FACEIT</span></button>
       <!-- A crate, for what is in it. -->
       <button class="tab" data-tab="inventory" role="tab" aria-selected="false" title="Inventory">
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8l9-4.5L21 8v8l-9 4.5L3 16z"/><path d="M3 8l9 4.5L21 8M12 12.5V21"/></svg></i><span class="tx">Inventory</span></button>
@@ -5742,16 +5740,16 @@ const startup = (() => {
     <div class="scroll">
 
     <div class="tab-panel" data-panel="launcher">
-      <div class="hero">
+      <div class="hero home-hero" id="home-hero">
+        <div class="hero-art" aria-hidden="true"><img src="assets/home/hero.webp" alt="" fetchpriority="high"><div class="monitor-light"></div><div class="desk-light"></div></div>
         <div class="hero-copy">
-          <div class="eyebrow">Ready to play</div>
+          <div class="hero-brand"><span class="config-mark" aria-hidden="true"></span><span>CS CONFIG AI</span></div><div class="eyebrow">Ready to play</div>
           <h2>Counter-Strike <em>2</em></h2>
           <p>
             Starts the game <strong>through Steam</strong>, so your launch options, the
             overlay, VAC and inventory all work exactly as normal. Runs it borderless
             windowed, which is what stops alt-tab going black.
           </p>
-        </div>
         <div class="hero-play">
           <div class="play-row">
             <button class="btn-play" id="play">
@@ -5784,27 +5782,16 @@ const startup = (() => {
             <span class="sub" id="stop-hint">running</span>
           </div>
         </div>
+        </div>
       </div>
 
       <section class="panel">
         <h2>Optimise for</h2>
-        <div class="dial" id="intents" role="slider" tabindex="0"
-             aria-label="Optimise for" aria-valuemin="0" aria-valuemax="2" aria-valuenow="1"
-             aria-valuetext="Balanced">
-          <div class="dial-track" id="band-stage">
-            <!-- The band is drawn once by paintBand; only the bead and the two
-                 figures move afterwards. -->
-            <button class="dial-stop" data-intent="competitive" type="button" tabindex="-1"></button>
-            <button class="dial-stop" data-intent="balanced" type="button" tabindex="-1"></button>
-            <button class="dial-stop" data-intent="quality" type="button" tabindex="-1"></button>
-            <div class="dial-ball" id="dial-ball"></div>
-          </div>
-          <div class="dial-labels">
-            <span data-for="competitive"><strong>Competitive</strong><span>frames &amp; clarity</span></span>
-            <span data-for="balanced"><strong>Balanced</strong><span>the default</span></span>
-            <span data-for="quality"><strong>Quality</strong><span>best picture</span></span>
-          </div>
-        </div>
+        <div class="mode-cards" id="intents" role="group" aria-label="Optimise for">
+          <button class="mode-card" data-intent="competitive" type="button" aria-pressed="false" title="Choose Competitive"><img src="assets/home/mode-competitive.webp" alt="Competitive rendering of a Mediterranean training courtyard"><span class="mode-shade"></span><span class="mode-index">01 / FPS</span><span class="mode-fps"><b data-mode-fps="competitive">—</b><small>EST. FPS</small></span><span class="mode-copy"><strong>Competitive</strong><span>Maximum frames. Clear sightlines.</span></span><span class="mode-selected" aria-hidden="true">&#10003;</span></button>
+          <button class="mode-card" data-intent="balanced" type="button" aria-pressed="true" title="Choose Balanced"><img src="assets/home/mode-balanced.webp" alt="Balanced rendering of a Mediterranean training courtyard"><span class="mode-shade"></span><span class="mode-index">02 / BALANCE</span><span class="mode-fps"><b data-mode-fps="balanced">—</b><small>EST. FPS</small></span><span class="mode-copy"><strong>Balanced</strong><span>Clarity meets atmosphere.</span></span><span class="mode-selected" aria-hidden="true">&#10003;</span></button>
+          <button class="mode-card" data-intent="quality" type="button" aria-pressed="false" title="Choose Quality"><img src="assets/home/mode-quality.webp" alt="Quality rendering of a Mediterranean training courtyard"><span class="mode-shade"></span><span class="mode-index">03 / DETAIL</span><span class="mode-fps"><b data-mode-fps="quality">—</b><small>EST. FPS</small></span><span class="mode-copy"><strong>Quality</strong><span>Every detail. Every shadow.</span></span><span class="mode-selected" aria-hidden="true">&#10003;</span></button>
+        </div><p class="mode-note sub">FPS estimates use your hardware and current settings; actual performance varies.</p>
 
       </section>
 
@@ -5875,41 +5862,23 @@ const startup = (() => {
 
     </div>
 
-    <!-- FACEIT, pulled out of the Launcher into a tab of its own: a page
-         you check between matches as much as one you pass through on the
-         way to playing. The badge below is drawn by this application --
-         a trophy, not FACEIT's own mark -- the same rule the Crosshair X
-         card follows: the shape the category obviously uses, never a logo
-         that belongs to someone else. -->
+    <!-- FACEIT account, recent performance, match scoreboards and local replays. -->
     <div class="tab-panel hidden" data-panel="faceit">
-      <div class="hero">
-        <div class="hero-copy">
-          <div class="eyebrow">Matches &amp; demos</div>
-          <h2><span class="fc-mark"><b>FACEIT</b></span></h2>
-          <p>
-            Follow your account and your recent matches turn up here on their own, with
-            stats and a one-click demo &mdash; or paste any match link below. <b>Watch</b>
-            starts CS2 with the demo already playing, no console, no filenames.
-          </p>
-        </div>
+      <div class="fc-top">
+        <span class="fc-logo" aria-hidden="true"></span>
+        <div><div class="eyebrow">Your competitive record</div><h2>FACEIT</h2>
+        <p>Your form. Your matches. Your next review.</p></div>
       </div>
-
+      <div id="fc-wrap" aria-live="polite"><div class="fc-empty fc-surface">Loading your account&hellip;</div></div>
       <section class="panel" id="demo-card">
-        <h2>Match demos</h2>
-        <p class="sub" style="margin:0 0 12px">
-          Your recent matches are below. Open one for the full scoreboard, get its
-          demo, and <b>Watch</b> starts CS2 with the demo playing on its own &mdash;
-          no console, no filenames. You can also paste any match link.
-        </p>
+        <h3>Replay library</h3>
+        <p>Watch starts CS2 with your demo playing. Choose saves it for your next launch. Paste a match link to get another replay.</p>
         <div class="demo-get">
-          <input id="demo-link" type="text" spellcheck="false"
+          <input id="demo-link" type="text" spellcheck="false" aria-label="FACEIT match link"
                  placeholder="https://www.faceit.com/en/cs2/room/1-&hellip;">
           <button class="btn" id="demo-fetch">Get demo</button>
         </div>
         <div id="demo-note"></div>
-        <!-- The followed account and its recent matches. Filled by loadFaceit;
-             hidden entirely until an account is linked. -->
-        <div id="fc-wrap"></div>
         <div class="demo-prog hidden" id="demo-prog">
           <div class="demo-bar"><i id="demo-bar-fill"></i></div>
           <span class="sub2" id="demo-prog-say">starting&hellip;</span>
@@ -6071,13 +6040,11 @@ const startup = (() => {
     <div class="tab-panel hidden" data-panel="keyboard">
       <div class="hero">
         <div class="hero-copy">
-          <div class="eyebrow">Your board</div>
-          <h2>Keyboard</h2>
+          <div class="eyebrow">Your controls, your way</div>
+          <h2>Keyboard &amp; mouse</h2>
           <p>
-            Every bind in your config, drawn where it sits. Keys running one of
-            your own scripts glow magenta; a key changed from CS2's own default
-            glows gold; blue keys still do exactly what CS2 ships, and the dark
-            ones are free. Pick any key to see what it runs.
+            A place for every command. Select a key or mouse button to inspect its
+            binding, or drag a command from the library onto your device.
           </p>
         </div>
       </div>
@@ -6153,41 +6120,39 @@ const startup = (() => {
     </div>
 
     <div class="tab-panel hidden" data-panel="fix">
-      <div class="hero">
+      <div class="hero fix-hero">
         <div class="hero-copy">
-          <div class="eyebrow">When something has gone wrong</div>
-          <h2>Fix <em>It</em></h2>
-          <p>
-            The things people restart the whole machine for, done one at a time. Each
-            says what it will do before it does it, nothing runs while a match is on
-            that it could interrupt, and anything taken down is put straight back.
-          </p>
+          <div class="eyebrow">Diagnostics / repair bench</div>
+          <h2>Back in <em>the game.</em></h2>
+          <p>One problem. One tool. Repair a connection, picture or device without restarting your PC.</p>
+          <span class="fix-hero-note">Choose a tool below. Nothing runs automatically.</span>
         </div>
+        <svg class="fix-wallpaper" viewBox="0 0 420 200" aria-hidden="true">
+          <path class="fix-wire" d="M0 130h70l25-25h80m60 0h85l30-30h70M80 180h65l30-30h180M190 20v30m100 90v50"/>
+          <rect x="92" y="38" width="234" height="126" rx="12" class="fix-console"/>
+          <path class="fix-wire" d="M110 62h64m-64 13h36m-36 63h48m-48 10h72m98-10h28"/>
+          <g class="fix-gear"><path d="M229 58l8 3 8-5 10 10-5 8 3 8 9 2v14l-9 2-3 8 5 8-10 10-8-5-8 3-2 9h-14l-2-9-8-3-8 5-10-10 5-8-3-8-9-2V84l9-2 3-8-5-8 10-10 8 5 8-3 2-9h14z"/><circle cx="220" cy="91" r="15"/></g>
+          <path class="fix-wrench" d="M285 76a20 20 0 0 0-25 25l-38 38a8 8 0 0 0 12 12l38-38a20 20 0 0 0 25-25l-15 15-12-12z"/>
+          <g class="fix-scan"><path d="M105 96h208"/><circle cx="113" cy="96" r="3"/></g>
+        </svg>
       </div>
+      <div class="fix-toolbar"><span>YOUR TOOLBOX <small>16 focused tools</small></span><button class="btn" id="fix-refresh">Check current settings</button></div>
       <div id="fix-out"><span class="sub"><span class="spin"></span> Looking&hellip;</span></div>
     </div>
 
     <div class="tab-panel hidden" data-panel="gpu">
-      <div class="hero">
+      <div class="hero gfx-heading">
         <div class="hero-copy">
           <div class="eyebrow">Display &amp; driver</div>
           <h2>Graphics</h2>
           <p>
-            Refresh rate is a Windows display mode, so it can be set here on any GPU
-            and is the only thing on this page that changes anything. The driver
-            profile below is shown read-only: writing to it would mean editing a
-            system-wide database as an administrator, and the driver does not publish
-            what its setting values mean.
+            See your display. Understand your settings. Set your refresh rate,
+            check stretched scaling, and explore your driver profiles.
           </p>
         </div>
+        <button class="btn" id="gpu-reload">Re-read</button>
       </div>
-      <section class="panel">
-        <h2>Graphics</h2>
-        <div class="actions" style="margin-top:0">
-          <button class="btn" id="gpu-reload">Re-read</button>
-        </div>
-        <div id="gpu-out" style="margin-top:10px"><span class="sub">Loading&hellip;</span></div>
-      </section>
+      <div id="gpu-out" aria-live="polite"><span class="sub">Loading&hellip;</span></div>
     </div>
 
     <div class="tab-panel hidden" data-panel="settings">
@@ -6460,8 +6425,11 @@ const startup = (() => {
 <div class="modal-back hidden" id="mstat-back">
   <div class="mstat" role="dialog" aria-modal="true" aria-labelledby="mstat-title">
     <header class="mstat-head">
+      <img class="mstat-map" id="mstat-map" alt="">
+      <span class="mstat-mark" aria-hidden="true"></span>
       <div>
         <div class="eyebrow" id="mstat-when">Match</div>
+        <div class="mstat-result" id="mstat-result"></div>
         <h3 id="mstat-title">Scoreboard</h3>
       </div>
       <div class="mstat-actions">
@@ -6488,6 +6456,7 @@ const startup = (() => {
   </div>
 </div>
 <script src="skin-viewer.js"></script>
+<script src="assets/faceit/dashboard.js"></script>
 <script>
 const TOKEN = "__CS2CFG_TOKEN__";
 const $ = (id) => document.getElementById(id);
@@ -6558,173 +6527,176 @@ let gpuData = null;
 
 function hz(n) { return n + " Hz"; }
 
-function renderDisplays(d) {
-  if (!d || !d.displays || !d.displays.length) {
-    return '<span class="sub">No displays reported.</span>';
-  }
-  return d.displays.map(s => {
-    const rates = (s.rates || []);
-    const options = rates.map(r =>
-      '<option value="' + r + '"' + (r === s.refresh ? " selected" : "") + ">" +
-      esc(hz(r)) + "</option>").join("");
-    const state = s.at_best
-      ? '<span class="flag">at this panel’s maximum</span>'
-      : '<span class="flag warn">' + esc(hz(s.best)) + " available</span>";
-    return '<div class="setting" id="disp-' + esc(s.device) + '">' +
-      '<div class="top"><div class="name"><b>' + esc(s.name) + "</b>" +
-      (s.primary ? '<span class="flag">primary</span>' : "") + state +
-      '<br><span class="sub mono">' + esc(s.device) + " · " +
-      esc(s.width + "×" + s.height) + "</span></div>" +
-      '<div class="ctl">' +
-      (rates.length > 1
-        ? '<select data-display="' + esc(s.device) + '">' + options + "</select>" +
-          '<button class="btn small" data-apply-display="' + esc(s.device) + '">Apply</button>'
-        : '<span class="sub">' + esc(hz(s.refresh)) + "</span>") +
-      "</div></div>" +
-      '<div class="src">Refresh rate is a Windows display mode, not a driver setting. ' +
-      "Applying one keeps the resolution as it is and survives a restart.</div></div>";
-  }).join("");
+// Original vector scene: no downloaded game art. All colours inherit theme tokens.
+function gfxScene(mode = 'native') {
+  const inner = mode === 'bars' ? '<svg x="30" y="0" width="180" height="135" viewBox="0 0 240 135" preserveAspectRatio="none">' : '<svg width="240" height="135" viewBox="0 0 240 135" preserveAspectRatio="none">';
+  return '<svg class="gfx-scene" viewBox="0 0 240 135" role="img" aria-label="' +
+    esc(mode === 'bars' ? '4:3 picture with side bars' : mode === 'stretch' ? '4:3 picture widened to fill 16:9' : '16:9 picture with original proportions') + '">' +
+    '<rect width="240" height="135" fill="var(--gfx-unlit)"/>' + inner +
+    '<path d="M0 0H240V135H0Z" fill="var(--panel-2)"/>' +
+    '<g fill="none" stroke="var(--line)" stroke-width="1"><path d="M0 0L75 45H165L240 0M0 135L75 90H165L240 135M75 45V90M165 45V90M0 68H75M165 68H240M35 0L90 45M205 0L150 45M35 135L90 90M205 135L150 90"/></g>' +
+    '<path d="M24 88L54 80L73 88V116H24Z M178 73H207V99H178Z" fill="var(--accent-dim)" stroke="var(--accent)"/>' +
+    '<g transform="translate(120 68) scale(' + (mode === 'stretch' ? '1.333 1' : mode === 'bars' ? '1.333 1' : '1 1') + ')" fill="none" stroke="var(--accent)" stroke-width="1.5"><circle r="13"/><path d="M-20 0H-8M8 0H20M0-20V-8M0 8V20"/></g></svg></svg>';
 }
+function gfxMotion(rate) {
+  const n = Math.max(1, Number(rate) || 60);
+  // Slow time by 12x: 60 illustrative steps in 12 seconds, selected Hz steps likewise.
+  // The browser cannot demonstrate refresh above the physical screen's own rate.
+  const lane = (value, selected) => '<div class="gfx-motion-lane"><span>' + (selected ? 'Selected ' : '') + esc(hz(value)) +
+    '</span><div class="gfx-track" style="--gfx-steps:' + value + '">' +
+    Array.from({length: Math.min(48, Math.max(2, Math.round(value / 6)))}, (_,i) => '<i style="left:' + (i / Math.max(1,Math.min(48,Math.max(2,Math.round(value/6)))-1)*94) + '%"></i>').join('') +
+    '<b class="gfx-mover"></b></div><small>' + (1000/value).toFixed(2) + ' ms/frame</small></div>';
+  return '<div class="gfx-motion">' + lane(60,false) + lane(n,true) +
+    '<p>Frame-step illustration · 12× slower. Not a screen test or an FPS estimate.</p></div>';
+}
+function renderDisplays(d) {
+  if (!d || !d.displays || !d.displays.length) return '<p class="sub">No displays reported. Re-read to try again.</p>';
+  return '<div class="gfx-monitors">' + d.displays.map((s,i) => {
+    const rates = (s.rates || []).filter(r=>Number(r)>0);
+    const options = rates.map(r => '<option value="' + Number(r) + '"' + (r === s.refresh ? ' selected' : '') + '>' + esc(hz(r)) + '</option>').join('');
+    const reported = s.width > 0 && s.height > 0;
+    return '<article class="gfx-monitor" id="disp-' + esc(s.device) + '">' +
+      '<header><b>Display ' + (i+1) + '</b>' + (s.primary ? '<span class="flag">Primary</span>' : '') +
+      '<span class="sub">' + (s.at_best ? 'Highest offered at this resolution' : s.best ? esc(hz(s.best)) + ' available' : 'Available rates not reported') + '</span></header>' +
+      '<div class="gfx-monitor-body"><div class="gfx-hardware">' + gfxScene() + '<div class="gfx-stand"></div></div>' +
+      '<div class="gfx-readout"><strong>' + (s.refresh > 0 ? esc(s.refresh) + '<small> Hz</small>' : '—') + '</strong><b>' +
+      (reported ? esc(s.width + ' × ' + s.height) : 'Mode unavailable') + '</b><span class="sub">Current Windows mode</span></div></div>' +
+      '<p class="gfx-adapter">' + esc(s.name || 'Display adapter') + '<small>' + esc(s.device) + '</small></p>' +
+      '<div class="gfx-rate"><label>Refresh rate <select aria-label="Refresh rate for display ' + (i+1) + '" data-display="' + esc(s.device) + '"' + (!rates.length ? ' disabled' : '') + '>' +
+      (rates.length ? (!rates.includes(s.refresh) ? '<option selected disabled value="' + Number(s.refresh||0) + '">Current rate not listed</option>' : '') + options : '<option>No rates reported</option>') + '</select></label>' +
+      '<button class="btn small" data-apply-display="' + esc(s.device) + '"' + (!reported || !rates.length ? ' disabled' : '') + '>Apply</button></div>' +
+      '<div class="gfx-motion-slot">' + (s.refresh > 0 ? gfxMotion(s.refresh) : '<p class="sub">Motion comparison needs a reported refresh rate.</p>') + '</div></article>';
+  }).join('') + '</div><p class="gfx-note">Refresh rate controls how often Windows updates the picture. Apply keeps your resolution and saves the rate across restarts. Close CS2 before applying.</p>';
+}
+// Update only the illustration: changing the picker never changes Windows until Apply.
+document.addEventListener('change', e => {
+  if (!e.target.matches('select[data-display]')) return;
+  e.target.closest('.gfx-monitor').querySelector('.gfx-motion-slot').innerHTML = gfxMotion(e.target.value);
+  gfxObserveMotion();
+});
+// CSS handles hidden tabs. Visibility also pauses motion when the app is minimised.
+const gfxMotionResize = new ResizeObserver(entries=>{
+  for (const {target} of entries) target.style.setProperty('--gfx-distance', Math.max(0,target.clientWidth-9)+'px');
+});
+function gfxObserveMotion() { gfxMotionResize.disconnect(); document.querySelectorAll('#gpu-out .gfx-track').forEach(e=>gfxMotionResize.observe(e)); }
+function gfxPauseMotion() { document.documentElement.classList.toggle('gfx-paused', document.hidden); }
+document.addEventListener('visibilitychange', gfxPauseMotion);
+gfxPauseMotion();
 
 function renderScaling(d) {
+  const comparisons = '<div class="gfx-scaling-guide">' + [
+    ['bars','Black bars','4:3 keeps its shape, with unused space at the sides.'],
+    ['stretch','Stretched','4:3 widens to fill 16:9. Shapes look wider.'],
+    ['native','Native proportions','A matching 16:9 picture fills the screen without widening.']
+  ].map(([mode,title,text])=>'<figure>' + gfxScene(mode) + '<figcaption><b>' + title + '</b><span>' + text + '</span></figcaption></figure>').join('') + '</div>';
+  let rows = '';
   if (!d || !d.available) {
-    return '<div class="subcat">Stretched resolution</div>' +
-      '<span class="sub">' + esc(d && d.reason || "Scaling could not be read.") +
-      " On AMD or Intel the same setting lives in the driver’s own control " +
-      "panel, under scaling or display options.</span>";
-  }
-  const rows = (d.displays || []).map(s => {
-    const state = s.fills
-      ? '<span class="flag">fills the screen</span>'
-      : '<span class="flag warn">' + esc(s.name) + "</span>";
-    const control = s.fills
-      ? '<span class="sub">no black bars</span>'
-      : '<button class="btn small" data-fill-display="' + esc(s.id) + '">Fix</button>';
-    return '<div class="setting"><div class="top"><div class="name"><b>' +
-      esc(s.width + "×" + s.height + " @ " + s.refresh + " Hz") + "</b>" +
-      (s.primary ? '<span class="flag">primary</span>' : "") + state +
-      '<br><span class="sub mono">' + esc(s.id) + "</span></div>" +
-      '<div class="ctl">' + control + "</div></div>" +
-      '<div class="src">' + (s.fills
-        ? "A narrow mode is scaled out to the whole panel, which is what makes a " +
-          "stretched resolution actually stretch."
-        : "A mode narrower than this panel is letterboxed: the picture sits in the " +
-          "middle with a black bar down each side. Launching stretched from here " +
-          "fixes this automatically and puts it back on exit — Fix makes it " +
-          "permanent.") + "</div></div>";
-  }).join("");
-  return '<div class="subcat">Stretched resolution</div>' + rows;
+    rows = '<p class="sub">' + esc(d && d.reason || 'Scaling could not be read.') + ' On AMD or Intel, check scaling in your GPU control panel.</p>';
+  } else if (!(d.displays || []).length) rows = '<p class="sub">No scaling displays reported.</p>';
+  else rows = d.displays.map(s=>{
+    const mode = Number(s.scaling);
+    // Only the published enum establishes aspect/centred/integer behaviour. DEFAULT,
+    // CUSTOM and future modes must not be labelled black bars merely because !fills.
+    const explained = s.fills ? 'A narrower CS2 mode will widen to fill the panel.' : [5,6].includes(mode) ? 'A narrower CS2 mode keeps its proportions, leaving side bars.' : [3,7].includes(mode) ? 'A smaller CS2 picture stays centred, with unused space around it.' : mode === 8 ? 'CS2 pixels scale in whole steps; unused space may remain.' : 'The effect on a narrower CS2 mode is not reported. Check the driver control panel.';
+    const state = s.fills ? 'Stretched scaling ready' : [5,6].includes(mode) ? 'Preserve proportions' : [3,7].includes(mode) ? 'Centred · no scaling' : mode === 8 ? 'Integer scaling' : 'Scaling effect unknown';
+    const preview = s.fills || [5,6].includes(mode)
+      ? '<div class="gfx-policy-preview" title="Illustration of this policy with a narrower CS2 picture">' + gfxScene(s.fills ? 'stretch' : 'bars') + '</div>'
+      : '<span class="gfx-icon" aria-hidden="true">' + gfxIcon('screen') + '</span>';
+    return '<div class="gfx-scaling-row">' + preview + '<div><b>' + esc(s.width + ' × ' + s.height + ' · ' + s.refresh + ' Hz') + '</b>' +
+      (s.primary ? '<span class="flag">Primary</span>' : '') + '<p>' + esc(explained) + '</p><small class="sub">Reported policy: ' + esc(s.name) + '</small>' +
+      '<details class="gfx-raw"><summary>Display details</summary><code>' + esc(s.id) + '</code></details></div><div class="gfx-scaling-state"><span class="flag">' + state + '</span>' +
+      (s.fills ? '' : '<button class="btn small" data-fill-display="' + esc(s.id) + '">Fix</button>') + '</div></div>';
+  }).join('');
+  return '<section class="gfx-section"><h3>Stretched resolution</h3><p class="gfx-note">Same target, three ways to show it. Illustrations use a 16:9 panel; your native panel size is not reported.</p>' + comparisons + rows +
+    '<p class="gfx-note">These rows show the driver’s current scaling policy, not CS2’s live resolution. Fix saves full-screen scaling permanently. The launcher also fixes scaling for stretched play and restores it on exit.</p></section>';
 }
-
-function renderProfile(p, caption) {
-  if (!p) return "";
-  const named = p.settings.filter(s => s.known);
-  const internal = p.settings.length - named.length;
-
-  let head = '<div class="subcat">' + esc(caption) + "</div>";
-  if (p.error) {
-    return head + '<span class="sub warn">' + esc(p.error) + "</span>";
-  }
-  if (!p.settings.length) {
-    return head + '<span class="sub">Nothing overridden here — every setting is at ' +
-      "the driver’s own default.</span>";
-  }
-
-  const rows = named.map(s =>
-    '<div class="row"><span class="k">' + esc(s.name) + "</span>" +
-    '<span class="v"><code>' + esc(s.value) + "</code>" +
-    (s.predefined ? '<span class="flag">NVIDIA default</span>'
-                  : '<span class="flag warn">changed</span>') +
-    "</span></div>").join("");
-
-  // NVIDIA's own game profiles lean on ids the driver does not name. Saying so
-  // is more honest than captioning them with a guess.
-  const tail = internal
-    ? '<div class="sub2" style="margin-top:7px">' + internal +
-      " further setting" + (internal === 1 ? "" : "s") +
-      " in this profile use internal ids the driver does not publish names for." +
-      "</div>"
-    : "";
-  return head + rows + tail;
+function gfxIcon(kind) {
+  const paths = {screen:'M3 4H21V16H3ZM9 20H15M12 16V20',frames:'M3 5H15V15H3ZM8 2H20V12M7 19H20',image:'M3 3H21V21H3ZM3 17L9 11L13 15L17 10L21 14M7 7H8',power:'M12 2V11M6 5A9 9 0 1 0 18 5',chip:'M6 6H18V18H6ZM9 1V6M15 1V6M9 18V23M15 18V23M1 9H6M1 15H6M18 9H23M18 15H23',info:'M12 10V17M12 6V7M12 2A10 10 0 1 0 12 22A10 10 0 1 0 12 2'};
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="' + (paths[kind] || paths.info) + '"/></svg>';
 }
-
-// Start on the handful that have been changed rather than all ~130. The rest
-// are read-only rows the driver will not explain -- worth having, not worth
-// opening on.
+// Names stay sourced from the installed driver. These explanations describe a feature,
+// never decode a raw value or promise that a legacy override affects CS2.
+// Reference: NVIDIA Control Panel Help, Manage 3D Settings (Reference).
+function gfxSettingInfo(name) {
+  const n = String(name || '').toLowerCase();
+  if (/predefined|behavior flags|behaviour flags|streamline|shim|compatibility|optimus|do not display/.test(n)) {
+    if (/optimus/.test(n)) return ['chip','Laptop GPU routing','A hybrid-graphics routing option. Its value and effect in CS2 are not decoded.'];
+    if (/ansel/.test(n)) return ['image','NVIDIA photo-mode compatibility','An internal photo-mode profile option; its effect in CS2 is not published.'];
+    if (/streamline/.test(n)) return ['chip','Streamline compatibility override','An internal driver integration option; its effect in CS2 is not published.'];
+    if (/do not display/.test(n)) return ['info','Control Panel profile visibility','Controls profile visibility in NVIDIA Control Panel, rather than game image quality.'];
+    return ['info',name,'A driver compatibility option. Its effect in CS2 is not published.'];
+  }
+  if (/maximum pre-rendered frames/.test(n)) return ['frames','Frames prepared ahead','Limits CPU frames queued ahead of GPU work in supported DirectX games. CS2 support is not reported.'];
+  if (/low latency/.test(n)) return ['frames','Render queue latency','Adjusts the render queue in supported games. This does not report CS2’s Reflex setting.'];
+  if (/frame rate|frame limiter/.test(n)) return ['frames',/background/.test(n) ? 'Background FPS limit' : 'Driver FPS limit','Caps rendered frames in supported applications. The raw value is not decoded here.'];
+  if (/vertical sync|vsync/.test(n)) return ['screen','Frame synchronisation','Coordinates frame delivery with refresh in supported games; can affect tearing and latency.'];
+  if (/power management/.test(n)) return ['power','GPU power behaviour','Controls how GPU performance levels change while running supported 3D applications.'];
+  if (/texture filtering|anisotropic/.test(n)) return ['image',name,'Controls texture sampling in supported games; can trade surface detail for rendering speed.'];
+  if (/antialias|multi-frame sampled/.test(n)) return ['image',name,'Controls edge smoothing in supported games. Compatibility depends on the rendering path.'];
+  if (/shader cache/.test(n)) return ['chip',name,'Caches compiled shader work in supported games to reduce repeated compilation.'];
+  if (/ambient occlusion/.test(n)) return ['image',name,'Adds contact shading in supported games. This profile does not confirm support in CS2.'];
+  if (/triple buffering/.test(n)) return ['frames',name,'Adds a buffer for OpenGL vertical sync. This is not a CS2 graphics control.'];
+  if (/opengl/.test(n)) return ['chip',name,'Applies to OpenGL applications. CS2 on Windows uses a different rendering path.'];
+  if (/sli|multi.gpu/.test(n)) return ['chip',name,'A multi-GPU driver option; this does not establish multi-GPU support in CS2.'];
+  if (/cuda/.test(n)) return ['chip',name,'Controls GPU compute resources for supported applications, rather than CS2 image quality.'];
+  return ['info',name || 'Unnamed driver setting','The driver reports this option, but its effect in CS2 is not published.'];
+}
+function gfxSetting(s, changed) {
+  const [kind,title,help] = gfxSettingInfo(s.name);
+  return '<div class="gfx-setting"><span class="gfx-icon" aria-hidden="true">' + gfxIcon(kind) + '</span><div class="gfx-setting-copy"><b>' + esc(title) + '</b><p>' + esc(help) + '</p></div>' +
+    '<span class="flag' + (changed ? ' warn' : '') + '">' + (changed ? 'Changed' : 'NVIDIA default') + '</span>' +
+    '<details class="gfx-raw"><summary>Details</summary><dl><dt>Driver name</dt><dd>' + esc(s.name || 'Not published') + '</dd><dt>Setting ID</dt><dd><code>' + esc(s.id) + '</code></dd><dt>Stored value</dt><dd><code>' + esc(s.value || 'Not published · driver default') + '</code></dd></dl><p>Raw driver data; no enabled/disabled meaning is inferred.</p></details></div>';
+}
 let show3dAll = false;
-
+// Preserve accordion state across filter changes and re-reads.
+const gfxOpenGroups = new Map();
+document.addEventListener('toggle', e=>{
+  if (e.target.isConnected && e.target.matches('details[data-gfx-group]')) gfxOpenGroups.set(e.target.dataset.gfxGroup,e.target.open);
+},true);
+function gfxGroup(key,title,subtitle,body,open=false) {
+  return '<details class="gfx-profile" data-gfx-group="' + esc(key) + '"' + ((gfxOpenGroups.has(key) ? gfxOpenGroups.get(key) : open) ? ' open' : '') + '><summary><span>' + esc(title) + '<small>' + esc(subtitle) + '</small></span></summary><div class="gfx-profile-body">' + body + '</div></details>';
+}
+function renderProfile(p, caption, key = caption) {
+  if (!p) return gfxGroup(key,caption,'Not found','<p class="sub">No application profile was reported by this driver.</p>');
+  const settings = p.settings || [];
+  const named = settings.filter(s=>s.known);
+  const internal = settings.length - named.length;
+  const changed = settings.filter(s=>!s.predefined).length;
+  let body = p.error ? '<p class="sub warn">' + esc(p.error) + '</p>' :
+    named.filter(s=>show3dAll || !s.predefined).map(s=>gfxSetting(s,!s.predefined)).join('') ||
+    '<p class="sub">' + (!settings.length ? 'No overrides reported. This profile uses NVIDIA defaults.' : show3dAll ? 'No named settings in this profile. Internal values are under Details below.' : 'No named changed settings in this profile. Uncheck the filter to explore defaults.') + '</p>';
+  if (internal) body += '<p class="gfx-note">' + internal + ' unnamed internal settings. NVIDIA does not publish their purpose.</p><details class="gfx-raw"><summary>Internal setting details</summary>' +
+    settings.filter(s=>!s.known && (show3dAll || !s.predefined)).map(s=>gfxSetting(s,!s.predefined)).join('') + '</details>';
+  return gfxGroup(key,caption,settings.length + ' stored settings · ' + changed + ' changed',body,key === 'cs2.exe');
+}
 function render3d(nv) {
   const list = nv.catalogue_3d || [];
-  if (!list.length) return renderProfile(nv["global"], "Global 3D settings");
-
-  const changed = nv.overridden_count || 0;
-  let html = '<div class="subcat">Manage 3D settings &nbsp;·&nbsp; ' +
-    list.length + " settings, " + changed + " changed from default</div>";
-
-  html += '<label class="opt" style="margin:2px 0 8px">' +
-    '<input type="checkbox" id="gpu-only-changed"' + (show3dAll ? "" : " checked") +
-    "> Only the ones that have been changed</label>";
-
-  const rows = list.filter(x => show3dAll || x.overridden);
-  if (!rows.length) {
-    return html + '<span class="sub">Nothing has been changed from the driver’s ' +
-      "defaults.</span>";
-  }
-  // The driver's own id for each setting is carried as a tooltip rather than
-  // printed: it is how you look one up, not something to read past 130 times.
-  html += rows.map(x =>
-    '<div class="row" title="' + esc(x.name + "  \u00b7  " + x.id) + '">' +
-    '<span class="k">' + esc(x.name) + "</span>" +
-    '<span class="v">' +
-    (x.overridden
-      ? '<code>' + esc(x.value) + '</code><span class="flag warn">changed</span>'
-      : '<span class="sub">driver default</span>') +
-    "</span></div>").join("");
-
-  // The driver names every setting but will not say what its values mean, so
-  // the raw number is shown rather than a label invented here.
-  html += '<div class="sub2" style="margin-top:8px">' +
-    "Values are shown as the driver stores them. It publishes the setting names " +
-    "but not what each value means, so nothing here is translated into a guess." +
-    "</div>";
-  return html;
+  if (!list.length) return renderProfile(nv.global,'Global 3D settings','global');
+  const globalSettings = new Map(((nv.global && nv.global.settings) || []).map(s=>[s.id,s]));
+  const isChanged = s => globalSettings.has(s.id) ? !globalSettings.get(s.id).predefined : !!s.overridden;
+  const rows = list.filter(s=>show3dAll || isChanged(s));
+  const body = (nv.global && nv.global.error ? '<p class="sub warn">' + esc(nv.global.error) + '</p>' : '') + (rows.length ? rows.map(s=>gfxSetting(s,isChanged(s))).join('') : '<p class="sub">Nothing has been changed from the driver’s defaults.</p>');
+  return gfxGroup('global','Global 3D settings',list.length + ' named settings · ' + list.filter(isChanged).length + ' changed',body,true);
 }
-
 function renderGpu() {
-  const box = $("gpu-out");
+  const box = $('gpu-out');
   if (!box || !gpuData) return;
+  // Capture current state before replacing DOM; detached toggle events are ignored.
+  box.querySelectorAll('details[data-gfx-group]').forEach(d=>gfxOpenGroups.set(d.dataset.gfxGroup,d.open));
   const nv = gpuData.nvidia || {};
-
-  let html = '<div class="subcat">Displays</div>' + renderDisplays(gpuData.displays) +
-    renderScaling(gpuData.scaling);
-
-  if (!nv.available) {
-    html += '<div class="subcat">Graphics driver</div>' +
-      '<span class="sub">' + esc(nv.reason || "No NVIDIA driver found.") +
-      " Display settings above still apply.</span>";
-    box.innerHTML = html;
-    return;
+  let html = '<section class="gfx-section"><h3>Your displays</h3>' + renderDisplays(gpuData.displays) + '</section>' + renderScaling(gpuData.scaling);
+  html += '<section class="gfx-section gfx-driver"><div class="gfx-driver-heading"><span class="gfx-icon" aria-hidden="true">' + gfxIcon('chip') + '</span><h3>NVIDIA driver</h3>' + (nv.available ? '<strong>' + esc(nv.driver || 'Version not reported') + '</strong>' : '') + '</div>';
+  if (!nv.available) html += '<p class="sub">' + esc(nv.reason || 'No NVIDIA driver found.') + ' Display refresh controls still work with AMD and Intel GPUs. Driver profiles require a readable NVIDIA driver.</p>';
+  else {
+    html += '<p class="gfx-driver-meta">' + esc(String(nv.profiles ?? 0)) + ' profiles known to the driver · ' + esc(String(nv.catalogue ?? 0)) + ' named settings <span class="mono">' + esc(nv.branch || '') + '</span></p>' +
+      '<p class="gfx-note">Read-only · Explore NVIDIA’s saved profiles here. To edit, use NVIDIA Control Panel. Details keeps undecoded values out of your way.</p>' +
+      '<label class="opt gfx-filter"><input type="checkbox" id="gpu-only-changed"' + (show3dAll ? '' : ' checked') + '> Only the ones that have been changed</label>' + render3d(nv);
+    const apps = nv.apps || {};
+    for (const [exe,caption] of [['cs2.exe','Counter-Strike 2'],['csgo.exe','Counter-Strike: Global Offensive']]) html += renderProfile(apps[exe],caption + ' · ' + exe,exe);
+    for (const [exe,prof] of Object.entries(apps)) if (!['cs2.exe','csgo.exe'].includes(exe)) html += renderProfile(prof,prof.name + ' · ' + exe,exe);
   }
-
-  html += '<div class="subcat">Driver</div>' +
-    '<div class="row"><span class="k">Version</span><span class="v mono">' +
-    esc(nv.driver) + " " + esc(nv.branch) + "</span></div>" +
-    '<div class="row"><span class="k">Profiles</span><span class="v mono">' +
-    esc(String(nv.profiles)) + " known to the driver</span></div>" +
-    '<div class="row"><span class="k">Settings</span><span class="v mono">' +
-    esc(String(nv.catalogue)) + " named settings</span></div>";
-
-  html += render3d(nv);
-  for (const [exe, prof] of Object.entries(nv.apps || {})) {
-    html += renderProfile(prof, prof.name + "  ·  " + exe);
-  }
-  html += '<div class="sub2" style="margin-top:10px">' +
-    "This panel reads the driver only. Changing these would mean writing to a " +
-    "system-wide driver database as an administrator, and the driver does not " +
-    "publish what its values mean — so the app does not do it." +
-    "</div>";
-
-  box.innerHTML = html;
+  box.innerHTML = html + '</section>';
+  gfxObserveMotion();
 }
 
 async function loadGpu() {
@@ -6922,6 +6894,134 @@ function paintModeBadge(name) {
   badge.title = MODE_WORD[name] || name;
 }
 
+/* Launcher motion: one scheduler, persistent instruments, no synthetic readings. */
+const homeMotion = { jobs: new Map(), raf: 0, reduced: matchMedia('(prefers-reduced-motion: reduce)') };
+function homeVisible() { return !document.hidden && document.querySelector('[data-panel="launcher"]')?.classList.contains('hidden') !== true; }
+function homeCancel(el) { homeMotion.jobs.delete(el); }
+function homeTween(el, key, target, paint, duration = 850) {
+  if (!el || !Number.isFinite(Number(target))) return;
+  target = Number(target);
+  const from = Number(el.dataset['home' + key]) || 0;
+  const draw = v => { el.dataset['home' + key] = v; paint(v); };
+  if (homeMotion.reduced.matches || !homeVisible()) { homeCancel(el); draw(target); return; }
+  homeMotion.jobs.set(el, { from, target, draw, start: performance.now(), duration });
+  homeSchedule();
+}
+function homeNumber(el, value, suffix = '') {
+  homeTween(el, 'value', value, v => { el.textContent = Math.round(v) + suffix; });
+}
+function homeSchedule() {
+  if (!homeMotion.raf && homeVisible() && homeMotion.jobs.size) homeMotion.raf = requestAnimationFrame(homeFrame);
+}
+function homeFrame(now) {
+  homeMotion.raf = 0;
+  if (!homeVisible()) return;
+  for (const [el, job] of homeMotion.jobs) {
+    if (!el.isConnected) { homeMotion.jobs.delete(el); continue; }
+    const p = homeMotion.reduced.matches ? 1 : Math.min(1, (now - job.start) / job.duration);
+    job.draw(job.from + (job.target - job.from) * (1 - Math.pow(1 - p, 3)));
+    if (p === 1) homeMotion.jobs.delete(el);
+  }
+  homeSchedule();
+}
+function homePause() {
+  document.documentElement.classList.toggle('home-paused', !homeVisible());
+  if (!homeVisible()) { cancelAnimationFrame(homeMotion.raf); homeMotion.raf = 0; }
+  else homeSchedule();
+}
+document.addEventListener('visibilitychange', homePause);
+homeMotion.reduced.addEventListener('change', homePause);
+const homeHero = document.getElementById('home-hero');
+if (homeHero) {
+  homeHero.addEventListener('pointermove', e => {
+    if (homeMotion.reduced.matches || !homeVisible()) return;
+    const r = homeHero.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width - .5;
+    const y = (e.clientY - r.top) / r.height - .5;
+    homeHero.querySelector('.hero-art').style.transform = 'translate(' + x * 7 + 'px,' + y * 5 + 'px) scale(1.02)';
+  });
+  homeHero.addEventListener('pointerleave', () => { homeHero.querySelector('.hero-art').style.transform = ''; });
+}
+new MutationObserver(homePause).observe(document.querySelector('[data-panel="launcher"]'), { attributes: true, attributeFilter: ['class'] });
+function homePatchReadouts(host, markup) {
+  if (!host) return;
+  const template = document.createElement('template'); template.innerHTML = markup;
+  if (host.children.length !== template.content.children.length) host.replaceChildren(template.content);
+  else [...host.children].forEach((el, i) => {
+    const fresh = template.content.children[i];
+    el.title = fresh.title;
+    const oldSub = el.querySelector('.sub2'), nextSub = fresh.querySelector('.sub2');
+    if (oldSub && nextSub) oldSub.textContent = nextSub.textContent;
+    else if (nextSub) el.append(nextSub.cloneNode(true));
+    else if (oldSub) oldSub.remove();
+    const oldArc = el.querySelector('.ring-fg, .score-fg'), newArc = fresh.querySelector('.ring-fg, .score-fg');
+    if (oldArc && newArc) {
+      oldArc.setAttribute('stroke', newArc.getAttribute('stroke'));
+      for (const attr of ['stroke-dasharray', 'stroke-dashoffset']) if (newArc.hasAttribute(attr)) oldArc.dataset['target' + attr.replaceAll('-', '')] = newArc.getAttribute(attr);
+    }
+    const val = el.querySelector('.val, .score-text b'), newVal = fresh.querySelector('.val, .score-text b');
+    if (val && newVal) val.dataset.targetValue = newVal.textContent;
+    const unit = el.querySelector('.unit'), newUnit = fresh.querySelector('.unit');
+    if (unit && !newUnit) unit.remove(); else if (!unit && newUnit) el.querySelector('svg').append(newUnit.cloneNode(true));
+  });
+  host.querySelectorAll('.gauge, .score').forEach(el => {
+    const arc = el.querySelector('.ring-fg, .score-fg');
+    const val = el.querySelector('.val, .score-text b');
+    const raw = val.dataset.targetValue ?? val.textContent;
+    delete val.dataset.targetValue;
+    if (raw === '—') { homeCancel(val); val.textContent = raw; }
+    else homeNumber(val, Number(raw));
+    const circumference = 2 * Math.PI * Number(arc.getAttribute('r'));
+    const offset = arc.dataset.targetstrokedashoffset ?? arc.getAttribute('stroke-dashoffset');
+    const dash = arc.dataset.targetstrokedasharray ?? arc.getAttribute('stroke-dasharray');
+    const share = el.classList.contains('score') ? Number(dash.split(' ')[0]) / circumference : 1 - Number(offset) / circumference;
+    homeTween(arc, 'arc', share, v => {
+      arc.setAttribute('stroke-dasharray', circumference + ' ' + circumference);
+      arc.setAttribute('stroke-dashoffset', circumference * (1 - v));
+      arc.style.filter = 'drop-shadow(0 0 ' + (1 + v * 7) + 'px ' + arc.getAttribute('stroke') + ')';
+    });
+  });
+}
+function homeSmoothPath(points) {
+  if (!points.length) return '';
+  let path = 'M' + points[0].join(' ');
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1], b = points[i], mid = (a[0] + b[0]) / 2;
+    path += ' C' + mid + ' ' + a[1] + ' ' + mid + ' ' + b[1] + ' ' + b.join(' ');
+  }
+  return path;
+}
+function homeChart(id, series, colour) {
+  const el = $(id); if (!el) return;
+  const samples = (series || []).slice(-40);
+  if (samples.filter(v => Number.isFinite(v)).length < 2) {
+    homeCancel(el); el.innerHTML = '<text x="6" y="26" fill="var(--muted)" font-size="11">no samples yet</text>'; return;
+  }
+  const points = samples.map(v => Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : null);
+  const previous = el.homeSamples || points;
+  el.homeSamples = points;
+  const gid = 'home-gradient-' + id;
+  if (!el.querySelector('.chart-line')) el.innerHTML = '<defs><linearGradient id="' + gid + '" x2="0" y2="1"><stop stop-color="' + colour + '" stop-opacity=".4"/><stop offset="1" stop-color="' + colour + '" stop-opacity="0"/></linearGradient></defs><path class="chart-area" fill="url(#' + gid + ')"/><path class="chart-line" fill="none" stroke="' + colour + '" stroke-width="1.8"/><circle class="chart-tip" r="2.6" fill="' + colour + '"/>';
+  el.setAttribute('role', 'img'); el.setAttribute('aria-label', id.replace('spark-', '').toUpperCase() + ' load history; latest ' + (points.at(-1) ?? 'unavailable') + '%');
+  el.dataset.homescroll = 0;
+  homeTween(el, 'scroll', 1, progress => {
+    const count = points.length, step = 240 / (count - 1), segments = []; let segment = [];
+    // Slide the old window left while the newest measured point enters from right.
+    const values = [...previous.slice(-count), points.at(-1)];
+    for (let i = 0; i < values.length; i++) {
+      const v = values[i];
+      if (v === null) { if (segment.length) segments.push(segment); segment = []; continue; }
+      segment.push([(i - progress) * step, 43 - v * .4]);
+    }
+    if (segment.length) segments.push(segment);
+    el.querySelector('.chart-line').setAttribute('d', segments.map(homeSmoothPath).join(' '));
+    el.querySelector('.chart-area').setAttribute('d', segments.map(p => homeSmoothPath(p) + ' L' + p.at(-1)[0] + ' 46 L' + p[0][0] + ' 46 Z').join(' '));
+    const latest = values.at(-2), next = values.at(-1), tip = el.querySelector('.chart-tip');
+    tip.style.opacity = latest === null || next === null ? 0 : 1;
+    tip.setAttribute('cx', 240); tip.setAttribute('cy', 43 - ((latest ?? 0) + ((next ?? 0) - (latest ?? 0)) * progress) * .4);
+  }, 1900);
+}
+
 function scoreRing(value, cap, label, detail, tone) {
   const share = Math.max(0, Math.min(1, value / cap));
   const r = 13, track = 2 * Math.PI * r;
@@ -6941,7 +7041,7 @@ function scoreRing(value, cap, label, detail, tone) {
 function renderScores(p, headroomPct, hue) {
   const box = $("scorebar");
   if (!box || !p) return;
-  box.innerHTML =
+  homePatchReadouts(box,
     scoreRing(headroomPct, 100, "Headroom",
               p.headroom + "× of " + p.target_fps + " Hz", hue) +
     scoreRing(p.cpu_score, 105, "CPU",
@@ -6949,7 +7049,7 @@ function renderScores(p, headroomPct, hue) {
               "var(--warn)") +
     scoreRing(p.gpu_score, 135, "GPU",
               "score " + p.gpu_score + ", ceiling ~" + p.gpu_ceiling + " fps",
-              "var(--accent)");
+              "var(--accent)"));
 }
 
 function renderPlan(p) {
@@ -7567,184 +7667,42 @@ async function runNetCheck() {
 
 if ($("net-run")) $("net-run").addEventListener("click", runNetCheck);
 
-/* The optimise-for dial.
-
-   Three stops rather than a free slider: there are three profiles, and a
-   continuous track would promise blends between them that do not exist. The
-   ball follows the pointer while dragging and settles on the nearest stop when
-   released, so it reads as one control rather than three buttons.
-
-   Pointer capture is taken on the ball so a drag that leaves the track keeps
-   working, and released on pointerup -- the same shape the rail divider uses.
-*/
+/* Three scene cards share the existing preference and plan-preview flow. */
 const INTENTS = ["competitive", "balanced", "quality"];
 
-/* The band behind the Optimise-for control.
-
-   Drawn once. The boundary is a smoothstep from low-left to high-right, which
-   is the only honest shape for it: the trade is gradual, not stepped, and the
-   ends flatten because there is nothing beyond them to trade for.
-*/
-const BAND_W = 620, BAND_H = 96;
-const BAND_SPREAD = 56, BAND_BLUR = 13;          // the G1 falloff
-// How far past the band's own box the light is allowed to go. The falloff
-// from the line reaches about 54px, so anything less cuts it off square.
-const BAND_PAD = 70;
-
-function bandBoundary() {
-  const pts = [];
-  for (let x = 0; x <= BAND_W; x += 2) {
-    const p = x / BAND_W;
-    const e = p * p * (3 - 2 * p);
-    pts.push([x, (BAND_H - 10) - e * (BAND_H - 20)]);
-  }
-  return pts;
-}
-const BAND_PTS = bandBoundary();
-const BAND_D = BAND_PTS.map((q, i) =>
-  (i ? "L" : "M") + q[0] + " " + q[1].toFixed(1)).join("");
-
-/* Where the line is, as a percentage of the band's height, at a percentage
-   across -- so the bead rides the curve rather than a straight line. */
-function bandY(pct) {
-  const x = Math.min(BAND_W, Math.max(0, (pct / 100) * BAND_W));
-  return (BAND_PTS[Math.round(x / 2)][1] / BAND_H) * 100;
-}
-
-/* Where each profile sits across the band.
-
-   Over the middle of its own label, measured from the labels themselves. Two
-   earlier answers were both wrong in the same way -- they were fractions of
-   the band, and the band is deliberately wider than the panel so its light can
-   run past the frame. A fixed 8% put the bead outside the panel; matching the
-   panel's content edge was worse again, because the outer labels are aligned
-   to those edges and the travel stretched the full width.
-
-   Anchoring to the labels makes the rule obvious instead: the bead stands on
-   the thing it has selected, and the travel is however far apart those are.
-*/
-function bandStops() {
-  const stage = $("band-stage");
-  const labels = document.querySelectorAll(".dial-labels > span");
-  const box = stage ? stage.getBoundingClientRect() : null;
-  if (!box || !box.width || labels.length !== 3) return [19, 50, 81];
-  return [...labels].map(el => {
-    const r = el.getBoundingClientRect();
-    return ((r.left + r.width / 2) - box.left) / box.width * 100;
+/* Every card uses the backend's existing plan estimate, with a request snapshot
+   so a late response cannot overwrite estimates for newer settings. */
+let modeEstimateRevision = 0;
+let modeEstimateKey = "";
+function setBandFigures(plan) {
+  const body = requestBody();
+  const key = JSON.stringify({...body, intent: null});
+  const selected = document.querySelector('[data-mode-fps="' + plan.intent + '"]');
+  if (selected) homeNumber(selected, plan.estimated_fps);
+  if (key === modeEstimateKey) return;
+  const revision = ++modeEstimateRevision;
+  modeEstimateKey = key;
+  document.querySelectorAll('[data-mode-fps]').forEach(el => { el.textContent = "—"; });
+  INTENTS.forEach(async name => {
+    try {
+      const p = name === plan.intent ? plan : await api("/api/plan", {...body, intent: name});
+      if (revision !== modeEstimateRevision) return;
+      const el = document.querySelector('[data-mode-fps="' + name + '"]');
+      if (el) homeNumber(el, p.estimated_fps);
+    } catch (_) { if (revision === modeEstimateRevision) modeEstimateKey = ""; }
   });
 }
-
-function paintBand() {
-  const stage = $("band-stage");
-  if (!stage || stage.querySelector(".band-svg")) return;
-  const svg =
-    '<svg class="band-svg" viewBox="0 0 ' + BAND_W + " " + BAND_H +
-      '" preserveAspectRatio="none" aria-hidden="true">' +
-      "<defs>" +
-        '<linearGradient id="band-up" x1="0" y1="0" x2="0" y2="1">' +
-          '<stop offset="0" stop-color="var(--neon-frames, #22e6ff)" stop-opacity=".95"/>' +
-          '<stop offset="1" stop-color="var(--neon-frames, #22e6ff)" stop-opacity=".45"/>' +
-        "</linearGradient>" +
-        '<linearGradient id="band-down" x1="0" y1="1" x2="0" y2="0">' +
-          '<stop offset="0" stop-color="var(--neon)" stop-opacity=".95"/>' +
-          '<stop offset="1" stop-color="var(--neon)" stop-opacity=".45"/>' +
-        "</linearGradient>" +
-        // The mask IS the line, stroked wide and blurred: opacity falls away
-        // at right angles to it, which follows the curve.
-        // Every region here is spelled out in user space. Left to their
-        // defaults, a filter is clipped to 110% of its input and a mask to
-        // 120% of the object -- both of which cut the falloff off flat.
-        '<filter id="band-soft" filterUnits="userSpaceOnUse"' +
-          ' x="-60" y="' + (-BAND_PAD - 20) + '" width="' + (BAND_W + 120) +
-          '" height="' + (BAND_H + 2 * BAND_PAD + 40) + '">' +
-          '<feGaussianBlur stdDeviation="' + BAND_BLUR + '"/></filter>' +
-        '<mask id="band-near" maskUnits="userSpaceOnUse"' +
-          ' x="-60" y="' + (-BAND_PAD) + '" width="' + (BAND_W + 120) +
-          '" height="' + (BAND_H + 2 * BAND_PAD) + '">' +
-          '<path d="' + BAND_D + '" fill="none" stroke="#fff"' +
-          ' stroke-width="' + BAND_SPREAD + '" filter="url(#band-soft)"/></mask>' +
-        // ...and the ends go, so it reads as a section of something longer.
-        '<linearGradient id="band-ends-g" x1="0" x2="1">' +
-          '<stop offset="0" stop-color="#000"/><stop offset=".17" stop-color="#fff"/>' +
-          '<stop offset=".83" stop-color="#fff"/><stop offset="1" stop-color="#000"/>' +
-        "</linearGradient>" +
-        '<mask id="band-ends" maskUnits="userSpaceOnUse"' +
-          ' x="0" y="' + (-BAND_PAD) + '" width="' + BAND_W +
-          '" height="' + (BAND_H + 2 * BAND_PAD) + '">' +
-          '<rect y="' + (-BAND_PAD) + '" width="' + BAND_W +
-          '" height="' + (BAND_H + 2 * BAND_PAD) +
-          '" fill="url(#band-ends-g)"/></mask>' +
-      "</defs>" +
-      '<g mask="url(#band-ends)">' +
-        '<g mask="url(#band-near)">' +
-          '<path d="' + BAND_D + "L" + BAND_W + " " + (-BAND_PAD) + "L0 " +
-            (-BAND_PAD) + 'Z" fill="url(#band-up)"/>' +
-          '<path d="' + BAND_D + "L" + BAND_W + " " + (BAND_H + BAND_PAD) +
-            "L0 " + (BAND_H + BAND_PAD) + 'Z" fill="url(#band-down)"/>' +
-        "</g>" +
-        '<path class="band-line" d="' + BAND_D + '" fill="none" stroke="#fff"' +
-          ' stroke-opacity=".9" stroke-width="1.5"/>' +
-      "</g></svg>";
-  stage.insertAdjacentHTML("afterbegin", svg);
-}
-
-/* The figure, from the plan the preview already worked out. Blank until there
-   is one: inventing a number here would be worse than showing none. */
-let bandFps = "";
-
-function setBandFigures(plan) {
-  bandFps = plan && plan.estimated_fps ? String(plan.estimated_fps) : "";
-  paintBandFigures();
-}
-
-function paintBandFigures() {
-  const at = Math.max(0, INTENTS.indexOf(intent));
-  const pct = bandStops()[at];
-  const ball = $("dial-ball");
-  if (!ball) return;
-  // Empty until a preview has run: a number invented to fill the sphere would
-  // be worse than an empty one, and the sphere shrinks back to a plain bead.
-  ball.innerHTML = bandFps
-    ? "<b>" + esc(bandFps) + "</b><i>FPS</i>" : "";
-  ball.title = bandFps ? "Estimated " + bandFps + " fps at this profile" : "";
-}
-
-function paintIntent(name, live) {
-  paintBand();
-  const at = Math.max(0, INTENTS.indexOf(name));
-  const pct = bandStops()[at];
-  const where = live === undefined ? pct : live;
-  const ball = $("dial-ball");
-  ball.style.left = where + "%";
-  // On the line, not through the middle of the box.
-  ball.style.top = bandY(where) + "%";
-
-  const dial = $("intents");
-  // Everything below describes which profile is lit, and a drag fires a
-  // pointermove per frame while crossing only two boundaries. Doing this work
-  // every frame is what made the window judder: #mode-glow is a fixed,
-  // full-viewport element under a 58px blur with a 0.65s colour transition,
-  // and setting its trigger again each frame restarted that transition on a
-  // full-screen blurred layer ~60 times a second. Rebuilding the title bar's
-  // notch -- an SVG with two masks, three gradients and two drop-shadows --
-  // was being redone just as often. So it happens when the answer changes,
-  // and not otherwise.
-  if (dial.dataset.intent !== name) {
-    dial.dataset.intent = name;
-    // The whole window takes the mode's colour, not just the control.
-    document.body.dataset.intent = name;
-    // ...and so does the drop in the title bar, which shows the same choice.
-    // Driven from here rather than from the plan so it moves with the dial
-    // instead of waiting for the next preview to come back.
-    paintModeBadge(name);
-    dial.setAttribute("aria-valuenow", String(at));
-    dial.setAttribute("aria-valuetext", name);
-    dial.querySelectorAll(".dial-labels > span").forEach(el =>
-      el.setAttribute("aria-pressed", el.dataset.for === name));
-    dial.querySelectorAll(".dial-stop").forEach(el =>
-      el.setAttribute("aria-pressed", el.dataset.intent === name));
-  }
-  if (live === undefined) paintBandFigures();
+function paintIntent(name) {
+  if (!INTENTS.includes(name)) return;
+  const cards = $("intents");
+  cards.dataset.intent = name;
+  document.body.dataset.intent = name;
+  paintModeBadge(name);
+  cards.querySelectorAll(".mode-card").forEach(el => {
+    const selected = el.dataset.intent === name;
+    el.setAttribute("aria-pressed", String(selected));
+    el.tabIndex = selected ? 0 : -1;
+  });
 }
 
 function chooseIntent(name, quiet) {
@@ -7761,73 +7719,22 @@ function chooseIntent(name, quiet) {
   }
 }
 
-(function wireDial() {
-  const dial = $("intents");
-  const track = $("band-stage");
-  const ball = $("dial-ball");
-  let dragging = false;
-
-  const nearest = pct => {
-    const stops = bandStops();
-    let best = 0;
-    stops.forEach((at, i) => {
-      if (Math.abs(pct - at) < Math.abs(pct - stops[best])) best = i;
-    });
-    return INTENTS[best];
-  };
-  // Clamped to the outer stops, not to the track. The track runs wider than
-  // the panel and its ends are faded out, so 0% and 100% are off the edge of
-  // the control -- the bead would leave the box and sit over nothing.
-  const pctFor = event => {
-    const box = track.getBoundingClientRect();
-    const stops = bandStops();
-    if (!box.width) return stops[1];
-    const raw = ((event.clientX - box.left) / box.width) * 100;
-    return Math.min(stops[2], Math.max(stops[0], raw));
-  };
-
-  ball.addEventListener("pointerdown", e => {
-    dragging = true;
-    dial.classList.add("dragging");
-    ball.setPointerCapture(e.pointerId);
-    e.preventDefault();
+(function wireModeCards() {
+  const cards = $("intents");
+  cards.addEventListener("click", e => {
+    const card = e.target.closest(".mode-card");
+    if (card) chooseIntent(card.dataset.intent);
   });
-  ball.addEventListener("pointermove", e => {
-    if (!dragging) return;
-    // Paint the stop being dragged towards, not the one still selected, so the
-    // colour answers "where am I about to land" while the ball is moving.
-    // Nothing is committed until pointerup.
-    const where = pctFor(e);
-    paintIntent(nearest(where), where);
+  cards.addEventListener("keydown", e => {
+    let at = INTENTS.indexOf(intent);
+    if (["ArrowLeft", "ArrowUp"].includes(e.key)) at = Math.max(0, at - 1);
+    else if (["ArrowRight", "ArrowDown"].includes(e.key)) at = Math.min(2, at + 1);
+    else if (e.key === "Home") at = 0;
+    else if (e.key === "End") at = 2;
+    else return;
+    e.preventDefault(); chooseIntent(INTENTS[at]);
+    cards.querySelectorAll(".mode-card")[at].focus();
   });
-  ball.addEventListener("pointerup", e => {
-    if (!dragging) return;
-    dragging = false;
-    dial.classList.remove("dragging");
-    try { ball.releasePointerCapture(e.pointerId); } catch (_) { /* already gone */ }
-    chooseIntent(nearest(pctFor(e)));
-  });
-
-  // Clicking the track, a stop, or a label jumps there.
-  dial.addEventListener("click", e => {
-    if (dragging) return;
-    const stop = e.target.closest("[data-intent]");
-    if (stop) { chooseIntent(stop.dataset.intent); return; }
-    const label = e.target.closest(".dial-labels > span");
-    if (label) { chooseIntent(label.dataset.for); return; }
-    if (e.target.closest(".dial-track")) chooseIntent(nearest(pctFor(e)));
-  });
-
-  dial.addEventListener("keydown", e => {
-    const at = INTENTS.indexOf(intent);
-    if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
-      chooseIntent(INTENTS[Math.max(0, at - 1)]); e.preventDefault();
-    } else if (e.key === "ArrowRight" || e.key === "ArrowUp") {
-      chooseIntent(INTENTS[Math.min(2, at + 1)]); e.preventDefault();
-    } else if (e.key === "Home") { chooseIntent(INTENTS[0]); e.preventDefault(); }
-    else if (e.key === "End") { chooseIntent(INTENTS[2]); e.preventDefault(); }
-  });
-
   paintIntent(intent);
 })();
 
@@ -8127,45 +8034,10 @@ function meter(label, value, max, text, tone) {
 }
 
 function sparkline(id, series, colour) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  const points = (series || []).filter(v => v !== null && v !== undefined);
-  if (points.length < 2) {
-    el.innerHTML = '<text x="6" y="26" fill="var(--muted)" font-size="11">no samples yet</text>';
-    return;
-  }
-  const w = 240, h = 46, pad = 3;
-  const max = Math.max(100, ...points);
-  const step = w / (points.length - 1);
-  const y = v => h - pad - (v / max) * (h - pad * 2);
-  const line = points.map((v, i) => (i ? "L" : "M") + (i * step).toFixed(1) + " " + y(v).toFixed(1)).join(" ");
-  const area = line + " L" + w + " " + h + " L0 " + h + " Z";
-  const gid = "g-" + id;
-  el.innerHTML =
-    "<defs><linearGradient id=\"" + gid + "\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">" +
-    '<stop offset="0%" stop-color="' + colour + '" stop-opacity=".38"/>' +
-    '<stop offset="100%" stop-color="' + colour + '" stop-opacity="0"/>' +
-    "</linearGradient></defs>" +
-    '<path d="' + area + '" fill="url(#' + gid + ')"/>' +
-    '<path d="' + line + '" fill="none" stroke="' + colour + '" stroke-width="1.6"' +
-    ' stroke-linejoin="round" stroke-linecap="round"/>';
+  homeChart(id, series, colour);
 }
 
-/* Temperatures, drawn the way the load gauges are.
-
-   Same 92px ring as CPU and GPU, so the row reads as one set of instruments
-   rather than a gauge next to a badge. Inside sits a thermometer whose level
-   rises and falls with the reading -- the shape people already know, doing the
-   thing it is shaped to do.
-
-   The ring is filled against the part's own limit rather than against 100
-   degrees. A GPU is in trouble at 87 and a drive at 70, so one shared scale
-   would leave every gauge sitting near empty and say nothing.
-
-   Rebuilt only when the set of parts changes; otherwise the existing nodes are
-   patched in place. That is what lets the level slide between readings instead
-   of jumping -- a fresh element every second cannot transition from anything.
-*/
+/* Sensor availability, elevation and alarm handling are shared by thermal strips. */
 const tempAlarm = {};
 
 /* Turning the locked gauges into something answerable.
@@ -8434,18 +8306,83 @@ document.addEventListener("click", e => {
    this page, and must hold whoever calls it.
    --------------------------------------------------------------------------- */
 let fixData = null;
+const fixStates = new Map(); // Session outcomes survive surveys and tab changes.
+let fixSurveyPending = false;
+let fixFilter = "all";
+const FIX_COPY = {
+  "net.restart": ["Reconnect an adapter that drops packets.", "Every connection briefly drops.", "Restarting the selected connection"],
+  "net.flush": ["Clear stale addresses that stop servers connecting.", "", "Clearing the DNS resolver cache"],
+  "gpu.restart": ["Reset a frozen, black or glitching picture.", "The screen will blink briefly.", "Sending the Windows graphics reset shortcut"],
+  "display.restore": ["Restore the desktop after a stretched launch.", "", "Checking and restoring the saved desktop mode"],
+  "device.restart": ["Reconnect an unresponsive mouse, keyboard or headset.", "The selected device briefly disconnects.", "Restarting the selected device"],
+  "steam.restart": ["Recover a stuck Steam client or lost sign-in.", "Closes Steam and interrupts downloads; close CS2 first.", "Restarting Steam; waiting for the client and sign-in"],
+  "sound.apps": ["Choose CS2’s own input and output in Windows.", "", "Opening Windows app volume and device preferences"],
+  "sound.restart": ["Bring back silent or crackling Windows audio.", "All audio briefly stops.", "Restarting Windows audio services"],
+  "mic.privacy": ["Review the permissions that can block your mic.", "", "Opening Windows microphone permissions"],
+  "shader.clear": ["Rebuild stale shaders after game or driver updates.", "Expect temporary stutter while CS2 rebuilds shaders.", "Clearing the graphics shader caches"],
+  "steam.zombie": ["End a leftover CS2 process with no game window.", "", "Checking for and ending a leftover CS2 process"],
+  "steam.verify": ["Ask Steam to check missing or damaged game files.", "", "Opening Steam’s CS2 file verification"],
+  "defender.exclude": ["Toggle real-time scanning of CS2’s folder.", "Excluded files will no longer be scanned in real time.", "Updating the Windows Security exclusion"],
+  "fullscreen.exclusive": ["Toggle Windows’ Fullscreen Optimizations for CS2.", "", "Updating CS2’s compatibility setting"],
+  "power.performance": ["Switch performance power on, or restore your plan.", "", "Switching the Windows power plan"],
+  "startup.apps": ["Review apps that slow boot and run in the background.", "", "Opening Windows startup apps"]
+};
+const FIX_OPENERS = new Set(["sound.apps", "mic.privacy", "startup.apps", "steam.verify"]);
+function fixCurrent(id) {
+  const d = fixData || {};
+  if (id === "net.restart") return "Target: " + ($("fix-adapter")?.selectedOptions[0]?.textContent || "No connected adapter reported");
+  if (id === "device.restart") return "Target: " + ($("fix-device")?.selectedOptions[0]?.textContent || "Choose a restartable device");
+  if (id === "sound.apps" || id === "sound.restart") return "Detected: " + ((d.sound?.devices || []).map(a => a.name).join(", ") || "No sound devices reported") + ". CS2 routing is not reported.";
+  if (id === "steam.zombie") return "Current: " + (d.zombie_cs2 ? "Leftover process detected" : "No stuck process reported");
+  if (id === "defender.exclude" && d.defender?.supported) return "Current: CS2 folder " + (d.defender.excluded ? "excluded from scanning" : "not excluded");
+  if (id === "fullscreen.exclusive" && d.fullscreen?.supported) return "Current: Fullscreen Optimizations " + (d.fullscreen.disabled ? "off" : "on");
+  if (id === "power.performance" && d.power?.supported) return "Current: " + (d.power.boosted ? "App performance boost active" : "App performance boost inactive") + (d.power.plan ? " · " + d.power.plan : "");
+  return "Current setting not reported by Windows survey";
+}
+function paintFixState(id) {
+  const tile = document.querySelector('[data-tool="' + id + '"]');
+  if (!tile) return;
+  const state = fixSurveyPending ? {phase:"checking"} : fixStates.get(id) || {phase:"idle"};
+  tile.dataset.state = state.phase;
+  tile.setAttribute("aria-busy", String(state.phase === "fixing" || state.phase === "checking"));
+  tile.querySelector(".fix-state").textContent = state.phase === "fixed" ? (state.label || (FIX_OPENERS.has(id) ? "Opened" : "Fixed")) + " · " + new Date(state.at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"}) : state.phase === "checking" ? "Checking · reading current settings" : state.phase === "fixing" ? "Fixing · waiting for Windows" : state.phase === "failed" ? "Failed · retry available" : "Idle · ready when you are";
+  tile.querySelector(".fix-current").textContent = fixCurrent(id);
+  const said = $(fixSaidId(id));
+  said.textContent = state.text || "";
+  if (state.steps?.length) {
+    const details = document.createElement("details");
+    const summary = document.createElement("summary"); summary.textContent = "Reported steps"; details.append(summary);
+    const list = document.createElement("ol"); state.steps.forEach(step => { const li = document.createElement("li"); li.textContent = step; list.append(li); }); details.append(list); said.append(details);
+  }
+  const button = tile.querySelector("[data-fix]");
+  if (id === "device.restart") button.dataset.unavailable = String(!$("fix-device")?.selectedOptions[0] || $("fix-device").selectedOptions[0].disabled);
+  if (id === "defender.exclude") button.dataset.label = fixData.defender?.excluded ? "Remove the exclusion" : "Exclude it";
+  if (id === "fullscreen.exclusive") button.dataset.label = fixData.fullscreen?.disabled ? "Turn it back on" : "Turn it off";
+  if (id === "power.performance") button.dataset.label = fixData.power?.boosted ? "Put the previous plan back" : "Switch to it";
+  button.disabled = button.dataset.unavailable === "true" || state.phase === "fixing" || state.phase === "checking";
+  button.textContent = state.phase === "failed" ? "Retry · " + button.dataset.label : state.phase === "fixing" ? "Working..." : button.dataset.label;
+  tile.querySelectorAll("select,input").forEach(el => { el.disabled = state.phase === "fixing" || state.phase === "checking"; });
+}
+function fixPauseMotion() { document.documentElement.classList.toggle("fix-paused", document.hidden); }
+document.addEventListener("visibilitychange", fixPauseMotion);
+fixPauseMotion();
+$("fix-refresh").addEventListener("click", () => loadFixes(true));
 
 async function loadFixes(force) {
   const box = $("fix-out");
+  if (fixSurveyPending || [...fixStates.values()].some(s => s.phase === "fixing")) return;
   if (fixData && !force) { renderFixes(); return; }
-  if (box) box.innerHTML = '<span class="sub"><span class="spin"></span> Looking&hellip;</span>';
+  fixSurveyPending = true;
+  (fixData?.fixes || []).forEach(f => paintFixState(f.id));
+  $("fix-refresh").disabled = true;
+  $("fix-refresh").textContent = "Checking...";
+  if (box && !fixData) box.innerHTML = '<div class="fix-banner" role="status">Checking...  reading devices and current settings...</div>';
   try {
     fixData = await api("/api/fix/survey", {});
     renderFixes();
   } catch (err) {
-    if (box) box.innerHTML = '<span class="sub warn">Could not read the machine: ' +
-      esc(String(err && err.message || err)) + "</span>";
-  }
+    if (box) { box.querySelector(".fix-survey-error")?.remove(); box.insertAdjacentHTML("afterbegin", '<p class="fix-banner fix-survey-error" role="alert">Could not read the machine: ' + esc(String(err && err.message || err)) + '. Use Check current settings to retry.</p>'); }
+  } finally { fixSurveyPending = false; $("fix-refresh").disabled = false; $("fix-refresh").textContent = "Check current settings"; (fixData?.fixes || []).forEach(f => paintFixState(f.id)); }
 }
 
 /* Each repair gets a face.
@@ -8456,65 +8393,22 @@ async function loadFixes(force) {
    the colour is never the only signal -- every tile still says what it is.
 */
 const FIX_ART = {
-  "net.restart":
-    '<path d="M2.5 9.5a15 15 0 0119 0M6 13a10 10 0 0112 0M9.5 16.5a5 5 0 015 0"/>' +
-    '<circle cx="12" cy="20" r="1.4" fill="currentColor" stroke="none"/>',
-  "net.flush":
-    '<path d="M5 6h14M9 6V4.5h6V6M7 6l1 13.5a1.5 1.5 0 001.5 1.4h5a1.5 1.5 0 001.5-1.4L17 6"/>' +
-    '<path d="M10.5 10v7M13.5 10v7"/>',
-  "gpu.restart":
-    '<rect x="3" y="6" width="18" height="12" rx="2.2"/>' +
-    '<rect x="8.5" y="10" width="7" height="4.5" rx="1"/>' +
-    '<path d="M7 3.5v2.5M17 3.5v2.5M7 18v2.5M17 18v2.5"/>',
-  "device.restart":
-    '<rect x="8" y="2.8" width="8" height="18.4" rx="4"/><path d="M12 6.5v3.5"/>',
-  "sound.apps":
-    '<path d="M11 5L6.5 9H3.5v6h3L11 19z"/><path d="M15.5 9.2a4 4 0 010 5.6"/>' +
-    '<path d="M18.2 6.5a8 8 0 010 11"/>',
-  "sound.restart":
-    '<path d="M4 13a8 8 0 0116 0"/><path d="M4 13v3.5a2 2 0 002 2h1.5V13z"/>' +
-    '<path d="M20 13v3.5a2 2 0 01-2 2h-1.5V13z"/>',
-  // A monitor with an arrow striking out to each corner: the shape everything
-  // else uses for "back to full size", so it reads before it is thought about.
-  "display.restore":
-    '<rect x="2.5" y="4" width="19" height="13" rx="2.2"/>' +
-    '<path d="M9 20.5h6M12 17v3.5"/>' +
-    // Short strokes with a gap left in the middle. Run to the centre and the
-    // four of them meet in an X, which at 24 pixels reads as a cross rather
-    // than as four arrows.
-    '<path d="M10.1 9.9L6.7 6.6M13.9 9.9L17.3 6.6' +
-    'M10.1 11.6L6.7 14.9M13.9 11.6L17.3 14.9"/>' +
-    '<path d="M6.7 6.6h2.7M6.7 6.6v2.7M17.3 6.6h-2.7M17.3 6.6v2.7' +
-    'M6.7 14.9h2.7M6.7 14.9v-2.7M17.3 14.9h-2.7M17.3 14.9v-2.7"/>',
-  // Not Steam's mark, which is theirs: the restart arrow everything uses.
-  "steam.restart":
-    '<path d="M20 11a8 8 0 10-2.2 6.3"/>' +
-    '<path d="M20 4.8V11h-6"/>',
-  // A shader: three overlapping panes catching light, the shape used
-  // elsewhere in this file for "picture".
-  "shader.clear":
-    '<rect x="3" y="4" width="18" height="14" rx="2"/>' +
-    '<circle cx="8.5" cy="9" r="1.5"/><path d="M3 16l5-4 4 3 3-2 6 5"/>',
-  // A process that stopped answering: a window with an X instead of content.
-  "steam.zombie":
-    '<rect x="3" y="4" width="18" height="16" rx="1.5"/>' +
-    '<path d="M3 9h18M9 13l6 6M15 13l-6 6"/>',
-  // A checkmark inside a shield -- verification, not a repair.
-  "steam.verify":
-    '<path d="M12 3l7 3v5c0 5-3.2 8-7 10-3.8-2-7-5-7-10V6z"/>' +
-    '<path d="M9 12l2 2 4-4"/>',
-  "mic.privacy":
-    '<rect x="9" y="3" width="6" height="11" rx="3"/>' +
-    '<path d="M6 11a6 6 0 0012 0M12 17v3.5M9 20.5h6"/>',
-  "startup.apps":
-    '<rect x="3" y="4" width="18" height="16" rx="1.5"/>' +
-    '<path d="M3 10h18M7 14h4"/>',
-  "defender.exclude":
-    '<path d="M12 3l7 3v5c0 5-3.2 8-7 10-3.8-2-7-5-7-10V6z"/>',
-  "fullscreen.exclusive":
-    '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
-  "power.performance":
-    '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
+  "net.restart": "<path d=\"M5 3v4m5-4v4M3 7h9v4l-3 3v4H6v-4l-3-3M15 6a7 7 0 0 1 5 12m-4 1h5v-5M8 22h8\"/>",
+  "net.flush": "<path d=\"M3 4h11M3 8h8M3 12h6M3 16h4m14-13-8 11m-2-2 5 3-3 6-7-5zM8 17l3 2m-1-4 3 2\"/>",
+  "gpu.restart": "<path d=\"M2 6h15v13H2zM5 19v2m4-2v2m4-2v2M17 14h4v4h-4\"/><circle cx=\"9\" cy=\"12\" r=\"3\"/><path d=\"M16 3a5 5 0 0 1 6 7m0-4v4h-4\"/>",
+  "device.restart": "<path d=\"M4 8a5 5 0 0 1 10 0v9a5 5 0 0 1-10 0zM9 5v6m8-8a6 6 0 0 1 5 8m0-4v4h-4m0 4a6 6 0 0 1-1 6\"/>",
+  "sound.apps": "<path d=\"M9 5 5 9H2v6h3l4 4zM14 4v16M20 4v16M12 9h4m2 6h4\"/>",
+  "sound.restart": "<path d=\"M9 5 5 9H2v6h3l4 4zM12 12h2l2-5 3 10 2-5h2\"/>",
+  "display.restore": "<rect x=\"2.5\" y=\"4\" width=\"19\" height=\"13\" rx=\"2.2\"/><path d=\"M9 20.5h6M12 17v3.5\"/><path d=\"M10.1 9.9L6.7 6.6M13.9 9.9L17.3 6.6M10.1 11.6L6.7 14.9M13.9 11.6L17.3 14.9\"/><path d=\"M6.7 6.6h2.7M6.7 6.6v2.7M17.3 6.6h-2.7M17.3 6.6v2.7M6.7 14.9h2.7M6.7 14.9v-2.7M17.3 14.9h-2.7M17.3 14.9v-2.7\"/>",
+  "steam.restart": "<path d=\"M5 16a5 5 0 0 1-1-10 7 7 0 0 1 13-1 5 5 0 0 1 4 7M9 14a6 6 0 1 0 10 6m1-5v5h-5\"/>",
+  "shader.clear": "<path d=\"m2 6 8-4 8 4-8 4zM2 10l8 4 4-2M2 14l8 4m12-9-7 7m-2-2 5 3-3 5-6-4zM11 19l3 2\"/>",
+  "steam.zombie": "<rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"1.5\"/><path d=\"M3 9h18M9 13l6 6M15 13l-6 6\"/>",
+  "steam.verify": "<path d=\"M4 2h10l6 6v14H4zM14 2v6h6M8 15l3 3 6-7\"/>",
+  "mic.privacy": "<rect x=\"4\" y=\"2\" width=\"6\" height=\"12\" rx=\"3\"/><path d=\"M1 10a6 6 0 0 0 12 0M7 16v5M3 21h8m7-13 5 2v5c0 3-3 5-5 6-2-1-5-3-5-6v-5zM16 14l2 2 3-4\"/>",
+  "startup.apps": "<path d=\"M2 5h20v17H2zM2 10h20m10 9v-6m-3 3 3-3 3 3M5 7h1m3 0h1\"/>",
+  "defender.exclude": "<path d=\"m12 2 9 4v6c0 5-5 8-9 10-4-2-9-5-9-10V6zM7 12h10\"/>",
+  "fullscreen.exclusive": "<path d=\"M3 8V3h5m8 0h5v5M3 16v5h5m8 0h5v-5M7 7h10v10H7zM10 10l4 4m0-4-4 4\"/>",
+  "power.performance": "<path d=\"M15 2 6 13h6l-3 9 10-12h-6zM3 5h4M1 9h3m14 10h4m-2-4h3\"/>"
 };
 
 const FIX_FAMILY_NAME = {
@@ -8537,31 +8431,24 @@ function fixProgId(id) { return "fix-prog-" + id.split(".").join("-"); }
 
 function fixTile(fix, inner) {
   if (!fix) return "";
-  const tags =
-    (fix.needs_admin ? '<span class="flag warn">administrator</span>' : "") +
-    (fix.disruptive && !fix.allowed_in_game
-      ? '<span class="flag warn">not during a match</span>' : "");
-  return '<section class="fix-tile" data-family="' + esc(fix.family) + '">' +
-    '<div class="fix-head">' + fixIcon(fix) +
-      '<div class="fix-title"><span class="fix-fam">' +
-        esc(FIX_FAMILY_NAME[fix.family] || fix.family) + "</span>" +
-        "<h3>" + esc(fix.title) + "</h3>" + tags +
-      "</div>" +
-    "</div>" +
-    '<p class="fix-blurb">' + esc(fix.blurb) + "</p>" +
-    (fix.danger
-      ? '<p class="fix-danger">' + esc(fix.danger) + "</p>"
-      : "") +
-    '<div class="fix-body">' + inner + "</div>" +
-    '<div class="fix-prog" id="' + fixProgId(fix.id) + '" hidden>' +
-      '<div class="fix-track"><i></i></div>' +
-      '<p class="fix-step"><span class="what"></span><span class="secs"></span></p>' +
-    "</div>" +
-    '<div class="fix-said" id="' + fixSaidId(fix.id) + '"></div></section>';
+  const copy = FIX_COPY[fix.id] || [fix.blurb, fix.danger, "Working"];
+  const shield = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6zM12 8v5m0 3v1"/></svg>';
+  const pause = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7v10M16 7v10"/><circle cx="12" cy="12" r="10"/></svg>';
+  const tags = (fix.needs_admin ? '<span class="fix-chip">' + shield + 'Administrator</span>' : '') +
+    (fix.disruptive && !fix.allowed_in_game ? '<span class="fix-chip">' + pause + 'Close CS2 first</span>' : '');
+  return '<section class="fix-tile" data-tool="' + esc(fix.id) + '" data-family="' + esc(fix.family) + '">' +
+    '<div class="fix-head">' + fixIcon(fix) + '<div class="fix-title"><span class="fix-fam">' + esc(FIX_FAMILY_NAME[fix.family] || fix.family) + '</span><h3>' + esc(fix.title) + '</h3></div></div>' +
+    '<p class="fix-blurb">' + esc(copy[0]) + '</p><div class="fix-chips">' + tags + '</div>' +
+    (copy[1] ? '<p class="fix-danger">Caution: ' + esc(copy[1]) + '</p>' : '') +
+    '<details class="fix-details"><summary>Details</summary><p>' + esc(fix.blurb) + '</p>' + (fix.danger ? '<p>' + esc(fix.danger) + '</p>' : '') + '</details>' +
+    '<p class="fix-current"></p><div class="fix-body">' + inner + '</div>' +
+    '<div class="fix-state" role="status" aria-live="polite"></div>' +
+    '<div class="fix-prog" id="' + fixProgId(fix.id) + '" hidden><div class="fix-track"><i></i></div><p class="fix-step"><span class="what"></span><span class="secs"></span></p></div>' +
+    '<div class="fix-said" role="status" id="' + fixSaidId(fix.id) + '"></div></section>';
 }
 
 function fixButton(id, label, disabled) {
-  return '<button class="btn primary" data-fix="' + esc(id) + '"' +
+  return '<button class="btn primary" data-fix="' + esc(id) + '" data-label="' + esc(label) + '" data-unavailable="' + !!disabled + '"' +
     (disabled ? " disabled" : "") + ">" + esc(label) + "</button>";
 }
 
@@ -8586,7 +8473,7 @@ function renderFixes() {
     (a.wireless ? " · Wi-Fi" : " · wired") + "</option>").join("");
   html += fixTile(by["net.restart"],
     (adapters.length
-      ? '<select id="fix-adapter">' + options + "</select>"
+      ? '<label class="fix-select-label" for="fix-adapter">Connection to restart</label><select id="fix-adapter">' + options + "</select>"
       : '<span class="sub">no connected adapter found</span>') +
     '<div class="actions">' + fixButton("net.restart", "Restart it", !adapters.length) +
     "</div>");
@@ -8607,7 +8494,7 @@ function renderFixes() {
     esc(d.class) + " · " + esc(d.name) +
     (d.restartable ? "" : "  (the only one)") + "</option>").join("");
   html += fixTile(by["device.restart"],
-    '<select id="fix-device">' + listFor(false) + "</select>" +
+    '<label class="fix-select-label" for="fix-device">Device to restart</label><select id="fix-device">' + listFor(false) + "</select>" +
     '<label class="opt"><input type="checkbox" id="fix-all-devices"> ' +
     "Everything, not just the usual (" + devices.length + ")</label>" +
     '<div class="actions">' + fixButton("device.restart", "Restart it", !devices.length) +
@@ -8626,13 +8513,7 @@ function renderFixes() {
   const sound = fixData.sound || {};
   const special = sound.special || [];
   html += fixTile(by["sound.apps"],
-    (special.length
-      ? '<p class="fix-danger">Audio here runs through ' + esc(special.join(", ")) +
-        ". Changing the Windows default would move everything with it, streams " +
-        "included — so this gives CS2 its own device instead. The app will not " +
-        "write that routing for you: the interface behind it is undocumented, and " +
-        "guessing at a mixer somebody streams through is not a small mistake.</p>"
-      : "") +
+    (special.length ? '<p class="fix-danger">Caution: Keep your mixer routing intact; choose CS2’s device in Windows.</p><details class="fix-details"><summary>Detected mixers</summary><p>' + esc(special.join(", ")) + '. Changing the Windows default also moves other apps and streams. This tool opens per-app settings; select the routing there.</p></details>' : '') +
     '<div class="actions">' + fixButton("sound.apps", "Open the mixer", false) + "</div>");
 
   html += fixTile(by["sound.restart"],
@@ -8693,7 +8574,23 @@ function renderFixes() {
     '<div class="actions">' + fixButton("startup.apps", "Open the list", false) + "</div>");
 
   html += "</div>";
+  // Keep controls across refreshes and returning to this tab.
+  const held = {};
+  box.querySelectorAll("select,input").forEach(el => { held[el.id] = {value:el.value,checked:el.checked}; });
   box.innerHTML = html;
+  const grid = box.querySelector(".fix-grid");
+  const nav = document.createElement("div"); nav.className = "fix-categories"; nav.setAttribute("aria-label", "Tool categories");
+  [["all","All tools"], ...Object.entries(FIX_FAMILY_NAME)].forEach(([key,label]) => {
+    const button = document.createElement("button"); button.className = "btn"; button.textContent = label; button.setAttribute("aria-pressed", String(fixFilter === key));
+    button.onclick = () => { fixFilter = key; nav.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b === button))); grid.querySelectorAll(".fix-tile").forEach(t => { t.hidden = key !== "all" && t.dataset.family !== key; }); }; nav.append(button);
+  });
+  grid.before(nav);
+  grid.querySelectorAll(".fix-tile").forEach(t => { t.hidden = fixFilter !== "all" && t.dataset.family !== fixFilter; });
+  Object.entries(held).forEach(([id,state]) => { const el = $(id); if (el && el.type === "checkbox") el.checked = state.checked; });
+  if (held["fix-all-devices"]?.checked) $("fix-device").innerHTML = listFor(true);
+  Object.entries(held).forEach(([id,state]) => { const el = $(id); if (el?.tagName === "SELECT" && [...el.options].some(o => o.value === state.value && !o.disabled)) el.value = state.value; });
+  (fixData.fixes || []).forEach(f => paintFixState(f.id));
+  box.querySelectorAll("select").forEach(el => el.addEventListener("change", () => paintFixState(el.closest("[data-tool]").dataset.tool)));
 
   const toggle = $("fix-all-devices");
   if (toggle) {
@@ -8702,7 +8599,8 @@ function renderFixes() {
       if (!select) return;
       const held = select.value;
       select.innerHTML = listFor(toggle.checked);
-      select.value = held;
+      if ([...select.options].some(o => o.value === held && !o.disabled)) select.value = held;
+      paintFixState("device.restart");
     });
   }
 }
@@ -8710,10 +8608,9 @@ function renderFixes() {
 async function runFix(button) {
   const id = button.dataset.fix;
   const fix = ((fixData && fixData.fixes) || []).find(f => f.id === id);
-  if (!fix) return;
+  if (!fix || fixSurveyPending || fixStates.get(id)?.phase === "fixing" || button.disabled) return;
   if (fix.danger && !confirm(fix.title + "\n\n" + fix.danger + "\n\nGo ahead?")) return;
 
-  const said = $(fixSaidId(id));
   const body = { id: id };
   if (id === "net.restart" && $("fix-adapter")) body.adapter = $("fix-adapter").value;
   if (id === "device.restart" && $("fix-device")) body.device = $("fix-device").value;
@@ -8722,25 +8619,21 @@ async function runFix(button) {
   }
 
   button.disabled = true;
-  const label = button.textContent;
-  button.textContent = "Working…";
-  if (said) said.innerHTML = "";
-  const bar = fixProgress(id,
-    fix.needs_admin ? "Waiting for the administrator prompt" : "Working");
+  fixStates.set(id, {phase:"fixing"}); paintFixState(id);
+  const bar = fixProgress(id, (FIX_COPY[id] || [,,"Working"])[2] + (fix.needs_admin ? " · administrator approval may be required" : ""));
   try {
     const r = await api("/api/fix/run", body);
     const good = !!r.ok;
     const text = r.detail || r.error || (good ? "Done." : "Nothing changed.");
     bar.finish(good ? "done" : r.declined ? "stopped" : "failed", text);
-    if (said) {
-      said.innerHTML = '<span style="color:' +
-        (good ? "var(--good)" : r.declined ? "var(--muted)" : "var(--bad)") + '">' +
-        esc(text) + "</span>";
-    }
+    fixStates.set(id, {phase: good ? "fixed" : r.declined ? "idle" : "failed", at:Date.now(), text:(r.declined ? "Cancelled · " : "") + text, steps:r.steps, label:id === "steam.restart" && r.signed_in === false ? "Restarted · sign-in pending" : undefined});
+    // Only response fields establish a new setting; a later survey confirms it.
+    if (good && id === "defender.exclude" && typeof r.excluded === "boolean") fixData.defender.excluded = r.excluded;
+    if (good && id === "fullscreen.exclusive" && typeof r.disabled === "boolean") fixData.fullscreen.disabled = r.disabled;
+    if (good && id === "power.performance" && typeof r.boosted === "boolean") { fixData.power.boosted = r.boosted; fixData.power.plan = r.plan; }
+    if (good && id === "steam.zombie" && r.ended) fixData.zombie_cs2 = false;
+    paintFixState(id);
     status(text, !good && !r.declined);
-    // Re-surveying rebuilds the tiles, which throws away the bar that has just
-    // finished. Let it be read first: the moment it reports success is the one
-    // the bar exists for, and the survey is not urgent.
     if (good && id !== "sound.apps") setTimeout(() => loadFixes(true), 2700);
     // Steam is back and signed in, and the launch was asked for. Handed to
     // the ordinary Play button rather than launched from here, so the game
@@ -8753,11 +8646,10 @@ async function runFix(button) {
   } catch (err) {
     const text = String(err && err.message || err);
     bar.finish("failed", text);
-    if (said) said.innerHTML = '<span style="color:var(--bad)">' + esc(text) + "</span>";
+    fixStates.set(id, {phase:"failed", at:Date.now(), text}); paintFixState(id);
     status("Could not run that: " + text, true);
   } finally {
-    button.disabled = false;
-    button.textContent = label;
+    paintFixState(id);
   }
 }
 
@@ -8769,9 +8661,9 @@ async function runFix(button) {
    creeps to 90% and waits is the thing everyone has learnt to distrust. It
    sweeps instead, which says "still going" without claiming to know how far.
 
-   What it does know it shows: whether it is waiting on a UAC prompt rather
-   than on the work, and how long it has been going. The seconds are the part
-   that tells you whether to keep waiting.
+   The action text describes the known operation, not a live backend phase.
+   Administrator approval may be required; the response does not tell us when
+   UAC ends. Elapsed seconds and the sweep indicate an outstanding request.
 */
 function fixProgress(id, what) {
   const box = $(fixProgId(id));
@@ -8788,10 +8680,9 @@ function fixProgress(id, what) {
   const tick = setInterval(() => {
     const gone = Math.round((Date.now() - began) / 1000);
     if (secs) secs.textContent = gone >= 1 ? gone + "s" : "";
-    // A fix that is still going after this long is usually one where Windows
-    // is taking its time rather than one that has hung, and saying so beats
-    // leaving somebody to wonder.
-    if (gone === 12 && step) step.textContent = what + "… Windows is taking a while";
+    // There is no heartbeat or intermediate phase from this endpoint.
+    // Report only that the result has not arrived.
+    if (gone === 12 && step) step.textContent = what + "… Still waiting for the result";
   }, 250);
 
   return {
@@ -8820,68 +8711,21 @@ document.addEventListener("click", e => {
   if (button) runFix(button);
 });
 
-// One outline for the glass, used three times per gauge: the empty body, the
-// clip that shapes the mercury, and the rim drawn back over the top. Written
-// once so they cannot drift apart -- a clip that disagrees with the outline by
-// a couple of pixels is exactly how a bulb ends up not filling.
-const THERMO_PATH =
-  "M46 12 a9 9 0 0 1 9 9 v33.5 a15 15 0 1 1 -18 0 V21 a9 9 0 0 1 9 -9 z";
-
+// Horizontal thermal strips preserve the sensor's own floor and hot limit.
 function thermoGauge(part) {
-  // Sized to the load gauges beside it so the row reads as one set of
-  // instruments, but shaped as a thermometer rather than wrapped in a ring --
-  // the symbol people already know, doing the thing it is shaped to do.
-  const id = "tc-" + String(part.part + "-" + part.label).replace(/[^a-z0-9-]/gi, "");
-  return '<div class="gauge temp-gauge" data-label="' + esc(part.label) + '">' +
-    '<svg width="92" height="92" viewBox="0 0 92 92" aria-hidden="true">' +
-      '<defs><clipPath id="' + id + '"><path d="' + THERMO_PATH + '"/></clipPath></defs>' +
-      '<path class="t-glass" d="' + THERMO_PATH + '"/>' +
-      '<g class="t-ticks">' +
-        '<line x1="58" y1="26" x2="65" y2="26"/>' +
-        '<line x1="58" y1="34" x2="62" y2="34"/>' +
-        '<line x1="58" y1="42" x2="65" y2="42"/>' +
-        '<line x1="58" y1="50" x2="62" y2="50"/>' +
-      "</g>" +
-      // What moves. One rectangle, clipped to the glass, so the bulb is filled
-      // by the very shape that draws it -- there is no second circle to line
-      // up, and the bottom cannot come out short.
-      '<rect class="t-fill" x="28" y="54" width="36" height="38"' +
-      ' clip-path="url(#' + id + ')"/>' +
-      // The rim, back over the top, so the mercury does not swallow the glass.
-      '<path class="t-rim" d="' + THERMO_PATH + '"/>' +
-    "</svg>" +
-    '<span class="cap">' + esc(part.label) + "</span>" +
-    '<span class="sub2 t-read">' +
-      (part.known ? Math.round(part.celsius) + "°C"
-                  : esc(part.unavailable || "—")) +
-    "</span></div>";
+  return '<div class="temp-gauge" data-label="' + esc(part.label) + '"><div class="heat-heading"><span class="cap">' + esc(part.label) + '</span><b class="t-read">—</b></div><div class="heat-track"><span class="t-fill"></span></div></div>';
 }
-
 function paintTempGauge(el, part) {
   const known = !!part.known;
   const floor = part.floor != null ? part.floor : 25;
   const hot = part.hot != null ? part.hot : 90;
-  const span = Math.max(1, hot - floor);
-  const level = known
-    ? Math.max(0, Math.min(1, (part.celsius - floor) / span)) : 0;
-
-  // Only the top of the column moves. It always runs past the bottom of the
-  // frame and the clip shapes it, so the bulb is solid at every reading -- an
-  // empty bulb reads as a broken thermometer, not as a cold one.
-  const top = 18, bottom = 54;
-  const y = bottom - level * (bottom - top);
-
-  el.className = "gauge temp-gauge " + (known ? part.state : "unknown");
+  const level = known ? Math.max(0, Math.min(1, (part.celsius - floor) / Math.max(1, hot - floor))) : 0;
+  el.className = "temp-gauge " + (known ? part.state : "unknown");
   const fill = el.querySelector(".t-fill");
-  if (fill) {
-    fill.setAttribute("y", y.toFixed(1));
-    fill.setAttribute("height", (92 - y).toFixed(1));
-  }
+  homeTween(fill, "heat", level, v => { fill.style.transform = "scaleX(" + v + ")"; });
   const read = el.querySelector(".t-read");
-  if (read) {
-    read.textContent = known ? Math.round(part.celsius) + "°C"
-                             : (part.unavailable || "—");
-  }
+  if (known) homeNumber(read, part.celsius, "\u00b0C");
+  else { homeCancel(read); read.textContent = part.unavailable || "—"; }
 }
 
 function renderTemps(data) {
@@ -8942,7 +8786,7 @@ async function pollLive() {
     const gpu = d.gpu || {};
     const ram = d.ram || {};
 
-    document.getElementById("live-gauges").innerHTML =
+    homePatchReadouts(document.getElementById("live-gauges"),
       ring(d.cpu ? d.cpu.percent : null, "CPU", null) +
       ring(gpu.percent, "GPU",
            gpu.temperature != null ? Math.round(gpu.temperature) + "°C" : null) +
@@ -8951,10 +8795,10 @@ async function pollLive() {
       ring(gpu.vram_percent, "VRAM",
            gpu.vram_used_mb != null
              ? Math.round(gpu.vram_used_mb / 1024 * 10) / 10 + " / " +
-               Math.round(gpu.vram_total_mb / 1024) + " GB" : null);
+               Math.round(gpu.vram_total_mb / 1024) + " GB" : null));
 
-    sparkline("spark-cpu", d.history.cpu, "#e4002b");
-    sparkline("spark-gpu", d.history.gpu, "#3d8bfd");
+    sparkline("spark-cpu", (d.history || {}).cpu, "var(--accent)");
+    sparkline("spark-gpu", (d.history || {}).gpu, "var(--good)");
     renderTemps(d.temps);
 
     const note = [];
@@ -8972,7 +8816,7 @@ async function pollLive() {
 function startLive() {
   if (liveTimer) return;
   const first = pollLive();
-  liveTimer = setInterval(() => { if (activeTab === "launcher") pollLive(); }, 2000);
+  liveTimer = setInterval(() => { if (activeTab === "launcher" && !document.hidden) pollLive(); }, 2000);
   return first;
 }
 
@@ -10234,36 +10078,36 @@ let kbBusy = false;
 const KB_ROWS = [
   ["Escape:Esc", "gap:::1", "F1:F1", "F2:F2", "F3:F3", "F4:F4", "gap:::0.5",
    "F5:F5", "F6:F6", "F7:F7", "F8:F8", "gap:::0.5",
-   "F9:F9", "F10:F10", "F11:F11", "F12:F12", "gap:::0.4",
+   "F9:F9", "F10:F10", "F11:F11", "F12:F12", "gap:::0.5",
    "PrintScreen:PrtSc", "ScrollLock:ScrLk", "Pause:Pause"],
 
   ["Backquote:`", "Digit1:1", "Digit2:2", "Digit3:3", "Digit4:4", "Digit5:5",
    "Digit6:6", "Digit7:7", "Digit8:8", "Digit9:9", "Digit0:0",
-   "Minus:-", "Equal:=", "Backspace:Backspace::2", "gap:::0.4",
-   "Insert:Ins", "Home:Home", "PageUp:PgUp", "gap:::0.4",
+   "Minus:-", "Equal:=", "Backspace:Backspace::2", "gap:::0.5",
+   "Insert:Ins", "Home:Home", "PageUp:PgUp", "gap:::0.5",
    "NumLock:Num", "NumpadDivide:/", "NumpadMultiply:*", "NumpadSubtract:-"],
 
   ["Tab:Tab::1.5", "KeyQ:Q", "KeyW:W", "KeyE:E", "KeyR:R", "KeyT:T", "KeyY:Y",
    "KeyU:U", "KeyI:I", "KeyO:O", "KeyP:P", "BracketLeft:[", "BracketRight:]",
-   "Backslash:\\\\::1.5", "gap:::0.4",
-   "Delete:Del", "End:End", "PageDown:PgDn", "gap:::0.4",
+   "Backslash:\\\\::1.5", "gap:::0.5",
+   "Delete:Del", "End:End", "PageDown:PgDn", "gap:::0.5",
    "Numpad7:7", "Numpad8:8", "Numpad9:9", "NumpadAdd:+"],
 
   ["CapsLock:Caps::1.75", "KeyA:A", "KeyS:S", "KeyD:D", "KeyF:F", "KeyG:G",
    "KeyH:H", "KeyJ:J", "KeyK:K", "KeyL:L", "Semicolon:;", "Quote:'",
-   "Enter:Enter::2.25", "gap:::0.4", "gap:::3.4", "gap:::0.4",
+   "Enter:Enter::2.25", "gap:::0.5", "gap:::3", "gap:::0.5",
    "Numpad4:4", "Numpad5:5", "Numpad6:6"],
 
   ["ShiftLeft:Shift::2.25", "KeyZ:Z", "KeyX:X", "KeyC:C", "KeyV:V", "KeyB:B",
    "KeyN:N", "KeyM:M", "Comma:,", "Period:.", "Slash:/",
-   "ShiftRight:Shift::2.75", "gap:::0.4",
-   "gap:::1.1", "ArrowUp:↑", "gap:::1.1", "gap:::0.4",
+   "ShiftRight:Shift::2.75", "gap:::0.5",
+   "gap:::1", "ArrowUp:↑", "gap:::1", "gap:::0.5",
    "Numpad1:1", "Numpad2:2", "Numpad3:3", "NumpadEnter:Ent"],
 
   ["ControlLeft:Ctrl::1.25", "MetaLeft:Win::1.25", "AltLeft:Alt::1.25",
    "Space:Space::6.25", "AltRight:Alt::1.25", "MetaRight:Win::1.25",
-   "ContextMenu:Menu::1.25", "ControlRight:Ctrl::1.25", "gap:::0.4",
-   "ArrowLeft:←", "ArrowDown:↓", "ArrowRight:→", "gap:::0.4",
+   "ContextMenu:Menu::1.25", "ControlRight:Ctrl::1.25", "gap:::0.5",
+   "ArrowLeft:←", "ArrowDown:↓", "ArrowRight:→", "gap:::0.5",
    "Numpad0:0::2", "NumpadDecimal:."],
 ];
 
@@ -10332,7 +10176,8 @@ function kbCap(spec) {
     : hit.script ? (hit.enabled ? "script" : "script off")
     : hit.is_default === false ? "custom"
     : "bound";
-  const picked = pickedKey && pickedKey.code === code ? " picked" : "";
+  const picked = (pickedKey && pickedKey.code === code ? " picked" : "") +
+    (["NumpadAdd", "NumpadEnter"].includes(code) ? " kb-tall" : "");
   // The game and the config disagreeing about a key matters more than what
   // either of them says alone, so it is marked where the key is drawn.
   const odd = hit && hit.agrees === false ? " adrift" : "";
@@ -10349,159 +10194,87 @@ function kbCap(spec) {
   return '<button class="kb-key ' + cls + picked + odd + missingCls +
     '" style="--w:' + w + '"' +
     ' data-kbcode="' + esc(code) + '" data-kblabel="' + esc(label) + '"' +
-    ' title="' + esc(fullTitle) + '">' +
+    ' aria-pressed="' + !!(pickedKey && pickedKey.code === code) + '"' +
+    ' aria-label="' + esc(label + ': ' + fullTitle) + '" data-kbpreview="' + esc(fullTitle) + '">' +
     '<span class="kb-cap">' + esc(label) + "</span>" +
     (hit ? '<span class="kb-mark"></span>' : "") + "</button>";
 }
 
-const MS_SHELL =
-  "M100 4 L132 12 L152 34 L164 66 L173 104 L180 148 " +
-  "L181 192 L173 238 L157 280 L133 312 L110 330 L100 332 " +
-  "L90 330 L67 312 L43 280 L27 238 L19 192 L20 148 " +
-  "L27 104 L36 66 L48 34 L68 12 Z";
-
-// The divide between the click area and the palm, angled like the shell.
-const MS_SPLIT = "M23 138 L62 158 L138 158 L177 138";
-// The seam between the two main buttons.
-const MS_SEAM = "M100 6 L100 158";
-// The lit strips down each flank, which is what the reference is really about.
-const MS_GLOW_L = "M36 66 L27 104 L20 148 L19 192 L27 238 L43 280";
-const MS_GLOW_R = "M164 66 L173 104 L180 148 L181 192 L173 238 L157 280";
+const MS_SHELL = "M100 7 C51 7 28 47 24 104 C17 161 19 227 43 276 C57 306 79 322 103 322 C137 322 163 296 174 256 C186 214 179 160 175 106 C172 46 148 7 100 7 Z";
+let mouseShape = "two";
 
 function msZone(code, label, shape, labelAt, extra) {
   const hit = kbLookup(code, label);
-  const cls = !hit ? "free"
-    : hit.script ? (hit.enabled ? "script" : "script off")
-    : hit.is_default === false ? "custom"
-    : "bound";
+  const cls = !hit ? "free" : hit.script ? (hit.enabled ? "script" : "script off")
+    : hit.is_default === false ? "custom" : "bound";
   const picked = pickedKey && pickedKey.code === code ? " picked" : "";
-  const note = cls === "custom" ? " \u2014 changed from CS2 default"
-    : cls === "bound" && hit.is_default ? " \u2014 same as CS2 default" : "";
-  const title = (hit ? (hit.script || hit.command) : label + " \u2014 free") + note;
-  // Most disagreements land on the mouse, so it is marked here too.
   const odd = hit && hit.agrees === false ? " adrift" : "";
   const missing = kbMissingMap.get(kbBindingFor(code));
-  const missingCls = missing ? " kb-missing" : "";
-  const fullTitle = esc(missing
-    ? title + " \u2014 CS2 default here is \u201c" + missing.command +
-      "\u201d, not set by this profile"
-    : title);
-  return '<g class="ms-zone ' + cls + picked + odd + missingCls +
-    '" data-kbcode="' + esc(code) +
-    '" data-kblabel="' + esc(label) + '"' + (extra || "") + ">" +
-    "<title>" + label + " \u2014 " + fullTitle + "</title>" +
-    shape +
-    '<text class="ms-label" x="' + labelAt[0] + '" y="' + labelAt[1] + '">' +
-    esc(label.replace("Mouse ", "M").replace("Wheel ", "")) + "</text></g>";
+  const title = (hit ? (hit.script || hit.command) : "Free — no assignment") +
+    (missing ? " — CS2 default: " + missing.command + ", not set by this profile" : "");
+  return '<g role="button" tabindex="0" class="ms-zone ' + cls + picked + odd +
+    (missing ? ' kb-missing' : '') + '" data-kbcode="' + esc(code) +
+    '" data-kblabel="' + esc(label) + '" aria-pressed="' + !!(pickedKey && pickedKey.code === code) + '" aria-label="' + esc(label + ': ' + title) +
+    '" data-kbpreview="' + esc(title) + '"' + (extra || '') + '>' +
+    shape + '<text class="ms-label" x="' + labelAt[0] + '" y="' + labelAt[1] + '">' +
+    esc(label.replace('Mouse ', 'M')) + '</text></g>';
 }
 
-// "two" is the ordinary gaming shell; "four" is the one with a thumb cluster.
-let mouseShape = "two";
+function msCallout(code, label, shape, point, at) {
+  const right = at[0] > point[0];
+  return msZone(code, label, shape +
+    '<path class="ms-leader" d="M' + point.join(' ') + ' L' +
+    (right ? at[0] - 12 : at[0] + 42) + ' ' + (at[1] - 4) + ' H' + at[0] + '"/>' +
+    '<circle class="ms-point" cx="' + point[0] + '" cy="' + point[1] + '" r="2"/>' +
+    '<rect class="ms-callout" x="' + (at[0] - 4) + '" y="' + (at[1] - 15) +
+    '" width="76" height="23"/>', at);
+}
 
 function mouseSideButtons() {
-  if (mouseShape === "four") {
-    // Four in a block, the way a thumb cluster is actually laid out: two
-    // columns of two rather than a single long column no thumb could reach.
-    return [
-      ["mouse4", "Mouse 4", 2, 128], ["mouse6", "Mouse 6", 2, 172],
-      ["mouse5", "Mouse 5", 38, 128], ["mouse7", "Mouse 7", 38, 172],
-    ].map(([code, label, x, y]) =>
-      msZone(code, label,
-             '<rect class="ms-face side" x="' + x + '" y="' + y +
-             '" width="32" height="38" rx="9"/>',
-             [x + 16, y + 24])).join("");
-  }
-  return [
-    ["mouse4", "Mouse 4", 132], ["mouse5", "Mouse 5", 176],
-  ].map(([code, label, y]) =>
-    msZone(code, label,
-           '<rect class="ms-face side" x="2" y="' + y +
-           '" width="34" height="38" rx="11"/>',
-           [19, y + 23])).join("");
+  const sides = mouseShape === 'four'
+    ? [['mouse4','Mouse 4',26,145],['mouse5','Mouse 5',45,145],
+       ['mouse6','Mouse 6',26,180],['mouse7','Mouse 7',45,180]]
+    : [['mouse4','Mouse 4',26,145],['mouse5','Mouse 5',26,184]];
+  return sides.map(([code,label,x,y],i) => msCallout(code,label,
+    '<rect class="ms-face" x="' + x + '" y="' + y + '" width="' +
+    (mouseShape === 'four' ? 16 : 23) + '" height="28" rx="7"/>',
+    [x+8,y+12],[-70,155+i*29])).join('');
 }
 
 function mouseModel() {
-  // Ribs on the thumb panel, the way a textured grip is moulded.
-  const ribs = [0, 1, 2, 3, 4, 5].map(i =>
-    '<line class="ms-rib" x1="30" x2="52" y1="' + (176 + i * 13) +
-    '" y2="' + (170 + i * 13) + '"/>').join("");
-  const tread = [0, 1, 2, 3].map(i =>
-    '<line class="ms-tread" x1="89" x2="111" y1="' + (42 + i * 8) +
-    '" y2="' + (42 + i * 8) + '"/>').join("");
-
-  return '<svg class="ms-svg" viewBox="-20 -12 240 372" role="img" ' +
-    'aria-label="Mouse buttons and what they are bound to">' +
-    "<defs>" +
-    '<clipPath id="ms-clip"><path d="' + MS_SHELL + '"/></clipPath>' +
-    '<linearGradient id="ms-body" x1="0.1" y1="0" x2="0.9" y2="1">' +
-    '<stop offset="0" stop-color="#26364f"/>' +
-    '<stop offset="0.5" stop-color="#16203a"/>' +
-    '<stop offset="1" stop-color="#0a1020"/></linearGradient>' +
-    '<linearGradient id="ms-gloss" x1="0" y1="0" x2="0.75" y2="1">' +
-    '<stop offset="0" stop-color="#8fbaff" stop-opacity="0.18"/>' +
-    '<stop offset="0.4" stop-color="#8fbaff" stop-opacity="0.04"/>' +
-    '<stop offset="1" stop-color="#8fbaff" stop-opacity="0"/></linearGradient>' +
-    '<linearGradient id="ms-rgb" x1="0" y1="0" x2="0" y2="1">' +
-    '<stop offset="0" stop-color="#5b8cff"/>' +
-    '<stop offset="0.5" stop-color="#c04cff"/>' +
-    '<stop offset="1" stop-color="#ff2d95"/></linearGradient>' +
-    "</defs>" +
-
-    '<ellipse class="ms-shadow" cx="100" cy="340" rx="80" ry="12"/>' +
+  return '<svg class="ms-svg" viewBox="-85 -8 410 350" aria-label="Interactive gaming mouse">' +
+    '<defs><radialGradient id="device-body" cx=".38" cy=".25" r=".8" gradientTransform="translate(0 -.1) scale(1 1.25)">' +
+    '<stop class="ms-material-top"/><stop offset=".48" class="ms-material-mid"/>' +
+    '<stop offset=".88" class="ms-material-bottom"/><stop offset="1" class="ms-material-mid"/>' +
+    '</radialGradient><radialGradient id="device-button" cx=".3" cy=".2" r="1">' +
+    '<stop class="ms-material-top"/><stop offset=".7" class="ms-material-mid"/><stop offset="1" class="ms-material-bottom"/></radialGradient>' +
+    '<pattern id="device-grain" width="3" height="3" patternUnits="userSpaceOnUse">' +
+    '<circle cx="1" cy="1" r=".4" fill="currentColor"/></pattern></defs>' +
+    '<ellipse class="ms-shadow" cx="102" cy="306" rx="80" ry="22"/>' +
+    '<path d="' + MS_SHELL + '" transform="translate(0 5)" fill="var(--device-wall)"/>' +
     '<path class="ms-shell" d="' + MS_SHELL + '"/>' +
-
-    // The lit flanks sit under the shell edge so they read as light escaping
-    // from beneath the panels rather than as a drawn outline.
-    '<path class="ms-rgb" d="' + MS_GLOW_L + '"/>' +
-    '<path class="ms-rgb" d="' + MS_GLOW_R + '"/>' +
-
-    '<g clip-path="url(#ms-clip)">' +
-    msZone("mouse1", "Mouse 1",
-           '<path class="ms-face" d="M0 0 L97 0 L97 158 L58 158 L20 138 L0 60 Z"/>',
-           [55, 96]) +
-    msZone("mouse2", "Mouse 2",
-           '<path class="ms-face" d="M103 0 L200 0 L200 60 L180 138 L142 158 L103 158 Z"/>',
-           [145, 96]) +
-    '<polygon class="ms-panel" points="20,150 62,168 138,168 180,150 178,250 100,300 22,250"/>' +
-    '<path class="ms-gloss" d="' + MS_SHELL + '"/>' +
-    "</g>" +
-
-    '<path class="ms-seam" d="' + MS_SEAM + '"/>' +
-    '<path class="ms-split" d="' + MS_SPLIT + '"/>' +
-
-    // The wheel, sunk into a well and lit round the rim.
-    '<rect class="ms-wheel-well" x="81" y="26" width="38" height="98" rx="8"/>' +
-    msZone("mwheelup", "Wheel \u2191",
-           '<rect class="ms-face wheel" x="86" y="32" width="28" height="26" rx="10"/>',
-           [100, 49]) +
-    msZone("mouse3", "Mouse 3",
-           '<rect class="ms-face wheel" x="86" y="59" width="28" height="30" rx="4"/>',
-           [100, 78]) +
-    msZone("mwheeldown", "Wheel \u2193",
-           '<rect class="ms-face wheel" x="86" y="90" width="28" height="26" rx="10"/>',
-           [100, 107]) +
-    '<g class="ms-treads">' + tread + "</g>" +
-
-    // Not bindable in game: the mouse resolves it before the engine sees it.
-    '<g class="ms-inert"><title>DPI \u2014 handled by the mouse itself, ' +
-    'not something the game can bind</title>' +
-    '<rect x="91" y="128" width="18" height="8" rx="4"/>' +
-    '<text class="ms-tiny" x="100" y="147">DPI</text></g>' +
-
-    // The ribbed thumb grip the reference has down its left flank.
-    '<polygon class="ms-grip" points="26,164 56,176 56,254 30,244 20,206"/>' +
-    '<g class="ms-ribs">' + ribs + "</g>" +
-
-    '<polygon class="ms-logo" points="100,232 112,244 100,256 88,244"/>' +
-
-    mouseSideButtons() +
-    '<path class="ms-edge" d="' + MS_SHELL + '"/>' +
-    "</svg>";
+    '<path d="M37 245 C60 330 142 340 166 253" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity=".65"/>' +
+    '<path class="ms-palm-texture" d="M31 148 Q100 174 173 145 L167 252 Q146 314 101 315 Q49 308 33 251 Z"/>' +
+    msCallout('mouse1','Mouse 1','<path class="ms-face" d="M96 9 C55 10 31 46 28 102 L27 130 Q62 149 96 143 Z"/>',[57,72],[-70,42]) +
+    msCallout('mouse2','Mouse 2','<path class="ms-face" d="M104 9 C148 12 169 48 172 102 L174 130 Q144 150 104 143 Z"/>',[145,72],[224,42]) +
+    '<rect x="88" y="33" width="24" height="73" rx="11" fill="var(--device-wall)"/>' +
+    msCallout('mwheelup','Wheel ↑','<rect class="ms-face" x="92" y="38" width="16" height="20" rx="5"/>',[100,45],[224,83]) +
+    msCallout('mouse3','Mouse 3','<rect class="ms-face" x="92" y="60" width="16" height="20" rx="3"/>',[100,69],[224,113]) +
+    msCallout('mwheeldown','Wheel ↓','<rect class="ms-face" x="92" y="82" width="16" height="20" rx="5"/>',[100,91],[224,143]) +
+    '<path class="ms-wheel-ridges" d="M94 42h12 M94 47h12 M94 52h12 M94 64h12 M94 69h12 M94 74h12 M94 86h12 M94 91h12 M94 96h12"/>' +
+    '<path class="ms-body-highlight" d="M32 102 C36 50 54 20 84 15 M119 17 C150 26 163 58 167 103 M35 241 C47 290 68 308 94 311"/>' +
+    '<g class="ms-inert"><title>DPI is handled by the mouse hardware; CS2 cannot bind it.</title>' +
+    '<rect x="93" y="119" width="14" height="19" rx="5"/>' +
+    '<path class="ms-leader" d="M100 130 L206 175 H224" stroke="var(--muted)"/>' +
+    '<text class="ms-label" x="224" y="179">DPI · hardware</text></g>' +
+    mouseSideButtons() + '<path d="M86 242 L98 230 H116 L105 241 H95 L89 250 H108" fill="none" stroke="var(--accent)" stroke-width="3" opacity=".65"/>' +
+    '</svg>';
 }
 
 // Where each piece sits and how big it is. Kept in one place so saving it is
 // one call and resetting it is one assignment.
-const KB_HOME = { board: { x: 10, y: 46, s: 1 }, mouse: { x: 720, y: 20, s: 1 } };
+const KB_LAYOUT_VERSION = 2;
+const KB_HOME = { board: { x: 10, y: 65, s: 1 }, mouse: { x: 340, y: 310, s: 1 } };
 let kbLayout = JSON.parse(JSON.stringify(KB_HOME));
 let kbShown = { board: true, mouse: true };
 
@@ -10529,7 +10302,7 @@ function kbClamp(name, el) {
     ? Math.min(room, Math.max(KB_EDGE, at.x))
     : Math.min(KB_EDGE, Math.max(room, at.x));
   // Downwards there is no ceiling to fight: the desk grows to follow.
-  at.y = Math.max(KB_EDGE, at.y);
+  at.y = Math.max(65, at.y);
 }
 
 // Fit the desk to what is on it, so the lowest piece is never cut in half.
@@ -10541,17 +10314,31 @@ function kbGrow() {
     const el = scene.querySelector('.kb-piece[data-piece="' + name + '"]');
     if (el) low = Math.max(low, kbLayout[name].y + el.offsetHeight * kbLayout[name].s);
   });
-  scene.style.height = Math.max(430, Math.round(low) + KB_EDGE) + "px";
+  scene.style.height = Math.max(300, Math.ceil(low) + KB_EDGE) + "px";
 }
 
 function kbPlace(name) {
   const el = document.querySelector('.kb-piece[data-piece="' + name + '"]');
-  if (!el) return;
+  if (!el || !$("kb-scene")?.clientWidth) return;
   kbClamp(name, el);
   const at = kbLayout[name];
   el.style.setProperty("--x", at.x + "px");
   el.style.setProperty("--y", at.y + "px");
   el.style.setProperty("--s", at.s);
+  // Keep the complete callout gutters clear even during a manual move/zoom.
+  // The desk can grow downwards, so make room for the other device there.
+  const otherName = name === "board" ? "mouse" : "board";
+  const other = document.querySelector('.kb-piece[data-piece="' + otherName + '"]');
+  if (other) {
+    const b = kbLayout[otherName];
+    if (at.x < b.x + other.offsetWidth * b.s + 8 &&
+        at.x + el.offsetWidth * at.s + 8 > b.x &&
+        at.y < b.y + other.offsetHeight * b.s + 8 &&
+        at.y + el.offsetHeight * at.s + 8 > b.y) {
+      b.y = Math.ceil(at.y + el.offsetHeight * at.s + 24);
+      other.style.setProperty("--y", b.y + "px");
+    }
+  }
   kbGrow();
   kbEdgeNote();
 }
@@ -10578,6 +10365,7 @@ function kbEdgeNote() {
 }
 
 function kbSaveLayout() {
+  kbLayout.version = KB_LAYOUT_VERSION;
   api("/api/prefs", { kb_layout: kbLayout, kb_shown: kbShown }).catch(() => {});
 }
 
@@ -10585,7 +10373,7 @@ function kbResetLayout() {
   kbLayout = JSON.parse(JSON.stringify(KB_HOME));
   // The mouse belongs to the right of whatever width the panel happens to be.
   const scene = $("kb-scene");
-  if (scene) kbLayout.mouse.x = Math.max(320, scene.clientWidth - 300);
+  if (scene) kbFitLayout(scene);
   ["board", "mouse"].forEach(kbPlace);
   kbSaveLayout();
 }
@@ -10617,7 +10405,7 @@ function kbResetLayout() {
       return;
     }
     const piece = e.target.closest(".kb-piece");
-    if (piece) begin(e, piece, piece.dataset.piece, "move");
+    if (piece && !e.target.closest("[data-kbcode], button")) begin(e, piece, piece.dataset.piece, "move");
   }, true);
 
   document.addEventListener("pointermove", e => {
@@ -10721,42 +10509,35 @@ function renderKeyboard() {
 
   const rows = KB_ROWS.map(row =>
     '<div class="kb-row">' + row.map(kbCap).join("") + "</div>").join("");
-  const scene0 = $("kb-scene");
-  if (!renderKeyboard.placed) {
-    renderKeyboard.placed = true;
-    if (kbLayout.mouse.x === KB_HOME.mouse.x) {
-      const wide = (scene0 || box).clientWidth || 900;
-      kbLayout.mouse.x = Math.max(320, wide - 300);
-    }
-  }
+  const fitInitially = !renderKeyboard.placed;
 
   box.innerHTML =
     '<p class="kb-edge" id="kb-edge" hidden>' +
       "Part of this is past the edge, because it is zoomed in. " +
       '<button class="btn ghost small" id="kb-edge-reset">Reset layout</button>' +
     "</p>" +
-    '<div class="kb-layout-row">' +
+    '<div class="kb-workspace"><div class="kb-devices"><div class="kb-layout-row">' +
     '<div class="kb-scene" id="kb-scene">' +
+    '<div class="kb-desk-label"><b>Full-size keyboard</b><span>104 keys · per-key assignments</span></div>' +
     (kbShown.board || kbShown.mouse ? "" :
       '<div class="kb-none">Both models are switched off.</div>') +
     kbPiece("board",
       '<div class="kb-stage"><div class="kb-board">' + rows + "</div></div>") +
     kbPiece("mouse", '<div class="kb-mouse">' + mouseModel() +
     '<div class="ms-pick">' +
-    ['["two", "2 side buttons"]', '["four", "4 side buttons"]']
-      .map(() => "").join("") +
     [["two", "2 side"], ["four", "4 side"]].map(([id, label]) =>
       '<button data-mouseshape="' + id + '" aria-pressed="' +
       (mouseShape === id) + '">' + label + "</button>").join("") +
     "</div></div>") +
     "</div>" +
-    kbMissingPanel(activeProfile, missingList, showPanel) +
     "</div>" +
+    '<div class="kb-desk-help"><b>Make it muscle memory.</b>Select a control to inspect it. Drag a command onto a key to assign it.<br>Drag the case to move. Scroll over a device to zoom.</div>' +
     '<div class="kb-show">' +
     [["board", "Keyboard"], ["mouse", "Mouse"]].map(([name, label]) =>
       '<label class="opt"><input type="checkbox" data-kbshow="' + name + '"' +
       (kbShown[name] ? " checked" : "") + "> " + label + "</label>").join("") +
     "</div>" +
+    '</div><aside class="kb-inspector" aria-label="Assignment inspector"><h3 class="kb-inspector-title">Assignment inspector</h3>' + kbDetail() +
     '<div class="kb-legend">' +
     '<span><i class="dot script"></i>one of your scripts</span>' +
     '<span><i class="dot custom"></i>changed from CS2 default</span>' +
@@ -10771,7 +10552,10 @@ function renderKeyboard() {
         "</span>"
       : "") +
     kbMissingLegend(activeProfile, missingList, showPanel) +
-    "</div>" + kbDetail();
+    "</div>" + kbMissingPanel(activeProfile, missingList, showPanel) + "</aside></div>";
+
+  if (fitInitially) kbEnsureLayout($("kb-scene"), true);
+  kbDecorateWorkspace();
 
   ["board", "mouse"].forEach(kbPlace);
 }
@@ -10796,7 +10580,7 @@ function renderKbSwitcher() {
     '<button class="kbsw-tab kbsw-default' + (defaultActive ? " active" : "") +
     (defaultBusy ? " busy" : "") + '" data-kbsw-default ' +
     'title="Put every key back to what it was before any profile touched it">' +
-    '<span class="kbsw-dot"></span><span class="kbsw-label">Default</span></button>';
+    kbIcon("crosshair") + '<span class="kbsw-label">Default</span></button>';
 
   const profileTabs = profiles.map(p => {
     const busy = kbSwitchBusy === p.file;
@@ -10808,7 +10592,7 @@ function renderKbSwitcher() {
     return '<button class="kbsw-tab' + (p.active ? " active" : "") +
       (busy ? " busy" : "") + '" data-kbsw="' + esc(p.file) +
       '" data-kbsw-label="' + esc(p.label) + '" title="' + esc(title) + '">' +
-      '<span class="kbsw-dot"></span>' +
+      kbIcon(/warm|practice/i.test(p.label) ? 'zap' : 'board') +
       '<span class="kbsw-label">' + esc(p.label) + "</span>" +
       (p.override_count
         ? '<span class="kbsw-count">' + p.override_count + "</span>" : "") +
@@ -10894,6 +10678,7 @@ document.addEventListener("contextmenu", e => {
   const tab = e.target.closest("[data-kbsw]");
   if (!tab) return;
   e.preventDefault();
+  if (kbBusy) return;
   kbswPopover = null;
   // Anchored to the tab's own box, not the click coordinates: some webviews
   // (WebView2 under non-100% Windows display scaling, most of all) report
@@ -10909,6 +10694,7 @@ document.addEventListener("click", async e => {
   // Clicking anywhere outside an open menu or popover closes it -- but not
   // the clicks that open one in the first place, handled below.
   const insideMenu = e.target.closest(".kbsw-menu");
+  if (kbBusy && e.target.closest("#kb-switcher")) return;
   const insidePopover = e.target.closest(".kbsw-popover");
   const opener = e.target.closest("[data-kbsw-add], [data-kbsw-menu]");
   if (!insideMenu && !insidePopover && !opener && (kbswMenu || kbswPopover)) {
@@ -11198,8 +10984,8 @@ document.addEventListener("click", async e => {
 
 function kbDetail() {
   if (!pickedKey) {
-    return '<div class="kb-detail empty">Pick a key to see what it runs. ' +
-      keyData.count + " keys bound, " + keyData.scripted + " of them your own scripts.</div>";
+    return '<div class="kb-detail empty"><b>Select a key or button</b><p>Inspect its command, source and CS2 default. Your command library opens here.</p>' +
+      keyData.count + " keys bound · " + keyData.scripted + " scripts</div>";
   }
   const hit = kbLookup(pickedKey.code, pickedKey.label);
   if (!hit) {
@@ -11209,7 +10995,7 @@ function kbDetail() {
       kbPicker() + "</div>";
   }
   return '<div class="kb-detail"><div class="kb-detail-key">' +
-    esc(hit.label) + "</div><div class=\"kb-detail-body\">" +
+    esc(pickedKey.label) + "</div><div class=\"kb-detail-body\">" +
     '<div class="row"><span class="k">Runs</span><span class="v"><code>' +
     esc(hit.command) + "</code></span></div>" +
     (hit.agrees === false
@@ -11380,7 +11166,7 @@ function kbPicker() {
   return '<div class="kb-pick">' +
     '<div class="kb-pick-head">' +
     "<h4>Assign something to " + esc(pickedKey.label) + "</h4>" +
-    '<input class="kb-search" id="kb-search" type="search" placeholder="Search commands" value="' +
+    '<input class="kb-search" id="kb-search" type="search" aria-label="Search commands" placeholder="Search commands" value="' +
     esc(kbFind) + '">' +
     "</div>" +
     '<div class="kb-cats">' + tabs + "</div>" +
@@ -11450,68 +11236,12 @@ function startFaceitWatch() {
     // Only while the FACEIT tab is actually on screen. Polling a tab nobody
     // is looking at is just someone else's bandwidth.
     const pane = document.querySelector('.tab-panel[data-panel="faceit"]');
-    if (pane && !pane.classList.contains("hidden")) loadFaceit();
+    if (!document.hidden && pane && !pane.classList.contains("hidden")) loadFaceit();
   }, 60000);
 }
 
 function renderFaceit() {
-  const wrap = $("fc-wrap");
-  if (!wrap) return;
-  if (!fcData || fcData.linked === false) {
-    // A poll landing mid-typing must not replace the box and throw away the
-    // half-typed nickname, so an existing form is left exactly as it is.
-    if ($("fc-nick")) return;
-    wrap.innerHTML =
-      '<div class="fc-me"><span class="who"><b>Follow your FACEIT matches</b>' +
-      "<span>Your recent games appear here on their own, with stats and a " +
-      "one-click demo.</span></span>" +
-      '<span class="actions"><input id="fc-nick" type="text" spellcheck="false" ' +
-      'placeholder="FACEIT nickname" style="width:170px">' +
-      '<button class="btn small" id="fc-link">Follow</button></span></div>';
-    return;
-  }
-  if (fcData.ok === false || (!fcData.player && fcData.error)) {
-    wrap.innerHTML = '<p class="sub2" style="margin:12px 0 0;color:var(--bad)">' +
-      esc(fcData.error || "could not read that account") +
-      '</p><div class="actions"><button class="btn small" id="fc-forget">Use another name</button></div>';
-    return;
-  }
-
-  const p = fcData.player || {};
-  const have = new Set((demoData && demoData.demos || []).map(d => d.name));
-  const head =
-    '<div class="fc-me">' +
-      (p.avatar ? '<img class="fc-av" src="' + esc(p.avatar) + '" alt="">'
-                : '<span class="fc-av"></span>') +
-      '<span class="who"><b>' + esc(p.nickname || "") + "</b><span>" +
-        (p.elo ? p.elo + " elo" : "") +
-        (fcData.stale ? " &middot; showing the last good read" : "") +
-      "</span></span>" +
-      (p.level ? '<span class="fc-lvl">' + p.level + "</span>" : "") +
-      '<span class="actions">' +
-        '<button class="btn small" id="fc-refresh">Refresh</button>' +
-        '<button class="btn small" id="fc-forget">Unfollow</button>' +
-      "</span>" +
-    "</div>";
-
-  const rows = (fcData.matches || []).map(m => {
-    const got = have.has(demoNameFor(m));
-    return '<div class="fc-row ' + (m.won ? "won" : "lost") + '">' +
-      '<span class="map">' + esc(m.map || "?") + "</span>" +
-      '<span class="sc">' + esc(m.score) + "</span>" +
-      '<span class="line">' + m.kills + "/" + m.deaths + "/" + m.assists +
-        " &middot; " + m.adr.toFixed(1) + " adr &middot; " + ago(m.played_at) +
-        (got ? ' &middot; <span class="fc-have">DOWNLOADED</span>' : "") +
-      "</span>" +
-      '<span class="delta ' + (m.elo_delta >= 0 ? "up" : "down") + '">' +
-        (m.elo_delta >= 0 ? "+" : "") + m.elo_delta + "</span>" +
-      '<span class="actions"><button class="btn small" data-match="' +
-        esc(m.match_id) + '">Stats</button></span>' +
-    "</div>";
-  }).join("");
-
-  wrap.innerHTML = head + (rows ||
-    '<p class="sub2" style="margin:10px 0 0">No CS2 matches on that account yet.</p>');
+  fcRenderDashboard();
 }
 
 /* What a match's demo is called once downloaded. Mirrors the server's naming
@@ -11527,72 +11257,113 @@ function demoNameFor(m) {
    Shown whenever a match link is looked up, and deliberately not tied to the
    download: FACEIT keeps the numbers long after it has thrown the demo away,
    so a match too old to rewatch can still be read. */
-function showStats(s) {
-  const back = $("mstat-back");
-  if (!back || !s) return;
-  const when = s.played_at ? new Date(s.played_at * 1000).toLocaleString() : "";
-  $("mstat-title").textContent = (s.map || "Match") + "  " + (s.score || "");
-  $("mstat-when").textContent =
-    [s.mode, s.region, s.rounds ? s.rounds + " rounds" : "", when]
-      .filter(Boolean).join(" · ");
-  const page = $("mstat-page");
-  if (page) page.href = s.page || "#";
-
-  const cols = [
-    ["K", "kills"], ["D", "deaths"], ["A", "assists"],
-    ["ADR", "adr"], ["K/D", "kd"], ["K/R", "kr"],
-    ["HS", "headshots"], ["HS%", "hs_percent"],
-    ["5K", "penta"], ["4K", "quadro"], ["3K", "triple"], ["2K", "double"],
-    ["MVP", "mvps"],
-  ];
-  const optional = new Set(["headshots", "penta", "quadro", "triple", "double"]);
-  // Which row is yours. The Steam persona and the FACEIT nickname are not the
-  // same string -- "MrWhiteER" against "MrWhiteE_R" -- so both are reduced to
-  // letters and digits before comparing. A wrong match only mislabels a row,
-  // and no match just leaves the badge off.
-  const plain = t => String(t || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-  const mine = (whoData && whoData.accounts || []).find(a => a.active);
-  const me = plain(mine && mine.name);
-
-  $("mstat-body").innerHTML = s.teams.map(t => {
-    const head =
-      '<div class="mstat-team ' + (t.won ? "won" : "lost") + '">' +
-        '<span class="score">' + t.score + "</span><b>" + esc(t.name) + "</b>" +
-        '<span class="halves">first half ' + t.first_half +
-        " &middot; second half " + t.second_half + "</span></div>";
-    const header = "<tr><th>Player</th>" + cols.map(([label, key]) =>
-      '<th class="' + (optional.has(key) ? "opt-col" : "") + '">' + label + "</th>").join("") + "</tr>";
-    const rows = t.players.map(p => {
-      const you = me && plain(p.nickname) === me
-        ? ' <span class="mstat-you">YOU</span>' : "";
-      return "<tr><td><span class=\"mstat-who\"><b>" + esc(p.nickname) + "</b>" + you + "</span></td>" +
-        cols.map(([, key]) => {
-          const v = p[key];
-          let cls = optional.has(key) ? "opt-col" : "";
-          if (key === "kd") cls += v >= 1 ? " kd-good" : " kd-bad";
-          if (!v && key !== "kd") cls += " zero";
-          // Ratios keep their decimals; counts do not grow any by having them.
-          const shown = (key === "kd" || key === "kr") ? v.toFixed(2)
-            : key === "adr" ? v.toFixed(1)
-            : key === "hs_percent" ? Math.round(v) + "%"
-            : String(Math.round(v));
-          return '<td class="' + cls.trim() + '">' + shown + "</td>";
-        }).join("") + "</tr>";
-    }).join("");
-    return head + '<table class="mstat-grid"><thead>' + header +
-           "</thead><tbody>" + rows + "</tbody></table>";
-  }).join("") +
-  '<div class="mstat-get" id="mstat-get"></div>' +
-  '<p class="mstat-note">Numbers are FACEIT&rsquo;s own, from the match&rsquo;s ' +
-  "scoreboard. Damage per round differs by about a point from the figure on " +
-  "their newer stats tab &mdash; both are theirs, and they disagree.</p>";
-
-  statsShown = s;
-  statsWaiting = null;
-  paintGetRow();
-  checkWaiting(false);      // a copy may already be sitting in Downloads
-  back.classList.remove("hidden");
+/* Stats and identities have independent lifetimes. Closing invalidates late replies. */
+let statsRequest = 0;
+let statsFocus = null;
+function statsIsYou(p) {
+  const profile = fcData && fcData.player;
+  if (profile && profile.player_id && p.player_id) return profile.player_id === p.player_id;
+  const plain = t => String(t || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const active = (whoData && whoData.accounts || []).find(a => a.active);
+  const name = plain(profile && profile.nickname || active && active.name);
+  return !!name && plain(p.nickname) === name;
 }
+function statsBadge(name, avatar, cls) {
+  const initials = String(name || '?').replace(/^team_/i, '').slice(0, 2).toUpperCase();
+  const safe = /^https?:\/\//i.test(avatar || '') ? avatar : '';
+  return '<span class="mstat-avatar '+cls+'"><span>'+esc(initials)+'</span>' +
+    (safe ? '<img src="'+esc(safe)+'" alt="" referrerpolicy="no-referrer" onerror="this.remove()">' : '')+'</span>';
+}
+function renderStatsTeams(s) {
+  const cols = [['K','kills'],['D','deaths'],['A','assists'],['ADR','adr'],['K/D','kd'],['K/R','kr'],['HS','headshots'],['HS%','hs_percent'],['5K','penta'],['4K','quadro'],['3K','triple'],['2K','double'],['MVP','mvps']];
+  const multi = new Set(['penta','quadro','triple','double']);
+  const all = s.teams.flatMap(t => t.players);
+  const numeric = v => typeof v === 'number' && Number.isFinite(v);
+  const best = Object.fromEntries(cols.map(([,k]) => {
+    const values=all.map(p=>p[k]).filter(numeric);
+    return [k, values.length ? (k==='deaths'?Math.min(...values):Math.max(...values)) : null];
+  }));
+  let index=0;
+  return s.teams.map(t => '<section class="mstat-side" aria-label="'+esc(t.name)+'">'+
+    '<div class="mstat-team '+(t.won?'won':'lost')+'">'+statsBadge(t.name,t.avatar,'team-avatar')+
+    '<b>'+esc(t.name)+'</b><span class="score">'+t.score+'</span><span class="halves">First half <strong>'+t.first_half+'</strong><span> / </span>Second half <strong>'+t.second_half+'</strong></span></div>'+
+    '<div class="mstat-scroll" tabindex="0" role="region" aria-label="'+esc(t.name)+' player statistics"><table class="mstat-grid"><thead><tr><th scope="col">Player</th>'+cols.map(([label])=>'<th scope="col">'+label+'</th>').join('')+'</tr></thead><tbody>'+
+    t.players.map(p=>{
+      const you=statsIsYou(p), level=Number(p.level), known=Number.isInteger(level)&&level>=1&&level<=10;
+      return '<tr class="'+(you?'is-you':'')+'" style="--row:'+index+++'"><th scope="row"><span class="mstat-who">'+statsBadge(p.nickname,p.avatar,'player-avatar')+
+        '<span class="mstat-name">'+esc(p.nickname)+'</span>'+(you?'<span class="mstat-you">YOU</span>':'')+
+        '<span class="mstat-level" style="--level:'+(known?FC_LEVEL_COLORS[level]:'var(--faint)')+'" title="'+(known?'FACEIT level '+level:'FACEIT level unavailable')+'">'+(known?level:'?')+'</span></span></th>'+
+      cols.map(([,key])=>{
+        const v=p[key], valid=numeric(v);
+        const leader=valid && v===best[key];
+        let shown=!valid?'—':key==='kd'||key==='kr'?v.toFixed(2):key==='adr'?v.toFixed(1):key==='hs_percent'?Math.round(v)+'%':String(Math.round(v));
+        if(multi.has(key)) shown=valid&&v>0?'<span class="mstat-kill">'+shown+'</span>':'<span class="mstat-empty" aria-label="0">—</span>';
+        if(key==='mvps' && valid) shown=v>0?'<span aria-label="'+v+' MVP stars">★ '+shown+'</span>':'<span aria-label="0 MVP stars">—</span>';
+        const bar=valid&&(key==='adr'||key==='kd')?'<span class="mstat-bar" aria-hidden="true"><i style="transform:scaleX('+Math.max(0,Math.min(1,v/Math.max(1,best[key])))+')"></i></span>':'';
+        return '<td data-stat="'+key+'" class="'+(leader?'mstat-best':'')+'"'+(leader?' title="Match best'+(key==='deaths'?' · lowest deaths':'')+' (ties included)"':'')+'><span class="mstat-value">'+shown+'</span>'+bar+'</td>';
+      }).join('')+'</tr>';
+    }).join('')+'</tbody></table></div></section>').join('');
+}
+function paintStatsHeader(s) {
+  const team=s.teams.find(t=>t.players.some(statsIsYou));
+  $('mstat-map').src=fcMapAsset(s.map);
+  $('mstat-title').textContent=fcMapName(s.map)+'  '+(team?[team.score,...s.teams.filter(t=>t!==team).map(t=>t.score)].join(' : '):s.score||'');
+  $('mstat-result').textContent=team?(team.won?'WIN':'LOSS'):'MATCH';
+  $('mstat-result').className='mstat-result '+(team?(team.won?'won':'lost'):'');
+  $('mstat-when').textContent=[s.mode,s.region,s.rounds?s.rounds+' rounds':'',s.played_at?new Date(s.played_at*1000).toLocaleString():''].filter(Boolean).join(' · ');
+  $('mstat-page').href=s.page||'#';
+  $('mstat-page').hidden=!s.page;
+}
+function showStats(s) {
+  if(!s) return;
+  paintStatsHeader(s);
+  $('mstat-body').innerHTML='<div id="mstat-teams">'+renderStatsTeams(s)+'</div><div class="mstat-get" id="mstat-get"></div>'+
+    '<p class="mstat-note"><span class="mstat-gold-key">✦ Gold = match best, ties included.</span> FACEIT scoreboard data; ADR may differ slightly from their newer stats tab.</p>';
+  statsShown=s; statsWaiting=null;
+  paintGetRow(); checkWaiting(false);
+  $('mstat-back').classList.remove('hidden');
+}
+async function openStats(link) {
+  const request=++statsRequest;
+  statsFocus=document.activeElement;
+  stopWaitingWatch(); statsShown=null;
+  paintStatsHeader({map:'',teams:[]});
+  $('mstat-title').textContent='Loading match';
+  $('mstat-body').innerHTML='<div class="mstat-skeleton" role="status" aria-label="Loading match statistics">'+Array.from({length:10},()=>'<div></div>').join('')+'</div>';
+  $('mstat-back').classList.remove('hidden');
+  $('mstat-close').focus();
+  try {
+    const s=await api('/api/demos/stats',{link});
+    if(request!==statsRequest) return;
+    showStats(s);
+    // Cosmetic data cannot hold up the table or disturb the download watcher.
+    api('/api/demos/identities',{link}).then(details=>{
+      if(request!==statsRequest || statsShown!==s) return;
+      s.teams.forEach(t=>{
+        const side=(details.teams||[]).find(d=>d.players.some(p=>p.player_id&&t.players.some(row=>row.player_id===p.player_id))) || (details.teams||[]).find(d=>d.name===t.name);
+        if(!side) return;
+        t.avatar=side.avatar;
+        t.players.forEach(p=>{const identity=side.players.find(d=>d.player_id&&d.player_id===p.player_id);if(identity) Object.assign(p,{avatar:identity.avatar,level:identity.level});});
+      });
+      const region=$('mstat-teams');if(region) {region.classList.add('identities-ready');region.innerHTML=renderStatsTeams(s);}
+    }).catch(()=>{});
+  } catch(err) {
+    if(request!==statsRequest) return;
+    $('mstat-title').textContent='Match unavailable';
+    $('mstat-body').innerHTML='<p role="alert">'+esc(err.message)+'</p><button class="btn" id="mstat-retry">Try again</button>';
+    $('mstat-retry').onclick=()=>openStats(link);
+  }
+}
+document.addEventListener('visibilitychange',()=>{
+  $('mstat-back').classList.toggle('motion-paused',document.hidden);
+});
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Tab'||$('mstat-back').classList.contains('hidden')) return;
+  const items=[...$('mstat-back').querySelectorAll('a[href],button,[tabindex="0"]')].filter(el=>!el.disabled&&!el.hidden);
+  const first=items[0],last=items[items.length-1];
+  if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+  else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+});
 
 /* The download strip at the foot of the scoreboard: one of three states, and
    never more than one. Not downloaded, downloading, or ready to watch. */
@@ -11683,10 +11454,7 @@ function paintGetRow() {
     return;
   }
   row.innerHTML =
-    '<span class="say"><b>Demo not downloaded</b><span>FACEIT only hands demos ' +
-    "to a signed-in browser, so <b>Get it</b> opens the download in yours. " +
-    "Save it anywhere &mdash; this watches your Downloads folder and takes it " +
-    "from there.</span></span>" +
+    '<span class="say"><b>Demo not downloaded</b><span>Get it opens FACEIT in your signed-in browser; download the demo to Downloads and this app will import it automatically.</span></span>' +
     '<span class="actions">' +
       '<button class="btn small" data-getdemo="1">Try direct</button>' +
       '<button class="btn" id="demo-openpage">Get it</button>' +
@@ -11700,8 +11468,11 @@ let waitTimer = null;
 
 async function checkWaiting(andImport) {
   if (!statsShown) return;
+  const match = statsShown.match_id;
   try {
-    statsWaiting = await api("/api/demos/waiting", { link: statsShown.match_id });
+    const waiting = await api("/api/demos/waiting", { link: match });
+    if (!statsShown || statsShown.match_id !== match) return;
+    statsWaiting = waiting;
   } catch (err) { return; }
   if (statsWaiting && statsWaiting.waiting && !statsWaiting.waiting.pending
       && andImport) {
@@ -11732,7 +11503,11 @@ function stopWaitingWatch() {
 
 function hideStats() {
   const back = $("mstat-back");
+  if (!back || back.classList.contains("hidden")) return;
   if (back) back.classList.add("hidden");
+  ++statsRequest;
+  if (statsFocus && statsFocus.isConnected) statsFocus.focus();
+  statsFocus = null;
   stopWaitingWatch();
   statsShown = null;
 }
@@ -11752,9 +11527,11 @@ async function loadDemos() {
     demoData = await api("/api/demos", {});
   } catch (err) {
     demoData = null;
+    $("demo-list").innerHTML = '<p class="fc-caption" role="status">Could not read the replay library. Reopen this tab to retry.</p>';
     return;
   }
   renderDemos();
+  if (fcData) renderFaceit();
   // A download already in flight -- after a page reload, say -- is picked
   // back up rather than left running invisibly.
   if (demoData.job && demoData.job.active) watchDemoJob();
@@ -11764,23 +11541,25 @@ function renderDemos() {
   const list = $("demo-list");
   if (!list || !demoData) return;
   const picked = demoData.picked || "";
-  if (!demoData.demos.length) {
+  const demos = Array.isArray(demoData.demos) ? demoData.demos : [];
+  if (!demos.length) {
     list.innerHTML = '<p class="sub2" style="margin:12px 0 0">' +
       (demoData.folder ? "No demos in the replay folder yet."
                        : "CS2's install was not found, so there is nowhere to put one.") +
       "</p>";
     return;
   }
-  list.innerHTML = demoData.demos.map(d =>
+  list.innerHTML = demos.map(d =>
     '<div class="demo-row' + (d.name === picked ? " picked" : "") + '">' +
+      '<span class="fc-replay-icon" aria-hidden="true">&#9654;</span>' +
       '<span class="who"><b>' + esc(d.name) + "</b><span>" +
-        bytes(d.size) + " &middot; " + ago(d.when) +
+        bytes(d.size) + " &middot; " + esc(fcWhen({ played_at: d.when })) +
         (d.name === picked ? ' &middot; <span class="demo-key">NEXT LAUNCH</span>' : "") +
       "</span></span>" +
       '<span class="actions">' +
-        '<button class="btn small" data-watch="' + esc(d.name) + '">Watch</button>' +
+        '<button class="btn small fc-watch" data-watch="' + esc(d.name) + '">Watch</button>' +
         '<button class="btn small" data-pick="' + esc(d.name) + '">' +
-        (d.name === picked ? "Chosen" : "Choose") + "</button>" +
+        (d.name === picked ? "Clear choice" : "Choose") + "</button>" +
       "</span>" +
     "</div>").join("");
 }
@@ -11860,7 +11639,7 @@ document.addEventListener("click", async e => {
     openMatch.disabled = true;
     try {
       if (!whoData) await loadWho();
-      showStats(await api("/api/demos/stats", { link: id }));
+      await openStats(id);
     } catch (err) {
       status("Could not read that match: " + esc(err.message), true);
     }
@@ -11949,7 +11728,7 @@ document.addEventListener("click", async e => {
       // Who you are decides which row gets marked, and the profile loads late
       // in startup -- late enough to lose the race against a quick paste.
       if (!whoData) await loadWho();
-      showStats(await api("/api/demos/stats", { link }));
+      await openStats(link);
     } catch (err) { /* the download below reports what went wrong */ }
 
     try {
@@ -13292,6 +13071,7 @@ document.addEventListener("change", e => {
   const box = e.target.closest("[data-kbshow]");
   if (!box) return;
   kbShown[box.dataset.kbshow] = box.checked;
+  renderKeyboard.placed = false;
   kbSaveLayout();
   renderKeyboard();
 });
@@ -13299,13 +13079,15 @@ document.addEventListener("change", e => {
 document.addEventListener("click", e => {
   const shape = e.target.closest("[data-mouseshape]");
   if (shape) {
+    if (kbBusy) return;
     mouseShape = shape.dataset.mouseshape;
     api("/api/prefs", { mouse_shape: mouseShape }).catch(() => {});
     renderKeyboard();
     return;
   }
   const cap = e.target.closest("[data-kbcode]");
-  if (!cap) return;
+  if (!cap || kbBusy) return;
+  kbOpenInspector = true;
   pickedKey = { code: cap.dataset.kbcode, label: cap.dataset.kblabel };
   kbOptions = null;
   kbFind = "";
@@ -13325,6 +13107,7 @@ async function loadKeyOptions() {
       kbGroup = answer.groups[0].id;
     }
   } catch (err) {
+    if (!pickedKey || pickedKey.code !== want) return;
     kbOptions = { error: String(err && err.message || err) };
   }
   renderKeyboard();
@@ -13359,6 +13142,7 @@ async function kbAssign(payload, describe) {
                                "recognise that command" : ""));
       await loadKeyboard(true);
       await loadKeyOptions();
+      kbAssignedCode = payload.code;
     }
   } finally {
     kbBusy = false;
@@ -14845,9 +14629,7 @@ function applyPrefs(ui) {
   if (ui.mouse_shape === "two" || ui.mouse_shape === "four") {
     mouseShape = ui.mouse_shape;
   }
-  if (ui.kb_layout && ui.kb_layout.board && ui.kb_layout.mouse) {
-    kbLayout = ui.kb_layout;
-  }
+  kbLoadLayout(ui.kb_layout);
   if (ui.kb_shown && typeof ui.kb_shown.board === "boolean") {
     kbShown = ui.kb_shown;
   }
@@ -15677,6 +15459,7 @@ $("rescan").addEventListener("click", () => scan(true));
       const n = Number(reading);
       chip.querySelector("b").textContent =
         reading === undefined || reading === "—" ? "—" : reading + "%";
+      chip.style.setProperty("--chip-load", Number.isFinite(n) ? Math.max(0,Math.min(1,n/100)) : 0);
       chip.classList.toggle("warn", Number.isFinite(n) && n >= 70 && n < 90);
       chip.classList.toggle("bad", Number.isFinite(n) && n >= 90);
     }

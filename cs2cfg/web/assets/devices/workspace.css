@@ -1,0 +1,107 @@
+/* Device workspace. Materials inherit the application theme; RGB describes binds. */
+[data-panel="keyboard"] { --rgb-stock:#5caaff; --rgb-custom:#ffbb4f; --rgb-script:#ff63be; --rgb-free:#526071; --device-top:color-mix(in srgb,var(--panel-2) 80%,#727985); --device-wall:color-mix(in srgb,var(--bg) 85%,#080a0d); }
+[data-panel="keyboard"] .hero { margin-bottom:18px; }
+[data-panel="keyboard"] .hero-copy { max-width:720px; }
+[data-panel="keyboard"] .hero p { max-width:640px; }
+[data-panel="keyboard"] > .panel { padding:20px; }
+[data-panel="keyboard"] .chg-head { margin-bottom:6px; }
+[data-panel="keyboard"] .kbsw-row { justify-content:flex-start; gap:4px; border-bottom:1px solid var(--line); }
+[data-panel="keyboard"] .kbsw-tab { border:0; border-bottom:2px solid transparent; border-radius:5px 5px 0 0; background:transparent; padding:12px 18px; }
+[data-panel="keyboard"] .kbsw-tab.active { color:var(--accent); background:var(--accent-dim); border-bottom-color:var(--accent); }
+[data-panel="keyboard"] .kbsw-dot { display:none; }
+.kbsw-device-icon { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.7; }
+[data-panel="keyboard"] .kbsw-tab .kb-ico-art { width:18px; height:18px; }
+.kb-workspace { display:grid; grid-template-columns:minmax(0,1fr) 330px; gap:22px; align-items:start; }
+.kb-devices { min-width:0; }
+[data-panel="keyboard"] .kb-layout-row { display:block; }
+[data-panel="keyboard"] .kb-scene { min-height:300px; transition:none; border-radius:0; background:radial-gradient(ellipse at 45% 25%,rgba(var(--lift),.055),transparent 65%); }
+.kb-desk-label { position:absolute; top:8px; left:12px; pointer-events:none; }
+.kb-desk-label b { display:block; font-size:13px; letter-spacing:.12em; text-transform:uppercase; }
+.kb-desk-label span { color:var(--muted); font-size:11px; }
+[data-panel="keyboard"] .kb-stage { padding:24px 12px 40px; overflow:visible; perspective:1300px; }
+[data-panel="keyboard"] .kb-stage,[data-panel="keyboard"] .kb-board { width:max-content; }
+[data-panel="keyboard"] .kb-board { --u:34px; --kgap:5px; position:relative; gap:var(--kgap); padding:22px 20px 26px; border-radius:12px; transform:rotateX(18deg) rotateZ(-1deg); transform-origin:50% 50%; background:repeating-linear-gradient(90deg,rgba(var(--lift),.035) 0 1px,transparent 1px 3px),linear-gradient(170deg,var(--device-top),var(--device-wall)); border:1px solid color-mix(in srgb,var(--ink) 18%,transparent); box-shadow:inset 0 2px 2px rgba(var(--lift),.22),inset 0 -2px 1px #0009,0 10px 0 -1px var(--device-wall),0 13px 0 -2px color-mix(in srgb,var(--ink) 15%,var(--device-wall)),0 35px 25px -12px #0009; }
+[data-panel="keyboard"] .kb-board::after { content:'CS / CONFIG AI'; position:absolute; bottom:5px; right:24px; font:7px var(--mono); letter-spacing:2px; color:var(--muted); }
+[data-panel="keyboard"] .kb-row { gap:var(--kgap); height:calc(var(--u) - var(--kgap)); }
+[data-panel="keyboard"] .kb-row:first-child { margin-bottom:10px; }
+[data-panel="keyboard"] .kb-gap { width:calc(var(--w)*var(--u) - var(--kgap)); }
+[data-panel="keyboard"] .kb-key { --key-rgb:var(--rgb-free); width:calc(var(--w)*var(--u) - var(--kgap)); height:calc(var(--u) - var(--kgap)); border-radius:4px; overflow:visible; color:var(--ink); background:linear-gradient(115deg,var(--device-top),var(--device-wall)); box-shadow:0 4px 0 var(--device-wall),0 5px 1px var(--key-rgb),0 7px 9px -2px var(--key-rgb); border:1px solid color-mix(in srgb,var(--ink) 15%,transparent); font-size:9px; font-weight:500; transition:transform 110ms ease; text-shadow:none; }
+[data-panel="keyboard"] .kb-key::before { content:''; position:absolute; inset:2px 3px 4px; border:1px solid rgba(var(--lift),.08); border-top-color:rgba(var(--lift),.18); border-radius:3px; background:linear-gradient(170deg,color-mix(in srgb,var(--device-top) 90%,var(--ink)),var(--device-top) 55%,var(--device-wall)); box-shadow:0 1px 3px #0005; pointer-events:none; }
+[data-panel="keyboard"] .kb-cap { position:relative; z-index:1; padding-bottom:4px; color:var(--ink); text-shadow:0 0 8px color-mix(in srgb,var(--key-rgb) 45%,transparent); }
+[data-panel="keyboard"] .kb-key.bound,.ms-zone.bound { --key-rgb:var(--rgb-stock); }
+[data-panel="keyboard"] .kb-key.custom,.ms-zone.custom { --key-rgb:var(--rgb-custom); }
+[data-panel="keyboard"] .kb-key.script,.ms-zone.script { --key-rgb:var(--rgb-script); }
+[data-panel="keyboard"] .kb-key.free { box-shadow:0 4px 0 var(--device-wall),0 5px 1px color-mix(in srgb,var(--rgb-free) 45%,transparent),0 6px 5px #0008; }
+[data-panel="keyboard"] .kb-key.kb-tall { height:calc(2*var(--u) - var(--kgap)); z-index:2; }
+[data-panel="keyboard"] .kb-key:hover,[data-panel="keyboard"] .kb-key:active { transform:translateY(3px); }
+[data-panel="keyboard"] .kb-key.picked { outline:1.5px solid var(--accent); outline-offset:3px; transform:translateY(2px); z-index:3; }
+[data-panel="keyboard"] .kb-mark { display:none; }
+[data-panel="keyboard"] .kb-key.kb-missing::before { border:1px dashed var(--accent); }
+[data-panel="keyboard"] .kb-piece[data-piece="mouse"] { width:360px; }
+[data-panel="keyboard"] .kb-mouse { width:360px; }
+[data-panel="keyboard"] .ms-svg { width:360px; height:300px; }
+[data-panel="keyboard"] .ms-shell { fill:url(#device-body); stroke:color-mix(in srgb,var(--ink) 24%,transparent); stroke-width:.8; }
+.ms-material-top { stop-color:color-mix(in srgb,var(--panel-2) 70%,var(--ink)); }
+.ms-material-mid { stop-color:color-mix(in srgb,var(--panel-2) 90%,var(--ink)); }
+.ms-material-bottom { stop-color:var(--device-wall); }
+[data-panel="keyboard"] .ms-face { fill:url(#device-button); stroke:var(--device-wall); stroke-width:1.4; filter:none; transition:transform 100ms; }
+[data-panel="keyboard"] .ms-zone { --key-rgb:var(--rgb-free); outline:none; }
+[data-panel="keyboard"] .ms-zone .ms-face { fill:url(#device-button); filter:drop-shadow(0 1px 1px var(--key-rgb)); }
+[data-panel="keyboard"] .ms-zone:hover .ms-face { transform:translateY(1px); }
+[data-panel="keyboard"] .ms-zone.picked .ms-face,[data-panel="keyboard"] .ms-zone:focus-visible .ms-face { stroke:var(--accent); stroke-width:2; }
+[data-panel="keyboard"] .ms-zone .ms-label { fill:var(--ink); font-size:12px; font-weight:500; text-anchor:start; }
+.ms-wheel-ridges { fill:none; stroke:var(--ink); opacity:.22; stroke-width:1; pointer-events:none; }
+.ms-body-highlight { fill:none; stroke:var(--ink); opacity:.16; stroke-width:1; pointer-events:none; }
+.ms-leader { fill:none; stroke:var(--key-rgb); stroke-width:.7; opacity:.8; pointer-events:none; }
+.ms-point { fill:var(--key-rgb); pointer-events:none; }
+.ms-callout { fill:transparent; stroke:none; }
+.ms-palm-texture { fill:url(#device-grain); opacity:.25; pointer-events:none; }
+[data-panel="keyboard"] .ms-inert .ms-label { fill:var(--muted); font-size:9px; }
+[data-panel="keyboard"] .ms-inert { --key-rgb:var(--muted); }
+[data-panel="keyboard"] .ms-pick { margin-top:-6px; }
+[data-panel="keyboard"] .ms-pick button[aria-pressed="true"] { background:var(--accent-dim); border-color:var(--accent); color:var(--ink); }
+.kb-desk-help { position:static; padding:16px 12px; color:var(--muted); font-size:12px; line-height:1.7; }
+.kb-desk-help b { color:var(--ink); display:block; margin-bottom:8px; font-size:16px; }
+[data-panel="keyboard"] .kb-show { justify-content:flex-start; border-top:1px solid var(--line); padding:14px 0; margin:0; }
+.kb-inspector { border-left:1px solid var(--line); padding-left:20px; min-width:0; position:sticky; top:14px; }
+.kb-inspector-title { margin:0 0 14px; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
+[data-panel="keyboard"] .kb-detail { background:transparent; border:0; border-radius:0; margin:0; padding:0; max-width:none; min-width:0; }
+[data-panel="keyboard"] .kb-detail.empty { text-align:left; padding:28px 0; }
+[data-panel="keyboard"] .kb-detail-key { color:var(--ink); background:var(--panel-2); border:1px solid var(--accent); border-bottom-width:4px; border-radius:6px; font-size:22px; min-width:48px; text-align:center; text-shadow:none; }
+[data-panel="keyboard"] .kb-detail-body .row { display:grid; grid-template-columns:40px minmax(0,1fr); gap:10px; padding:5px 0; }
+[data-panel="keyboard"] .kb-detail-body .v { min-width:0; overflow-wrap:anywhere; }
+[data-panel="keyboard"] .kb-pick { border-top:1px solid var(--line); padding-top:16px; margin-top:16px; }
+[data-panel="keyboard"] .kb-pick-head { display:block; }
+[data-panel="keyboard"] .kb-pick-head h4 { margin-bottom:10px; }
+[data-panel="keyboard"] .kb-search { width:100%; min-width:0; }
+[data-panel="keyboard"] .kb-cats { gap:4px; margin:12px 0; }
+[data-panel="keyboard"] .kb-cat { border-radius:4px; padding:5px 8px; }
+[data-panel="keyboard"] .kb-cat[aria-pressed="true"] { background:var(--accent-dim); border-color:var(--accent); color:var(--ink); }
+[data-panel="keyboard"] .kb-cmds { grid-template-columns:1fr; max-height:300px; gap:6px; }
+[data-panel="keyboard"] .kb-cmd { grid-template-columns:28px minmax(0,1fr) 12px; border-radius:5px; padding:8px; touch-action:none; cursor:grab; position:relative; }
+[data-panel="keyboard"] .kb-cmd::after { content:'⠿'; margin-left:auto; color:var(--muted); }
+[data-panel="keyboard"] .kb-ico { width:28px; height:28px; box-shadow:none; border:0; background:var(--bg-2); border-radius:4px; color:var(--accent); }
+[data-panel="keyboard"] .kb-cmd-name { font-size:12px; }
+[data-panel="keyboard"] .kb-cmd.on,[data-panel="keyboard"] .kb-cmd:hover:not(:disabled) { background:var(--accent-dim); border-color:var(--accent); }
+[data-panel="keyboard"] .kb-cmd.on .kb-cmd-name::after { content:' ✓'; }
+[data-panel="keyboard"] .kb-cmd.on .kb-ico,[data-panel="keyboard"] .kb-cmd:hover:not(:disabled) .kb-ico { background:var(--accent-dim); box-shadow:none; }
+[data-panel="keyboard"] .kb-legend { display:grid; grid-template-columns:1fr 1fr; justify-content:start; margin:18px 0; gap:9px 16px; }
+[data-panel="keyboard"] .kb-legend .kb-live,[data-panel="keyboard"] .kb-legend .kb-missing-note { grid-column:1/-1; }
+.kb-state-count { font-family:var(--mono); color:var(--ink); margin-left:auto; }
+[data-panel="keyboard"] .kb-missing-panel { width:auto; min-height:0; max-height:240px; padding:14px 0 0; border:0; border-top:1px solid var(--line); background:transparent; border-radius:0; }
+.kb-hover-preview { position:fixed; z-index:130; pointer-events:none; max-width:300px; padding:10px 14px; background:var(--panel-2); border:1px solid var(--line); color:var(--ink); box-shadow:0 10px 25px #0006; border-radius:5px; font:12px var(--mono); }
+.kb-hover-preview b { display:block; font:600 12px system-ui; color:var(--accent); margin-bottom:4px; }
+.kb-drag-ghost { position:fixed; z-index:140; pointer-events:none; padding:10px 16px; border:1px solid var(--accent); color:var(--ink); background:var(--panel-2); border-radius:5px; box-shadow:0 8px 30px #0007; font:12px var(--mono); }
+[data-panel="keyboard"] .kb-key.kb-drop-target { outline:2px solid var(--accent); outline-offset:4px; transform:translateY(3px); }
+[data-panel="keyboard"] .ms-zone.kb-drop-target .ms-face { stroke:var(--accent); stroke-width:3; }
+.kb-assigned::after { content:''; position:absolute; inset:-6px; border:2px solid var(--accent); border-radius:5px; pointer-events:none; animation:kb-assigned 650ms ease-out forwards; }
+.ms-zone.kb-assigned { animation:kb-inspector-in 400ms ease-out; }
+.kb-inspector.is-opening { animation:kb-inspector-in 230ms ease-out; }
+@keyframes kb-assigned { from { transform:scale(.85); opacity:1; } to { transform:scale(1.6); opacity:0; } }
+@keyframes kb-inspector-in { from { transform:translateX(16px); opacity:.2; } to { transform:translateX(0); opacity:1; } }
+/* Give both devices the full desk on laptop-sized windows. The inspector
+   follows in normal flow rather than squeezing a full keyboard into a sliver. */
+@media(max-width:1600px) { .kb-workspace { grid-template-columns:minmax(0,1fr); } .kb-inspector { position:static; border-left:0; border-top:1px solid var(--line); padding:20px 0 0; } [data-panel="keyboard"] .kb-cmds { grid-template-columns:1fr 1fr; } }
+@media(max-width:850px) { [data-panel="keyboard"] .kb-cmds { grid-template-columns:1fr; } }
+@media(prefers-reduced-motion:reduce) { [data-panel="keyboard"] *,[data-panel="keyboard"] *::before,[data-panel="keyboard"] *::after, .kb-drag-ghost { animation:none!important; transition:none!important; } }
+[data-panel="keyboard"].hidden *,[data-panel="keyboard"].hidden *::after,html.kb-motion-paused [data-panel="keyboard"] *,html.kb-motion-paused [data-panel="keyboard"] *::after { animation-play-state:paused!important; }

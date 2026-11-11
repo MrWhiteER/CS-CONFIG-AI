@@ -116,3 +116,20 @@ Edy can drop in his own image later.
 3. Performance: animations use transform and opacity, run at 60 fps, pause when the window or tab
    is hidden, and respect `prefers-reduced-motion`.
 4. Work in the order above, one branch and PR per section, stacked on `codex/redesign-5`.
+
+## Practical notes (verified in the codebase)
+
+- **Themes:** this branch line (`codex/redesign-5`) has the 7 themes in `const THEMES`.
+  Crimson, Frost and Neon arrive with PR #5. Style everything through tokens and all of them
+  will work.
+- **Where assets go:** `cs2cfg/web/assets/`. `webui.py` serves any file under the web root,
+  including subfolders. The PyInstaller spec (`cs2cfg.spec`) only bundles `cs2cfg/web/*`, so
+  add `("cs2cfg/web/assets/*", "cs2cfg/web/assets")` (and any deeper folders) to `datas`, or
+  the built .exe will be missing them.
+- **Generated raster art is allowed.** Codex can generate images (gpt-image). For the hero
+  soldier, the three optimise scenes and the map thumbnails, a generated, web-optimised
+  image (WebP, a few hundred KB at most) plus CSS/canvas motion on top is fine and often
+  better than hand-drawn SVG. Keep each one at a stable file path so Edy can swap in his own.
+- **FACEIT logo:** the official asset can't be downloaded from inside the sandbox. Reference
+  `cs2cfg/web/assets/faceit/faceit-logo.svg` and ship a clearly marked placeholder there,
+  then tell us. Edy or Claude will drop in the official file from FACEIT's brand kit.

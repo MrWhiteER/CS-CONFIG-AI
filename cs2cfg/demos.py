@@ -38,6 +38,8 @@ import gzip
 import json
 import re
 import shutil
+import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -397,6 +399,58 @@ def stats(reference: str, opener: Optional[Callable[[str], Any]] = None) -> Dict
         "teams": teams,
         "page": MATCH_PAGE.format(match_id=found),
     }
+
+
+_identity_cache = {}
+_identity_lock = threading.Lock()
+
+
+def identities(reference: str, opener: Optional[Callable[[str], Any]] = None) -> Dict[str, Any]:
+    """Optional roster decoration, fetched separately so stats never wait for it.
+
+    Match details carries roster avatars/levels and team logos; the opaque
+    stats endpoint does not. No per-player requests are needed. Cache finished
+    match rosters for an hour, including empty answers for a minute on failure.
+    """
+    found = match_id(reference)
+    if not found:
+        raise DemoError("that does not look like a FACEIT match link")
+    with _identity_lock:
+        cached = _identity_cache.get(found) if opener is None else None
+        if cached and cached[0] > time.monotonic():
+            return cached[1]
+    result = {"match_id": found, "teams": []}
+    ttl = 3600
+    try:
+        get = opener or (lambda url: _open(url, timeout=5))
+        with get(MATCH_API.format(match_id=found)) as response:
+            root = json.loads(response.read().decode("utf-8", errors="replace"))
+        body = root.get("payload", root)
+        sides = body.get("teams", {})
+        for key, side in (sides.items() if isinstance(sides, dict) else enumerate(sides)):
+            players = []
+            for p in side.get("roster", []):
+                level = int(_num(p.get("game_skill_level", p.get("gameSkillLevel"))))
+                players.append({
+                    "player_id": str(p.get("player_id") or p.get("id") or p.get("playerId") or ""),
+                    "nickname": str(p.get("nickname") or ""),
+                    "avatar": str(p.get("avatar") or ""),
+                    "level": level if 1 <= level <= 10 else 0,
+                })
+            result["teams"].append({
+                "team_id": str(side.get("faction_id") or side.get("id") or key),
+                "name": str(side.get("name") or side.get("nickname") or ""),
+                "avatar": str(side.get("avatar") or ""), "players": players,
+            })
+    except (ValueError, TypeError, AttributeError, OverflowError, urllib.error.URLError, OSError):
+        ttl = 60
+        result["teams"] = []
+    if opener is None:
+        with _identity_lock:
+            if len(_identity_cache) >= 128:
+                _identity_cache.pop(next(iter(_identity_cache)))
+            _identity_cache[found] = (time.monotonic() + ttl, result)
+    return result
 
 
 def local_name(found: str, about: Optional[Dict[str, str]] = None) -> str:
