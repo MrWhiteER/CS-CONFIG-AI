@@ -5396,7 +5396,7 @@
     position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center;
     padding: 24px; background: var(--bg); color: var(--ink);
     transition: opacity 200ms ease-out, visibility 200ms;
-    animation: boot-failsafe 1ms 4600ms forwards;
+    animation: boot-failsafe 1ms 16000ms forwards;
   }
   .boot-screen.is-dismissed { opacity: 0; visibility: hidden; pointer-events: none; }
   .boot-content { width: min(320px, 100%); text-align: center; }
@@ -5407,11 +5407,10 @@
   }
   .boot-track { height: 2px; margin: 24px 0; overflow: hidden; background: var(--line); }
   .boot-track::after {
-    content: ""; display: block; width: 36%; height: 100%; background: var(--accent);
-    animation: boot-progress 1400ms ease-in-out infinite;
+    content: ""; display: block; width: var(--boot-progress, 0%); height: 100%; background: var(--accent);
+    transition: width 160ms ease-out;
   }
   .boot-tip { min-height: 3.1em; margin: 0; color: var(--muted); font-size: 12px; }
-  @keyframes boot-progress { from { transform: translateX(-100%); } to { transform: translateX(380%); } }
   @keyframes boot-glow {
     from { opacity: .25; transform: scale(.94); }
     to { opacity: 1; transform: scale(1); filter: drop-shadow(0 0 18px var(--component-glow)); }
@@ -5508,14 +5507,14 @@
   }
   @media (prefers-reduced-motion: reduce) {
     .boot-screen { transition-duration: 80ms; }
-    .boot-track::after { animation: none; width: 100%; }
+    .boot-track::after { transition: none; }
     #account-card *, #account-card *::before, #account-card *::after { animation: none !important; transition: none !important; }
     #account-card :is(.way, .btn):hover:not(:disabled) { transform: none; }
   }
 </style>
 </head>
 <body>
-<!-- Independent of app startup: a timeout and a CSS failsafe always uncover it. -->
+<!-- Startup readiness dismisses this veil; independent JS/CSS deadlines always uncover it. -->
 <div class="boot-screen" aria-hidden="true">
   <div class="boot-content">
     <svg class="boot-mark" viewBox="0 0 16 16" focusable="false"><path fill="currentColor" d="M12 3H6L3 6V10L6 13H12V11H7L5 9V7L7 5H12Z"/><path fill="var(--ink)" d="M10 5H12V7H14V9H12V11H10V9H8V7H10Z"/></svg>
@@ -5525,26 +5524,53 @@
   </div>
 </div>
 <script>
-/* Only owns the veil. Read first-scan/preferences readiness without modifying
-   startup, its promises, requests, handlers, or error handling. */
-(() => {
+/* Each first load settles only after its loader has rendered success or error.
+   The fixed list keeps progress honest, including work started after prefs. */
+const startup = (() => {
   const veil = document.querySelector(".boot-screen");
   const tip = veil.querySelector(".boot-tip");
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
   const tips = ["Keep your crosshair at head height.",
     "Stop moving before you take the shot.", "Use the radar to keep track of your team."];
   let nextTip = 0, finished = false, tipTimer;
+  const names = ["scan", "prefs", "plan", "machine", "setups", "crosshair",
+    "companions", "audio", "history", "suggestions", "starter", "source",
+    "settings-pane", "profile", "launch", "monitor", "updates", "cloud"];
+  let settled = 0;
+  const tasks = new Map(names.map(name => {
+    let resolve;
+    const ready = new Promise(done => { resolve = done; });
+    return [name, { ready, resolve, job: null }];
+  }));
+  const run = (name, load) => {
+    const task = tasks.get(name);
+    if (task.job) return task.job;
+    task.job = Promise.resolve().then(load).catch(error => {
+      // Loaders own their normal error states. Surface unexpected render errors too.
+      console.error("Startup " + name + " failed", error);
+      if (typeof status === "function") status("Startup " + name + " failed: " + esc(error.message), true);
+    }).finally(() => {
+      veil.style.setProperty("--boot-progress", (++settled / names.length * 100) + "%");
+      task.resolve();
+    });
+    return task.job;
+  };
   const dismiss = () => {
     if (finished) return;
     finished = true;
-    clearTimeout(fallback); clearInterval(readyTimer); clearInterval(tipTimer);
+    clearTimeout(fallback); clearInterval(tipTimer);
     veil.classList.add("is-dismissed");
     setTimeout(() => veil.remove(), reduced.matches ? 100 : 240);
   };
-  const fallback = setTimeout(dismiss, 4200);
-  const readyTimer = setInterval(() => {
-    if (document.readyState === "complete" && typeof prefsReady !== "undefined" && prefsReady) dismiss();
-  }, 60);
+  const fallback = setTimeout(dismiss, 15000);
+  const documentReady = new Promise(resolve => {
+    if (document.readyState === "complete") resolve();
+    else window.addEventListener("load", resolve, { once: true });
+  });
+  Promise.all([documentReady, ...[...tasks.values()].map(task => task.ready)]).then(() => {
+    // Let the final DOM updates paint and the bar reach 100% before the fade.
+    requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(dismiss, reduced.matches ? 0 : 180)));
+  });
   tipTimer = setInterval(() => {
     if (reduced.matches) return;
     tip.classList.remove("is-changing");
@@ -5552,6 +5578,7 @@
     void tip.offsetWidth;
     tip.classList.add("is-changing");
   }, 1500);
+  return { run, get finished() { return finished; } };
 })();
 </script>
 <!-- One icon per setting. Stroke icons on a 24 grid, drawn in currentColor so
@@ -7804,13 +7831,14 @@ function chooseIntent(name, quiet) {
   paintIntent(intent);
 })();
 
-$("preview").addEventListener("click", async () => {
+async function previewPlan() {
   busy("Building plan…");
   $("preview").disabled = true;
   try { renderPlan(await api("/api/plan", requestBody())); }
   catch (e) { status("Plan failed: " + esc(e.message), true); }
   finally { $("preview").disabled = false; }
-});
+}
+$("preview").addEventListener("click", previewPlan);
 
 $("apply").addEventListener("click", async () => {
   if (!planned) return;
@@ -8261,10 +8289,13 @@ function setSettingsSub(name, restoring) {
       box.addEventListener("transitionend", done);
     }
   }
-  if (name === "sound") loadAudio(false);
-  if (name === "logs") loadHistory();
-  if (name === "config" || name === "editing") ensureScan(false);
-  if (name === "apps") loadCompanions();
+  // Preference restoration only selects the pane. Startup owns its first loads.
+  if (prefsReady && startup.finished) {
+    if (name === "sound") loadAudio(false);
+    if (name === "logs") loadHistory();
+    if (name === "config" || name === "editing") ensureScan(false);
+    if (name === "apps") loadCompanions();
+  }
   rememberPrefs();
 }
 
@@ -8940,8 +8971,9 @@ async function pollLive() {
 
 function startLive() {
   if (liveTimer) return;
-  pollLive();
+  const first = pollLive();
   liveTimer = setInterval(() => { if (activeTab === "launcher") pollLive(); }, 2000);
+  return first;
 }
 
 // --- CS2 settings ---------------------------------------------------------
@@ -14638,9 +14670,15 @@ function setTab(name) {
   if (name === "keyboard") loadKeyboard(false);
   if (name === "fix") loadFixes(false);
   if (name === "settings") {
-    setSettingsSub(settingsSub, true); loadSetups(); loadCrosshairX();
-    loadCompanions(); startCompanionsWatch();
-    loadMachine(); renderThemes(); loadCloud();
+    setSettingsSub(settingsSub, true);
+    // During boot the tracked first loads fill even the hidden Settings tab.
+    // Revisiting it after boot keeps the existing refresh behaviour.
+    if (startup.finished) {
+      loadSetups(); loadCrosshairX();
+      loadCompanions(); startCompanionsWatch();
+      loadMachine(); loadCloud();
+    }
+    renderThemes();
   }
   document.querySelectorAll(".tabs .tab").forEach(b =>
     b.setAttribute("aria-selected", String(b.dataset.tab === name)));
@@ -15082,7 +15120,7 @@ async function refreshCfgSuggestions() {
       sel.value = best.path;
       $("cfg-folder").value = best.path;
     }
-    checkCfgFolder();
+    await checkCfgFolder();
   } catch (e) {
     $("cfg-suggest").innerHTML = '<option value="">could not detect folders</option>';
   }
@@ -15375,8 +15413,8 @@ function paintRunning() {
 
 function startGameWatch() {
   if (runningTimer) return;
-  const ask = async () => {
-    if (document.hidden) return;
+  const ask = async (reattach = false) => {
+    if (document.hidden && !reattach) return;
     try {
       const s = await api("/api/play/status");
       if (typeof s.game_running === "boolean") gameUp = s.game_running;
@@ -15385,10 +15423,15 @@ function startGameWatch() {
       // While a launch is in flight its own one-second poll owns the card;
       // this only keeps the running flags current underneath it.
       if (!pollTimer) { liveStatus = s; paintRunning(); }
+      if (reattach && s.active) {
+        renderLaunch(s);
+        pollTimer = setInterval(pollLaunch, 1000);
+      }
     } catch (err) { /* next tick */ }
   };
-  ask();
+  const first = ask(true);
   runningTimer = setInterval(ask, 4000);
+  return first;
 }
 
 $("play").addEventListener("click", async () => {
@@ -15449,40 +15492,59 @@ $("rescan").addEventListener("click", () => scan(true));
 // refresh rather than pretending nothing is happening.
 (async () => {
   setStretchMode(stretchMode);
-  await scan(false);
-  try {
-    const prefs = await api("/api/prefs");
-    prefsCs2Mode = prefs.cs2_mode || "";
-    applyPrefs(prefs.ui);
-  } catch (e) { /* first run */ }
-  prefsReady = true;
-  $("preview").click();
+  // prefs also calls State.refresh(). Starting it alongside scan can run the
+  // expensive hardware probe twice before either request populates the cache.
+  await startup.run("scan", () => scan(false));
+  await startup.run("prefs", async () => {
+    try {
+      const prefs = await api("/api/prefs");
+      prefsCs2Mode = prefs.cs2_mode || "";
+      applyPrefs(prefs.ui);
+    } catch (e) { /* first run */ }
+    prefsReady = true;
+  });
+  // GET monitor/status and independent local loaders need not wait for the
+  // starter config. Every promise includes its loader's final render.
+  await Promise.allSettled([
+    startup.run("plan", previewPlan),
+    startup.run("machine", loadMachine),
+    startup.run("setups", loadSetups),
+    startup.run("crosshair", loadCrosshairX),
+    startup.run("companions", async () => { await loadCompanions(); startCompanionsWatch(); }),
+    startup.run("audio", () => loadAudio(false)),
+    startup.run("history", loadHistory),
+    startup.run("profile", loadWho),
+    startup.run("launch", startGameWatch),
+    startup.run("monitor", startLive),
+    startup.run("updates", pollUpdates),
+    (async () => {
+      // Folder suggestions can choose the collection; settle that before the
+      // starter and source read it, rather than racing their initial renders.
+      await startup.run("suggestions", refreshCfgSuggestions);
+      let created = false;
+      await startup.run("starter", async () => {
+        const first = await checkStarter();
+        if (first && first.ok && !first.complete &&
+            !first.present.length && !first.autoexec &&
+            !($("cfg-folder") && $("cfg-folder").value.trim())) {
+          created = !!(await makeStarter(true));
+        }
+      });
+      await startup.run("source", async () => {
+        // makeStarter already awaits loadSource after creating a collection.
+        if (!created) await loadSource();
+      });
+      await startup.run("settings-pane", async () => {
+        if (settingsSub === "config" || settingsSub === "editing") await ensureScan(false);
+      });
+    })(),
+  ]);
+  // All POST handlers hold state.lock. A signed-in cloud /me can spend 12s
+  // on the network: queue it after local first renders so it cannot block them.
+  const cloudReady = startup.run("cloud", loadCloud);
+  // FACEIT is a separate tab. Its remote work must not delay Play/Settings.
   loadDemos().then(() => { loadFaceit(); startFaceitWatch(); });
-  loadHistory();
-  refreshCfgSuggestions();
-  // A fresh install has no config anywhere. Offer to lay one out -- and where
-  // the machine has nothing at all, just do it, so the Keyboard and Scripts
-  // tabs have somewhere to write instead of four empty panels.
-  try {
-    const first = await checkStarter();
-    if (first && first.ok && !first.complete &&
-        !first.present.length && !first.autoexec &&
-        !($("cfg-folder") && $("cfg-folder").value.trim())) {
-      await makeStarter(true);
-    }
-  } catch (e) { /* said on the card */ }
-  if ($("cfg-folder") && $("cfg-folder").value.trim()) loadSource();
-  startLive();
-  startGameWatch();
-  pollUpdates();
-  loadWho();
-  try {
-    const s = await api("/api/play/status");
-    if (s.active) {
-      renderLaunch(s);
-      pollTimer = setInterval(pollLaunch, 1000);
-    }
-  } catch (e) { /* no launch to reattach to */ }
+  await cloudReady;
 })();
 </script>
 <script>
