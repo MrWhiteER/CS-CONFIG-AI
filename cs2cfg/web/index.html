@@ -5119,6 +5119,278 @@
     * { transition-duration: .01ms !important; }
   }
 </style>
+<style>
+  /* Components / step 3. Scoped to the workspace and its floating surfaces;
+     the rail and account/sign-in surface keep their own design contracts. */
+  :root {
+    --component-radius: max(12px, var(--r));
+    --control-radius: 8px;
+    --chip-radius: 6px;
+    --on-accent: #10091c;
+    --component-shadow: 0 8px 24px -14px var(--sunk);
+    --floating-shadow: 0 24px 64px -18px var(--sunk);
+    --component-glow: color-mix(in srgb, var(--accent) calc(var(--glow) * 26%), transparent);
+    --component-hover: color-mix(in srgb, var(--accent) 7%, var(--panel-2));
+    --component-focus: color-mix(in srgb, var(--accent) 24%, transparent);
+    --component-veil: color-mix(in srgb, var(--bg) 76%, transparent);
+    --component-motion: 200ms ease-out;
+    --skeleton-base: var(--chip);
+    --skeleton-light: color-mix(in srgb, var(--accent) 14%, var(--panel-2));
+  }
+  :root[data-theme="daylight"], :root[data-theme="paper"] { --on-accent: #ffffff; }
+  :root[data-theme="pro"] {
+    --component-radius: var(--r);
+    --control-radius: var(--r);
+    --chip-radius: var(--r);
+    --component-shadow: none;
+    --floating-shadow: none;
+  }
+
+  /* Solid primary, outlined secondary, and quiet ghost/icon actions. */
+  :is(.stage, .modal-back, .confirm-veil, .updc-dialog, .upd-toast) .btn:not(:where(#account-card *)) {
+    clip-path: none; border-radius: var(--control-radius);
+    border: 1px solid var(--line); background: transparent; color: var(--ink);
+    box-shadow: none; min-height: 34px; padding: 8px 14px;
+    font-size: 12px; line-height: 1.3; text-decoration: none;
+    transition: background var(--component-motion), border-color var(--component-motion),
+      color var(--component-motion), box-shadow var(--component-motion), transform var(--component-motion);
+  }
+  :is(.stage, .modal-back, .confirm-veil, .updc-dialog, .upd-toast) .btn:not(:where(#account-card *)):hover:not(:disabled) {
+    background: var(--accent-dim); border-color: var(--accent); color: var(--accent);
+  }
+  :is(.stage, .modal-back, .confirm-veil, .updc-dialog, .upd-toast) .btn.primary:not(:where(#account-card *)),
+  .stage #apply, .stage .btn-play {
+    background: var(--accent); border: 1px solid var(--accent); color: var(--on-accent);
+    border-radius: var(--control-radius); clip-path: none; box-shadow: var(--component-shadow);
+  }
+  :is(.stage, .modal-back, .confirm-veil, .updc-dialog, .upd-toast) .btn.primary:not(:where(#account-card *)):hover:not(:disabled),
+  .stage #apply:hover:not(:disabled), .stage .btn-play:hover:not(:disabled) {
+    background: var(--accent); border-color: var(--accent); color: var(--on-accent);
+    filter: none; transform: translateY(-1px);
+    box-shadow: var(--component-shadow), 0 0 22px var(--component-glow);
+  }
+  .stage .btn-play, .stage #apply {
+    min-height: 56px; padding: 16px 24px; justify-content: center;
+    font-family: var(--display); font-size: 17px; font-weight: 700;
+    letter-spacing: .1em; text-transform: uppercase;
+    transition: transform var(--component-motion), box-shadow var(--component-motion), opacity var(--component-motion);
+  }
+  .stage #apply { flex: 1 0 100%; width: 100%; order: -1; }
+  :is(.stage, .modal-back, .confirm-veil, .updc-dialog, .upd-toast) .btn.small:not(:where(#account-card *)) { min-height: 28px; padding: 5px 10px; font-size: 11px; }
+  .stage .btn-play .glyph { background: var(--accent-dim); color: inherit; border-radius: var(--control-radius); }
+  :is(.stage, .modal-back, .confirm-veil, .updc-dialog, .upd-toast) .btn.ghost:not(:where(#account-card *)) {
+    border-color: transparent; color: var(--muted);
+  }
+  :is(.stage, .modal-back, .confirm-veil, .updc-dialog, .upd-toast) .btn.danger:not(:where(#account-card *)) {
+    background: transparent; color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, var(--line));
+  }
+  :is(.stage, .modal-back, .confirm-veil, .updc-dialog, .upd-toast) .btn.danger:not(:where(#account-card *)):hover:not(:disabled) {
+    background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--bad); border-color: var(--bad);
+  }
+  :is(.stage, .modal-back, .confirm-veil, .updc-dialog, .upd-toast) .btn:not(:where(#account-card *)):active:not(:disabled),
+  .stage #apply:active:not(:disabled), .stage .btn-play:active:not(:disabled) { transform: translateY(0); }
+  :is(.stage, .modal-back, .confirm-veil, .updc-dialog, .upd-toast) .btn:not(:where(#account-card *)):disabled,
+  .stage .btn-play:disabled { opacity: .45; filter: none; transform: none; box-shadow: none; cursor: default; }
+  .stage :is(.setup-chip .drop, .plug-star), .updc-dialog .updc-close {
+    border-radius: var(--control-radius); color: var(--muted);
+    transition: color var(--component-motion), background var(--component-motion);
+  }
+  .stage :is(.setup-chip .drop, .plug-star):hover, .updc-dialog .updc-close:hover {
+    color: var(--accent); background: var(--accent-dim);
+  }
+
+  /* Remove clipped corners so shadows and keyboard focus remain visible. */
+  .stage :is(.panel, .card, .editor, .fix-tile, .inv-item, .skin-viewer-box):not(:where(#account-card, #account-card *)) {
+    clip-path: none; border: 1px solid var(--line); border-radius: var(--component-radius);
+    background: var(--panel); box-shadow: var(--component-shadow);
+    -webkit-backdrop-filter: var(--panel-blur); backdrop-filter: var(--panel-blur);
+    transition: border-color var(--component-motion), box-shadow var(--component-motion), background var(--component-motion);
+  }
+  .stage :is(.panel, .card, .editor, .fix-tile, .inv-item, .skin-viewer-box):not(:where(#account-card, #account-card *)):hover {
+    border-color: color-mix(in srgb, var(--accent) 34%, var(--line));
+    box-shadow: var(--component-shadow), 0 0 20px var(--component-glow);
+  }
+  .stage :is(.panel, .card, .editor):not(:where(#account-card, #account-card *))::before,
+  .stage :is(.panel, .editor):not(:where(#account-card, #account-card *))::after { content: none; }
+  .stage :is(.panel, .card, .editor):not(:where(#account-card, #account-card *)) > h2::before {
+    box-shadow: 0 0 8px var(--component-glow);
+  }
+  .stage .panel.is-live { border-color: var(--good); }
+  .stage .panel.is-warn { border-color: var(--warn); }
+  .stage :is(.editor-side, .editor-foot) { background: var(--bg-2); }
+  .stage .fix-tile { --fam: var(--accent); }
+  .stage .fix-tile[data-family="network"] { --fam: var(--cat-config); }
+  .stage .fix-tile[data-family="graphics"] { --fam: var(--cat-look); }
+  .stage .fix-tile[data-family="devices"] { --fam: var(--cat-apps); }
+  .stage .fix-tile[data-family="sound"] { --fam: var(--cat-sound); }
+  .stage .fix-tile[data-family="steam"] { --fam: var(--cat-account); }
+  .stage .fix-tile[data-family="boost"] { --fam: var(--good); }
+
+  /* Measurements and semantic state chips share the same small shape. */
+  .stage :is(.stat, .chip, .pill, .badge, .flag, .fbadge, .chg-chip, .setup-chip, .dirty-badge):not(:where(#account-card *)) {
+    clip-path: none; border: 1px solid var(--line); border-radius: var(--chip-radius);
+    background: var(--chip); color: var(--muted); box-shadow: none;
+  }
+  .stage .stat { padding: 12px 14px; border-radius: var(--component-radius); }
+  .stage :is(.stat b, .chg-count) { color: var(--accent); }
+  .stage :is(.chip, .pill, .badge, .flag, .fbadge, .stat).good,
+  .stage :is(.fbadge.start, .chg-chip.to, .xh-live.up) { --state: var(--good); }
+  .stage :is(.chip, .pill, .badge, .flag, .fbadge, .stat).warn,
+  .stage :is(.dirty-badge, .badge.stattrak) { --state: var(--warn); }
+  .stage :is(.chip, .pill, .badge, .flag, .fbadge, .stat).bad { --state: var(--bad); }
+  .stage :is(.fbadge.entry, .fbadge.gen, .chg-chip.new, .setup-chip.live) { --state: var(--accent); }
+  .stage :is(.good, .warn, .bad, .fbadge.start, .fbadge.entry, .fbadge.gen, .chg-chip.to, .chg-chip.new, .setup-chip.live, .dirty-badge, .badge.stattrak, .xh-live.up):is(.chip, .pill, .badge, .flag, .fbadge, .stat, .chg-chip, .setup-chip, .dirty-badge, .xh-live) {
+    color: var(--state); background: color-mix(in srgb, var(--state) 10%, var(--panel));
+    border-color: color-mix(in srgb, var(--state) 30%, var(--line));
+  }
+  .stage .stat:is(.good, .warn, .bad) b { color: var(--state); }
+  .stage #gpu-out .flag { background: var(--chip); border-color: var(--line); color: var(--muted); border-radius: var(--chip-radius); }
+  .stage #gpu-out .flag.warn {
+    background: color-mix(in srgb, var(--warn) 10%, var(--panel));
+    border-color: color-mix(in srgb, var(--warn) 30%, var(--line)); color: var(--warn);
+  }
+  .stage .chg-count { background: var(--accent-dim); border-radius: var(--chip-radius); }
+  .stage .chg-row { background: var(--accent-dim); border-radius: var(--control-radius); }
+  .stage .meter.warn .fill { background: var(--warn); }
+  .stage .meter.bad .fill { background: var(--bad); }
+
+  /* Form fields keep their existing dimensions and native semantics. */
+  :is(.stage, .modal-back, .confirm-veil, .updc-dialog) :is(input[type="text"], input[type="number"], input[type="search"], input[type="url"], select, textarea):not(:where(#account-card *)) {
+    clip-path: none; border: 1px solid var(--line); border-radius: var(--control-radius);
+    background: var(--sunk); color: var(--ink); caret-color: var(--accent);
+    transition: border-color var(--component-motion), box-shadow var(--component-motion), background var(--component-motion);
+  }
+  :is(.stage, .modal-back, .confirm-veil, .updc-dialog) :is(input, select, textarea):not(:where(#account-card *)):hover:not(:disabled) { border-color: var(--accent); }
+  :is(.stage, .modal-back, .confirm-veil, .updc-dialog) :is(input, select, textarea):not(:where(#account-card *)):focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px; border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--component-focus);
+  }
+  .stage :is(input, textarea):not(:where(#account-card *))::placeholder { color: var(--faint); }
+  .stage select option { background: var(--panel-2); color: var(--ink); }
+  .stage :is(input, select, textarea):not(:where(#account-card *)):disabled { opacity: .5; cursor: default; }
+  .stage .code-input::selection { background: var(--accent-dim); }
+  .stage label.opt { border-radius: var(--control-radius); transition: background var(--component-motion), border-color var(--component-motion); }
+  .stage input:is([type="checkbox"], [type="radio"]):not(:where(#account-card *)) { accent-color: var(--accent); }
+  .stage input[type="radio"]:not(:where(#account-card *)) {
+    appearance: none; width: 16px; height: 16px; vertical-align: middle;
+    border: 1px solid var(--line); border-radius: 50%; background: var(--sunk);
+    transition: background var(--component-motion), border-color var(--component-motion);
+  }
+  .stage input[type="radio"]:not(:where(#account-card *)):checked {
+    border-color: var(--accent); background: var(--accent); box-shadow: inset 0 0 0 4px var(--panel-2);
+  }
+  .stage label.opt input[type="checkbox"] {
+    appearance: none; clip-path: none; position: relative; box-sizing: border-box;
+    display: grid; place-items: center; width: 18px; height: 18px; flex: none;
+    border: 1px solid var(--line); border-radius: min(4px, var(--control-radius)); background: var(--sunk);
+    transition: background var(--component-motion), border-color var(--component-motion);
+  }
+  .stage label.opt input[type="checkbox"]::after {
+    content: ""; position: static; width: 8px; height: 4px; border-radius: 0;
+    clip-path: none; background: transparent; border-left: 2px solid var(--on-accent);
+    border-bottom: 2px solid var(--on-accent); transform: translateY(-1px) rotate(-45deg) scale(0);
+    transition: transform var(--component-motion);
+  }
+  .stage label.opt input[type="checkbox"]:checked { background: var(--accent); border-color: var(--accent); }
+  .stage label.opt input[type="checkbox"]:checked::after { transform: translateY(-1px) rotate(-45deg) scale(1); }
+  .stage .switch input[type="checkbox"], .updc-dialog .updc-opt input[type="checkbox"] {
+    clip-path: none; background: var(--chip); border-color: var(--line);
+    border-radius: var(--component-radius); transition: background var(--component-motion), border-color var(--component-motion);
+  }
+  .stage .switch input[type="checkbox"]:checked, .updc-dialog .updc-opt input[type="checkbox"]:checked {
+    background: var(--accent); border-color: var(--accent);
+  }
+  .stage .switch input[type="checkbox"]::after, .updc-dialog .updc-opt input[type="checkbox"]::after {
+    background: var(--ink); transition: transform var(--component-motion);
+  }
+  .stage .switch input[type="checkbox"]:checked::after, .updc-dialog .updc-opt input[type="checkbox"]:checked::after { background: var(--on-accent); }
+  .stage input[type="range"]::-webkit-slider-runnable-track { height: 4px; border-radius: var(--control-radius); background: var(--line); }
+  .stage input[type="range"]::-webkit-slider-thumb {
+    width: 16px; height: 16px; margin-top: -6px; background: var(--accent);
+    border: 2px solid var(--panel-2); box-shadow: 0 0 0 2px var(--component-focus);
+    transition: box-shadow var(--component-motion);
+  }
+  .stage input[type="range"]:hover:not(:disabled)::-webkit-slider-thumb { box-shadow: 0 0 0 4px var(--component-focus); }
+  .stage input[type="range"]:disabled::-webkit-slider-thumb { background: var(--faint); box-shadow: none; }
+  .stage input[type="range"]::-moz-range-track { height: 4px; background: var(--line); border-radius: var(--control-radius); }
+  .stage input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border: 2px solid var(--panel-2); border-radius: 50%; background: var(--accent); }
+
+  /* Existing sliding thumbs keep their JS positioning and measurement. */
+  .stage :is(.segbar, .seg button, .seg-item, .seg-thumb, .subtabs button, .subtab):not(:where(#account-card *)) {
+    clip-path: none; border-radius: var(--control-radius);
+    transition-duration: 200ms; transition-timing-function: ease-out;
+  }
+  .stage .segbar { background: var(--bg-2); border-color: var(--line); box-shadow: none; }
+  .stage .seg-thumb { background: var(--accent-dim); box-shadow: inset 0 0 0 1px var(--accent); }
+  .stage #launch-modes .seg-thumb { background: var(--accent-dim); box-shadow: inset 0 0 0 1px var(--accent); }
+  .stage #launch-modes .seg-item[aria-selected="true"] { color: var(--accent); }
+  .stage #launch-modes .seg-item[aria-selected="true"] .why { color: var(--muted); text-shadow: none; }
+  .stage .seg button { background: var(--bg-2); color: var(--muted); }
+  .stage .seg button[aria-pressed="true"] { background: var(--accent-dim); border-color: var(--accent); box-shadow: none; }
+  .stage .seg button[aria-pressed="true"] strong,
+  .stage .segbar .seg-item[aria-selected="true"], .stage .subtabs button[aria-pressed="true"] { color: var(--accent); }
+  .stage .segbar .seg-item[aria-selected="true"] :is(.n, .why) { color: var(--muted); }
+  .stage .subtabs button[aria-pressed="true"] { background: var(--accent-dim); }
+  .stage .seg button:hover, .stage .seg-item:hover { background: var(--accent-dim); color: var(--accent); }
+
+  /* Floating surfaces: solid enough to read even without backdrop support. */
+  :is(.modal, .mstat, .chgwin, .updc-dialog, .bellpop, .codetip, .kbsw-menu, .kbsw-popover, .upd-toast) {
+    background: var(--panel-2); color: var(--ink); border: 1px solid var(--line);
+    border-radius: var(--component-radius); box-shadow: var(--floating-shadow);
+    -webkit-backdrop-filter: var(--panel-blur); backdrop-filter: var(--panel-blur);
+  }
+  :is(.modal-back, .confirm-veil, .updc-veil, .bellveil) {
+    background: var(--component-veil); -webkit-backdrop-filter: var(--panel-blur); backdrop-filter: var(--panel-blur);
+  }
+  .chgwin-head, .updc-head { border-radius: var(--component-radius) var(--component-radius) 0 0; }
+  .kbsw-menu button { border-radius: var(--control-radius); transition: background var(--component-motion), color var(--component-motion); }
+  .kbsw-menu button:hover { background: var(--accent-dim); color: var(--accent); }
+  .kbsw-menu button.danger:hover { background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--bad); }
+  .upd-toast { border-left: 3px solid var(--accent); }
+  .upd-toast h4 { color: var(--ink); }
+  .upd-toast h4 i { background: var(--accent); box-shadow: 0 0 8px var(--component-glow); }
+  .stage .upd-bar i { background: var(--accent); }
+  .stage .xh-live.up i { box-shadow: 0 0 8px color-mix(in srgb, var(--good) calc(var(--glow) * 70%), transparent); }
+  .stage .led { clip-path: none; border-radius: var(--chip-radius); }
+  .stage .led.on { box-shadow: 0 0 8px color-mix(in srgb, var(--good) calc(var(--glow) * 70%), transparent); }
+  .stage .led.warn { box-shadow: 0 0 8px color-mix(in srgb, var(--warn) calc(var(--glow) * 70%), transparent); }
+  .stage .led.off { box-shadow: 0 0 8px color-mix(in srgb, var(--bad) calc(var(--glow) * 70%), transparent); }
+
+  /* Empty scanning indicators become skeleton bars, retaining the live text
+     and the exact .spin markup that JS uses to recognise busy messages.
+     Progress rings with actual download state keep their own semantics. */
+  :is(.stage, .modal-back, .confirm-veil) .spin:not(.ring):empty {
+    display: inline-block; width: 72px; height: 10px; margin-right: 8px;
+    border: 0; border-radius: var(--chip-radius); vertical-align: middle;
+    background: linear-gradient(100deg, var(--skeleton-base) 20%, var(--skeleton-light) 50%, var(--skeleton-base) 80%);
+    background-size: 220% 100%; animation: component-shimmer 1.6s ease-out infinite;
+  }
+  .stage #phase[style*="--good"]::before {
+    content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 7px;
+    border-radius: var(--chip-radius); background: var(--good);
+  }
+  @keyframes component-shimmer { from { background-position: 100% 0; } to { background-position: -120% 0; } }
+  @keyframes component-arrive { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes component-live { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+  @media (prefers-reduced-motion: no-preference) {
+    .stage :is(.panel, .card, .editor, .fix-tile):not(:where(#account-card, #account-card *)) {
+      animation: component-arrive 240ms ease-out backwards;
+    }
+    .stage :is(.panel, .card, .editor, .fix-tile):not(:where(#account-card *)):nth-child(2) { animation-delay: 40ms; }
+    .stage :is(.panel, .card, .editor, .fix-tile):not(:where(#account-card *)):nth-child(3) { animation-delay: 80ms; }
+    .stage :is(.panel, .card, .editor, .fix-tile):not(:where(#account-card *)):nth-child(4) { animation-delay: 120ms; }
+    .stage :is(.panel, .card, .editor, .fix-tile):not(:where(#account-card *)):nth-child(n+5) { animation-delay: 160ms; }
+    .stage .xh-live.up i, .stage .led.on, .stage #phase[style*="--good"]::before,
+    .updc-dialog.busy .updc-mark { animation: component-live 2s ease-out infinite; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .stage :is(.panel, .card, .editor, .fix-tile, .spin, .ring.spin i, .led, .xh-live i),
+    .modal-back *, .confirm-veil *, .updc-dialog *, .upd-toast { animation: none !important; animation-delay: 0ms !important; }
+    .stage :is(.btn, #apply, .btn-play):hover:not(:disabled) { transform: none; }
+    .stage .fix-tile:hover { transform: none; }
+    :is(.stage, .modal-back, .confirm-veil) .spin:not(.ring):empty { background: var(--skeleton-base); }
+  }
+</style>
 </head>
 <body>
 <!-- One icon per setting. Stroke icons on a 24 grid, drawn in currentColor so
