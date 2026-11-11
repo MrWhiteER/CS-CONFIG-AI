@@ -5390,9 +5390,170 @@
     .stage .fix-tile:hover { transform: none; }
     :is(.stage, .modal-back, .confirm-veil) .spin:not(.ring):empty { background: var(--skeleton-base); }
   }
+  /* Step 4: first-load veil and Account. All surfaces follow the theme,
+     including the two light themes; Pro inherits its flat shape and glow. */
+  .boot-screen {
+    position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center;
+    padding: 24px; background: var(--bg); color: var(--ink);
+    transition: opacity 200ms ease-out, visibility 200ms;
+    animation: boot-failsafe 1ms 4600ms forwards;
+  }
+  .boot-screen.is-dismissed { opacity: 0; visibility: hidden; pointer-events: none; }
+  .boot-content { width: min(320px, 100%); text-align: center; }
+  .boot-mark { width: 80px; height: 80px; color: var(--accent); margin-bottom: 24px; }
+  .boot-name, .account-brand {
+    font-family: var(--display); font-weight: 700; letter-spacing: .12em;
+    font-size: 16px; line-height: 1.3;
+  }
+  .boot-track { height: 2px; margin: 24px 0; overflow: hidden; background: var(--line); }
+  .boot-track::after {
+    content: ""; display: block; width: 36%; height: 100%; background: var(--accent);
+    animation: boot-progress 1400ms ease-in-out infinite;
+  }
+  .boot-tip { min-height: 3.1em; margin: 0; color: var(--muted); font-size: 12px; }
+  @keyframes boot-progress { from { transform: translateX(-100%); } to { transform: translateX(380%); } }
+  @keyframes boot-glow {
+    from { opacity: .25; transform: scale(.94); }
+    to { opacity: 1; transform: scale(1); filter: drop-shadow(0 0 18px var(--component-glow)); }
+  }
+  @keyframes boot-failsafe { to { visibility: hidden; opacity: 0; pointer-events: none; } }
+  @keyframes boot-tip-in { from { opacity: .35; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+
+  .stage #account-card {
+    padding: 0; overflow: hidden; border-radius: var(--component-radius);
+    border: 1px solid var(--line); background: var(--panel);
+    box-shadow: var(--component-shadow);
+    -webkit-backdrop-filter: var(--panel-blur); backdrop-filter: var(--panel-blur);
+    container-type: inline-size;
+  }
+  #account-card::before, #account-card::after, #account-card > h2::before { content: none; }
+  #account-card > h2 { margin: 0; padding: 16px 24px; border-bottom: 1px solid var(--line); }
+  #account-out { padding: 24px; }
+  #account-out:has(> .account-login) { padding: 0; }
+  .account-login { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .9fr); }
+  .account-form { min-width: 0; padding: clamp(24px, 4cqi, 44px); }
+  .account-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+  .account-brand svg { flex: none; width: 38px; height: 38px; color: var(--accent); }
+  #account-card .sub { color: var(--muted); }
+  #account-card .ways { grid-template-columns: minmax(0, 1fr); gap: 8px; margin: 20px 0 0; }
+  #account-card .way {
+    min-width: 0; width: 100%; min-height: 58px; padding: 10px 12px;
+    border-radius: var(--control-radius); background: var(--bg-2); color: var(--ink);
+    transition: background var(--component-motion), border-color var(--component-motion), transform var(--component-motion);
+  }
+  #account-card .way:hover:not(:disabled) { background: var(--accent-dim); }
+  #account-card .way .wi { border-radius: var(--chip-radius); margin: 0; }
+  #account-card .way b { font-weight: 600; }
+  #account-card .way span { overflow-wrap: anywhere; }
+  #account-card .pwform { grid-template-columns: minmax(0, 1fr); gap: 10px; margin-top: 24px; }
+  #account-card .pwform input {
+    width: 100%; min-width: 0; min-height: 44px; padding: 12px;
+    border-radius: var(--control-radius); background: var(--bg-2); color: var(--ink);
+    border: 1px solid var(--line); font-family: var(--body);
+  }
+  #account-card .pwform input::placeholder { color: var(--muted); }
+  #account-card :is(input, button, a):focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 3px;
+  }
+  #account-card .btn {
+    clip-path: none; border-radius: var(--control-radius); min-height: 34px;
+    border: 1px solid var(--line); background: var(--bg-2); color: var(--ink); box-shadow: none;
+    transition: background var(--component-motion), box-shadow var(--component-motion), transform var(--component-motion);
+  }
+  #account-card .btn:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-dim); }
+  #account-card .btn.primary {
+    min-height: 48px; width: 100%; margin-top: 6px; background: var(--accent);
+    border-color: var(--accent); color: var(--on-accent); font-size: 14px; letter-spacing: .08em;
+  }
+  #account-card .btn.primary:hover:not(:disabled) {
+    filter: none; transform: translateY(-1px); box-shadow: 0 0 22px var(--component-glow);
+  }
+  #account-card .btn:disabled { opacity: .5; cursor: default; }
+  #account-card .need { border-radius: var(--control-radius); overflow-wrap: anywhere; }
+  #account-card .acct .who-big { overflow-wrap: anywhere; min-width: 0; }
+  #account-card .ident span, #account-card .plan { border-radius: var(--chip-radius); }
+  .account-art {
+    position: relative; isolation: isolate; overflow: hidden; min-height: 460px;
+    border-left: 1px solid var(--line); background: var(--bg);
+  }
+  .account-art::before {
+    content: ""; position: absolute; inset: -20%; opacity: var(--glow);
+    background: radial-gradient(ellipse at 65% 25%, var(--accent) 0%, transparent 48%),
+      linear-gradient(145deg, transparent 25%, var(--accent-dim) 50%, var(--accent-deep) 100%);
+  }
+  .account-art::after {
+    content: ""; position: absolute; inset: 0;
+    background: repeating-linear-gradient(135deg, transparent 0 79px, var(--line-soft) 80px 81px);
+  }
+  .account-art svg {
+    position: absolute; width: 130%; height: 100%; left: -15%; top: 0;
+    color: var(--accent); fill: none; stroke: currentColor; stroke-width: .6;
+  }
+  .account-art .art-solid { fill: var(--accent-dim); stroke: var(--accent); }
+  .account-art .art-axis { stroke: var(--line); }
+  @keyframes account-drift { to { transform: translate3d(-3%, 4%, 0) rotate(-4deg); } }
+  @media (prefers-reduced-motion: no-preference) {
+    .boot-mark { animation: boot-glow 900ms ease-out both; }
+    .boot-tip.is-changing { animation: boot-tip-in 220ms ease-out; }
+    .account-art::before { animation: account-drift 12s ease-in-out infinite alternate; }
+    .account-art svg { animation: account-drift 16s ease-in-out infinite alternate-reverse; }
+  }
+  @container (max-width: 640px) {
+    .account-login { grid-template-columns: minmax(0, 1fr); }
+    .account-art { display: none; }
+  }
+  @media (max-width: 760px) {
+    .account-login { grid-template-columns: minmax(0, 1fr); }
+    .account-art { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .boot-screen { transition-duration: 80ms; }
+    .boot-track::after { animation: none; width: 100%; }
+    #account-card *, #account-card *::before, #account-card *::after { animation: none !important; transition: none !important; }
+    #account-card :is(.way, .btn):hover:not(:disabled) { transform: none; }
+  }
 </style>
 </head>
 <body>
+<!-- Independent of app startup: a timeout and a CSS failsafe always uncover it. -->
+<div class="boot-screen" aria-hidden="true">
+  <div class="boot-content">
+    <svg class="boot-mark" viewBox="0 0 16 16" focusable="false"><path fill="currentColor" d="M12 3H6L3 6V10L6 13H12V11H7L5 9V7L7 5H12Z"/><path fill="var(--ink)" d="M10 5H12V7H14V9H12V11H10V9H8V7H10Z"/></svg>
+    <div class="boot-name">CS CONFIG AI</div>
+    <div class="boot-track"></div>
+    <p class="boot-tip">Keep your crosshair at head height.</p>
+  </div>
+</div>
+<script>
+/* Only owns the veil. Read first-scan/preferences readiness without modifying
+   startup, its promises, requests, handlers, or error handling. */
+(() => {
+  const veil = document.querySelector(".boot-screen");
+  const tip = veil.querySelector(".boot-tip");
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const tips = ["Keep your crosshair at head height.",
+    "Stop moving before you take the shot.", "Use the radar to keep track of your team."];
+  let nextTip = 0, finished = false, tipTimer;
+  const dismiss = () => {
+    if (finished) return;
+    finished = true;
+    clearTimeout(fallback); clearInterval(readyTimer); clearInterval(tipTimer);
+    veil.classList.add("is-dismissed");
+    setTimeout(() => veil.remove(), reduced.matches ? 100 : 240);
+  };
+  const fallback = setTimeout(dismiss, 4200);
+  const readyTimer = setInterval(() => {
+    if (document.readyState === "complete" && typeof prefsReady !== "undefined" && prefsReady) dismiss();
+  }, 60);
+  tipTimer = setInterval(() => {
+    if (reduced.matches) return;
+    tip.classList.remove("is-changing");
+    tip.textContent = tips[++nextTip % tips.length];
+    void tip.offsetWidth;
+    tip.classList.add("is-changing");
+  }, 1500);
+})();
+</script>
 <!-- One icon per setting. Stroke icons on a 24 grid, drawn in currentColor so
      a row's icon takes the colour of its state rather than its own. Referenced
      by name from OPT_ICONS below -- add an icon here and there, nowhere else. -->
@@ -12451,6 +12612,11 @@ function renderCloud() {
 
   if (!d.signed_in) {
     box.innerHTML =
+      '<div class="account-login"><div class="account-form">' +
+      '<div class="account-brand"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">' +
+        '<path fill="currentColor" d="M12 3H6L3 6V10L6 13H12V11H7L5 9V7L7 5H12Z"/>' +
+        '<path fill="var(--ink)" d="M10 5H12V7H14V9H12V11H10V9H8V7H10Z"/>' +
+      '</svg>CS CONFIG AI</div>' +
       '<p class="sub">One account, three ways in. Whichever you use, you land on ' +
       "the same settings and the same plan.</p>" +
       '<div class="ways">' +
@@ -12459,7 +12625,15 @@ function renderCloud() {
         cloudWay("mail", "Email and password", "if you would rather not use either") +
       "</div><div id=\"pw-area\"></div>" +
       (d.error ? '<p class="need">The cloud could not be reached: ' +
-                 esc(d.error) + "</p>" : "");
+                 esc(d.error) + "</p>" : "") +
+      '</div><div class="account-art" aria-hidden="true">' +
+        '<svg viewBox="0 0 400 600" focusable="false" preserveAspectRatio="xMidYMid slice">' +
+          '<path class="art-axis" d="M0 300h400M200 0v600"/>' +
+          '<path class="art-solid" d="M310 80L70 320h110L90 520l250-280H225Z"/>' +
+          '<path d="M340 30L30 340h110L50 570l320-350H265Z"/>' +
+          '<circle cx="200" cy="300" r="155"/><circle cx="200" cy="300" r="170"/>' +
+          '<path d="M200 110v40m0 300v40M10 300h40m300 0h40"/>' +
+        '</svg></div></div>';
     return;
   }
 
