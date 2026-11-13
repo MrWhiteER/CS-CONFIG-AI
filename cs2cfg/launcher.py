@@ -449,6 +449,7 @@ def _bring_up_companions(
     from . import companions as companions_mod
 
     pending: List[Tuple[str, Callable[[], bool]]] = []
+    wait = COMPANION_WAIT
 
     if start_crosshairx:
         from . import crosshairx
@@ -475,6 +476,15 @@ def _bring_up_companions(
         if result.get("ok") and not result.get("already"):
             report(f"  starting {entry['name']}...", "")
             pending.append((entry["name"], lambda n=exe_name: companions_mod.running(n)))
+            if entry.get("integration") == "faceit-ac":
+                # FACEIT refuses a game that started before its anti-cheat,
+                # and the anti-cheat waits on a UAC prompt a person answers.
+                from .faceit_apps import AC_WAIT
+
+                wait = max(wait, AC_WAIT)
+            if result.get("elevated"):
+                report(f"  {entry['name']} needs administrator rights: "
+                       "accept the Windows prompt", "")
         elif not result.get("ok"):
             report(f"  could not start {entry['name']}: "
                   f"{result.get('error', 'unknown error')}", "warn")
@@ -482,7 +492,7 @@ def _bring_up_companions(
     if not pending:
         return
 
-    deadline = time.monotonic() + COMPANION_WAIT
+    deadline = time.monotonic() + wait
     still = {name for name, _ in pending}
     while still and time.monotonic() < deadline:
         if should_stop and should_stop():
