@@ -1935,6 +1935,46 @@
   .spin { display: inline-block; animation: sp 1s linear infinite; }
   @keyframes sp { to { transform: rotate(360deg); } }
 
+/* Valve relay drop-up: the panel uses the top layer to escape hero clipping. */
+.sp-chip { position:absolute; right:22px; bottom:20px; display:flex; align-items:center; gap:10px; max-width:min(430px,calc(42% - 24px)); padding:11px 14px; border:1px solid var(--line); border-radius:4px; background:var(--panel-2); color:var(--ink); box-shadow:0 6px 24px #0003; cursor:pointer; font:600 12px var(--mono); text-align:left; line-height:1.5; }
+.sp-chip:hover,.sp-chip[aria-expanded="true"] { border-color:var(--accent); }
+.sp-glyph { width:22px; height:22px; flex:none; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+.sp-led { width:5px; height:5px; border-radius:50%; background:currentColor; flex:none; }
+.sp-chip.fresh .sp-led { animation:sp-pulse 2.4s ease-in-out infinite; }
+.sp-tone { color:var(--sp-tone,var(--faint)); }
+.sp-panel { position:fixed; inset:auto; margin:0; box-sizing:border-box; width:380px; padding:0; color:var(--ink); border:1px solid var(--line); border-top:2px solid var(--accent); border-radius:5px; background:linear-gradient(var(--panel-2),var(--panel-2)),var(--bg); box-shadow:0 16px 60px #0006; transform-origin:bottom right; overflow:hidden; }
+.sp-panel:popover-open { animation:sp-unfold .23s ease-out both; }
+.sp-head { display:flex; justify-content:space-between; align-items:center; padding:16px 18px 10px; margin:0; }
+.sp-head strong { font-size:15px; letter-spacing:.02em; }
+.sp-head small { display:block; margin-top:3px; color:var(--faint); font-size:11px; }
+.sp-refresh { border:1px solid var(--line); background:transparent; color:var(--ink); border-radius:3px; cursor:pointer; padding:7px; display:flex; }
+.sp-refresh:disabled { opacity:.5; cursor:wait; }
+.sp-search { display:block; box-sizing:border-box; width:calc(100% - 36px); margin:2px 18px 12px; padding:10px 12px; background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:3px; font:inherit; font-size:12px; }
+.sp-list { overflow:auto; overscroll-behavior:contain; max-height:285px; padding:0 8px; }
+.sp-row { display:grid; grid-template-columns:26px minmax(90px,1fr) 96px 23px; gap:9px; align-items:center; padding:11px 9px; border-bottom:1px solid var(--line); outline-offset:-2px; }
+.sp-row:focus { outline:2px solid var(--accent); background:var(--panel); }
+.sp-row.sp-over { opacity:.65; }
+.sp-row.sp-unknown { color:var(--faint); }
+.sp-city { display:block; font-size:12px; font-weight:650; }
+.sp-country { display:block; color:var(--faint); font-size:10px; margin-top:3px; }
+.sp-region-icon { color:var(--faint); }
+.sp-value { display:block; text-align:right; font:600 15px var(--mono); font-variant-numeric:tabular-nums; }
+.sp-value small { font:10px sans-serif; }
+.sp-track { position:relative; height:3px; background:var(--line); margin-top:7px; }
+.sp-fill { display:block; height:100%; background:currentColor; transform-origin:left; }
+.sp-limit { position:absolute; width:1px; height:9px; top:-3px; background:var(--ink); }
+.sp-foot { padding:12px 18px; display:flex; justify-content:space-between; gap:12px; color:var(--faint); font-size:10px; background:var(--panel); }
+.sp-notice { margin:0; padding:0 18px 10px; font-size:11px; color:var(--faint); }
+.sp-empty { padding:30px 18px; color:var(--faint); font-size:12px; text-align:center; }
+.sp-measuring .sp-sweep { transform-origin:12px 12px; animation:sp-radar 1.4s linear infinite; }
+.sp-panel.sp-enter .sp-row { animation:sp-row .25s ease-out both; animation-delay:calc(var(--sp-index) * 35ms); }
+.sp-paused,.sp-paused * { animation-play-state:paused !important; }
+@keyframes sp-unfold { from { transform:translateY(8px) scaleY(.94); opacity:0; } to { transform:none; opacity:1; } }
+@keyframes sp-row { from { transform:translateY(7px); opacity:0; } to { transform:none; opacity:1; } }
+@keyframes sp-radar { to { transform:rotate(360deg); } }
+@keyframes sp-pulse { 50% { transform:scale(1.7); opacity:.35; } }
+@media(prefers-reduced-motion:reduce) { .sp-panel,.sp-panel *,.sp-chip * { animation:none !important; } }
+@media(max-width:700px) { [data-panel="launcher"] .home-hero { padding-bottom:100px; }.sp-chip { right:16px; bottom:16px; font-size:11px; max-width:calc(100% - 32px); } }
 </style>
 <style>
   /* ------------------------------------------------------------------------
@@ -5562,6 +5602,7 @@ const startup = (() => {
     finished = true;
     clearTimeout(fallback); clearInterval(tipTimer);
     veil.classList.add("is-dismissed");
+    document.dispatchEvent(new Event('cs2cfg:ready'));
     setTimeout(() => veil.remove(), reduced.matches ? 100 : 240);
   };
   const fallback = setTimeout(dismiss, 15000);
@@ -5741,6 +5782,7 @@ const startup = (() => {
 
     <div class="tab-panel" data-panel="launcher">
       <div class="hero home-hero" id="home-hero">
+        <button type="button" class="sp-chip" id="sp-toggle" aria-expanded="false" aria-controls="sp-panel" aria-haspopup="dialog" title="Ping to Valve's relay in this city. In-game ping is usually within a few ms."><span id="sp-chip-icon" class="sp-tone"></span><span id="sp-summary">Server regions</span><span class="sp-led sp-tone" aria-hidden="true"></span><span aria-hidden="true">⌃</span></button>
         <div class="hero-art" aria-hidden="true"><img src="assets/home/hero.webp" alt="" fetchpriority="high"><div class="monitor-light"></div><div class="desk-light"></div></div>
         <div class="hero-copy">
           <div class="hero-brand"><span class="config-mark" aria-hidden="true"></span><span>CS CONFIG AI</span></div><div class="eyebrow">Ready to play</div>
@@ -14434,6 +14476,142 @@ document.addEventListener("click", async e => {
 
 // Two views over one page: what you do, and what you configure. The active
 // tab is remembered like every other preference.
+const serverPingWidget = (() => {
+  const chip = document.getElementById('sp-toggle');
+  const panel = document.createElement('section');
+  panel.id = 'sp-panel'; panel.className = 'sp-panel'; panel.setAttribute('popover','auto');
+  panel.setAttribute('role','dialog'); panel.setAttribute('aria-label','Valve server regions');
+  panel.innerHTML = '<header class="sp-head"><div><strong>Server regions</strong><small>Live routes to Valve relays</small></div><button type="button" class="sp-refresh" aria-label="Refresh server ping" title="Measure again">↻</button></header><input class="sp-search" aria-label="Search by country, city or code" placeholder="Search country, city or code…" autocomplete="off"><div class="sp-list" role="list" aria-label="Regions sorted by ping"></div><p class="sp-notice" role="status"></p><footer class="sp-foot"><span class="sp-age">Not measured yet</span><span class="sp-limit-label"></span></footer>';
+  document.body.append(panel);
+  const search = panel.querySelector('input'), list = panel.querySelector('.sp-list');
+  const refresh = panel.querySelector('.sp-refresh'), summary = document.getElementById('sp-summary');
+  let data = {regions:[],running:false}, opened = false, busy = false, timer = 0, frame = 0;
+  const values = new Map();
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+  function glyph(status) {
+    const shapes = {
+      good:'<path d="M5 8h14M5 15h8M8 5v1m0 5v1m0 6v1"/><path d="m15 18 2 2 4-5"/>',
+      ok:'<path d="M5 8h14M5 15h10M8 5v1m0 5v1m0 6v1M18 16v4m3-6v6"/>',
+      bad:'<path d="M5 8h14M5 15h8M8 5v1m0 5v1m0 6v1M18 14v3m0 3h.01"/>',
+      down:'<path d="M5 8h14M5 15h8M8 5v1m0 5v1m0 6v1m7-3 6 6m0-6-6 6"/>',
+      unknown:'<path d="M5 8h14M5 15h8M8 5v1m0 5v1m0 6v1m8-4c0-3 5-3 5 0 0 2-3 1-3 3m0 3h.01"/>',
+      measuring:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><path class="sp-sweep" d="M12 12V4m0 8 6 4"/>'
+    };
+    return '<svg class="sp-glyph" viewBox="0 0 24 24" aria-hidden="true">' + (status === 'measuring' ? '' : '<path d="M12 21H4V3h16v9"/>') + (shapes[status] || shapes.unknown) + '</svg>';
+  }
+  function tone(ms) {
+    if (ms == null) return 'var(--faint)';
+    const stops = [30,60,90,130,180];
+    const colors = ['var(--good)','color-mix(in srgb,var(--good) 55%,var(--warn))','var(--warn)','color-mix(in srgb,var(--warn) 50%,var(--bad))','var(--bad)'];
+    for(let i=0;i<4;i++) if(ms<=stops[i+1]) {
+      const pct = Math.min(100,Math.max(0,(ms-stops[i])/(stops[i+1]-stops[i])*100));
+      return 'color-mix(in srgb,'+colors[i]+' '+(100-pct)+'%,'+colors[i+1]+')';
+    }
+    return colors[4];
+  }
+  function position() {
+    if(!opened) return;
+    const box = chip.getBoundingClientRect(), gap = 9;
+    if(box.top<110 || box.top>window.innerHeight) { panel.hidePopover(); return; }
+    panel.style.width = Math.min(380,window.innerWidth-24)+'px';
+    panel.style.right = Math.max(12,window.innerWidth-box.right)+'px';
+    panel.style.bottom = Math.max(12,window.innerHeight-box.top+gap)+'px';
+    panel.style.maxHeight = Math.max(100,box.top-gap-12)+'px';
+    list.style.maxHeight = Math.max(55,Math.min(285,box.top-190))+'px';
+  }
+  function age() {
+    panel.querySelector('.sp-age').textContent = data.running ? 'Measuring '+(data.completed||0)+' / '+(data.total||'…') : data.updated_at ? 'Updated '+Math.max(0,Math.floor(Date.now()/1000-data.updated_at))+' s ago' : 'Not measured yet';
+    chip.classList.toggle('fresh',!!data.updated_at && Date.now()/1000-data.updated_at<60);
+  }
+  function paintValues() {
+    list.querySelectorAll('.sp-row').forEach(row => {
+      const value = values.get(row.dataset.code);
+      const ms = value == null ? null : Math.round(value);
+      row.style.setProperty('--sp-tone',tone(value));
+      row.querySelector('.sp-number').textContent = ms == null ? '—' : ms;
+      row.querySelector('.sp-fill').style.transform = 'scaleX('+(value == null ? 0 : Math.min(1,Math.max(.015,value/200)))+')';
+    });
+  }
+  function render() {
+    const focusCode = document.activeElement?.dataset.code;
+    const scrollTop = list.scrollTop;
+    const query = search.value.toLocaleLowerCase().trim();
+    const regions = [...data.regions].sort((a,b)=>(a.ping_ms??(a.status==='measuring'?values.get(a.code):null)??Infinity)-(b.ping_ms??(b.status==='measuring'?values.get(b.code):null)??Infinity)||a.city.localeCompare(b.city));
+    const filtered = regions.filter(r => (r.city+' '+r.country+' '+r.code+' '+(r.codes||[]).join(' ') + (r.country==='United Arab Emirates'?' uae emirates':'')).toLocaleLowerCase().includes(query));
+    list.innerHTML = filtered.map((r,i) => '<div class="sp-row sp-tone '+(r.ping_ms==null?'sp-unknown ':'')+(data.max_ping && r.ping_ms>data.max_ping?'sp-over ':'')+(r.status==='measuring'?'sp-measuring':'')+'" role="listitem" tabindex="0" data-code="'+esc(r.code)+'" style="--sp-index:'+Math.min(i,8)+'" title="'+esc(r.status==='unknown'?'No ICMP reply; availability unknown.':r.status==='measuring'?'Measuring relay…':r.status+' · '+r.loss+'% packet loss · '+r.relays_tried+' relay(s) tried')+'"><span class="sp-region-icon" aria-hidden="true"><svg class="sp-glyph" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><ellipse cx="12" cy="12" rx="3.5" ry="8"/><path d="M4 12h16M6 7h12M6 17h12"/></svg></span><span><span class="sp-city">'+esc(r.city)+'</span><span class="sp-country">'+esc(r.country)+'</span></span><span><span class="sp-value"><span class="sp-number">—</span> <small>ms</small></span><span class="sp-track"><span class="sp-fill"></span>'+(data.max_ping?'<span class="sp-limit" style="left:'+Math.min(100,data.max_ping/2)+'%" title="Matchmaking limit: '+data.max_ping+' ms"></span>':'')+'</span></span><span aria-label="'+esc(r.status)+'">'+glyph(r.status)+'</span></div>').join('') || '<div class="sp-empty">'+(query?'No regions match your search.':data.running?'Discovering Valve relays…':'Refresh to measure server regions.')+'</div>';
+    list.scrollTop = scrollTop;
+    if(focusCode) [...list.children].find(r=>r.dataset.code===focusCode)?.focus({preventScroll:true});
+    paintValues();
+    const best = regions.find(r=>r.ping_ms!=null), preferred = regions.find(r=>r.code===(data.preferred_code||'dxb'));
+    const degraded = preferred && ['bad','down','unknown'].includes(preferred.status);
+    summary.textContent = best ? (degraded ? preferred.city.toUpperCase()+' '+(preferred.status==='bad'?'DEGRADED':preferred.status.toUpperCase())+' · best: ' : '')+best.city.toUpperCase()+' · '+Math.round(best.ping_ms)+' ms' : data.running ? 'Measuring regions…' : data.regions.length ? 'Relay ping unknown' : 'Server regions';
+    chip.style.setProperty('--sp-tone',tone(degraded ? preferred.ping_ms : best?.ping_ms));
+    document.getElementById('sp-chip-icon').innerHTML = glyph(data.running?'measuring':degraded?preferred.status:best?.status||'unknown');
+    chip.classList.toggle('sp-measuring',data.running);
+    refresh.disabled = data.running;
+    panel.querySelector('.sp-notice').textContent = data.error || (data.regions.some(r=>r.status==='unknown')?'Unknown means no ICMP reply, not a confirmed outage.':'Ping to Valve’s relay in this city. In-game ping is usually within a few ms.');
+    panel.querySelector('.sp-limit-label').textContent = data.max_ping ? '│ Your limit '+data.max_ping+' ms' : 'Relay ping · ICMP';
+    age(); position();
+  }
+  function accept(next) {
+    cancelAnimationFrame(frame);
+    const from = new Map(values), start = performance.now(); data = next;
+    const targets = new Map(next.regions.map(r=>[r.code,r.status==='measuring'?(values.get(r.code)??null):r.ping_ms]));
+    for(const [code,value] of targets) if(!values.has(code)||value==null) values.set(code,value);
+    render();
+    function step(now) {
+      const t = document.hidden||reduced.matches ? 1 : Math.min(1,(now-start)/420), eased = 1-Math.pow(1-t,3);
+      for(const [code,value] of targets) values.set(code,value==null?null:(from.get(code)??value)+(value-(from.get(code)??value))*eased);
+      paintValues();
+      if(t<1) frame=requestAnimationFrame(step);
+    }
+    frame=requestAnimationFrame(step);
+  }
+  function visible() { return startup.finished && !document.hidden && !chip.closest('.tab-panel').classList.contains('hidden'); }
+  function schedule() {
+    clearTimeout(timer);
+    if(data.running && visible()) timer=setTimeout(poll,650);
+  }
+  async function poll() {
+    try { accept(await api('/api/servers/ping')); } catch(e) { panel.querySelector('.sp-notice').textContent=e.message; }
+    schedule();
+  }
+  async function start(force=false) {
+    if(busy||!visible()) return;
+    busy=true;
+    try {
+      const current=await api('/api/servers/ping'); accept(current);
+      if(!current.running && (force||!current.updated_at||Date.now()/1000-current.updated_at>=60)) accept(await api('/api/servers/ping/start',{}));
+    } catch(e) { panel.querySelector('.sp-notice').textContent=e.message; summary.textContent='Server ping unavailable'; }
+    finally { busy=false; schedule(); }
+  }
+  chip.setAttribute('popovertarget','sp-panel');
+  panel.addEventListener('toggle',event=>{
+    opened=event.newState==='open'; chip.setAttribute('aria-expanded',String(opened));
+    if(opened) { panel.classList.add('sp-enter'); setTimeout(()=>panel.classList.remove('sp-enter'),650); position(); search.focus(); start(true); }
+    else if(document.activeElement===document.body) chip.focus({preventScroll:true});
+  });
+  panel.addEventListener('keydown',event=>{
+    if(event.key==='Escape') { event.preventDefault(); panel.hidePopover(); chip.focus(); return; }
+    if(['ArrowDown','ArrowUp'].includes(event.key)) {
+      event.preventDefault(); const rows=[...list.querySelectorAll('.sp-row')];
+      const index=rows.indexOf(document.activeElement), delta=event.key==='ArrowDown'?1:-1;
+      rows[index<0?(delta>0?0:rows.length-1):(index+delta+rows.length)%rows.length]?.focus();
+    } else if(event.key.length===1 && !event.ctrlKey && !event.metaKey && document.activeElement!==search) { search.focus(); }
+  });
+  search.addEventListener('input',render); refresh.addEventListener('click',()=>start(true));
+  window.addEventListener('resize',position); window.addEventListener('scroll',position,true);
+  document.addEventListener('visibilitychange',()=>{
+    [panel,chip].forEach(el=>el.classList.toggle('sp-paused',document.hidden));
+    if(document.hidden) { clearTimeout(timer); cancelAnimationFrame(frame); }
+    else if(visible()) start();
+  });
+  document.addEventListener('cs2cfg:ready',()=>start());
+  setInterval(()=>{ if(visible()) age(); },1000);
+  render();
+  return {shown(){start();},hidden(){clearTimeout(timer); if(opened) panel.hidePopover();}};
+})();
+
 let activeTab = "launcher";
 
 function setTab(name) {
@@ -14468,6 +14646,7 @@ function setTab(name) {
     b.setAttribute("aria-selected", String(b.dataset.tab === name)));
   document.querySelectorAll(".tab-panel").forEach(panel =>
     panel.classList.toggle("hidden", panel.dataset.panel !== name));
+  if (name === 'launcher') serverPingWidget.shown(); else serverPingWidget.hidden();
   // Now that the panel is on screen there is something to measure.
   if (name === "settings") moveSegThumb("settings-subtabs");
   if (name === "cs2") requestAnimationFrame(() => moveSegThumb("cs2-sections"));
