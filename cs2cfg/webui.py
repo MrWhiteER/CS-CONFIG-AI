@@ -70,6 +70,7 @@ class State:
         self.updates: Optional[Any] = None   # updates.Checker, started on demand
         self.demo: Optional[Any] = None      # _DemoJob, while one is downloading
         self.faceit: Optional[Dict[str, Any]] = None  # cached profile + history
+        self.server_ping: Optional[Any] = None  # on-demand Valve relay survey
 
     def refresh(self, rescan: bool = False) -> None:
         if self.machine is None or rescan:
@@ -2618,6 +2619,32 @@ def _net(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     return netcheck.progress()
 
 
+def _servers_ping(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import serverping
+    if state.server_ping is None:
+        return {"running": False, "updated_at": None, "regions": [],
+                "completed": 0, "total": 0, "max_ping": None,
+                "preferred_code": "dxb", "source": "fallback", "error": ""}
+    result = state.server_ping.snapshot()
+    result.update(max_ping=None, preferred_code="dxb")
+    try:
+        user = state.user_for(_active_account(state))
+        result["max_ping"] = serverping.read_max_ping(
+            user.video_cfg.parent / "cs2_user_convars_0_slot0.vcfg")
+    except steam.SteamError:
+        pass
+    return result
+
+
+def _servers_ping_start(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import serverping
+    from .paths import user_data_dir
+    if state.server_ping is None:
+        state.server_ping = serverping.ServerPing(user_data_dir() / "sdr-relays.json")
+    state.server_ping.start()
+    return _servers_ping(state, body)
+
+
 def _temps_elevate(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     """Raise the one prompt, and start the privileged reader behind it.
 
@@ -4298,6 +4325,7 @@ def make_handler(state: State):
         "/api/focus": _focus,
         "/api/net": _net,
         "/api/net/start": _net_start,
+        "/api/servers/ping/start": _servers_ping_start,
         "/api/audio": _audio,
         "/api/audio/pin": _audio_pin,
         "/api/fix/survey": _fix_survey,
@@ -4671,6 +4699,11 @@ def make_handler(state: State):
                         self._send_json({"ok": True, **_machine_payload(state.machine, state)})
                 except (ProbeError, steam.SteamError) as exc:
                     self._send_json({"ok": False, "error": str(exc)}, 500)
+                return
+
+            if path == "/api/servers/ping":
+                with state.lock:
+                    self._send_json({"ok": True, **_servers_ping(state, {})})
                 return
 
             candidate = (WEB_ROOT / path.lstrip("/")).resolve()
