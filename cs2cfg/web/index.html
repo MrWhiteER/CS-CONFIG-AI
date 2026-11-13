@@ -1939,7 +1939,7 @@
 .sp-chip { white-space:nowrap; min-width:0; box-sizing:border-box; position:absolute; right:22px; bottom:20px; display:flex; align-items:center; gap:10px; max-width:min(430px,calc(42% - 24px)); padding:11px 14px; border:1px solid var(--line); border-radius:4px; background:var(--panel-2); color:var(--ink); box-shadow:0 6px 24px #0003; cursor:pointer; font:600 12px var(--mono); text-align:left; line-height:1.5; }
 #sp-summary { display:flex; align-items:center; gap:6px; min-width:0; overflow:hidden; }
 .sp-summary-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.sp-summary-ms { flex:none; color:var(--sp-tone); }
+.sp-summary-ms { flex:none; color:var(--sp-ping-tone,var(--faint)); }
 .sp-chip > :not(#sp-summary) { flex:none; }
 .sp-chip:hover,.sp-chip[aria-expanded="true"] { border-color:var(--accent); }
 .sp-glyph { width:22px; height:22px; flex:none; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
@@ -14566,6 +14566,7 @@ const serverPingWidget = (() => {
     summary.innerHTML = best ? '<span class="sp-summary-name">'+esc(prefix+shortName(best).toUpperCase())+'</span><span class="sp-summary-ms">'+Math.round(best.ping_ms)+' ms</span>' : '<span class="sp-summary-name">'+(data.running?'Measuring regions\u2026':data.regions.length?'Relay ping unknown':'Server regions')+'</span>';
     chip.title = (best ? prefix+best.city+' ('+best.country+') \u00b7 '+Math.round(best.ping_ms)+' ms. ' : '')+"Ping to Valve's relay in this city. In-game ping is usually within a few ms.";
     chip.style.setProperty('--sp-tone',tone(degraded ? preferred.ping_ms : best?.ping_ms));
+    chip.style.setProperty('--sp-ping-tone',tone(best?.ping_ms));
     document.getElementById('sp-chip-icon').innerHTML = glyph(data.running?'measuring':degraded?preferred.status:best?.status||'unknown');
     chip.classList.toggle('sp-measuring',data.running);
     refresh.disabled = data.running;
