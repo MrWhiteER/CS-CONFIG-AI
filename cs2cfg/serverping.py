@@ -51,9 +51,14 @@ def parse_regions(config: dict) -> list:
                 continue
         if not relays:
             continue
-        key = (city.casefold(), country.casefold())
+        # partners is also set on Valve-owned tier-0 POPs (including dxb).
+        # Tier 1 identifies partner relays; never combine them with Valve's
+        # city row, even when their descriptions use the same city.
+        partner = pop.get("partners") == 1 and pop.get("tier") == 1
+        key = (city.casefold(), country.casefold(), partner,
+               re.sub(r"\d+$", "", code) if partner else "")
         region = groups.setdefault(key, {"code": re.sub(r"\d+$", "", code),
-                                        "city": city, "country": country,
+                                        "city": city, "country": country, "partner": partner,
                                         "codes": [], "relays": [], "pop_relays": []})
         region["codes"].append(code)
         region["relays"] = list(dict.fromkeys(region["relays"] + relays))
@@ -99,6 +104,7 @@ def measure(region: dict) -> dict:
                 break
     ping_ms, loss = min(candidates) if candidates else (None, 100.0)
     return {key: region[key] for key in ("code", "city", "country", "codes")} | {
+        "partner": region.get("partner", False),
         "ping_ms": ping_ms, "loss": loss, "status": classify(ping_ms, loss),
         "relays_tried": tried}
 
@@ -162,22 +168,45 @@ class ServerPing:
             return parse_regions(self.config or FALLBACK), "cache" if self.config else "fallback", self.directory_error
 
     def start(self):
+        with netcheck.start_lock:
+            return self._start_reserved()
+
+    def _start_reserved(self):
         with self.lock:
             if self.data["running"]:
                 return copy.deepcopy(self.data)
+            if netcheck.progress().get("running") or not netcheck.probe_lock.acquire(blocking=False):
+                return copy.deepcopy(self.data)
             self.data.update(running=True, completed=0, total=0, error="")
             result = copy.deepcopy(self.data)
-        threading.Thread(target=self._sweep, daemon=True, name="server-ping").start()
+        try:
+            threading.Thread(target=self._run_reserved, daemon=True, name="server-ping").start()
+        except Exception:
+            netcheck.probe_lock.release()
+            with self.lock:
+                self.data["running"] = False
+            raise
         return result
+
+    def _run_reserved(self):
+        try:
+            self._sweep()
+        finally:
+            netcheck.probe_lock.release()
 
     def _sweep(self):
         try:
             regions, source, error = self._regions()
-            pending = [{key: row[key] for key in ("code", "city", "country", "codes")} | {
+            previous = {row["code"]: row for row in self.snapshot()["regions"]}
+            pending = [{key: row[key] for key in ("code", "city", "country", "codes", "partner")} | {
                 "ping_ms": None, "loss": None, "status": "measuring", "relays_tried": 0} for row in regions]
+            for row in pending:
+                old = previous.get(row["code"])
+                if old:
+                    row.update({key: old[key] for key in ("ping_ms", "loss", "status", "relays_tried")})
             with self.lock:
                 self.data.update(regions=pending, total=len(regions), source=source, error=error)
-            with ThreadPoolExecutor(max_workers=8) as pool:
+            with ThreadPoolExecutor(max_workers=4) as pool:
                 jobs = {pool.submit(measure, region): index for index, region in enumerate(regions)}
                 for future in as_completed(jobs):
                     result = future.result()

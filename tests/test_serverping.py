@@ -21,6 +21,23 @@ CONFIG = {"pops": {
 
 
 class Regions(unittest.TestCase):
+    def test_partners_stay_separate_even_with_identical_city(self):
+        config = {"pops": {
+            "dxb": {"desc": "Dubai (UAE)", "partners": 1, "tier": 0,
+                    "relays": [{"ipv4": "185.25.183.163"}]},
+            "dfjr": {"desc": "Datapacket Fujairah (UAE)", "partners": 1, "tier": 1,
+                     "relays": [{"ipv4": "185.25.183.179"}]},
+            "ddxb": {"desc": "Dubai (UAE)", "partners": 1, "tier": 1,
+                     "relays": [{"ipv4": "155.133.226.68"}]},
+        }}
+        rows = {r["code"]: r for r in sp.parse_regions(config)}
+        self.assertEqual(len(rows), 3)
+        self.assertFalse(rows["dxb"]["partner"])
+        self.assertTrue(rows["dfjr"]["partner"])
+        self.assertTrue(rows["ddxb"]["partner"])
+        with patch.object(sp.netcheck, "_ping_once", return_value=5):
+            self.assertTrue(sp.measure(rows["dfjr"])["partner"])
+
     def test_groups_numbered_city_variants_and_skips_unusable_entries(self):
         rows = sp.parse_regions(CONFIG)
         self.assertEqual(len(rows), 2)
@@ -109,6 +126,96 @@ class CachedSurvey(unittest.TestCase):
         response = MagicMock()
         response.__enter__.return_value.read.return_value = json.dumps(CONFIG).encode()
         return response
+
+    def test_net_check_blocks_new_sweep_without_touching_cached_results(self):
+        self.survey.data["regions"] = [{"code": "dxb", "ping_ms": 122}]
+        before = self.survey.snapshot()
+        with patch.object(sp.netcheck, "progress", return_value={"running": True}), \
+             patch.object(self.survey, "_sweep") as sweep:
+            self.assertEqual(self.survey.start(), before)
+        sweep.assert_not_called()
+
+    def test_refresh_keeps_cached_rows_until_each_result_arrives_and_uses_four_workers(self):
+        from concurrent.futures import ThreadPoolExecutor
+        rows = sp.parse_regions(CONFIG)
+        old = [{k: r[k] for k in ("code", "city", "country", "codes", "partner")} |
+               {"ping_ms": 6, "loss": 0, "status": "good", "relays_tried": 1} for r in rows]
+        self.survey.data.update(regions=old, updated_at=123)
+        def measured(region):
+            snapshot = self.survey.snapshot()
+            self.assertEqual(snapshot["updated_at"], 123)
+            self.assertTrue(all(r["ping_ms"] is not None for r in snapshot["regions"]))
+            self.assertTrue(all(r["status"] != "measuring" for r in snapshot["regions"]))
+            return next(r for r in old if r["code"] == region["code"]) | {"ping_ms": 8}
+        with patch.object(self.survey, "_regions", return_value=(rows, "cache", "")), \
+             patch.object(sp, "measure", side_effect=measured), \
+             patch.object(sp, "ThreadPoolExecutor", wraps=ThreadPoolExecutor) as pool:
+            self.survey._sweep()
+        pool.assert_called_once_with(max_workers=4)
+        self.assertEqual([r["ping_ms"] for r in self.survey.snapshot()["regions"]], [8, 8])
+
+    def test_net_check_waits_for_sweep_and_blocks_another_start(self):
+        net = sp.netcheck
+        entered, release, finished = threading.Event(), threading.Event(), threading.Event()
+        run = net.Run()
+        def begin():
+            entered.set()
+            run.done = True
+            return False  # no finish worker in this mock
+        def sweep():
+            release.wait(3)
+            self.survey.data["running"] = False
+        original = self.survey._run_reserved
+        def reserved():
+            try:
+                original()
+            finally:
+                finished.set()
+        with patch.object(net, "_run_now", None), \
+             patch.object(net, "Run", return_value=run), \
+             patch.object(run, "_begin", side_effect=begin), \
+             patch.object(self.survey, "_sweep", side_effect=sweep), \
+             patch.object(self.survey, "_run_reserved", side_effect=reserved):
+            self.assertTrue(self.survey.start()["running"])
+            self.assertTrue(net.start()["running"])
+            self.assertFalse(entered.wait(.05))
+            other = sp.ServerPing(self.path)
+            self.assertFalse(other.start()["running"])
+            release.set()
+            self.assertTrue(entered.wait(2))
+            self.assertTrue(finished.wait(2))
+            self.assertTrue(net.probe_lock.acquire(timeout=2))
+            net.probe_lock.release()
+
+    def test_net_check_failure_releases_probe_lock(self):
+        run = sp.netcheck.Run()
+        with patch.object(run, "_begin", side_effect=RuntimeError("failed")):
+            run._begin_serialized()
+        self.assertTrue(run.done)
+        self.assertEqual(run.error, "failed")
+        self.assertTrue(sp.netcheck.probe_lock.acquire(blocking=False))
+        sp.netcheck.probe_lock.release()
+
+    def test_net_check_keeps_reservation_through_fallback_and_releases_on_finish(self):
+        run = sp.netcheck.Run()
+        def finish():
+            self.assertFalse(sp.netcheck.probe_lock.acquire(blocking=False))
+            run.done = True
+        sp.netcheck.probe_lock.acquire()
+        with patch.object(run, "_finish", side_effect=finish):
+            run._finish_serialized()
+        self.assertTrue(sp.netcheck.probe_lock.acquire(blocking=False))
+        sp.netcheck.probe_lock.release()
+
+    def test_failed_sweep_releases_probe_reservation(self):
+        self.survey.data["running"] = True
+        # _run_reserved owns the reservation and must release on failure.
+        sp.netcheck.probe_lock.acquire()
+        with patch.object(self.survey, "_sweep", side_effect=RuntimeError("failed")):
+            with self.assertRaises(RuntimeError):
+                self.survey._run_reserved()
+        self.assertTrue(sp.netcheck.probe_lock.acquire(blocking=False))
+        sp.netcheck.probe_lock.release()
 
     def test_daily_cache_survives_new_instance(self):
         with patch.object(sp, "urlopen", return_value=self.response()) as fetch:
