@@ -10441,8 +10441,7 @@ function kbGhosted(name) { return kbFocus !== 'both' && kbFocus !== name; }
 function kbPiece(name, inner) {
   return '<div class="kb-piece" data-piece="' + name + '"><div class="kb-device-head"><span>' +
     (name === 'board' ? 'Full-size keyboard · 104 keys' : 'Mouse') +
-    '</span><button class="kb-eye" data-kbghost="' + name + '" aria-label="Ghost ' +
-    (name === 'board' ? 'keyboard' : 'mouse') + '">' + kbIcon('eye') + '</button></div>' +
+    '</span></div>' +
     '<div class="kb-device-body">' + inner + '</div></div>';
 }
 function kbApplyFocus() {
@@ -10450,21 +10449,18 @@ function kbApplyFocus() {
     const ghost = kbGhosted(el.dataset.piece);
     el.classList.toggle('is-ghost', ghost);
     el.querySelector('.kb-device-body').inert = ghost;
-    el.querySelector('.kb-eye').setAttribute('aria-pressed', String(ghost));
     el.querySelectorAll('[data-kbcode]').forEach(control => {
       control.setAttribute('tabindex', ghost ? '-1' : '0');
       control.setAttribute('aria-disabled', String(ghost));
     });
   });
   document.querySelectorAll('[data-kbfocus]').forEach(el => el.setAttribute('aria-pressed', String(el.dataset.kbfocus === kbFocus)));
-  document.querySelectorAll('[data-kbghost-toggle]').forEach(el => { el.checked = kbGhosted(el.dataset.kbghostToggle); });
   document.querySelectorAll('.kb-hover-preview').forEach(el => el.remove());
 }
 function kbSetFocus(mode) {
   kbFocus = mode; kbApplyFocus();
   api('/api/prefs', {kb_focus: kbFocus}).catch(() => {});
 }
-function kbToggleGhost(name) { kbSetFocus(kbGhosted(name) ? 'both' : name === 'board' ? 'mouse' : 'board'); }
 function kbCardTitle(title, help) {
   return '<h3 class="kb-card-title">' + title + '<button class="kb-help" aria-label="' +
     esc(help) + '" title="' + esc(help) + '">?</button></h3>';
@@ -10519,33 +10515,32 @@ function renderKeyboard() {
   const rows = KB_ROWS.map(row =>
     '<div class="kb-row">' + row.map(kbCap).join("") + "</div>").join("");
   box.innerHTML =
-    '<div class="kb-workspace"><div class="kb-scene" id="kb-scene"><div class="kb-rig">' +
-    kbPiece('board', '<div class="kb-stage"><div class="kb-board">' + rows + '</div></div>') +
-    kbPiece('mouse', '<div class="kb-mouse">' + mouseModel() + kbShapePicker() + '</div>') +
-    '</div></div><div class="kb-focus-row"><div id="kb-focus" class="kb-mode" role="group" aria-label="Device focus"></div>' +
-    '<button class="kb-help" aria-label="About device focus" title="Fade the other device so you can focus on one. Faded devices can\'t be clicked.">?</button></div><div class="kb-settings">' +
-    '<section class="kb-card kb-inspector" aria-label="Assignment inspector">' +
-    kbCardTitle('Assignment', 'Select a control to inspect its binding or assign a command.') + kbDetail() + '</section>' +
-    '<section class="kb-card">' + kbCardTitle('Key colors', 'Colors show binding sources. Rings mark differences and selection.') +
-    '<div class="kb-legend">' +
+    '<div class="kb-workspace"><div class="kb-scene" id="kb-scene">' +
+    '<div class="kb-legend" aria-label="Key colors">' +
     '<span><i class="dot script"></i>your scripts</span>' +
     '<span><i class="dot custom"></i>changed from CS2 default</span>' +
     '<span><i class="dot bound"></i>CS2 default</span>' +
     '<span><i class="dot free"></i>free</span>' +
     '<span><i class="dot missing"></i>missing default</span>' +
-    '<span><i class="dot selected"></i>selected control</span>' +
+    '<span><i class="dot selected"></i>selected</span>' +
     (keyData.live?.available ? '<span class="kb-live"><i class="dot adrift"></i>' +
       keyData.live.differences.length + ' differ from live CS2</span>' : '') +
-    kbMissingLegend(activeProfile, missingList, showPanel) + '</div>' +
-    kbMissingPanel(activeProfile, missingList, showPanel) + '</section>' +
+    kbMissingLegend(activeProfile, missingList, showPanel) + '</div><div class="kb-rig">' +
+    kbPiece('board', '<div class="kb-stage"><div class="kb-board">' + rows + '</div></div>') +
+    kbPiece('mouse', '<div class="kb-mouse">' + mouseModel() + '</div>') +
+    '</div></div><div class="kb-focus-row"><div id="kb-focus" class="kb-mode" role="group" aria-label="Device focus"></div>' +
+    '<button class="kb-help" aria-label="About device focus" title="Fade the other device so you can focus on one. Faded devices can\'t be clicked.">?</button></div><div class="kb-settings">' +
+    '<section class="kb-card kb-inspector" aria-label="Assignment inspector">' +
+    kbCardTitle('Assignment', 'Select a control to inspect its binding or assign a command.') + kbDetail() + '</section>' +
     '<section class="kb-card">' + kbCardTitle('Mouse', 'Choose your side-button count. Select a mouse zone above to assign it.') +
     kbShapePicker() + '<div class="kb-mouse-bindings">' +
     ['mouse1','mouse2','mouse3','mouse4','mouse5', ...(mouseShape === 'four' ? ['mouse6','mouse7'] : []), 'mwheelup','mwheeldown'].map(code =>
       '<div><span>' + esc(code) + '</span><code>' + esc(kbLookup(code, code)?.command || 'Free') + '</code></div>').join('') +
-    '</div></section><section class="kb-card">' + kbCardTitle('View', 'Ghost a device to focus on the other. Its position stays the same.') +
-    ['board','mouse'].map(name => '<label class="kb-view-toggle"><input type="checkbox" role="switch" data-kbghost-toggle="' +
-      name + '"><span>Ghost ' + (name === 'board' ? 'keyboard' : 'mouse') + '</span></label>').join('') +
-    '</section><section class="kb-card kb-how">' + kbCardTitle('How it works', 'Assignments are saved through the current configuration collection.') +
+    '</div></section>' +
+    (showPanel ? '<section class="kb-card">' + kbCardTitle('Missing defaults',
+      'Stock CS2 binds this profile does not set. They keep the standard layout.') +
+      kbMissingPanel(activeProfile, missingList, showPanel) + '</section>' : '') +
+    '<section class="kb-card kb-how">' + kbCardTitle('How it works', 'Assignments are saved through the current configuration collection.') +
     '<p>Select a control to inspect it. Drag a command onto a key to assign it.</p></section></div></div>';
   $('kb-focus').innerHTML = [['both','Both'],['board','Keyboard'],['mouse','Mouse']].map(([mode,label]) =>
     '<button data-kbfocus="' + mode + '" aria-pressed="' + (kbFocus === mode) + '">' + label + '</button>').join('');
@@ -13567,14 +13562,9 @@ async function loadKeyboard(force) {
   renderKeyboard();
 }
 
-document.addEventListener('change', e => {
-  const toggle = e.target.closest('[data-kbghost-toggle]');
-  if (toggle) kbToggleGhost(toggle.dataset.kbghostToggle);
-});
 document.addEventListener('click', e => {
-  const mode = e.target.closest('[data-kbfocus]'), eye = e.target.closest('[data-kbghost]');
+  const mode = e.target.closest('[data-kbfocus]');
   if (mode) kbSetFocus(mode.dataset.kbfocus);
-  if (eye) kbToggleGhost(eye.dataset.kbghost);
 });
 
 document.addEventListener("click", e => {

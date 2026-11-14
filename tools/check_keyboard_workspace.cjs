@@ -49,6 +49,8 @@ function checkLayout(name){
  const toggle=$('kb-focus').getBoundingClientRect(),help=document.querySelector('.kb-focus-row > .kb-help').getBoundingClientRect();
  check(name+' focus below stage and above cards',toggle.top>=scene.bottom&&toggle.bottom<cards[0].top);
  check(name+' focus centered with adjacent help',Math.abs((toggle.left+toggle.right)-(scene.left+scene.right))<2&&help.left>toggle.right&&help.left-toggle.right<12);
+ const legend=document.querySelector('.kb-scene > .kb-legend')?.getBoundingClientRect();
+ check(name+' legend in stage above devices',!!legend&&legend.top>=scene.top&&legend.bottom<=scene.bottom&&legend.left>=scene.left&&legend.right<=scene.right&&devices.every(b=>b.top>=legend.bottom)&&document.querySelectorAll('.kb-legend').length===1);
  check(name+' dotted stage',getComputedStyle($('kb-scene')).backgroundImage.includes('radial-gradient'));
  check(name+' corner help', [...document.querySelectorAll('.kb-card')].every(card=>{const c=card.getBoundingClientRect(),h=card.querySelector('.kb-help').getBoundingClientRect();return h.right<c.right&&c.right-h.right<14&&h.top>c.top&&h.top-c.top<14;}));
 
@@ -134,8 +136,9 @@ for(const mode of ['board','mouse']){
 }
 kbSetFocus('both');await new Promise(r=>setTimeout(r,450));kbSetFocus('mouse');
 const ghostBinds=calls.filter(c=>c.route==='/api/cfg/bind').length;await drop('+jump','KeyW');check('ghost rejects drops',calls.filter(c=>c.route==='/api/cfg/bind').length===ghostBinds);kbSetFocus('both');await new Promise(r=>setTimeout(r,450));
-document.querySelector('[data-kbghost="mouse"]').click();check('eye ghosts mouse',kbFocus==='board');document.querySelector('[data-kbghost="mouse"]').click();check('eye restores mouse',kbFocus==='both');
-const ghostToggle=document.querySelector('[data-kbghost-toggle="board"]');ghostToggle.checked=true;ghostToggle.dispatchEvent(new Event('change',{bubbles:true}));check('view toggle ghosts keyboard',kbFocus==='mouse');kbSetFocus('both');
+check('one focus control only',document.querySelectorAll('[data-kbghost],[data-kbghost-toggle],.kb-eye').length===0&&document.querySelectorAll('#kb-focus').length===1);
+check('one shape picker only',document.querySelectorAll('.ms-pick').length===1&&!document.querySelector('.kb-piece .ms-pick'));
+document.querySelector('[data-kbfocus="mouse"]').click();check('toggle ghosts keyboard',kbFocus==='mouse');kbSetFocus('both');
 check('focus preference persisted',calls.some(c=>c.route==='/api/prefs'&&c.body.kb_focus==='mouse'));
 document.querySelector('[data-kbsw]').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}));check('profile context menu retained',document.querySelectorAll('[data-kbsw-menu]').length===4);kbswMenu=null;renderKbSwitcher();
 document.querySelector('[data-kbsw]').click();await settle();check('profile switch API preserved',calls.some(c=>c.route==='/api/cfg/layouts/apply'));
