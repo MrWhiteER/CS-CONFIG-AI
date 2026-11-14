@@ -3854,6 +3854,43 @@ def _companions_act(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     return {"ok": True, "companions": companions.survey(fresh)}
 
 
+def _faceit_apps(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """The FACEIT client and FACEIT AC: installed, running, start with game."""
+    from . import faceit_apps, profiles
+    from .cli import load_prefs
+
+    ui = profiles.ui_for(load_prefs(), _active_account(state))
+    return {"ok": True, "apps": faceit_apps.survey(ui)}
+
+
+def _faceit_apps_set(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Turn 'start with the game' on or off for one of them."""
+    from . import companions, faceit_apps, profiles
+    from .cli import load_prefs, save_prefs
+
+    account = _active_account(state)
+    prefs = load_prefs()
+    ui = profiles.ui_for(prefs, account)
+    try:
+        changes = faceit_apps.set_with_game(
+            ui, str(body.get("app") or ""), bool(body.get("with_game")),
+            str(body.get("exe") or ""))
+    except companions.CompanionError as exc:
+        return {"ok": False, "error": str(exc)}
+    profiles.remember(prefs, account, changes)
+    save_prefs(prefs)
+    return {"ok": True, "apps": faceit_apps.survey(profiles.ui_for(prefs, account))}
+
+
+def _faceit_apps_launch(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Start the FACEIT client or FACEIT AC now."""
+    from . import faceit_apps, profiles
+    from .cli import load_prefs
+
+    ui = profiles.ui_for(load_prefs(), _active_account(state))
+    return faceit_apps.launch(ui, str(body.get("app") or ""))
+
+
 def _companions_start(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     """Start one companion, by the id its tile was drawn with."""
     from . import companions, profiles
@@ -4349,6 +4386,9 @@ def make_handler(state: State):
         "/api/demos/identities": _demo_identities,
         "/api/faceit": _faceit,
         "/api/faceit/forget": _faceit_forget,
+        "/api/faceit/apps": _faceit_apps,
+        "/api/faceit/apps/set": _faceit_apps_set,
+        "/api/faceit/apps/launch": _faceit_apps_launch,
         "/api/demos/get": _demo_get,
         "/api/demos/cancel": _demo_cancel,
         "/api/demos/waiting": _demo_waiting,

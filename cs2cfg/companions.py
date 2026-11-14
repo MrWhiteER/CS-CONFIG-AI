@@ -226,11 +226,45 @@ def start(entry: Dict[str, Any]) -> Dict[str, Any]:
     try:
         subprocess.Popen(argv, cwd=str(exe.parent),
                          creationflags=_CREATE_NO_WINDOW if sys.platform == "win32" else 0)
-    except (OSError, subprocess.SubprocessError, ValueError) as exc:
+    except OSError as exc:
+        # 740: the program asks for administrator rights (FACEIT AC does).
+        # CreateProcess will not raise that prompt; the shell will.
+        if getattr(exc, "winerror", None) != ERROR_ELEVATION_REQUIRED:
+            return {"ok": False, "error": f"could not start {exe.name}: {exc}"}
+        elevated = _start_elevated(exe, entry.get("args") or "")
+        if elevated:
+            return {"ok": False, "error": f"could not start {exe.name}: {elevated}"}
+        forget_running()
+        return {"ok": True, "already": False, "elevated": True,
+                "detail": f"Started {entry.get('name') or exe.stem} "
+                          "(Windows asks for permission first)"}
+    except (subprocess.SubprocessError, ValueError) as exc:
         return {"ok": False, "error": f"could not start {exe.name}: {exc}"}
     forget_running()
     return {"ok": True, "already": False,
             "detail": f"Started {entry.get('name') or exe.stem}"}
+
+
+ERROR_ELEVATION_REQUIRED = 740
+
+
+def _start_elevated(exe: Path, args: str) -> str:
+    """Start a program through the shell so Windows can show its UAC prompt.
+    Returns an error message, or "" when it was handed over."""
+    if sys.platform != "win32":
+        return "needs administrator rights"
+    import ctypes
+
+    shell32 = ctypes.WinDLL("shell32", use_last_error=True)
+    shell32.ShellExecuteW.restype = ctypes.c_void_p
+    # "open", not "runas": the program's own manifest asks for elevation, so
+    # Windows prompts exactly as it does for a double-click.
+    result = shell32.ShellExecuteW(None, "open", str(exe), args or None,
+                                   str(exe.parent), 1)
+    code = int(result or 0)
+    if code <= 32:
+        return "declined" if code == 5 else f"Windows refused (code {code})"
+    return ""
 
 
 def start_all(prefs_ui: Dict[str, Any]) -> List[Dict[str, Any]]:
