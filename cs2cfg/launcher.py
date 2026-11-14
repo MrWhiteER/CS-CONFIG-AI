@@ -686,14 +686,13 @@ def play(
         mark("running")
 
         desktop_now = window.current_mode()
-        recorder = telemetry.SessionRecorder(fresh.hwnd, {
+        recorder = telemetry.acquire_recorder(fresh.hwnd, {
             "resolution": f"{new_w}x{new_h}",
             "desktop_mode": f"{desktop_now[0]}x{desktop_now[1]}@{desktop_now[2]}",
             "stretched": stretch_mode == "borderless",
             "stretch_mode": stretch_mode,
             "borderless": stretch_mode == "borderless",
         })
-        recorder.start()
 
         # Keep the stretch. The desktop mode is deliberately temporary (see
         # window.set_mode), so Windows hands it back whenever it re-evaluates
@@ -729,7 +728,7 @@ def play(
         try:
             exited = wait_for_exit(should_stop=should_stop, on_tick=keep_stretched)
         finally:
-            record = recorder.stop()
+            record = telemetry.release_recorder(recorder, finish=True)
             if heal["count"]:
                 report(f"  put the stretch back {heal['count']} time(s) during the session",
                        "warn")

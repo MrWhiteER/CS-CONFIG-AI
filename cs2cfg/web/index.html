@@ -6388,6 +6388,7 @@ const startup = (() => {
           <button class="seg-item" data-sub="apps" role="tab" aria-selected="false">Apps</button>
           <button class="seg-item" data-sub="look" role="tab" aria-selected="false">Look</button>
           <button class="seg-item" data-sub="sound" role="tab" aria-selected="false">Sound</button>
+          <button class="seg-item" data-sub="overlay" role="tab" aria-selected="false">Overlay</button>
           <button class="seg-item" data-sub="config" role="tab" aria-selected="false">Config files</button>
           <button class="seg-item" data-sub="editing" role="tab" aria-selected="false">Editing</button>
           <button class="seg-item" data-sub="logs" role="tab" aria-selected="false">Logs</button>
@@ -6436,6 +6437,16 @@ const startup = (() => {
 
       <div id="results" class="wide"></div>
 
+      </div>
+
+      <div class="subpane hidden" data-sub="overlay">
+        <section class="panel wide" id="overlay-card">
+          <h2>Performance overlay</h2>
+          <p class="sub">Show a small, click-through HUD over CS2 in Fullscreen Windowed.
+            Frame rate, frame time and freezes are saved with your session history.
+            The app keeps running in the notification area when you close its window.</p>
+          <div id="overlay-out"></div>
+        </section>
       </div>
 
       <!-- The other programs that run alongside the game. Crosshair X was
@@ -8373,6 +8384,7 @@ function setSettingsSub(name, restoring) {
   }
   // Preference restoration only selects the pane. Startup owns its first loads.
   if (prefsReady && startup.finished) {
+    if (name === "overlay") loadOverlay();
     if (name === "sound") loadAudio(false);
     if (name === "logs") loadHistory();
     if (name === "config" || name === "editing") ensureScan(false);
@@ -8384,6 +8396,87 @@ function setSettingsSub(name, restoring) {
 document.addEventListener("click", e => {
   const button = e.target.closest("#settings-subtabs .seg-item");
   if (button) setSettingsSub(button.dataset.sub);
+});
+
+// Read on entry or explicit refresh only. There are no overlay timers in the
+// app page, including when it is hidden in the notification area.
+async function loadOverlay() {
+  const box = $("overlay-out");
+  try { renderOverlay(await api("/api/overlay", {})); }
+  catch (err) { box.innerHTML = '<p class="sub warn">' + esc(err.message || String(err)) + '</p>'; }
+}
+
+function renderOverlay(d) {
+  const s = d.settings;
+  const labels = {fps: "FPS", one_percent_low: "1% low", frame_time_ms: "Frame time",
+    cpu_percent: "CPU load", gpu_percent: "GPU load", gpu_temp_c: "GPU temperature"};
+  const states = {disabled: "Off", waiting_for_game: "Waiting for CS2",
+    waiting: "Waiting for frame data", ok: "Capturing CS2", access_denied: "Frame stats unavailable",
+    permissions_required: "Frame stats unavailable",
+    missing: "PresentMon is missing. Fetch it for a source build, or reinstall the app.",
+    untrusted: "PresentMon failed its integrity check. Fetch it again, or reinstall the app.",
+    stopped: "Capture stopped. Toggle the overlay off and on to retry.",
+    error: "Capture failed. Toggle the overlay off and on to retry."};
+  $("overlay-out").innerHTML =
+    '<label class="opt"><input type="checkbox" id="overlay-enabled"' +
+      (s.overlay_enabled ? ' checked' : '') + '> Enable performance overlay</label>' +
+    '<p class="sub2">' + esc(states[d.status] || d.status) +
+      (d.hud_warning ? ' · ' + esc(d.hud_warning) : '') +
+      (d.error ? ' · ' + esc(d.error) : '') + '</p>' +
+    (d.notice ? '<div class="note"><div class="d">' + esc(d.notice) +
+      ' <button class="btn small" id="overlay-borderless">Use borderless next launch</button></div></div>' : '') +
+    (d.frame_capture_hint ? '<div class="note"><div class="d">' + esc(d.frame_capture_hint) +
+      (d.frame_capture_hint_dismissible ?
+        ' <button class="btn small" id="overlay-dismiss-sign-out">Dismiss</button>' : '') +
+      '</div></div>' : '') +
+    Object.entries(labels).map(([k,v]) => '<div class="row"><span class="k">' + v +
+      '</span><span class="v">' + esc(d.display[k]) + '</span></div>').join('') +
+    '<div class="row"><label class="k" for="overlay-corner">Corner</label><span class="v">' +
+      '<select id="overlay-corner">' + Object.entries({top_left:"Top left", top_right:"Top right",
+        bottom_left:"Bottom left", bottom_right:"Bottom right"}).map(([k,v]) =>
+        '<option value="' + k + '"' + (s.overlay_corner === k ? ' selected' : '') + '>' + v + '</option>').join('') +
+      '</select></span></div>' +
+    '<div class="row"><label class="k" for="overlay-hotkey">Show / hide shortcut</label><span class="v">' +
+      '<input id="overlay-hotkey" type="text" maxlength="32" value="' + esc(s.overlay_hotkey) +
+      '" aria-describedby="overlay-hotkey-help"></span></div>' +
+    '<p class="sub2" id="overlay-hotkey-help">Ctrl, Alt or Shift plus a letter, digit or F1–F24. ' +
+      'Hiding the HUD keeps recording. Unavailable shortcuts are reported here.</p>' +
+    '<div role="group" aria-label="HUD fields">' + Object.entries(labels).map(([k,v]) =>
+      '<label class="opt"><input type="checkbox" data-overlay-field="' + k + '"' +
+        (s.overlay_fields.includes(k) ? ' checked' : '') + '> ' + v + '</label>').join('') + '</div>' +
+    '<div class="actions"><button class="btn primary" id="overlay-save">Save overlay settings</button>' +
+      '<button class="btn" id="overlay-refresh">Refresh status</button></div>' +
+    '<p class="sub2" id="overlay-said" role="status"></p>';
+}
+
+document.addEventListener("click", async e => {
+  const button = e.target.closest("#overlay-save, #overlay-refresh, #overlay-dismiss-sign-out, #overlay-borderless");
+  if (!button) return;
+  button.disabled = true;
+  try {
+    if (button.id === "overlay-refresh") await loadOverlay();
+    else if (button.id === "overlay-save") {
+      const answer = await api("/api/overlay/settings", {
+        overlay_enabled: $("overlay-enabled").checked,
+        overlay_corner: $("overlay-corner").value,
+        overlay_hotkey: $("overlay-hotkey").value.trim(),
+        overlay_fields: [...document.querySelectorAll('[data-overlay-field]:checked')].map(x => x.dataset.overlayField),
+      });
+      renderOverlay(answer);
+      $("overlay-said").textContent = 'Saved. Refresh status after CS2 starts to check capture.';
+    } else if (button.id === "overlay-dismiss-sign-out") {
+      renderOverlay(await api("/api/overlay/settings", {overlay_sign_out_hint_dismissed: true}));
+    } else {
+      // The existing launch-mode switch owns the next launch's video changes.
+      setStretchMode("borderless");
+      $("p-video").checked = true;
+      rememberPrefs();
+      setTab("launcher");
+      status("Borderless selected for the next launch. Restart CS2 through Play to use it.");
+    }
+  } catch (err) {
+    $("overlay-said").textContent = err.message || String(err);
+  } finally { button.disabled = false; }
 });
 
 /* ---------------------------------------------------------------------------
@@ -15617,7 +15710,13 @@ function renderHistory(d) {
       (x.stretched ? " · stretched" : "") + "</span></td>" +
       '<td class="val">' + mins + " min<br><span class=\"sub\">" + x.alt_tabs +
       " alt-tab · " + ret + " back" + (x.stall_count ? " · " + x.stall_count + " stall" : "") +
-      "</span></td></tr>";
+      "</span>" + (x.overlay && x.overlay.avg_fps != null ?
+        '<br><span class="sub">' + x.overlay.avg_fps.toFixed(1) + ' FPS · 1% low ' +
+        (x.overlay.one_percent_low == null ? '—' : x.overlay.one_percent_low.toFixed(1)) +
+        ' · worst frame ' + (x.overlay.worst_frame_ms == null ? '—' : x.overlay.worst_frame_ms.toFixed(1) + ' ms') +
+        ' · ' + x.overlay.stutter_count + ' stutters · worst freeze ' +
+        (x.overlay.worst_freeze_ms == null ? '—' : x.overlay.worst_freeze_ms.toFixed(0) + ' ms') + '</span>' : '') +
+      "</td></tr>";
   }).join("") + "</table>";
 
   const latest = d.sessions[0];
@@ -16213,6 +16312,7 @@ $("rescan").addEventListener("click", () => scan(true));
         if (!created) await loadSource();
       });
       await startup.run("settings-pane", async () => {
+        if (settingsSub === "overlay") await loadOverlay();
         if (settingsSub === "config" || settingsSub === "editing") await ensureScan(false);
       });
     })(),

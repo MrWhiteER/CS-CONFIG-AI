@@ -4,17 +4,31 @@ from __future__ import annotations
 
 import bisect
 import csv
+import hashlib
 import math
 import os
 import re
 import statistics
 import subprocess
 import threading
+import time
 import uuid
 from collections import Counter, deque
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, Optional
+
+# Pin bytes, not a user-editable sidecar. Upgrades require a reviewed hash.
+EXECUTABLE_NAME = "PresentMon-2.6.0-x64.exe"
+EXECUTABLE_SHA256 = "b2a706bc6ad475749e3b7e3409263aa1e6906d45bdcf993f6dbc0f660188f1af"
+
+
+def verify_executable(path: Path) -> bool:
+    try:
+        with path.open("rb") as stream:
+            return hashlib.file_digest(stream, "sha256").hexdigest() == EXECUTABLE_SHA256
+    except OSError:
+        return False
 
 
 def _number(value: Optional[str]) -> Optional[float]:
@@ -98,6 +112,8 @@ class Aggregator:
         self._modes: Counter = Counter()
         self._latency: dict[str, list[float]] = {}
         self._spikes = 0
+        self._events: deque = deque(maxlen=200)
+        self._max_spike = None
 
     def add(self, frame: Frame) -> None:
         with self._lock:
@@ -119,6 +135,9 @@ class Aggregator:
                           (ordered[middle - 1] + ordered[middle]) / 2)
                 if value > 8 and value > 2.5 * median:
                     self._spikes += 1
+                    self._max_spike = max(self._max_spike or 0, value)
+                    self._events.append({"at": time.time(), "duration_ms": value,
+                                         "type": "frame_spike"})
             if len(recent) == 120:
                 ordered.pop(bisect.bisect_left(ordered, recent.popleft()))
             recent.append(value)
@@ -128,6 +147,9 @@ class Aggregator:
     def snapshot(self) -> dict:
         with self._lock:
             frames, modes, latency, spikes = self._frames, self._modes, self._latency, self._spikes
+            events = list(self._events)
+            self._events.clear()
+            max_spike, self._max_spike = self._max_spike, None
             self._frames, self._modes, self._latency, self._spikes = [], Counter(), {}, 0
         total = sum(frames)
         p99 = percentile99(frames)
@@ -140,6 +162,8 @@ class Aggregator:
             "p99_frame_time_ms": p99,
             "max_frame_time_ms": max(frames) if frames else None,
             "spikes": spikes,
+            "events": events,
+            "max_spike_ms": max_spike,
             "present_modes": dict(modes),
             "latency_ms": {name: statistics.fmean(values) for name, values in latency.items()},
             # Retain the distribution so the bench can calculate a run-wide
@@ -153,7 +177,10 @@ def locate_executable(root: Optional[Path] = None) -> Optional[Path]:
     if override:
         candidate = Path(override).expanduser()
         return candidate.resolve() if candidate.is_file() else None
-    root = root or Path(__file__).resolve().parents[2] / "tools" / "presentmon"
+    if root is None:
+        from ..paths import bundle_root
+
+        root = bundle_root().parent / "tools" / "presentmon"
 
     def version(path: Path) -> tuple:
         match = re.search(r"PresentMon[-_v]*(\d+(?:\.\d+)*)", path.name, re.IGNORECASE)
@@ -189,6 +216,7 @@ STATUS_TEXT = {
     "stopped": "PresentMon: capture stopped (restart probe to capture again)",
     "error": "PresentMon: capture failed - see presentmon_stderr in log",
     "missing": "PresentMon executable not found - see docs/overlay/README.md",
+    "untrusted": "PresentMon SHA256 mismatch - fetch the supported binary again",
     "ok": "Capturing cs2.exe",
 }
 
@@ -204,6 +232,8 @@ class PresentMon:
         self._threads: list[threading.Thread] = []
         self._errors: deque[str] = deque(maxlen=24)
         self._lock = threading.Lock()
+        self._untrusted = False
+        self._stop_lock = threading.Lock()
 
     @property
     def command(self) -> list[str]:
@@ -223,6 +253,15 @@ class PresentMon:
     def start(self) -> None:
         if self.executable is None:
             return
+        if self.process is not None:
+            return
+        if not verify_executable(self.executable):
+            self._untrusted = True
+            self._error(STATUS_TEXT["untrusted"])
+            return
+        self._untrusted = False
+        with self._lock:
+            self._errors.clear()
         try:
             self.process = subprocess.Popen(
                 self.command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -251,22 +290,30 @@ class PresentMon:
     def status(self, game_running: bool, has_frames: bool) -> str:
         if self.executable is None:
             return "missing"
-        if self.process is None:
+        if self._untrusted:
+            return "untrusted"
+        child = self.process
+        if child is None:
             return classify_status(self.stderr, 1, game_running=game_running)
-        return classify_status(self.stderr, self.process.poll(), game_running=game_running,
+        return classify_status(self.stderr, child.poll(), game_running=game_running,
                                has_frames=has_frames)
 
     def stop(self) -> None:
+        with self._stop_lock:
+            self._stop_child()
+
+    def _stop_child(self) -> None:
         child = self.process
         if child is None:
             return
         # Ask PresentMon to close only OUR session, including if the child has
         # already exited. Never stop a user's unrelated PresentMon session.
         try:
-            subprocess.run([str(self.executable), "--session_name", self.session,
-                            "--terminate_existing_session"], stdin=subprocess.DEVNULL,
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=3,
-                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            if verify_executable(self.executable):
+                subprocess.run([str(self.executable), "--session_name", self.session,
+                                "--terminate_existing_session"], stdin=subprocess.DEVNULL,
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=3,
+                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         except (OSError, subprocess.TimeoutExpired):
             pass
         try:
@@ -282,3 +329,5 @@ class PresentMon:
             thread.join(timeout=2)
         child.stdout.close()
         child.stderr.close()
+        self.process = None
+        self._threads.clear()

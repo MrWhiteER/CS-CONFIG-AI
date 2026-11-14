@@ -70,7 +70,9 @@ Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription
 ; The whole built folder. A folder build rather than one file, because the
 ; one-file bootloader validates its parent process and anti-cheat software
 ; blocks that query -- see cs2cfg.spec.
-Source: "dist\cs2-autoconfig\*"; DestDir: "{app}";   Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "dist\cs2-autoconfig\*"; DestDir: "{app}"; Excludes: "PresentMon-2.6.0-x64.exe"; Flags: ignoreversion recursesubdirs createallsubdirs
+; The portable build carries the same data file under _internal/tools/presentmon.
+Source: "tools\presentmon\PresentMon-2.6.0-x64.exe"; DestDir: "{app}\_internal\tools\presentmon"; Flags: ignoreversion
 
 [Icons]
 ; AppUserModelID has to match what the program sets on itself at startup --

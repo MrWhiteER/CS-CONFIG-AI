@@ -23,12 +23,18 @@ block_cipher = None
 import sys as _sys
 _sys.path.insert(0, ".")
 from cs2cfg import appicon as _appicon
+from cs2cfg.overlay.presentmon import EXECUTABLE_NAME, verify_executable
+
+PRESENTMON = pathlib.Path("tools") / "presentmon" / EXECUTABLE_NAME
+if not verify_executable(PRESENTMON):
+    raise SystemExit("Fetch the pinned PresentMon binary first: docs/overlay/README.md")
 ICON = str(_appicon.write_ico(pathlib.Path("build") / "cs2cfg.ico"))
 
 # Bundled resources. The probe is a PowerShell script rather than Python, and
 # the knowledge base and web page are data files, so none of them are picked up
 # by import analysis — they have to be listed.
 datas = collect_data_files("webview") + [
+    (str(PRESENTMON), "tools/presentmon"),
     ("cs2cfg/probe.ps1", "cs2cfg"),
     ("cs2cfg/helper/*.ps1", "cs2cfg/helper"),
     ("cs2cfg/knowledge/*.json", "cs2cfg/knowledge"),

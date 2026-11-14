@@ -1,14 +1,11 @@
 """Session recording: what actually happened while you played.
 
-What this can and cannot see is worth being straight about. Without injecting
-into the game there is no frame counter here — anything claiming an fps figure
-from outside the process is guessing. What *is* observable from outside, and
-what this measures:
+The recorder measures window state and process metadata. The optional overlay
+service attaches frame statistics from PresentMon's external ETW capture.
 
-* **Stalls.** A window that stops answering a no-op message is a window whose
-  message loop is blocked. That is exactly what a display-mode renegotiation
-  looks like from outside, so the alt-tab black screen gets timed rather than
-  estimated.
+* **Stalls.** Windows' read-only hung-window query reports "not responding".
+  Observed intervals are timed here; Windows controls the detection threshold.
+  Short frame freezes are measured separately by PresentMon when enabled.
 * **Focus.** Every switch away from the game and back, and how long each round
   trip took. This is the number that should drop to near zero once the game is
   running borderless.
@@ -30,7 +27,7 @@ from ctypes import wintypes
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from . import window
 from .kb import user_data_dir
@@ -50,9 +47,61 @@ FOCUS_POLL = 0.1
 PROBE_INTERVAL = 0.5
 SAMPLE_INTERVAL = 2.0
 
-# A window that does not answer within this long is treated as stalled. Well
-# above a normal frame time, well below anything a person would not notice.
-STALL_TIMEOUT_MS = 350
+# Windows owns the hung-window threshold; PROBE_INTERVAL is sampling cadence.
+
+# The launcher and overlay lease the same recorder for a window. Subscribers
+# receive existing detector results; they never probe the game themselves.
+_recorders_lock = threading.RLock()
+_recorders: dict = {}
+_listeners: list = []
+
+
+def subscribe(stall: Callable, finalising: Callable) -> Callable:
+    pair = (stall, finalising)
+    with _recorders_lock:
+        _listeners.append(pair)
+
+    def unsubscribe() -> None:
+        with _recorders_lock:
+            if pair in _listeners:
+                _listeners.remove(pair)
+    return unsubscribe
+
+
+def _publish(index: int, recorder, *args) -> None:
+    with _recorders_lock:
+        listeners = list(_listeners)
+    for pair in listeners:
+        try:
+            pair[index](recorder, *args)
+        except Exception:
+            # Optional consumers must not interrupt session recording.
+            pass
+
+
+def acquire_recorder(hwnd: int, meta: Optional[dict] = None):
+    with _recorders_lock:
+        if hwnd in _recorders:
+            recorder, users = _recorders[hwnd]
+            recorder.meta.update(meta or {})
+            _recorders[hwnd] = (recorder, users + 1)
+            return recorder
+        recorder = SessionRecorder(hwnd, meta)
+        _recorders[hwnd] = (recorder, 1)
+        recorder.start()
+        return recorder
+
+
+def release_recorder(recorder, *, finish: bool = False):
+    with _recorders_lock:
+        held = _recorders.get(recorder.hwnd)
+        if held is None or held[0] is not recorder:
+            return recorder.record
+        if held[1] > 1 and not finish:
+            _recorders[recorder.hwnd] = (recorder, held[1] - 1)
+            return recorder.record
+        del _recorders[recorder.hwnd]
+    return recorder.stop()
 
 
 class FILETIME(ctypes.Structure):
@@ -128,6 +177,7 @@ class SessionRecord:
     samples: int = 0
 
     notes: List[str] = field(default_factory=list)
+    overlay: Optional[Dict[str, Any]] = None
 
 
 class SessionRecorder:
@@ -157,6 +207,8 @@ class SessionRecorder:
         self._mem_peak = 0
         self._switches: List[FocusSwitch] = []
         self._stalls: List[Stall] = []
+        self._open_stall: Optional[Stall] = None
+        self._stall_since: Optional[float] = None
         self._handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, self.pid)
 
     # -- sampling ---------------------------------------------------------
@@ -178,6 +230,25 @@ class SessionRecorder:
         if kernel32.K32GetProcessMemoryInfo(self._handle, ctypes.byref(counters), counters.cb):
             return int(counters.WorkingSetSize)
         return None
+
+    def _sample_stall(self, responsive: Optional[bool], at: float,
+                      monotonic_at: float, focused: bool) -> None:
+        if responsive is None:
+            return
+        with self._lock:
+            if responsive and self._open_stall is None:
+                return
+            if self._open_stall is None:
+                self._stall_since = monotonic_at
+                self._open_stall = Stall(at=0, seconds=0, focused=focused)
+                self._stalls.append(self._open_stall)
+            stall = self._open_stall
+            stall.at = round(at - self.started, 1)
+            stall.seconds = round(max(0, monotonic_at - self._stall_since), 2)
+            update = Stall(stall.at, stall.seconds, stall.focused)
+            if responsive:
+                self._open_stall = self._stall_since = None
+        _publish(0, self, update)
 
     def _run(self) -> None:
         cpu_count = max(1, (kernel32.GetActiveProcessorCount(0xFFFF) or 1))
@@ -204,20 +275,10 @@ class SessionRecorder:
                         self._switches[-1].back_at = time.time()
             was_focused = focused
 
-            # Responsiveness, twice a second. Timed, because the duration is
-            # the whole point of recording it.
+            # Observe one continuous interval, not the duration of the query.
             if now >= next_probe:
                 next_probe = now + PROBE_INTERVAL
-                probe_start = time.monotonic()
-                alive = window.is_responsive(self.hwnd, STALL_TIMEOUT_MS)
-                probe_len = time.monotonic() - probe_start
-                if not alive:
-                    with self._lock:
-                        self._stalls.append(Stall(
-                            at=round(time.time() - self.started, 1),
-                            seconds=round(probe_len, 2),
-                            focused=focused,
-                        ))
+                self._sample_stall(window.is_responsive(self.hwnd), time.time(), now, focused)
 
             # CPU and memory, every couple of seconds. Cheap to read but
             # meaningless at a finer grain than this.
@@ -247,7 +308,12 @@ class SessionRecorder:
         self._stop.set()
         if self._thread:
             self._thread.join(timeout=SAMPLE_INTERVAL + 2)
+        self._sample_stall(True, time.time(), time.monotonic(), False)
+        _publish(1, self)
         self.record.resolution = self.meta.get("resolution", self.record.resolution)
+        for name in ("desktop_mode", "stretched", "borderless", "intent", "tier"):
+            if name in self.meta:
+                setattr(self.record, name, self.meta[name])
         if self._handle:
             kernel32.CloseHandle(self._handle)
             self._handle = None
@@ -318,7 +384,7 @@ def _observations(record: SessionRecord) -> List[str]:
     elif record.stall_count:
         notes.append(
             f"{record.stall_count} stall(s) totalling {record.total_stalled}s, worst {record.worst_stall}s. "
-            "A stall is the window not answering at all, which is what the black screen actually is."
+            "These are observed Windows not-responding intervals; shorter frame freezes need frame data."
         )
 
     if record.cpu_mean is not None and record.cpu_peak is not None:
@@ -326,10 +392,12 @@ def _observations(record: SessionRecord) -> List[str]:
     if record.mem_peak_mb:
         notes.append(f"Peak memory {record.mem_peak_mb} MB.")
 
-    notes.append(
-        "No frame rate here: measuring that from outside the process would be a guess. "
-        "Use the in-game net_graph or an overlay for fps."
-    )
+    if record.overlay and record.overlay.get("avg_fps") is not None:
+        notes.append(f"PresentMon: average {record.overlay['avg_fps']:.1f} FPS, "
+                     f"1% low {record.overlay['one_percent_low']:.1f} FPS.")
+    else:
+        notes.append("No frame rate here: no frame data recorded. "
+                     "Enable the performance overlay for FPS history.")
     return notes
 
 
