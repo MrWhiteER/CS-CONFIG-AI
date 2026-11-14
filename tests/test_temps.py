@@ -19,7 +19,25 @@ from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from cs2cfg import temps  # noqa: E402
+from cs2cfg import elevated, temps  # noqa: E402
+
+# Never start or read the real one-time helper from a test, even on a PC
+# where setup installed it.
+_NO_REAL_HELPER = [
+    mock.patch.object(elevated, "ready", return_value=False),
+    mock.patch.object(elevated, "run", side_effect=AssertionError("the real helper was called")),
+    mock.patch.object(elevated, "temps_published", return_value=None),
+]
+
+
+def setUpModule():
+    for patch in _NO_REAL_HELPER:
+        patch.start()
+
+
+def tearDownModule():
+    for patch in _NO_REAL_HELPER:
+        patch.stop()
 
 
 class Thresholds(unittest.TestCase):
