@@ -87,8 +87,20 @@ Name: "{autodesktop}\{#AppName}";        Filename: "{app}\{#AppExe}"; Tasks: des
 Filename: "{app}\{#AppExe}"; Description: "Open {#AppName}"; \
   Flags: nowait postinstall skipifsilent
 
+[UninstallRun]
+; Before any file goes: ask the one-time helper to remove what it made --
+; the region-lock firewall rules, CS2 Defender exclusions, its scheduled task
+; and its Program Files / ProgramData folders. Runs through the helper, so
+; there is no administrator prompt. Always exits 0; never blocks uninstall.
+Filename: "{app}\cs2cfg.exe"; Parameters: "uninstall-cleanup"; \
+  Flags: runhidden waituntilterminated; RunOnceId: "HelperCleanup"
+
 [UninstallDelete]
-; Written by the updater while staging a download. Nothing here is the user's
-; own work -- their preferences and backups live in cs2cfg-data, which is
-; deliberately left alone so reinstalling does not lose them.
-Type: filesandordirs; Name: "{app}\cs2cfg-data\updates"
+; Everything the app made goes: preferences (including the "setup done"
+; flag, so a reinstall starts with the setup wizard), backups, caches, logs
+; and update downloads. The only things kept are the configs it wrote into
+; CS2's own cfg folder, which live outside all of these.
+Type: filesandordirs; Name: "{app}\cs2cfg-data"
+Type: filesandordirs; Name: "{app}"
+Type: filesandordirs; Name: "{userappdata}\cs2-autoconfig"
+Type: filesandordirs; Name: "{%TEMP}\cs2-autoconfig"

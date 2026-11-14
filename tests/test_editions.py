@@ -249,12 +249,19 @@ class TheInstallerScript(unittest.TestCase):
         """So it can only ever come from the same place as everything else."""
         self.assertIn("#ifndef AppVersion", self.iss)
 
-    def test_uninstalling_keeps_the_users_own_data(self):
+    def test_uninstalling_removes_everything_the_app_made(self):
+        """Edy, Nov 2026: uninstall takes everything; only CS2's own configs stay."""
         removed = self.iss.split("[UninstallDelete]")[1]
-        self.assertIn("cs2cfg-data\\updates", removed)
-        self.assertNotIn('Name: "{app}\\cs2cfg-data"', removed,
-                         "preferences and backups must survive an uninstall")
+        for name in ('Name: "{app}\cs2cfg-data"', 'Name: "{app}"',
+                     'Name: "{userappdata}\cs2-autoconfig"', 'Name: "{%TEMP}\cs2-autoconfig"'):
+            self.assertIn(name, removed)
+        self.assertNotIn("game\csgo\cfg", removed, "the configs written for CS2 stay")
 
+    def test_uninstalling_asks_the_helper_to_remove_itself_first(self):
+        run = self.iss.split("[UninstallRun]")[1].split("[UninstallDelete]")[0]
+        self.assertIn('Parameters: "uninstall-cleanup"', run)
+        self.assertIn("runhidden", run)
+        self.assertIn("RunOnceId", run)
 
 if __name__ == "__main__":
     unittest.main()

@@ -38,8 +38,14 @@ way. Take whichever suits.
 Neither needs Python, an account, or a sign-in.
 
 Both keep their settings, backups and session history in a `cs2cfg-data`
-folder beside the executable, and uninstalling deliberately leaves that alone
-so a reinstall does not lose your work.
+folder beside the executable.
+
+**Uninstalling removes everything the app made:** the program, its settings,
+backups, caches and update downloads, and the one-time helper with its
+scheduled task, firewall rules and CS2 Defender exclusion -- without an
+administrator prompt. The only thing left behind is the configs it wrote into
+CS2's own cfg folder, so the game keeps playing the way you set it up. A
+reinstall starts again from the setup wizard.
 
 [releases]: ../../releases/latest
 

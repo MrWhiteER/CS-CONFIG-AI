@@ -667,6 +667,23 @@ def cmd_temp_helper(ctx: Context) -> int:
     return temps.run_helper(int(ctx.args.parent or 0))
 
 
+def cmd_uninstall_cleanup(ctx: Context) -> int:
+    """Run by the uninstaller before it deletes files. Never prompts.
+
+    Asks the one-time helper to remove what it made (firewall rules, CS2
+    Defender exclusions, its task and folders). Always exits 0 so a helper
+    problem can never block an uninstall.
+    """
+    from . import elevated
+
+    try:
+        result = elevated.uninstall_cleanup()
+        print(result.get("detail") or result.get("error") or "")
+    except Exception as exc:  # never block the uninstaller
+        print(f"helper cleanup skipped: {exc}")
+    return 0
+
+
 def cmd_net(ctx: Context) -> int:
     """Measure the connection the way sub-tick cares about."""
     from . import netcheck
@@ -1472,6 +1489,12 @@ def build_parser() -> argparse.ArgumentParser:
     stretch.add_argument("--list", action="store_true",
                          help="list matching windows ('--process *' for all)")
 
+    sub.add_parser(
+        "uninstall-cleanup", parents=[shared],
+        help=argparse.SUPPRESS,
+        description="Run by the uninstaller. Removes what the one-time helper made.",
+    )
+
     helper = sub.add_parser(
         "temp-helper", parents=[shared],
         help=argparse.SUPPRESS,
@@ -1630,6 +1653,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         "scaling": cmd_scaling,
         "net": cmd_net,
         "temp-helper": cmd_temp_helper,
+        "uninstall-cleanup": cmd_uninstall_cleanup,
         "web": cmd_web,
         "desktop": cmd_desktop,
         "cfg": cmd_cfg,

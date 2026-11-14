@@ -37,7 +37,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 # Must match $Version in helper/broker.ps1.
-HELPER_VERSION = 1
+HELPER_VERSION = 2
 
 TASK = r"\CS CONFIG AI\Helper"
 PROGRAM_DIR_NAME = "CS CONFIG AI Helper"
@@ -48,6 +48,7 @@ OPS = (
     "firewall.lock", "firewall.unlock", "firewall.status",
     "dns.flush", "adapter.restart", "audio.restart", "device.restart",
     "power.set", "cfg.grant", "temps.watch", "faceit_ac.start", "defender.cs2",
+    "helper.uninstall",
 )
 
 TIMEOUT = 45.0
@@ -123,6 +124,11 @@ def validate(op: str, args: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     args = dict(args or {})
     if op not in OPS:
         raise HelperError(f"the helper does not do {op!r}")
+
+    if op == "helper.uninstall":
+        if args:
+            raise HelperError("uninstalling the helper takes no arguments")
+        return {}
 
     if op == "firewall.lock":
         program = str(args.get("program") or "")
@@ -285,3 +291,18 @@ def remove() -> Dict[str, Any]:
     return _run_elevated(
         f"  $r = & '{source}\\install.ps1' -Remove\n"
         "  $out.ok = [bool]$r.ok\n  $out.detail = [string]$r.detail\n")
+
+
+def uninstall_cleanup(timeout: float = 30.0) -> Dict[str, Any]:
+    """Run by the uninstaller: undo everything the helper made, with no prompt.
+
+    Firewall rules, CS2 Defender exclusions, the scheduled task and both
+    helper folders. Needs the current helper; an older one cannot do this job
+    silently, and nothing else may prompt, so that case is only reported.
+    """
+    state = status()
+    if not state["installed"]:
+        return {"ok": True, "detail": "no helper installed; nothing to remove"}
+    if not state["current"]:
+        return {"ok": False, "error": "an older helper is installed and cannot remove itself silently"}
+    return run("helper.uninstall", {}, timeout=timeout)

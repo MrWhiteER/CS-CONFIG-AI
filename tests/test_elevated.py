@@ -53,6 +53,10 @@ class Refused(unittest.TestCase):
             self.bad("firewall.lock", {"program": CS2,
                                        "regions": [{"name": name, "cidrs": ["1.2.3.0/24"]}]})
 
+    def test_helper_uninstall_takes_nothing(self):
+        self.assertEqual(elevated.validate("helper.uninstall", {}), {})
+        self.bad("helper.uninstall", {"path": r"C:\Windows"})
+
     def test_power_plans_are_guids(self):
         self.bad("power.set", {"guid": "SCHEME_MIN & calc"})
         self.assertEqual(elevated.validate("power.set", {"guid": "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c"}),
@@ -183,3 +187,32 @@ class Temps(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class UninstallCleanup(unittest.TestCase):
+    def test_nothing_installed_is_fine(self):
+        with mock.patch.object(elevated, "installed_version", return_value=0),              mock.patch.object(elevated, "run") as run:
+            self.assertTrue(elevated.uninstall_cleanup()["ok"])
+            run.assert_not_called()
+
+    def test_an_older_helper_is_reported_never_prompted(self):
+        with mock.patch.object(elevated, "installed_version", return_value=1),              mock.patch.object(elevated, "run") as run,              mock.patch.object(quickfix, "_run_elevated") as prompt:
+            self.assertFalse(elevated.uninstall_cleanup()["ok"])
+            run.assert_not_called()
+            prompt.assert_not_called()
+
+    def test_the_current_helper_is_asked_to_remove_itself(self):
+        with mock.patch.object(elevated, "installed_version", return_value=elevated.HELPER_VERSION),              mock.patch.object(elevated, "run", return_value={"ok": True}) as run:
+            self.assertTrue(elevated.uninstall_cleanup()["ok"])
+            self.assertEqual(run.call_args[0][:2], ("helper.uninstall", {}))
+
+    def test_the_broker_job_only_uses_constants(self):
+        text = BROKER.read_text(encoding="utf-8")
+        body = text[text.index("function Invoke-HelperUninstall"):text.index("$Jobs = @{")]
+        self.assertNotIn("$a.", body, "nothing from the request may reach the cleanup")
+        self.assertIn("Remove-NetFirewallRule -Group $FwGroup", body)
+
+    def test_the_cli_never_fails_the_uninstaller(self):
+        from cs2cfg import cli
+        with mock.patch.object(elevated, "uninstall_cleanup", side_effect=RuntimeError("boom")):
+            self.assertEqual(cli.cmd_uninstall_cleanup(mock.Mock()), 0)

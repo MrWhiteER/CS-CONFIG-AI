@@ -21,13 +21,14 @@
 # newer helper asks once more to put the new one in place; nothing else does.
 
 $ErrorActionPreference = 'Stop'
-$Version = 1
+$Version = 2
 
 $Root     = Join-Path $env:ProgramData 'CS CONFIG AI Helper'
 $Requests = Join-Path $Root 'requests'
 $Claimed  = Join-Path $Root 'claimed'
 $Results  = Join-Path $Root 'results'
 $FwGroup  = 'CS CONFIG AI region lock'
+$Program  = Join-Path $env:ProgramFiles 'CS CONFIG AI Helper'
 
 $NameShape = '^[A-Za-z0-9 _\-\.\(\)]{1,48}$'
 $IdShape   = '^[A-Za-z0-9\-]{8,64}$'
@@ -200,7 +201,35 @@ function Invoke-DefenderCs2($a) {
     return @{ ok = $true; detail = $d; excluded = [bool]$a.on }
 }
 
+function Invoke-HelperUninstall($a) {
+    # The app is being uninstalled: take back everything the helper made.
+    # Nothing from the request is used; every path below is a constant.
+    Remove-NetFirewallRule -Group $FwGroup -ErrorAction SilentlyContinue
+    # Defender exclusions on a CS2 install folder: the only kind this app adds
+    # (defender.cs2 here, and Fix It's "Exclude CS2 from antivirus scanning").
+    $excluded = 0
+    try {
+        foreach ($path in @((Get-MpPreference).ExclusionPath)) {
+            if ([string]$path -match '\\steamapps\\common\\Counter-Strike Global Offensive\\?$') {
+                Remove-MpPreference -ExclusionPath $path
+                $excluded++
+            }
+        }
+    } catch {}
+    # The task, its folder and both helper folders go after this broker has
+    # written its answer and exited, since it is running from them.
+    $later = "Start-Sleep -Seconds 6; " +
+        "Unregister-ScheduledTask -TaskPath '\CS CONFIG AI\' -TaskName 'Helper' -Confirm:`$false -ErrorAction SilentlyContinue; " +
+        "try { `$s = New-Object -ComObject Schedule.Service; `$s.Connect(); `$s.GetFolder('\').DeleteFolder('CS CONFIG AI', 0) } catch {}; " +
+        "Remove-Item -LiteralPath '" + $Program + "' -Recurse -Force -ErrorAction SilentlyContinue; " +
+        "Remove-Item -LiteralPath '" + $Root + "' -Recurse -Force -ErrorAction SilentlyContinue"
+    $posh = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    Start-Process -FilePath $posh -WindowStyle Hidden -ArgumentList @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', $later)
+    return @{ ok = $true; detail = "firewall rules removed; $excluded Defender exclusion(s) removed; helper removes itself in a few seconds" }
+}
+
 $Jobs = @{
+    'helper.uninstall' = { param($a) Invoke-HelperUninstall $a }
     'defender.cs2'     = { param($a) Invoke-DefenderCs2 $a }
     'ping'             = { param($a) @{ ok = $true; version = $Version } }
     'firewall.lock'    = { param($a) Invoke-FirewallLock $a }

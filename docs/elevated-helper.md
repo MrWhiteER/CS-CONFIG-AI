@@ -43,6 +43,7 @@ When `run` answers `needs_setup`, fall back to your old path, or send the user t
 | `cfg.grant` | `{path: ...\steamapps\common\<x>\game\csgo\cfg}` | makes that folder writable for this user |
 | `temps.watch` | `{pid}` | publishes board and drive temperatures to `results/temps.json` until that process exits (max 12 h); use `wait=False` |
 | `faceit_ac.start` | none | starts FACEIT Anti-Cheat from the path in its own HKLM uninstall entry, never from a request |
+| `helper.uninstall` | none | removes everything the helper made, then the helper itself (run by the uninstaller) |
 | `defender.cs2` | `{program: cs2.exe path, on: bool}` | adds or removes a Defender exclusion for CS2's own install folder only |
 
 **Adding a job:**
@@ -59,7 +60,7 @@ Bumping the version means each PC sees **one** more prompt to put the new helper
 - Requests that are links, too large, or have bad ids are deleted unread. Request content is never echoed back.
 - The firewall work only ever adds block rules for cs2.exe, and only removes rules from its own group.
 - The Defender toggle on/off in Fix It stays limited to CS2's folder.
-- Uninstall with `elevated.remove()` (one prompt). It removes the task, the rules, and both folders.
+- Uninstalling the app removes the helper with no prompt: the uninstaller runs `cs2cfg.exe uninstall-cleanup`, which sends the `helper.uninstall` job. The helper removes the region-lock rules and any Defender exclusion on a CS2 install folder, then (after it has answered and exited) its scheduled task, task folder, and both its folders. The job takes no arguments; every path in it is a constant. `elevated.remove()` (one prompt) still exists for a manual removal.
 
 ## What still prompts, and why
 
