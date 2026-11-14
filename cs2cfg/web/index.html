@@ -3349,7 +3349,6 @@
 
   /* ---------------------------------------------------------------- board */
   .kb-stage {
-    perspective: 1500px; perspective-origin: 50% 34%;
     padding: 30px 4px 40px; display: flex; justify-content: center;
     overflow: hidden;
   }
@@ -3361,7 +3360,6 @@
     display: flex; flex-direction: column; gap: var(--kgap);
     padding: calc(var(--u) * 0.5);
     border-radius: calc(var(--u) * 0.3);
-    transform: rotateX(23deg); transform-origin: 50% 100%;
     background: linear-gradient(178deg, #262832 0%, #171922 58%, #0d0e14 100%);
     box-shadow:
       inset 0 1px 0 rgba(var(--lift), .07),
@@ -3441,15 +3439,6 @@
     position: absolute; top: calc(var(--u) * 0.12); right: calc(var(--u) * 0.12);
     width: calc(var(--u) * 0.13); height: calc(var(--u) * 0.13);
     border-radius: 50%; background: currentColor; opacity: .8;
-  }
-
-  .kb-show {
-    display: flex; gap: 16px; justify-content: center; margin-top: 12px;
-  }
-  .kb-show .opt { margin: 0; font-size: 11.5px; }
-  .kb-none {
-    position: absolute; inset: 0; display: grid; place-items: center;
-    color: var(--muted); font-size: 12px;
   }
 
   /* The update centre. The state colour carries most of the meaning, so the
@@ -3788,33 +3777,6 @@
   }
   .plug-drift code { color: var(--warn); font-family: var(--mono); font-size: 11px; }
 
-  /* A desk you can arrange: each piece carries its own position and scale. */
-  /* Said above the desk, where the thing it is about is. */
-  .kb-edge {
-    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-    margin: 0 0 9px; padding: 8px 12px; border-radius: 10px;
-    background: color-mix(in srgb, var(--warn) 11%, var(--panel-2));
-    border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent);
-    font-size: 11.5px; color: var(--ink-dim);
-  }
-  .kb-edge[hidden] { display: none; }
-  @supports not (color: color-mix(in srgb, red 50%, blue)) {
-    .kb-edge { background: var(--panel-2); border-color: var(--warn); }
-  }
-
-  .kb-layout-row {
-    display: flex; gap: 14px; align-items: stretch;
-  }
-  .kb-scene {
-    position: relative; min-height: 430px; overflow: hidden;
-    flex: 1 1 auto; min-width: 0;
-    transition: height 120ms ease;
-    border-radius: 12px;
-    background:
-      radial-gradient(120% 90% at 50% 0%, rgba(var(--lift), .03), transparent 70%),
-      repeating-linear-gradient(0deg, rgba(var(--lift), .022) 0 1px, transparent 1px 26px),
-      repeating-linear-gradient(90deg, rgba(var(--lift), .022) 0 1px, transparent 1px 26px);
-  }
   /* The panel beside the board for when too many keys are left at their
      stock CS2 default to mark each one without it turning into noise. */
   .kb-missing-panel {
@@ -3845,27 +3807,6 @@
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .kb-missing-note { color: var(--muted); }
-  @media (max-width: 760px) {
-    .kb-layout-row { flex-direction: column; }
-    .kb-missing-panel { width: auto; max-height: 220px; }
-  }
-  .kb-piece {
-    position: absolute; top: 0; left: 0;
-    transform: translate(var(--x), var(--y)) scale(var(--s));
-    transform-origin: 0 0;
-    cursor: grab; touch-action: none; user-select: none;
-  }
-  .kb-piece:active { cursor: grabbing; }
-  /* The grip sits at the corner and only appears on approach, so it does not
-     compete with the board itself. */
-  .kb-grip {
-    position: absolute; right: 3px; bottom: 3px; width: 18px; height: 18px;
-    border-radius: 5px; cursor: nwse-resize; opacity: 0;
-    background: var(--accent);
-    box-shadow: 0 0 0 2px rgba(0, 0, 0, .5), 0 0 12px rgba(61, 139, 253, .8);
-    transition: opacity 140ms ease;
-  }
-  .kb-piece:hover .kb-grip { opacity: .95; }
   .kb-mouse { flex: none; width: clamp(150px, 19vw, 250px); }
   .ms-svg { width: 100%; height: auto; display: block; overflow: visible; }
 
@@ -6261,10 +6202,9 @@ const startup = (() => {
         <div class="chg-head">
           <span id="kb-summary"></span>
           <span class="spacer"></span>
-          <button class="btn ghost small" id="kb-reset">Reset layout</button>
           <button class="btn ghost small" id="kb-reload">Re-read</button>
         </div>
-        <div id="kb-switcher"></div>
+        <div class="kb-header"><div id="kb-switcher"></div></div>
         <div id="kb-out"><span class="sub">Scan a configuration folder first.</span></div>
         <div id="kb-layouts"></div>
       </section>
@@ -10268,8 +10208,7 @@ async function loadPlugins(force) {
    you what is bound; a picture tells you what is free, what is crowded, and
    which of your own tools you have put where.
 
-   Tilted with a CSS perspective rather than a real 3D engine: the depth is
-   there to make the caps read as keys, not to be flown around.
+   A flat device grid shares one scale with the mouse; settings stay in flow.
    -------------------------------------------------------------------------- */
 let keyData = null;
 let pickedKey = null;
@@ -10486,206 +10425,54 @@ function mouseModel() {
     '<path class="ms-wheel-ridges" d="M94 42h12 M94 47h12 M94 52h12 M94 64h12 M94 69h12 M94 74h12 M94 86h12 M94 91h12 M94 96h12"/>' +
     '<path class="ms-body-highlight" d="M32 102 C36 50 54 20 84 15 M119 17 C150 26 163 58 167 103 M35 241 C47 290 68 308 94 311"/>' +
     '<g class="ms-inert"><title>DPI is handled by the mouse hardware; CS2 cannot bind it.</title>' +
-    '<rect x="93" y="119" width="14" height="19" rx="5"/>' +
-    '<path class="ms-leader" d="M100 130 L206 175 H224" stroke="var(--muted)"/>' +
-    '<text class="ms-label" x="224" y="179">DPI · hardware</text></g>' +
+    '<rect x="93" y="119" width="14" height="19" rx="5"/></g>' +
     mouseSideButtons() + '<path d="M86 242 L98 230 H116 L105 241 H95 L89 250 H108" fill="none" stroke="var(--accent)" stroke-width="3" opacity=".65"/>' +
     '</svg>';
 }
 
-// Where each piece sits and how big it is. Kept in one place so saving it is
-// one call and resetting it is one assignment.
-const KB_LAYOUT_VERSION = 2;
-const KB_HOME = { board: { x: 10, y: 65, s: 1 }, mouse: { x: 340, y: 310, s: 1 } };
-let kbLayout = JSON.parse(JSON.stringify(KB_HOME));
-let kbShown = { board: true, mouse: true };
-
+// Device geometry is CSS-owned. Legacy kb_layout preferences are ignored.
+let kbFocus = 'both';
+function kbLoadFocus(ui) {
+  kbFocus = ['both','board','mouse'].includes(ui.kb_focus) ? ui.kb_focus
+    : ui.kb_shown?.board === false && ui.kb_shown?.mouse !== false ? 'mouse'
+    : ui.kb_shown?.mouse === false && ui.kb_shown?.board !== false ? 'board' : 'both';
+}
+function kbGhosted(name) { return kbFocus !== 'both' && kbFocus !== name; }
 function kbPiece(name, inner) {
-  if (!kbShown[name]) return "";
-  const at = kbLayout[name] || KB_HOME[name];
-  return '<div class="kb-piece" data-piece="' + name + '" style="' +
-    "--x:" + at.x + "px; --y:" + at.y + "px; --s:" + at.s + '">' + inner +
-    '<span class="kb-grip" data-grip="' + name + '" title="Drag to resize"></span>' +
-    "</div>";
+  return '<div class="kb-piece" data-piece="' + name + '"><div class="kb-device-head"><span>' +
+    (name === 'board' ? 'Full-size keyboard · 104 keys' : 'Mouse') +
+    '</span><button class="kb-eye" data-kbghost="' + name + '" aria-label="Ghost ' +
+    (name === 'board' ? 'keyboard' : 'mouse') + '">' + kbIcon('eye') + '</button></div>' +
+    '<div class="kb-device-body">' + inner + '</div></div>';
 }
-
-// Hold a piece where it can still be reached. A piece that fits is kept whole
-// on the desk; one scaled bigger than the desk is allowed to hang off instead,
-// so its far edge -- and the grip on it -- can be brought back into view.
-const KB_EDGE = 8;
-
-function kbClamp(name, el) {
-  const scene = $("kb-scene");
-  if (!scene) return;
-  const at = kbLayout[name];
-  const w = el.offsetWidth * at.s;
-  const room = scene.clientWidth - w - KB_EDGE;
-  at.x = room >= KB_EDGE
-    ? Math.min(room, Math.max(KB_EDGE, at.x))
-    : Math.min(KB_EDGE, Math.max(room, at.x));
-  // Downwards there is no ceiling to fight: the desk grows to follow.
-  at.y = Math.max(65, at.y);
-}
-
-// Fit the desk to what is on it, so the lowest piece is never cut in half.
-function kbGrow() {
-  const scene = $("kb-scene");
-  if (!scene) return;
-  let low = 0;
-  ["board", "mouse"].forEach(name => {
-    const el = scene.querySelector('.kb-piece[data-piece="' + name + '"]');
-    if (el) low = Math.max(low, kbLayout[name].y + el.offsetHeight * kbLayout[name].s);
+function kbApplyFocus() {
+  document.querySelectorAll('#kb-out [data-piece]').forEach(el => {
+    const ghost = kbGhosted(el.dataset.piece);
+    el.classList.toggle('is-ghost', ghost);
+    el.querySelector('.kb-device-body').inert = ghost;
+    el.querySelector('.kb-eye').setAttribute('aria-pressed', String(ghost));
+    el.querySelectorAll('[data-kbcode]').forEach(control => {
+      control.setAttribute('tabindex', ghost ? '-1' : '0');
+      control.setAttribute('aria-disabled', String(ghost));
+    });
   });
-  scene.style.height = Math.max(300, Math.ceil(low) + KB_EDGE) + "px";
+  document.querySelectorAll('[data-kbfocus]').forEach(el => el.setAttribute('aria-pressed', String(el.dataset.kbfocus === kbFocus)));
+  document.querySelectorAll('[data-kbghost-toggle]').forEach(el => { el.checked = kbGhosted(el.dataset.kbghostToggle); });
+  document.querySelectorAll('.kb-hover-preview').forEach(el => el.remove());
 }
-
-function kbPlace(name) {
-  const el = document.querySelector('.kb-piece[data-piece="' + name + '"]');
-  if (!el || !$("kb-scene")?.clientWidth) return;
-  kbClamp(name, el);
-  const at = kbLayout[name];
-  el.style.setProperty("--x", at.x + "px");
-  el.style.setProperty("--y", at.y + "px");
-  el.style.setProperty("--s", at.s);
-  // Keep the complete callout gutters clear even during a manual move/zoom.
-  // The desk can grow downwards, so make room for the other device there.
-  const otherName = name === "board" ? "mouse" : "board";
-  const other = document.querySelector('.kb-piece[data-piece="' + otherName + '"]');
-  if (other) {
-    const b = kbLayout[otherName];
-    if (at.x < b.x + other.offsetWidth * b.s + 8 &&
-        at.x + el.offsetWidth * at.s + 8 > b.x &&
-        at.y < b.y + other.offsetHeight * b.s + 8 &&
-        at.y + el.offsetHeight * at.s + 8 > b.y) {
-      b.y = Math.ceil(at.y + el.offsetHeight * at.s + 24);
-      other.style.setProperty("--y", b.y + "px");
-    }
-  }
-  kbGrow();
-  kbEdgeNote();
+function kbSetFocus(mode) {
+  kbFocus = mode; kbApplyFocus();
+  api('/api/prefs', {kb_focus: kbFocus}).catch(() => {});
 }
-
-/* Zoomed in far enough, the far side of the board goes past the desk.
-
-   That is allowed -- it is how you get a close look at one corner -- but it
-   is also how somebody ends up thinking the app has lost half their keyboard,
-   because the state survives a restart and nothing on screen says why. So it
-   says why, and offers the one click that undoes it.
-*/
-function kbEdgeNote() {
-  const scene = $("kb-scene"), note = $("kb-edge");
-  if (!scene || !note) return;
-  let past = 0;
-  ["board", "mouse"].forEach(name => {
-    if (!kbShown[name]) return;
-    const el = scene.querySelector('.kb-piece[data-piece="' + name + '"]');
-    if (!el) return;
-    const at = kbLayout[name];
-    if (at.x + el.offsetWidth * at.s > scene.clientWidth + 2) past++;
-  });
-  note.hidden = !past;
+function kbToggleGhost(name) { kbSetFocus(kbGhosted(name) ? 'both' : name === 'board' ? 'mouse' : 'board'); }
+function kbCardTitle(title, help) {
+  return '<h3 class="kb-card-title">' + title + '<button class="kb-help" aria-label="' +
+    esc(help) + '" title="' + esc(help) + '">?</button></h3>';
 }
-
-function kbSaveLayout() {
-  kbLayout.version = KB_LAYOUT_VERSION;
-  api("/api/prefs", { kb_layout: kbLayout, kb_shown: kbShown }).catch(() => {});
+function kbShapePicker() {
+  return '<div class="ms-pick">' + [['two','2 side'],['four','4 side']].map(([id,label]) =>
+    '<button data-mouseshape="' + id + '" aria-pressed="' + (mouseShape === id) + '">' + label + '</button>').join('') + '</div>';
 }
-
-function kbResetLayout() {
-  kbLayout = JSON.parse(JSON.stringify(KB_HOME));
-  // The mouse belongs to the right of whatever width the panel happens to be.
-  const scene = $("kb-scene");
-  if (scene) kbFitLayout(scene);
-  ["board", "mouse"].forEach(kbPlace);
-  kbSaveLayout();
-}
-
-// Drag and scale. Pointer events rather than mouse events, so a pen or a
-// touchscreen behaves the same, and pointer capture keeps the drag alive when
-// the cursor leaves the piece.
-(function kbDragging() {
-  let live = null;
-
-  function begin(e, el, name, mode) {
-    const at = kbLayout[name];
-    live = {
-      name, mode, el, id: e.pointerId, moved: false,
-      startX: e.clientX, startY: e.clientY,
-      fromX: at.x, fromY: at.y, fromS: at.s,
-    };
-    // Deliberately no capture here. A press that turns out to be a click has
-    // to reach the key under it, and a captured pointer sends the click to the
-    // capture element instead. Capture is taken below, once it is a drag.
-  }
-
-  document.addEventListener("pointerdown", e => {
-    if (e.button !== 0) return;
-    const grip = e.target.closest("[data-grip]");
-    if (grip) {
-      begin(e, grip.closest(".kb-piece") || grip, grip.dataset.grip, "scale");
-      e.preventDefault();
-      return;
-    }
-    const piece = e.target.closest(".kb-piece");
-    if (piece && !e.target.closest("[data-kbcode], button")) begin(e, piece, piece.dataset.piece, "move");
-  }, true);
-
-  document.addEventListener("pointermove", e => {
-    if (!live || e.pointerId !== live.id) return;
-    const dx = e.clientX - live.startX;
-    const dy = e.clientY - live.startY;
-    if (!live.moved && Math.abs(dx) + Math.abs(dy) < 4) return;
-    if (!live.moved) {
-      live.moved = true;
-      // Now it is a drag, so keep the pointer even when it leaves the piece.
-      // Asked of the piece, not of the document these listeners sit on, and a
-      // refusal must not stop the drag -- this handler works without it.
-      try { live.el.setPointerCapture(live.id); } catch (err) {}
-    }
-
-    const at = kbLayout[live.name];
-    if (live.mode === "move") {
-      at.x = Math.round(live.fromX + dx);
-      at.y = Math.round(live.fromY + dy);
-    } else {
-      // Solve for the scale that leaves the corner under the cursor. Averaging
-      // the two axes lets either one drive it, so a mostly-sideways drag works
-      // as well as a diagonal one.
-      const w = live.el.offsetWidth || 1, h = live.el.offsetHeight || 1;
-      const want = ((live.fromS * w + dx) / w + (live.fromS * h + dy) / h) / 2;
-      at.s = Math.min(2.6, Math.max(0.35, +want.toFixed(3)));
-    }
-    kbPlace(live.name);
-    e.preventDefault();
-  }, true);
-
-  document.addEventListener("pointerup", e => {
-    if (!live || e.pointerId !== live.id) return;
-    const moved = live.moved;
-    try { live.el.releasePointerCapture(live.id); } catch (err) {}
-    live = null;
-    if (!moved) return;
-    kbSaveLayout();
-    // It was a drag, so the click that follows is not meant for a key.
-    window.addEventListener("click", stop => {
-      stop.stopPropagation();
-      stop.preventDefault();
-    }, { capture: true, once: true });
-  }, true);
-
-  // The wheel is the quickest way to resize, and the obvious one to try.
-  document.addEventListener("wheel", e => {
-    const piece = e.target.closest && e.target.closest(".kb-piece");
-    if (!piece) return;
-    const at = kbLayout[piece.dataset.piece];
-    at.s = Math.min(2.6, Math.max(0.35,
-      +(at.s * (e.deltaY < 0 ? 1.08 : 1 / 1.08)).toFixed(3)));
-    kbPlace(piece.dataset.piece);
-    e.preventDefault();
-    clearTimeout(kbDragging.save);
-    kbDragging.save = setTimeout(kbSaveLayout, 400);
-  }, { passive: false });
-})();
 
 // A short line in the legend saying how many stock CS2 binds the active
 // profile leaves untouched -- shown either way, whether they are lit on the
@@ -10698,7 +10485,7 @@ function kbMissingLegend(activeProfile, missingList, showPanel) {
     (showPanel ? "" : " — lit on the board") + "</span>";
 }
 
-// The panel next to the board, for when there are too many missing binds to
+// The Key colors panel, for when there are too many missing binds to
 // mark on the board itself without it turning into noise.
 function kbMissingPanel(activeProfile, missingList, showPanel) {
   if (!showPanel) return "";
@@ -10731,55 +10518,39 @@ function renderKeyboard() {
 
   const rows = KB_ROWS.map(row =>
     '<div class="kb-row">' + row.map(kbCap).join("") + "</div>").join("");
-  const fitInitially = !renderKeyboard.placed;
-
   box.innerHTML =
-    '<p class="kb-edge" id="kb-edge" hidden>' +
-      "Part of this is past the edge, because it is zoomed in. " +
-      '<button class="btn ghost small" id="kb-edge-reset">Reset layout</button>' +
-    "</p>" +
-    '<div class="kb-workspace"><div class="kb-devices"><div class="kb-layout-row">' +
-    '<div class="kb-scene" id="kb-scene">' +
-    '<div class="kb-desk-label"><b>Full-size keyboard</b><span>104 keys · per-key assignments</span></div>' +
-    (kbShown.board || kbShown.mouse ? "" :
-      '<div class="kb-none">Both models are switched off.</div>') +
-    kbPiece("board",
-      '<div class="kb-stage"><div class="kb-board">' + rows + "</div></div>") +
-    kbPiece("mouse", '<div class="kb-mouse">' + mouseModel() +
-    '<div class="ms-pick">' +
-    [["two", "2 side"], ["four", "4 side"]].map(([id, label]) =>
-      '<button data-mouseshape="' + id + '" aria-pressed="' +
-      (mouseShape === id) + '">' + label + "</button>").join("") +
-    "</div></div>") +
-    "</div>" +
-    "</div>" +
-    '<div class="kb-desk-help"><b>Make it muscle memory.</b>Select a control to inspect it. Drag a command onto a key to assign it.<br>Drag the case to move. Scroll over a device to zoom.</div>' +
-    '<div class="kb-show">' +
-    [["board", "Keyboard"], ["mouse", "Mouse"]].map(([name, label]) =>
-      '<label class="opt"><input type="checkbox" data-kbshow="' + name + '"' +
-      (kbShown[name] ? " checked" : "") + "> " + label + "</label>").join("") +
-    "</div>" +
-    '</div><aside class="kb-inspector" aria-label="Assignment inspector"><h3 class="kb-inspector-title">Assignment inspector</h3>' + kbDetail() +
+    '<div class="kb-workspace"><div class="kb-scene" id="kb-scene"><div class="kb-rig">' +
+    kbPiece('board', '<div class="kb-stage"><div class="kb-board">' + rows + '</div></div>') +
+    kbPiece('mouse', '<div class="kb-mouse">' + mouseModel() + kbShapePicker() + '</div>') +
+    '</div></div><div class="kb-focus-row"><div id="kb-focus" class="kb-mode" role="group" aria-label="Device focus"></div>' +
+    '<button class="kb-help" aria-label="About device focus" title="Fade the other device so you can focus on one. Faded devices can\'t be clicked.">?</button></div><div class="kb-settings">' +
+    '<section class="kb-card kb-inspector" aria-label="Assignment inspector">' +
+    kbCardTitle('Assignment', 'Select a control to inspect its binding or assign a command.') + kbDetail() + '</section>' +
+    '<section class="kb-card">' + kbCardTitle('Key colors', 'Colors show binding sources. Rings mark differences and selection.') +
     '<div class="kb-legend">' +
-    '<span><i class="dot script"></i>one of your scripts</span>' +
+    '<span><i class="dot script"></i>your scripts</span>' +
     '<span><i class="dot custom"></i>changed from CS2 default</span>' +
     '<span><i class="dot bound"></i>CS2 default</span>' +
     '<span><i class="dot free"></i>free</span>' +
-    (keyData && keyData.live && keyData.live.available
-      ? '<span class="kb-live">' +
-        (keyData.live.differences.length
-          ? '<i class="dot adrift"></i>' + keyData.live.differences.length +
-            " differ from CS2"
-          : '<i class="dot ok"></i>matches CS2') +
-        "</span>"
-      : "") +
-    kbMissingLegend(activeProfile, missingList, showPanel) +
-    "</div>" + kbMissingPanel(activeProfile, missingList, showPanel) + "</aside></div>";
-
-  if (fitInitially) kbEnsureLayout($("kb-scene"), true);
+    '<span><i class="dot missing"></i>missing default</span>' +
+    '<span><i class="dot selected"></i>selected control</span>' +
+    (keyData.live?.available ? '<span class="kb-live"><i class="dot adrift"></i>' +
+      keyData.live.differences.length + ' differ from live CS2</span>' : '') +
+    kbMissingLegend(activeProfile, missingList, showPanel) + '</div>' +
+    kbMissingPanel(activeProfile, missingList, showPanel) + '</section>' +
+    '<section class="kb-card">' + kbCardTitle('Mouse', 'Choose your side-button count. Select a mouse zone above to assign it.') +
+    kbShapePicker() + '<div class="kb-mouse-bindings">' +
+    ['mouse1','mouse2','mouse3','mouse4','mouse5', ...(mouseShape === 'four' ? ['mouse6','mouse7'] : []), 'mwheelup','mwheeldown'].map(code =>
+      '<div><span>' + esc(code) + '</span><code>' + esc(kbLookup(code, code)?.command || 'Free') + '</code></div>').join('') +
+    '</div></section><section class="kb-card">' + kbCardTitle('View', 'Ghost a device to focus on the other. Its position stays the same.') +
+    ['board','mouse'].map(name => '<label class="kb-view-toggle"><input type="checkbox" role="switch" data-kbghost-toggle="' +
+      name + '"><span>Ghost ' + (name === 'board' ? 'keyboard' : 'mouse') + '</span></label>').join('') +
+    '</section><section class="kb-card kb-how">' + kbCardTitle('How it works', 'Assignments are saved through the current configuration collection.') +
+    '<p>Select a control to inspect it. Drag a command onto a key to assign it.</p></section></div></div>';
+  $('kb-focus').innerHTML = [['both','Both'],['board','Keyboard'],['mouse','Mouse']].map(([mode,label]) =>
+    '<button data-kbfocus="' + mode + '" aria-pressed="' + (kbFocus === mode) + '">' + label + '</button>').join('');
+  kbApplyFocus();
   kbDecorateWorkspace();
-
-  ["board", "mouse"].forEach(kbPlace);
 }
 
 let kbSwitchBusy = null;
@@ -13796,13 +13567,14 @@ async function loadKeyboard(force) {
   renderKeyboard();
 }
 
-document.addEventListener("change", e => {
-  const box = e.target.closest("[data-kbshow]");
-  if (!box) return;
-  kbShown[box.dataset.kbshow] = box.checked;
-  renderKeyboard.placed = false;
-  kbSaveLayout();
-  renderKeyboard();
+document.addEventListener('change', e => {
+  const toggle = e.target.closest('[data-kbghost-toggle]');
+  if (toggle) kbToggleGhost(toggle.dataset.kbghostToggle);
+});
+document.addEventListener('click', e => {
+  const mode = e.target.closest('[data-kbfocus]'), eye = e.target.closest('[data-kbghost]');
+  if (mode) kbSetFocus(mode.dataset.kbfocus);
+  if (eye) kbToggleGhost(eye.dataset.kbghost);
 });
 
 document.addEventListener("click", e => {
@@ -13815,7 +13587,7 @@ document.addEventListener("click", e => {
     return;
   }
   const cap = e.target.closest("[data-kbcode]");
-  if (!cap || kbBusy) return;
+  if (!cap || cap.closest(".is-ghost") || kbBusy) return;
   kbOpenInspector = true;
   pickedKey = { code: cap.dataset.kbcode, label: cap.dataset.kblabel };
   kbOptions = null;
@@ -13924,11 +13696,6 @@ function kbPickerRows() {
 }
 
 $("kb-reload").addEventListener("click", () => loadKeyboard(true));
-$("kb-reset").addEventListener("click", kbResetLayout);
-document.addEventListener("click", e => {
-  if (e.target.closest("#kb-edge-reset")) kbResetLayout();
-});
-
 document.addEventListener("click", e => {
   if (e.target.closest("[data-goto-keyboard]")) setTab("keyboard");
 });
@@ -15523,10 +15290,7 @@ function applyPrefs(ui) {
   if (ui.mouse_shape === "two" || ui.mouse_shape === "four") {
     mouseShape = ui.mouse_shape;
   }
-  kbLoadLayout(ui.kb_layout);
-  if (ui.kb_shown && typeof ui.kb_shown.board === "boolean") {
-    kbShown = ui.kb_shown;
-  }
+  kbLoadFocus(ui);
   if (typeof ui.rail_width === "number" && ui.rail_width > 0) {
     railWidth = Math.max(RAIL_MIN, Math.min(RAIL_MAX, ui.rail_width));
     if (!railFolded()) railOpen = railWidth;

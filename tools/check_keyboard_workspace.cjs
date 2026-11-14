@@ -11,12 +11,11 @@ new vm.Script(fs.readFileSync('cs2cfg/web/assets/devices/workspace.js','utf8'));
 const slice=(a,b)=>page.slice(page.indexOf(a),page.indexOf(b,page.indexOf(a)));
 let code=`const $=id=>document.getElementById(id); const esc=x=>String(x??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');
 let profileData={default_active:true,profiles:[{file:'warmup.cfg',label:'Warmup',override_count:2,active:false,missing_defaults:[]}]};
-let layoutData={profiles:[]},layoutPending={},cloudData=null,kbswPopover=null,kbswMenu=null,persistedLayout=null;
+let layoutData={profiles:[]},layoutPending={},cloudData=null,kbswPopover=null,kbswMenu=null;
 const calls=[],notices=[];const confirm=()=>true;function status(t){notices.push(t)}async function ensureScan(){return true}function noFolderYet(){}
 const groups=[{id:'movement',name:'Movement',commands:[{label:'Move forward',command:'+forward',icon:'up',hold:true},{label:'Jump',command:'+jump',icon:'jump',hold:true}]},{id:'shoot',name:'Shooting',commands:[{label:'Attack',command:'+attack',icon:'crosshair',hold:true}]}];
 const keys={count:5,scripted:1,bound:{scancode26:{label:'W',command:'+forward',is_default:true,file:'key_binds.cfg',line:2},scancode4:{label:'A',command:'say left',is_default:false,file:'key_binds.cfg',line:3},scancode9:{label:'F',command:'tool',script:'Practice tool',enabled:true,file:'tools.cfg',line:8},mouse1:{label:'Mouse 1',command:'+attack',is_default:true,file:'key_binds.cfg',line:4}},live:{available:true,differences:[{key:'a'}]}};
 async function api(route,body){calls.push({route,body});if(route==='/api/cfg/keys')return keys;
-if(route==='/api/prefs'&&body?.kb_layout)persistedLayout=JSON.parse(JSON.stringify(body.kb_layout));
 if(route==='/api/cfg/layouts/profiles')return profileData;if(route==='/api/cfg/layouts/status')return layoutData;
 if(route==='/api/cfg/key/options')return {groups,stock:'+forward',current:{command:body.code==='KeyW'?'+forward':''},hold_note:'Held commands run until released.'};
 if(route==='/api/cfg/bind')return {ok:true,command:body.command||''};
@@ -29,11 +28,12 @@ code+=slice('async function loadKeyboard(force)','$("plug-reload").addEventListe
 code+=`
 const checks=[];function check(name,ok){checks.push({name,ok:!!ok});if(!ok)throw Error(name)}
 const settle=()=>new Promise(r=>setTimeout(r,35));
+async function waitFor(test){const end=performance.now()+3000;while(!test()&&performance.now()<end)await new Promise(r=>setTimeout(r,50));}
 const overlaps=(a,b)=>a.left<b.right-.5&&a.right>b.left+.5&&a.top<b.bottom-.5&&a.bottom>b.top+.5;
 function checkLayout(name){
  const scene=$('kb-scene').getBoundingClientRect();
  const devices=[...document.querySelectorAll('.kb-piece')].map(e=>e.getBoundingClientRect());
- if(!devices.every(b=>b.left>=scene.left-1&&b.right<=scene.right+1&&b.top>=scene.top&&b.bottom<=scene.bottom+1))checks.push({geometry:{scene,devices,layout:kbLayout}});
+ if(!devices.every(b=>b.left>=scene.left-1&&b.right<=scene.right+1&&b.top>=scene.top&&b.bottom<=scene.bottom+1))checks.push({geometry:{scene,devices,focus:kbFocus}});
  check(name+' pieces inside stage',devices.every(b=>b.left>=scene.left-1&&b.right<=scene.right+1&&b.top>=scene.top&&b.bottom<=scene.bottom+1));
  check(name+' devices side by side',devices.length<2||devices[0].right<devices[1].left);
  const caps=[...document.querySelectorAll('.kb-key')].map(e=>e.getBoundingClientRect());
@@ -43,59 +43,60 @@ function checkLayout(name){
  const shell=document.querySelector('.ms-shell')?.getBoundingClientRect();
  check(name+' labels outside silhouette',!shell||labels.every(b=>b.right<=shell.left||b.left>=shell.right));
  check(name+' callouts inside stage',labels.every(b=>b.left>=scene.left&&b.right<=scene.right));
- const help=document.querySelector('.kb-desk-help').getBoundingClientRect();
- check(name+' helper below devices',devices.every(b=>b.bottom<=help.top+1));
- check(name+' no edge warning',$('kb-edge').hidden);
+ check(name+' flat board',getComputedStyle(document.querySelector('.kb-board')).transform==='none');
+ const cards=[...document.querySelectorAll('.kb-settings > .kb-card')].map(e=>e.getBoundingClientRect());
+ check(name+' settings columns',document.querySelector('.kb-workspace').clientWidth>620 ? Math.abs(cards[0].top-cards[1].top)<1&&cards[1].left>cards[0].right : cards[1].top>=cards[0].bottom);
+ const toggle=$('kb-focus').getBoundingClientRect(),help=document.querySelector('.kb-focus-row > .kb-help').getBoundingClientRect();
+ check(name+' focus below stage and above cards',toggle.top>=scene.bottom&&toggle.bottom<cards[0].top);
+ check(name+' focus centered with adjacent help',Math.abs((toggle.left+toggle.right)-(scene.left+scene.right))<2&&help.left>toggle.right&&help.left-toggle.right<12);
+ check(name+' dotted stage',getComputedStyle($('kb-scene')).backgroundImage.includes('radial-gradient'));
+ check(name+' corner help', [...document.querySelectorAll('.kb-card')].every(card=>{const c=card.getBoundingClientRect(),h=card.querySelector('.kb-help').getBoundingClientRect();return h.right<c.right&&c.right-h.right<14&&h.top>c.top&&h.top-c.top<14;}));
+
 }
 function key(c){return document.querySelector('[data-kbcode="'+c+'"]')}
 function pointer(type,el,x,y){el.dispatchEvent(new PointerEvent(type,{bubbles:true,clientX:x,clientY:y,pointerId:7,button:0}));}
 async function drop(command,code,valid=true){const source=document.querySelector('[data-bindcmd="'+command+'"]');const surface=key(code).querySelector('.ms-face')||key(code);surface.scrollIntoView({block:'nearest'});const a=source.getBoundingClientRect(),b=surface.getBoundingClientRect();pointer('pointerdown',source,a.x+10,a.y+10);pointer('pointermove',document,valid?b.x+b.width/2:innerWidth-2,valid?b.y+b.height/2:2);check('drag ghost appears',!!document.querySelector('.kb-drag-ghost'));pointer('pointerup',document,valid?b.x+b.width/2:innerWidth-2,valid?b.y+b.height/2:2);await settle();}
 (async()=>{try{
 document.querySelector('.boot-screen').remove();document.querySelector('#status')?.remove();document.documentElement.dataset.boot='ready';document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('hidden',p.dataset.panel!=='keyboard'));
-await loadKeyboard(true);await settle();
-// These are the exact unversioned {board,mouse} shapes sent to /api/prefs by
-// the old renderer (851477d^), including a custom zoom/position like the owner's.
-// Exercise persistence round trips without reading or modifying their prefs.
+document.querySelectorAll('.rail [data-tab]').forEach(tab=>tab.setAttribute('aria-selected',String(tab.dataset.tab==='keyboard')));
+await loadKeyboard(true);await document.fonts.ready;await new Promise(r=>setTimeout(r,450));
+// Synthetic legacy payloads; never read user preferences.
 const fixtures=[null,
  {board:{x:10,y:46,s:1},mouse:{x:720,y:20,s:1}},
  {board:{x:10,y:150,s:1.3},mouse:{x:400,y:65,s:1}},
- // Owner's actual unversioned geometry, read without changing their prefs.
  {board:{x:136,y:123,s:.981},mouse:{x:1280,y:57,s:1}},
- {version:KB_LAYOUT_VERSION,board:{x:-90,y:200,s:2.6},mouse:{x:400,y:70,s:1}},
- {version:KB_LAYOUT_VERSION,board:{x:8,y:65,s:.8},mouse:{x:80,y:65,s:1}},
- {version:KB_LAYOUT_VERSION,board:{x:8,y:65,s:null},mouse:{x:80,y:65,s:-1}}];
+ {version:2,board:{x:-90,y:200,s:2.6},mouse:{x:400,y:70,s:1}},
+ {version:2,board:{x:8,y:65,s:.8},mouse:{x:80,y:65,s:1}},
+ {version:2,board:{x:8,y:65,s:null},mouse:{x:80,y:65,s:-1}}];
+const geometry=()=>{
+ const scene=$('kb-scene').getBoundingClientRect();
+ return [...document.querySelectorAll('.kb-piece')].map(e=>{const b=e.getBoundingClientRect();return [b.left-scene.left,b.top-scene.top,b.width,b.height];});
+};
+const sameGeometry=(a,b)=>a.every((row,i)=>row.every((v,j)=>Math.abs(v-b[i][j])<.1));
 for(const theme of ['violet','ember','carbon','acid','daylight','paper','pro']){
  document.documentElement.dataset.theme=theme;
- // Reproduce the owner's expanded 340px navigation rail too.
+ const palette=['script','custom','bound','free','missing','adrift','selected'].map(state=>getComputedStyle(document.querySelector('.kb-legend .dot.'+state)).borderColor+' '+getComputedStyle(document.querySelector('.kb-legend .dot.'+state)).backgroundColor);
+ check(theme+' seven distinct legend colors',new Set(palette).size===7);
  for(const rail of [186,340]){
   document.querySelector('.app').style.setProperty('--rail',rail+'px');
-  for(const [i,saved] of fixtures.entries()){
-   for(const shape of ['two','four']){
-    if(saved)await api('/api/prefs',{kb_layout:saved,kb_shown:kbShown});
-    mouseShape=shape;kbLoadLayout(saved?persistedLayout:null);renderKeyboard();await settle();
-    checkLayout(theme+'/'+rail+'/'+i+'/'+shape);
-    check('layout version persisted',persistedLayout?.version===KB_LAYOUT_VERSION);
+  for(const shape of ['two','four']){
+   mouseShape=shape;renderKeyboard();await settle();const baseline=geometry();
+   for(const [i,saved] of fixtures.entries()){
+    kbLoadFocus({kb_layout:saved});renderKeyboard();await settle();checkLayout(theme+'/'+rail+'/'+i+'/'+shape);
+    check('legacy geometry ignored',sameGeometry(baseline,geometry()));
    }
   }
  }
 }
-// Current, valid custom geometry survives a save/load and later selection.
-const custom=JSON.parse(JSON.stringify(kbLayout));custom.board.y+=20;custom.mouse.y+=30;
-kbLayout=custom;kbSaveLayout();kbLoadLayout(persistedLayout);renderKeyboard();await settle();
-check('compatible custom layout retained',JSON.stringify(kbLayout)===JSON.stringify(custom));
-const keyboardPanel=document.querySelector('[data-panel="keyboard"]');
-keyboardPanel.classList.add('hidden');kbLoadLayout(custom);renderKeyboard();await settle();
-check('hidden tab keeps saved geometry',JSON.stringify(kbLayout)===JSON.stringify(custom));
-keyboardPanel.classList.remove('hidden');await settle();
-check('showing tab keeps compatible geometry',JSON.stringify(kbLayout)===JSON.stringify(custom));
-// Resize the desk without a window reload; ResizeObserver must fix both devices.
-document.querySelector('.kb-devices').style.width='420px';await new Promise(r=>setTimeout(r,200));
-checkLayout('narrowed desk');
-document.querySelector('.kb-devices').style.removeProperty('width');await settle();
-kbShown.mouse=false;kbShown.board=false;renderKeyboard();await settle();
-check('both hidden supported',!document.querySelector('.kb-piece'));
-kbShown.mouse=true;kbShown.board=true;mouseShape='two';kbLoadLayout(null);renderKeyboard();await settle();
-document.querySelector('.app').style.removeProperty('--rail');delete document.documentElement.dataset.theme;await settle();
+check('positions never saved',!calls.some(c=>c.route==='/api/prefs'&&(c.body?.kb_layout||c.body?.kb_shown)));
+for(const [saved,expected] of [[{kb_shown:{board:false,mouse:true}},'mouse'],[{kb_shown:{board:true,mouse:false}},'board'],[{kb_shown:{board:false,mouse:false}},'both'],[{kb_focus:'both',kb_shown:{board:false}},'both'],[{kb_focus:'invalid'},'both']]){
+ kbLoadFocus(saved);check('focus preference migration',kbFocus===expected);
+}
+kbSetFocus('both');document.querySelector('.kb-workspace').style.width='420px';
+await waitFor(()=>{const scene=$('kb-scene').getBoundingClientRect();return [...document.querySelectorAll('.kb-piece')].every(el=>{const b=el.getBoundingClientRect();return b.left>=scene.left&&b.right<=scene.right;});});
+checkLayout('narrowed stage');
+document.querySelector('.kb-workspace').style.removeProperty('width');document.querySelector('.app').style.removeProperty('--rail');delete document.documentElement.dataset.theme;
+mouseShape='two';renderKeyboard();await settle();
 check('104 individually interactive keys',document.querySelectorAll('.kb-key').length===104);
 check('seven bindable mouse controls',document.querySelectorAll('.ms-zone').length===7);
 check('one key per code',new Set([...document.querySelectorAll('.kb-key')].map(k=>k.dataset.kbcode)).size===104);
@@ -119,32 +120,44 @@ await new Promise(r=>setTimeout(r,450));await drop('+jump','mouse2');check('mous
 await new Promise(r=>setTimeout(r,450));const before=calls.filter(c=>c.route==='/api/cfg/bind').length;await drop('+jump','KeyQ',false);check('drop outside cancels',calls.filter(c=>c.route==='/api/cfg/bind').length===before&&!document.querySelector('.kb-drag-ghost'));
 await new Promise(r=>setTimeout(r,450));document.querySelector('[data-mouseshape="four"]').click();check('four-side mouse exposes M6 and M7',!!key('mouse6')&&!!key('mouse7'));check('variant persisted',calls.some(c=>c.route==='/api/prefs'&&c.body.mouse_shape==='four'));
 key('mouse6').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));await settle();check('mouse keyboard accessible',pickedKey.code==='mouse6');
-const toggle=document.querySelector('[data-kbshow="mouse"]');toggle.checked=false;toggle.dispatchEvent(new Event('change',{bubbles:true}));check('visibility toggle preserves keyboard',!document.querySelector('[data-piece="mouse"]')&&!!key('KeyW'));
+const beforeFocus=geometry();
+for(const mode of ['board','mouse']){
+ document.querySelector('[data-kbfocus="'+mode+'"]').click();await new Promise(r=>setTimeout(r,350));
+ const ghost=document.querySelector('.is-ghost'),body=ghost.querySelector('.kb-device-body');
+ await waitFor(()=>+getComputedStyle(body).opacity<=.2);
+ check(mode+' focus fades other device',ghost.dataset.piece!==mode&&+getComputedStyle(body).opacity<=.2);
+ check(mode+' ghost is inert and unfocusable',body.inert&&[...body.querySelectorAll('[data-kbcode]')].every(e=>e.tabIndex===-1));
+ const old=pickedKey.code,control=body.querySelector('[data-kbcode]');control.dispatchEvent(new MouseEvent('click',{bubbles:true}));control.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));
+ check('ghost cannot select',pickedKey.code===old);
+ control.dispatchEvent(new PointerEvent('pointerover',{bubbles:true}));await new Promise(r=>setTimeout(r,230));check('ghost has no preview',!document.querySelector('.kb-hover-preview'));
+ check('focus keeps geometry',sameGeometry(beforeFocus,geometry()));
+}
+kbSetFocus('both');await new Promise(r=>setTimeout(r,450));kbSetFocus('mouse');
+const ghostBinds=calls.filter(c=>c.route==='/api/cfg/bind').length;await drop('+jump','KeyW');check('ghost rejects drops',calls.filter(c=>c.route==='/api/cfg/bind').length===ghostBinds);kbSetFocus('both');await new Promise(r=>setTimeout(r,450));
+document.querySelector('[data-kbghost="mouse"]').click();check('eye ghosts mouse',kbFocus==='board');document.querySelector('[data-kbghost="mouse"]').click();check('eye restores mouse',kbFocus==='both');
+const ghostToggle=document.querySelector('[data-kbghost-toggle="board"]');ghostToggle.checked=true;ghostToggle.dispatchEvent(new Event('change',{bubbles:true}));check('view toggle ghosts keyboard',kbFocus==='mouse');kbSetFocus('both');
+check('focus preference persisted',calls.some(c=>c.route==='/api/prefs'&&c.body.kb_focus==='mouse'));
+document.querySelector('[data-kbsw]').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}));check('profile context menu retained',document.querySelectorAll('[data-kbsw-menu]').length===4);kbswMenu=null;renderKbSwitcher();
 document.querySelector('[data-kbsw]').click();await settle();check('profile switch API preserved',calls.some(c=>c.route==='/api/cfg/layouts/apply'));
 profileData.profiles[0].missing_defaults=Array.from({length:6},(_,i)=>({key:'scancode'+(4+i),label:'Key '+i,command:'+jump'}));renderKeyboard();check('missing list and count retained',document.querySelectorAll('.kb-missing-row').length===6&&document.querySelector('.kb-missing-count').textContent==='6');
 document.querySelector('[data-kbsw-default]').click();await settle();check('default profile API preserved',calls.some(c=>c.route==='/api/cfg/layouts/default'));
 document.querySelector('[data-kbsw-add]').click();check('profile create opens naming control',!!$('kbsw-name'));$('kbsw-name').value='Test';$('kbsw-name-go').click();await settle();check('profile create API preserved',calls.some(c=>c.route==='/api/cfg/layouts/create'&&c.body.name==='Test'));
 openKbswCopyPopover('warmup.cfg','Warmup');$('kbsw-name').value='Warmup copy';$('kbsw-name-go').click();await settle();check('profile copy API preserved',calls.some(c=>c.route==='/api/cfg/layouts/copy'&&c.body.name==='Warmup copy'));
 const reloads=calls.filter(c=>c.route==='/api/cfg/keys').length;$('kb-reload').click();await settle();check('re-read reloads keys',calls.filter(c=>c.route==='/api/cfg/keys').length>reloads);
-kbShown.mouse=true;mouseShape='two';renderKeyboard();$('kb-reset').click();checkLayout('reset');
-const piece=document.querySelector('[data-piece="mouse"]'),start={...kbLayout.mouse};
-pointer('pointerdown',piece,0,0);pointer('pointermove',document,-40,20);pointer('pointerup',document,-40,20);piece.click();await settle();
-check('case drag moves and saves',kbLayout.mouse.y===start.y+20&&calls.at(-1).route==='/api/prefs');
-// A wheel zoom still works, and moving onto the keyboard reserves a clear lane
-// for the other device instead of drawing callouts across its keycaps.
-piece.dispatchEvent(new WheelEvent('wheel',{bubbles:true,cancelable:true,deltaY:-100}));
-check('wheel zoom retained',kbLayout.mouse.s>start.s);
-kbLayout.mouse.x=kbLayout.board.x;kbLayout.mouse.y=kbLayout.board.y;kbPlace('mouse');
-check('manual overlap separated',!overlaps(document.querySelector('[data-piece="board"]').getBoundingClientRect(),piece.getBoundingClientRect()));
-check('helper follows manual layout',document.querySelector('.kb-desk-help').getBoundingClientRect().top>=document.querySelector('[data-piece="board"]').getBoundingClientRect().bottom);
-$('kb-reset').click();
+mouseShape='two';kbSetFocus('both');renderKeyboard();checkLayout('final');
+check('removed layout UI absent',!document.querySelector('.kb-grip,.kb-edge,#kb-reset,[data-kbshow]'));
+profileData.profiles[0].active=true;profileData.profiles[0].missing_defaults=[{key:'scancode4',label:'A',command:'+left'},{key:'mouse2',label:'Mouse 2',command:'+attack2'}];keys.bound.scancode4.agrees=false;renderKeyboard();
+check('missing defaults highlight keys and mouse',key('KeyA').classList.contains('kb-missing')&&key('mouse2').classList.contains('kb-missing'));
+check('live drift highlight retained',key('KeyA').classList.contains('adrift'));
+check('missing and live drift colors differ',getComputedStyle(key('KeyA'),'::before').borderColor!==getComputedStyle(key('KeyA'),'::after').backgroundColor);
+profileData.profiles[0].active=false;keys.bound.scancode4.agrees=true;renderKeyboard();
 key('KeyE').click();await settle();document.querySelector('[data-bindstock]').click();await settle();check('restore default uses force',calls.some(c=>c.route==='/api/cfg/bind'&&c.body.force===true));
 for(const theme of ['violet','ember','carbon','acid','daylight','paper','pro']){document.documentElement.dataset.theme=theme;check('theme '+theme+' keeps device and text',getComputedStyle(key('KeyW')).color!==getComputedStyle(key('KeyW')).backgroundColor&&getComputedStyle(document.querySelector('.kb-inspector')).display!=='none');}
 delete document.documentElement.dataset.theme;
 if(${JSON.stringify(process.env.KEYBOARD_THEME||'')})document.documentElement.dataset.theme=${JSON.stringify(process.env.KEYBOARD_THEME||'')};
 check('no horizontal overflow',document.documentElement.scrollWidth<=innerWidth);
 key('KeyW').click();await new Promise(r=>setTimeout(r,350));document.querySelector('.scroll').scrollTop=0;
-if(${JSON.stringify(process.env.KEYBOARD_PREVIEW_OLD||'')}){document.querySelector('.app').style.setProperty('--rail','340px');kbLoadLayout(fixtures[3]);renderKeyboard();await settle();}
+
 }catch(e){checks.push({error:e.stack})}document.body.insertAdjacentHTML('beforeend','<pre id="checks">'+JSON.stringify(checks)+'</pre>');})();`;
 let html=page.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'');
 html=html.replace('<head>','<head><base href="'+url.pathToFileURL(path.join(root,'cs2cfg/web/')).href+'">');
@@ -153,7 +166,7 @@ fs.writeFileSync(path.join(work,'preview.html'),html);
 const chrome=process.env.CHROME_PATH||'C:/Program Files/Google/Chrome/Application/chrome.exe';
 // Use real compositor frames rather than --virtual-time-budget: ResizeObserver
 // and transitions need to settle before measuring the result of a live resize.
-const args=['--headless','--no-sandbox','--disable-gpu','--allow-file-access-from-files','--remote-debugging-port=0','--user-data-dir='+path.join(work,'chrome'),'about:blank'];
+const args=['--headless','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows','--no-sandbox','--disable-gpu','--allow-file-access-from-files','--remote-debugging-port=0','--user-data-dir='+path.join(work,'chrome'),'about:blank'];
 if(process.env.KEYBOARD_REDUCED)args.unshift('--force-prefers-reduced-motion');
 (async()=>{
  const browser=cp.spawn(chrome,args,{stdio:['ignore','ignore','pipe'],windowsHide:true});let socket;
@@ -184,6 +197,11 @@ if(process.env.KEYBOARD_REDUCED)args.unshift('--force-prefers-reduced-motion');
   const {result}=await command('Runtime.evaluate',{expression:'document.documentElement.outerHTML',returnByValue:true});
   fs.writeFileSync(path.join(work,'dom.html'),result.value);
   const shot=await command('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(work,'preview.png'),Buffer.from(shot.data,'base64'));
+  for(const mode of ['board','mouse']){
+   await command('Runtime.evaluate',{expression:"kbSetFocus('"+mode+"');new Promise(r=>setTimeout(r,350))",awaitPromise:true});
+   const focused=await command('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(work,'focus-'+mode+'.png'),Buffer.from(focused.data,'base64'));
+  }
+  await command('Runtime.evaluate',{expression:"kbSetFocus('both');new Promise(r=>setTimeout(r,350))",awaitPromise:true});
   if(process.env.KEYBOARD_CAPTURE_THEMES){
    for(const theme of ['violet','ember','carbon','acid','daylight','paper','pro']){
     await command('Runtime.evaluate',{expression:'document.documentElement.dataset.theme='+JSON.stringify(theme)+';new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))',awaitPromise:true});
