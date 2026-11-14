@@ -42,6 +42,12 @@ MACHINE_KEYS = frozenset({
     "audio_input",
     "audio_enforce",
     "settings_sub",   # which settings category was open
+    # The first-run wizard's answers about this PC: whether it ran, whether
+    # the app may write into this PC's CS2 cfg folder, and whether this PC
+    # syncs automatically. A permission is given per machine, not per player.
+    "firstrun_done",
+    "cfg_write_ok",
+    "sync_auto",
 })
 
 # The account whose settings are shown, which is itself machine-wide: it is a

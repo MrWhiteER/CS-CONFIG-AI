@@ -70,6 +70,7 @@ class State:
         self.updates: Optional[Any] = None   # updates.Checker, started on demand
         self.demo: Optional[Any] = None      # _DemoJob, while one is downloading
         self.faceit: Optional[Dict[str, Any]] = None  # cached profile + history
+        self.sync: Optional[Any] = None      # autosync.Loop, once started
 
     def refresh(self, rescan: bool = False) -> None:
         if self.machine is None or rescan:
@@ -3915,6 +3916,129 @@ def _settle_win_graphics(state: State, wanted: bool) -> Dict[str, Any]:
         return {"ok": False, "error": str(exc)}
 
 
+
+# --- first-run setup and automatic sync -------------------------------------
+
+def _game_cfg_root(state: State) -> Optional[Path]:
+    state.refresh()
+    return steam.cfg_dir(state.cs2_install) if state.cs2_install else None
+
+
+def _sync_round(state: State, force: bool = False) -> Dict[str, Any]:
+    """One automatic sync round for the account this window is showing."""
+    from . import autosync, cloud
+    from .cli import load_prefs, save_prefs
+
+    # Checked before anything touches Steam or the hardware: a PC that is not
+    # signed in pays nothing for this running in the background.
+    if not cloud.signed_in():
+        return {"ok": False, "action": "none", "at": time.time(),
+                "reason": "sign in with Steam to sync"}
+    return autosync.run(_active_account(state), _game_cfg_root(state),
+                        state.cfg_folder, load_prefs=load_prefs,
+                        save_prefs=save_prefs, force=force)
+
+
+def _sync_loop(state: State):
+    from . import autosync
+
+    loop = getattr(state, "sync", None)
+    if loop is None:
+        loop = autosync.Loop(lambda force=False: _sync_round(state, force))
+        state.sync = loop
+    return loop
+
+
+def _sync_status(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """What the last automatic round did, and whether rounds are running."""
+    from . import autosync, profiles
+    from .cli import load_prefs
+
+    ui = profiles.ui_for(load_prefs(), _active_account(state))
+    return {"ok": True, "auto": ui.get(autosync.AUTO_KEY) is not False,
+            "last": _sync_loop(state).last}
+
+
+def _sync_now(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    return {"ok": True, "last": _sync_loop(state).once(force=True)}
+
+
+def _sync_auto(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import autosync
+    from .cli import load_prefs, save_prefs
+
+    prefs = load_prefs()
+    prefs.setdefault("ui", {})[autosync.AUTO_KEY] = bool(body.get("on", True))
+    save_prefs(prefs)
+    if body.get("on", True):
+        _sync_loop(state).nudge()
+    return {"ok": True, "auto": bool(body.get("on", True))}
+
+
+def _firstrun(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Everything the setup wizard shows, in one call. Reads only."""
+    from . import audio, cloud, firstrun, profiles
+    from .cli import load_prefs
+
+    state.refresh()
+    prefs = load_prefs()
+    account = _active_account(state)
+    ui = profiles.ui_for(prefs, account)
+    libraries = steam.find_libraries(state.steam_root) if state.steam_root else []
+
+    try:
+        sound = audio.summary()
+    except Exception as exc:          # no audio stack is not a reason to fail
+        sound = {"error": str(exc)}
+
+    return {
+        "ok": True,
+        "needed": firstrun.needed(prefs),
+        "steps": list(firstrun.STEPS),
+        "account": account,
+        "cloud": cloud.status(),
+        "sync": _sync_loop(state).last,
+        "cfg": firstrun.cfg_access(_game_cfg_root(state)),
+        "sound": sound,
+        "presets": firstrun.presets(state.machine, state.kb),
+        "apps": firstrun.known_apps(libraries, ui),
+        "themes": list(firstrun.THEMES),
+        "current": {k: ui.get(k) for k in ("intent", "theme", "audio_output",
+                                           "audio_input", "cfg_write_ok", "sync_auto")},
+    }
+
+
+def _firstrun_finish(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Save the wizard's answers, put the sound devices in place, then sync."""
+    from . import firstrun, profiles
+    from .cli import load_prefs, save_prefs
+
+    state.refresh()
+    account = _active_account(state)
+    prefs = load_prefs()
+    ui = profiles.ui_for(prefs, account)
+    libraries = steam.find_libraries(state.steam_root) if state.steam_root else []
+    answers = body.get("answers") if isinstance(body.get("answers"), dict) else body
+
+    changes = firstrun.answers_to_changes(answers, ui,
+                                          firstrun.known_apps(libraries, ui))
+    profiles.remember(prefs, account, changes)
+    save_prefs(prefs)
+
+    sound = answers.get("sound")
+    if isinstance(sound, dict) and (sound.get("output") or sound.get("input")):
+        try:
+            _audio_pin(state, {"output": sound.get("output") or "",
+                               "input": sound.get("input") or "", "enforce": True})
+        except Exception:
+            pass                       # saved anyway; the keeper retries
+
+    # Permission may just have been given: files waiting on it can land now.
+    _sync_loop(state).nudge()
+    return {"ok": True, "saved": sorted(changes),
+            "ui": profiles.ui_for(load_prefs(), account)}
+
+
 # --- the cloud account ------------------------------------------------------
 
 def _cloud(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
@@ -4326,6 +4450,11 @@ def make_handler(state: State):
         "/api/demos/waiting": _demo_waiting,
         "/api/demos/page": _demo_page,
         "/api/demos/pick": _demo_pick,
+        "/api/firstrun": _firstrun,
+        "/api/firstrun/finish": _firstrun_finish,
+        "/api/sync": _sync_status,
+        "/api/sync/now": _sync_now,
+        "/api/sync/auto": _sync_auto,
         "/api/cloud": _cloud,
         "/api/cloud/login": _cloud_login,
         "/api/cloud/poll": _cloud_poll,
@@ -4737,6 +4866,13 @@ def serve(port: int = 8765, cfg_folder: str = "mrwhiteer",
         audio.shared().set_pin(_audio_pin_from_prefs())
     except Exception:
         pass                    # never let a sound preference stop the app
+
+    # Settings follow the Steam account between PCs without a button. The
+    # loop does nothing until somebody is signed in, and never raises.
+    try:
+        _sync_loop(state).start()
+    except Exception:
+        pass
 
     server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(state))
     server.daemon_threads = True
