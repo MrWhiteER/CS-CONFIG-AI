@@ -48,6 +48,8 @@ MACHINE_KEYS = frozenset({
     "firstrun_done",
     "cfg_write_ok",
     "sync_auto",
+    "overlay_enabled", "overlay_corner", "overlay_fields", "overlay_hotkey",
+    "overlay_sign_out_hint_dismissed",
 })
 
 # The account whose settings are shown, which is itself machine-wide: it is a

@@ -141,6 +141,8 @@ class Nvml:
                 api.nvmlDeviceGetTemperature.argtypes = [ctypes.c_void_p, ctypes.c_uint,
                                                          ctypes.POINTER(ctypes.c_uint)]
                 api.nvmlDeviceGetTemperature.restype = ctypes.c_int
+                api.nvmlDeviceGetMemoryInfo.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+                api.nvmlDeviceGetMemoryInfo.restype = ctypes.c_int
                 if api.nvmlInit_v2() != 0:
                     continue
                 if api.nvmlDeviceGetHandleByIndex_v2(0, ctypes.byref(self.device)) != 0:
@@ -152,7 +154,8 @@ class Nvml:
                 continue
 
     def sample(self) -> dict:
-        result = {"gpu_percent": None, "gpu_temp_c": None}
+        result = {"gpu_percent": None, "gpu_temp_c": None,
+                  "vram_used_mb": None, "vram_total_mb": None}
         if self.api:
             rates = (ctypes.c_uint * 2)()
             temp = ctypes.c_uint()
@@ -160,6 +163,10 @@ class Nvml:
                 result["gpu_percent"] = rates[0]
             if self.api.nvmlDeviceGetTemperature(self.device, 0, ctypes.byref(temp)) == 0:
                 result["gpu_temp_c"] = temp.value
+            memory = (ctypes.c_ulonglong * 3)()  # total, free, used
+            if self.api.nvmlDeviceGetMemoryInfo(self.device, ctypes.byref(memory)) == 0:
+                result["vram_total_mb"] = memory[0] / 1024 ** 2
+                result["vram_used_mb"] = memory[2] / 1024 ** 2
         return result
 
     def close(self) -> None:

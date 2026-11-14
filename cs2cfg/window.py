@@ -259,6 +259,12 @@ def find_game_window(process: str = "cs2.exe") -> Optional[WindowInfo]:
     return max(candidates, key=lambda w: w.size[0] * w.size[1])
 
 
+def is_borderless(found: WindowInfo) -> bool:
+    """The frame is absent and the window fills its monitor."""
+    style = _get_long(wintypes.HWND(found.hwnd), GWL_STYLE)
+    return not bool(style & FRAME_STYLES) and found.rect == monitor_bounds(found.hwnd)
+
+
 def window_pid(hwnd: int) -> int:
     """Process id owning a window."""
     pid = wintypes.DWORD()
@@ -297,22 +303,20 @@ def nudge_focus(hwnd: int, settle: float = 0.2) -> None:
     user32.SetForegroundWindow(handle)
 
 
-def is_responsive(hwnd: int, timeout_ms: int = 200) -> bool:
-    """Whether a window is pumping messages.
+def is_responsive(hwnd: int) -> Optional[bool]:
+    """Query Windows' hung-window state without communicating with the game.
 
-    Sends a no-op and sees whether the window's thread answers. A window that
-    stops answering is one whose message loop is blocked — which is exactly
-    what a mode-switch stall looks like from the outside, so this is how the
-    black-screen pause gets measured rather than guessed at.
+    Windows owns the detection threshold. None means the query is unavailable;
+    a destroyed window has no ongoing stall. Timing belongs to SessionRecorder.
     """
-    result = ctypes.c_size_t()
-    ok = user32.SendMessageTimeoutW(
-        wintypes.HWND(hwnd), 0x0000, 0, 0,  # WM_NULL
-        0x0002,                             # SMTO_ABORTIFHUNG
-        wintypes.UINT(timeout_ms),
-        ctypes.byref(result),
-    )
-    return bool(ok)
+    try:
+        query = user32.IsHungAppWindow
+        query.argtypes, query.restype = [wintypes.HWND], wintypes.BOOL
+        if not user32.IsWindow(wintypes.HWND(hwnd)):
+            return True
+        return not bool(query(wintypes.HWND(hwnd)))
+    except (AttributeError, OSError):
+        return None
 
 
 def primary_monitor_index() -> int:

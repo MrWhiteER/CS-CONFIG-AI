@@ -2,8 +2,8 @@
 
 Everything here is measured, not estimated. CPU and memory come from Win32
 calls through ctypes, which cost microseconds and can be polled continuously.
-GPU comes from ``nvidia-smi`` when it is present, which is a subprocess and so
-is cached for a couple of seconds rather than run on every request.
+GPU comes from driver-provided NVML, with ``nvidia-smi`` as a fallback. Readings
+are cached for a couple of seconds rather than sampled on every request.
 
 Where a figure genuinely cannot be obtained -- no NVIDIA driver, no GPU counter
 -- the field comes back ``None`` and the dashboard shows a dash. A gauge that
@@ -90,10 +90,13 @@ class Monitor:
 
     _last_times: Optional[tuple] = None
     _lock: threading.Lock = field(default_factory=threading.Lock)
+    _gpu_lock: threading.Lock = field(default_factory=threading.Lock)
     _gpu_cache: Optional[Dict[str, Optional[float]]] = None
     _gpu_at: float = 0.0
     _smi: Optional[str] = None
     _smi_checked: bool = False
+    _nvml: object = None
+    _nvml_checked: bool = False
     history: Dict[str, List[Optional[float]]] = field(default_factory=lambda: {
         "cpu": [], "gpu": [], "ram": [], "vram": [],
     })
@@ -127,10 +130,40 @@ class Monitor:
 
     # -- gpu ---------------------------------------------------------------
     def gpu(self) -> Dict[str, Optional[float]]:
+        # Serialize readers and cache unsuccessful samples too, so a missing
+        # driver cannot trigger repeated fallback processes on concurrent polls.
+        with self._gpu_lock:
+            now = time.monotonic()
+            with self._lock:
+                if self._gpu_cache is not None and now - self._gpu_at < GPU_CACHE_SECONDS:
+                    return dict(self._gpu_cache)
+            result = self._read_gpu()
+            with self._lock:
+                self._gpu_cache, self._gpu_at = result, now
+            return dict(result)
+
+    def _read_gpu(self) -> Dict[str, Optional[float]]:
         now = time.monotonic()
         with self._lock:
             if self._gpu_cache is not None and now - self._gpu_at < GPU_CACHE_SECONDS:
                 return dict(self._gpu_cache)
+            if not self._nvml_checked:
+                from .overlay.metrics import Nvml
+
+                self._nvml = Nvml()
+                self._nvml_checked = True
+            if self._nvml.api:
+                sample = self._nvml.sample()
+                if sample.get("gpu_percent") is not None:
+                    used, total = sample.get("vram_used_mb"), sample.get("vram_total_mb")
+                    result = {"percent": sample["gpu_percent"],
+                              "temperature": sample.get("gpu_temp_c"),
+                              "vram_used_mb": used, "vram_total_mb": total,
+                              "vram_percent": round(used * 100 / total, 1)
+                              if used is not None and total else None,
+                              "available": True}
+                    self._gpu_cache, self._gpu_at = result, now
+                    return dict(result)
             if not self._smi_checked:
                 self._smi = _find_nvidia_smi()
                 self._smi_checked = True
@@ -172,6 +205,11 @@ class Monitor:
             self._gpu_cache = result
             self._gpu_at = now
         return dict(result)
+
+    def close(self) -> None:
+        with self._lock:
+            if self._nvml is not None:
+                self._nvml.close()
 
     # -- game --------------------------------------------------------------
     def game(self) -> Dict[str, object]:

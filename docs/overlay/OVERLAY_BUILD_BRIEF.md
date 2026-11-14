@@ -50,10 +50,11 @@ Reviewer will grep for all of these.
   composed/independent-flip windowed, or the window is not borderless
   (window.py knows), hide the HUD and surface a notice in the app offering the
   existing borderless switch.
-- PresentMon access: if access denied, show a one-click fix in Settings that
-  runs `net localgroup "Performance Log Users" <user> /add` elevated (UAC
-  prompt, user-initiated only) and says a sign-out is needed. Never elevate
-  silently.
+- PresentMon access (Step 1b revision): setup asks for permissions once. The
+  overlay only checks token membership, shows setup/sign-out hints, and keeps
+  resource metrics and telemetry working without frame capture. It never
+  requests elevation or invokes the setup helper's operations. The sign-out
+  hint has a persistent, once-only dismissal in Settings.
 - PresentMon binary: the installer/build must ship it. Add it to the
   PyInstaller spec (cs2cfg.spec) and installer.iss as a data file from
   tools/presentmon/, with the SHA256 checked at runtime before launching it.

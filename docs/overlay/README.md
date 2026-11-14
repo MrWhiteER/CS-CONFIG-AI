@@ -1,10 +1,151 @@
-# Overlay step 0
+# Performance overlay (Step 1)
 
-This CLI-only spike measures a native external HUD over CS2 in **Fullscreen
+## Enable in the app
+
+Open **Settings > Overlay**, check **Enable performance overlay**, then save.
+It is **off by default**. The choices apply to this machine across Steam
+accounts. Choose any corner, the displayed fields, and a shortcut (default
+**Ctrl+Alt+O**). The shortcut toggles HUD visibility while capture continues.
+Field, corner and shortcut edits take effect without resetting capture.
+No panel, second shortcut, game-state receiver, or round-based visibility is
+included in Step 1.
+
+Use **Refresh status** after starting CS2 to check access and HUD warnings.
+Settings is read on entry or explicit refresh; there is no overlay JavaScript
+polling. In exclusive fullscreen the HUD is hidden. The notice offers
+**Use borderless next launch**, which selects the existing Play mode and
+video-patch option. Restart CS2 through Play to apply it. During frame capture,
+the HUD requires both a monitor-filling frameless window and a known
+composed/independent-flip PresentMode. Unknown modes and missing frame data
+hide it too. Loss of focus always hides it. When frame capture permission is
+unavailable, a borderless window can still show CPU/GPU stats with **—** for
+FPS, 1% low and frame time.
+
+All permission requests belong to the setup wizard, once. The overlay only
+checks enabled token membership for Administrators or Performance Log Users,
+using Windows SIDs so non-English Windows works. It never requests elevation,
+starts an admin helper operation, changes group membership, or opens a UAC
+prompt. `permissions.request_frame_capture()` is an inert compatibility stub
+returning `"handled by setup wizard"`.
+
+Settings shows **Finish setup to enable frame stats** if the optional setup
+helper module is absent or `cs2cfg.elevated.ready()` is false. If the helper is
+installed but the current token still lacks access, it shows **Sign out of
+Windows and back in once to enable frame stats**. Use **Dismiss** to hide that
+sign-out reminder permanently across app restarts and Steam accounts. The
+setup reminder is independent of that dismissal. Available capture has no
+permission hint. The overlay reads only the helper's readiness; setup owns its
+operations.
+
+The running app owns one `OverlayService` through its local server state. Its
+constructor and data API start nothing. Disabled means no overlay worker, HUD,
+GPU sampler or PresentMon. Enabled without CS2 means one worker blocked on an
+interruptible five-second wait between window checks. With CS2 it starts one
+capture when permitted and a native HUD, samples once per second, and reuses the telemetry
+`SessionRecorder` for stall events. The launcher and service share the recorder
+instead of running two stall detectors. Games opened outside the launcher also
+get a session record when the enabled service detects their window.
+
+Game exit closes capture and the HUD, saves the summary and returns to the
+five-second wait. Disabling joins the worker and releases its resources;
+closing the app's server or quitting does the same. Closing the desktop window
+to the existing tray keeps the service alive. The app's other existing features
+have their own lifecycle independently of this overlay setting.
+
+`snapshot(seconds=120|300|600)` exposes detached JSON-ready current data,
+history, events, status and summary for the later panel. The HTTP equivalent is
+the existing token-protected `POST /api/overlay`. It does not initiate capture.
+`POST /api/overlay/settings` validates and saves settings, including hint
+dismissal. The snapshot includes `frame_capture_ready`, `frame_capture_hint`,
+`frame_capture_hint_dismissible` and formatted `display` values, where missing
+fields are **—**; numeric samples retain `null` for missing measurements. No
+permission-request endpoint, GSI endpoint or panel window is created.
+
+Without frame permission, the service skips PresentMon and continues CPU/GPU
+sampling, HUD updates and telemetry stalls. A real PresentMon access-denied
+result also disables frame stats for that capture session and stops the failed
+capture. No permission retry or Windows approval is triggered.
+
+The ring holds at most 600 one-second summaries within the last ten minutes;
+the event list holds the latest 200, newest first. History starts fresh for a
+new detected game/capture session. Events combine overlapping frame spikes and
+telemetry stalls; consecutive unresponsive probes coalesce into one freeze.
+Event times are epoch seconds at the start and durations are milliseconds;
+PresentMon receipt times and telemetry's session-relative times are normalized
+to this basis. ETW buffering can delay a spike relative to a stall. Neither
+timestamp nor probe intervals can establish an exact in-game freeze boundary.
+The existing telemetry detector now queries
+[Windows' hung-window state](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-ishungappwindow)
+without communicating with the game. Windows currently uses an internal
+threshold of about five seconds, subject to change. Recorded stall duration
+starts at the first observed hung flag, so it is a lower bound on the full
+freeze; shorter freezes come from PresentMon. Unsupported queries produce no
+stall measurement. This replaces the older timed responsiveness probe.
+
+Session records retain an `overlay` summary: `avg_fps`, `one_percent_low`,
+`worst_frame_ms`, `stutter_count` (PresentMon spikes), `worst_freeze_ms` (either
+source), captured `frame_count` and `started_at`. Settings > Logs displays it.
+This describes the captured portion of the session; missing frames stay missing.
+FPS uses exact frame-count/time totals, not averaged per-second FPS. Session
+p99 uses a bounded histogram rounded upward in 0.001 ms bins below 10 ms,
+0.01 ms below 100 ms, 0.1 ms below 1 s, 1 ms below 10 s, then 10 ms bins capped
+at 60 s. Exact worst frames and raw spike
+durations remain available. The probe/benchmark retains its existing finer
+histogram for the on/off measurement.
+
+Machine-wide preferences under `ui` in `config.json`:
+
+| Key | Default |
+| --- | --- |
+| `overlay_enabled` | `false` |
+| `overlay_corner` | `"top_left"` |
+| `overlay_fields` | `["fps", "one_percent_low", "frame_time_ms", "cpu_percent", "gpu_percent", "gpu_temp_c"]` |
+| `overlay_hotkey` | `"Ctrl+Alt+O"` |
+| `overlay_sign_out_hint_dismissed` | `false` |
+
+The dashboard now reads GPU load, VRAM and temperature through the same ctypes
+NVML implementation, using its existing cached `nvidia-smi` fallback if NVML
+cannot provide load. The overlay itself uses NVML only; unsupported counters
+remain missing. No Python dependencies were added.
+
+## Fetch PresentMon before running from source
+
+Run this explicitly from the repository root:
+
+```powershell
+powershell -NoProfile -File tools/fetch_presentmon.ps1
+```
+
+This downloads the pinned official x64 console and checks the SHA256 below.
+`tools/presentmon/` stays ignored by git. The app never fetches a binary.
+Runtime checks the pinned SHA256 before starting capture or running the
+session-stop command. A renamed override still needs the same bytes. Missing
+or modified executables are refused and reported in Settings/probe output.
+
+## Release preparation
+
+1. Run the fetch command above. Do not commit the executable.
+2. Run `python -m unittest discover -s tests` and the live measurement below.
+3. When a release is separately authorized, run the normal build/release flow.
+   `cs2cfg.spec` refuses to build without the correct binary and includes it as
+   data under `_internal/tools/presentmon/` in the portable folder.
+   `installer.iss` explicitly ships the file from `tools/presentmon/` to the same
+   installed location. There is no capture subprocess or access prompt during
+   installation.
+4. Smoke-test both portable and installed copies: fresh settings off; enable;
+   missing-game idle; capture; hotkey; fullscreen notice; game exit; disable;
+   quit. Check the saved session summary. Repeat on the home PC with CS2.
+5. A PresentMon version upgrade must update the reviewed hash/name, fetch
+   script, installer source, provenance below, and confirmed CLI/CSV contract
+   together. Do not accept a hash from a writable sidecar.
+
+## Step 0 measurement probe
+
+The CLI probe measures a native external HUD over CS2 in **Fullscreen
 Windowed**. It reads frame data from Intel PresentMon's ETW console, system CPU
 from the existing `monitor.py` ctypes code, NVIDIA GPU zero's utilization and
 temperature from `nvml.dll`, and window/process metadata from Win32. Missing GPU
-support or frame data stays missing (`null` in JSON, `--` on the HUD).
+support or frame data stays missing (`null` in JSON, **—** on the HUD).
 
 The probe never changes game files, game windows, display modes, or game input.
 Process image queries use only `0x1000` access. Its own CPU/RAM measurements use
@@ -49,8 +190,9 @@ Intel Corporation, under the upstream MIT license.
 - Local file: `tools/presentmon/PresentMon-2.6.0-x64.exe`
 - SHA256: `b2a706bc6ad475749e3b7e3409263aa1e6906d45bdcf993f6dbc0f660188f1af`
 
-The SHA256 was verified locally. `tools/presentmon/` is ignored by git; no
-binary is committed or downloaded by the probe. Discovery globs
+The SHA256 was recorded during Step 0 and is pinned in the runtime/build.
+`tools/presentmon/` is ignored by git; no binary is committed or downloaded by
+the probe. Discovery globs
 `tools/presentmon/PresentMon*.exe` and chooses the highest numeric version
 (mtime breaks ties). An explicit path takes precedence:
 
@@ -87,22 +229,18 @@ values are missing. Zero frame intervals are also excluded.
 
 ## Access denied
 
-A non-elevated administrator is not automatically allowed to start this ETW
-session. PresentMon needs membership in **Performance Log Users**. The probe
+A filtered administrator token is not automatically allowed to start this ETW
+session. PresentMon needs an elevated administrator token or enabled membership
+in **Performance Log Users**. The probe
 detects the stderr error and exit code, shows
 `PresentMon: access denied - see docs/overlay/README.md`, and continues writing
 resource/status samples. When CS2 is also absent, both conditions appear in
 `status`, with separate `presentmon_status` and `game_status` fields.
 
-If you choose to enable ETW access, run this once from an **elevated Command
-Prompt**, then **sign out and back in** before starting the probe normally:
-
-```bat
-net localgroup "Performance Log Users" %USERNAME% /add
-```
-
-The group name may be localized on non-English Windows. The probe does not run
-this command, change group membership, or attempt to elevate.
+Finish the setup wizard once, then sign out of Windows and back in so the new
+group membership reaches the token before starting the probe normally. The
+app's Settings section shows the setup/sign-out hints described above. Neither
+the overlay nor the probe requests permissions or changes Windows membership.
 
 ## Metrics and comparison
 
@@ -167,6 +305,10 @@ idle smoke test.
 python -m unittest discover -s tests
 ```
 
-The overlay parser, one-second aggregator, status classifier, executable
-discovery, session-stop scoping, HUD text, and benchmark math tests do not need
-CS2, PresentMon, administrator privileges, a GPU, or a display.
+The tests cover the parser, aggregator, status classifier, executable discovery
+and SHA256 gate, bounded service history, event merge, lifecycle, shared
+telemetry, default-off settings, token membership, setup-helper hints, persistent
+sign-out dismissal, inert permission requests, resource/stall collection without
+frame access, NVML/fallback selection, HUD/API dashes and benchmark math.
+They use unittest and mocks, and need no CS2, PresentMon, administrator
+privileges, GPU or display. Win32 integration modules still require Windows.
