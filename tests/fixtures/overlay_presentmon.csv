@@ -1,0 +1,8 @@
+Application,ProcessID,SwapChainAddress,FrameTime,PresentMode,DisplayLatency,ClickToPhotonLatency,AllInputToPhotonLatency,UnknownFutureColumn
+cs2.exe,42,0x1,4,Hardware: Independent Flip,10,NA,,ignored
+cs2.exe,42,0x1,4,Hardware: Independent Flip,12,20,30,ignored
+cs2.exe,42,0x1,4,Hardware: Independent Flip,NA,,,ignored
+cs2.exe,42,0x1,12,Composed: Flip,14,22,32,ignored
+cs2.exe,42,0x1,NA,Composed: Flip,,NA,NA,ignored
+cs2.exe,42,0x1,,NA,NA,,,ignored
+another.exe,99,0x2,100,Composed: Flip,100,100,100,ignored
