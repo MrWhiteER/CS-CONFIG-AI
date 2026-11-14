@@ -45,3 +45,26 @@ There's a small sync indicator in the account area or title bar. Poll `POST /api
 ## Copy rules
 
 Plain words, no jargon. Say "your Steam account", not "cloud account". Never show raw ids or paths except `cfg.path` in step 2.
+
+## Look and motion (Edy: "nice animations, like good gaming wizards")
+
+Edy wants this to feel like a premium gaming first-run, not a settings form. Codex owns the design. These are references and patterns to draw from, not a spec.
+
+**Patterns from gaming first-run setups worth borrowing**
+- **NVIDIA app / GeForce first run**: a dark full-bleed hero with the brand accent glowing behind it, one big decision per screen, and a hardware readout ("RTX 4070 · i7-13700K") shown as a live chip. Use this on the preset step: show the detected CPU/GPU as chips above the three cards.
+- **Steam Deck / Xbox out-of-box setup**: a segmented progress bar at the top, with each finished segment filling in and the current one pulsing softly. Big focusable tiles, and keyboard/Enter friendly.
+- **Razer Synapse / Logitech G HUB device setup**: a device "scan" moment where the sound devices and companion apps appear one by one as they're found (staggered 60-80 ms), each with its icon and a small check that pops in.
+- **Riot Client / game launchers**: a cinematic backdrop with a slow parallax gradient or particle drift behind glass panels, and step changes that slide plus fade instead of hard cuts.
+- **Esports HUD language**: angled corner cuts and thin accent lines that draw themselves in. Numbers count up: the FPS estimate under each preset should roll up from 0 to its value when the step opens, and the Competitive card can get a faint "speed lines" shimmer.
+
+**Motion rules**
+- Step transition: about 280-360 ms. Outgoing content slides about 24px and fades; incoming slides in from the other side. Reverse the direction for Back.
+- Choice cards: lift and glow on hover (accent border plus soft outer glow from the theme accent). On select, a quick scale pop (0.97 → 1.0) and a check that draws in as an SVG stroke.
+- Steam sign-in success and "Brought over your settings": a short satisfying moment with the count of files sliding in and a checkmark burst. Keep it under 1 s.
+- Theme step: picking a theme cross-fades the whole wizard to it live (about 400 ms) so the user sees the result immediately.
+- Finish: the wizard panel scales down slightly and fades into the app behind it.
+- Honour `prefers-reduced-motion`: swap slides for plain fades and skip count-ups and particles.
+- CSS transitions and keyframes plus small vanilla JS only. No new libraries (the app is pure stdlib, single index.html). Animate only transform and opacity to stay at 60 fps.
+- Every colour comes from theme tokens so all 10 themes work, including the light ones (daylight, paper).
+
+**Reference reading**: [onboarding micro-interactions](https://uxpin.com/studio/blog/designing-onboarding-microinteractions-guide/), [game onboarding UI best practices](https://inworld.ai/blog/best-practices-in-video-game-ui-for-game-onboarding), [Riot client launcher concept](https://showwcase.com/show/8858/riot-games-client-launcher-concept-design), [Ankama launcher case study](https://app.uxcel.com/showcase/ankama-games-launcher-concept-uxui-case-study-508). Codex may also browse Dribbble for "game launcher onboarding" for more ideas.
