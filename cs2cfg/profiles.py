@@ -42,6 +42,8 @@ MACHINE_KEYS = frozenset({
     "audio_input",
     "audio_enforce",
     "settings_sub",   # which settings category was open
+    "overlay_enabled", "overlay_corner", "overlay_fields", "overlay_hotkey",
+    "overlay_sign_out_hint_dismissed",
 })
 
 # The account whose settings are shown, which is itself machine-wide: it is a

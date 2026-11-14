@@ -158,8 +158,8 @@ class StatusAndDiscovery(unittest.TestCase):
 
     def test_hud_has_dashes_and_status_without_data(self):
         lines = display_lines({"status": "cs2.exe not found"})
-        self.assertIn("FPS --", lines[0])
-        self.assertIn("CPU --", lines[1])
+        self.assertIn("FPS \u2014", lines[0])
+        self.assertIn("CPU \u2014", lines[1])
         self.assertEqual(lines[2], "cs2.exe not found")
 
 
@@ -174,7 +174,8 @@ class ChildLifecycle(unittest.TestCase):
         child = mock.Mock()
         first.process = child
         with mock.patch("cs2cfg.overlay.presentmon.subprocess.run") as run:
-            first.stop()
+            with mock.patch("cs2cfg.overlay.presentmon.verify_executable", return_value=True):
+                first.stop()
         self.assertEqual(run.call_args.args[0],
                          ["PresentMon.exe", "--session_name", first.session, "--terminate_existing_session"])
         child.wait.assert_called_once()

@@ -70,6 +70,9 @@ class State:
         self.updates: Optional[Any] = None   # updates.Checker, started on demand
         self.demo: Optional[Any] = None      # _DemoJob, while one is downloading
         self.faceit: Optional[Dict[str, Any]] = None  # cached profile + history
+        from .overlay.service import OverlayService
+
+        self.overlay = OverlayService()  # Inert until enabled in preferences.
 
     def refresh(self, rescan: bool = False) -> None:
         if self.machine is None or rescan:
@@ -744,6 +747,24 @@ def _history(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
 
     sessions = telemetry.load_sessions(int(body.get("limit") or 25))
     return {"ok": True, "sessions": sessions, "summary": telemetry.summarise(sessions)}
+
+
+def _overlay(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    return {"ok": True, **state.overlay.snapshot(int(body.get("seconds") or 600))}
+
+
+def _overlay_settings(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    from .cli import load_prefs, save_prefs
+    from .overlay import settings
+
+    prefs = load_prefs()
+    current = settings.read(prefs.get("ui"))
+    wanted = settings.read({**current, **{k: body[k] for k in settings.DEFAULTS if k in body}},
+                           strict=True)
+    profiles.remember(prefs, None, wanted)
+    save_prefs(prefs)
+    state.overlay.configure(wanted)
+    return _overlay(state, {})
 
 
 def _cfg_scan(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -4212,7 +4233,10 @@ def _quit(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     import os
 
     def bye() -> None:
-        os._exit(0)
+        try:
+            _state.overlay.stop()
+        finally:
+            os._exit(0)
 
     threading.Timer(0.6, bye).start()
     return {"ok": True, "closing": True}
@@ -4358,6 +4382,8 @@ def make_handler(state: State):
         "/api/update/settings": _update_settings,
         "/api/quit": _quit,
         "/api/history": _history,
+        "/api/overlay": _overlay,
+        "/api/overlay/settings": _overlay_settings,
     }
 
     class Handler(BaseHTTPRequestHandler):
@@ -4738,6 +4764,17 @@ def serve(port: int = 8765, cfg_folder: str = "mrwhiteer",
     except Exception:
         pass                    # never let a sound preference stop the app
 
-    server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(state))
+    class AppServer(ThreadingHTTPServer):
+        def server_close(self) -> None:
+            try:
+                state.overlay.stop()
+            finally:
+                super().server_close()
+
+    server = AppServer(("127.0.0.1", port), make_handler(state))
     server.daemon_threads = True
+    from .cli import load_prefs
+    from .overlay.settings import read as overlay_settings
+
+    state.overlay.configure(overlay_settings(load_prefs().get("ui")))
     return server, state

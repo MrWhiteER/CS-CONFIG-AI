@@ -8,6 +8,8 @@ import threading
 import time
 from ctypes import wintypes as w
 
+from .settings import FIELDS, hotkey as parse_hotkey
+
 WS_EX_LAYERED = 0x00080000
 WS_EX_TRANSPARENT = 0x00000020
 WS_EX_TOPMOST = 0x00000008
@@ -17,24 +19,41 @@ WDA_EXCLUDEFROMCAPTURE = 0x00000011
 WIDTH, HEIGHT = 640, 120
 
 
-def display_lines(sample: dict) -> tuple[str, ...]:
+def display_values(sample: dict) -> dict[str, str]:
+    """Shared HUD/API formatting; unavailable frame data stays missing."""
     def number(key: str, suffix: str = "") -> str:
         value = sample.get(key)
-        return f"{value:.1f}{suffix}" if value is not None else "--"
+        if sample.get("frame_capture_ready") is False and key in FIELDS[:3]:
+            value = None
+        return f"{value:.1f}{suffix}" if value is not None else "\u2014"
 
+    return {key: number(key, suffix) for key, suffix in zip(FIELDS, ("", "", " ms", "%", "%", " C"))}
+
+
+def display_lines(sample: dict, fields=FIELDS, hotkey="Ctrl+Alt+O") -> tuple[str, ...]:
+    values = display_values(sample)
+
+    labels = {"fps": "FPS", "one_percent_low": "1% low", "frame_time_ms": "Frame",
+              "cpu_percent": "CPU", "gpu_percent": "GPU", "gpu_temp_c": "Temp"}
+    shown = {key: f"{label} {values[key]}" for key, label in labels.items()
+             if key in fields}
     return (
-        f"CS CONFIG AI    FPS {number('fps')}    1% low {number('one_percent_low')}",
-        f"Frame {number('frame_time_ms', ' ms')}    CPU {number('cpu_percent', '%')}    "
-        f"GPU {number('gpu_percent', '%')}    Temp {number('gpu_temp_c', ' C')}",
+        "CS CONFIG AI    " + "    ".join(shown[k] for k in FIELDS[:2] if k in shown),
+        "    ".join(shown[k] for k in FIELDS[2:] if k in shown),
         sample.get("status", "PresentMon: waiting for frame data"),
-        "Ctrl+Alt+O: show/hide",
+        f"{hotkey}: show/hide",
     )
 
 
 class Hud:
-    def __init__(self, exclude_from_capture: bool = False) -> None:
+    def __init__(self, exclude_from_capture: bool = False, *, corner="top_left",
+                 fields=FIELDS, hotkey="Ctrl+Alt+O") -> None:
         self.exclude = exclude_from_capture
-        self.visible = True
+        self.corner, self.fields, self.hotkey = corner, tuple(fields), hotkey
+        self._chord = parse_hotkey(hotkey)
+        self.visible = False
+        self._requested = True
+        self._allowed = True
         self.warning = ""
         self.error = ""
         self._lock = threading.Lock()
@@ -69,6 +88,22 @@ class Hud:
             self._thread.join(timeout=5)
         if self._thread.is_alive():
             raise RuntimeError("HUD did not stop")
+
+    def set_allowed(self, allowed: bool) -> None:
+        """Presentation/focus gate, independent of the player's hotkey choice."""
+        with self._lock:
+            if self._allowed == allowed:
+                return
+            self._allowed = allowed
+            if self._wake:
+                self._kernel.SetEvent(self._wake)
+
+    def configure(self, *, fields, hotkey: str) -> None:
+        chord = parse_hotkey(hotkey)
+        with self._lock:
+            self.fields, self.hotkey, self._chord = tuple(fields), hotkey, chord
+            if self._wake:
+                self._kernel.SetEvent(self._wake)
 
     def _run(self) -> None:
         try:
@@ -169,13 +204,14 @@ class Hud:
             registered = True
             style = (WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOPMOST |
                      WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE)
-            hwnd = user.CreateWindowExW(style, name, "CS CONFIG AI overlay probe", 0x80000000,
+            hwnd = user.CreateWindowExW(style, name, "CS CONFIG AI performance HUD", 0x80000000,
                                         20, 20, WIDTH, HEIGHT, None, None, instance, None)
             if not hwnd:
                 raise ctypes.WinError(ctypes.get_last_error())
-            hotkey = user.RegisterHotKey(hwnd, 1, 0x4000 | 0x0002 | 0x0001, ord("O"))
+            hotkey = user.RegisterHotKey(hwnd, 1, *self._chord)
+            active_chord = self._chord
             if not hotkey:
-                self.warning = "Ctrl+Alt+O unavailable (already registered)"
+                self.warning = f"{self.hotkey} unavailable (already registered)"
             if self.exclude:
                 try:
                     bind(user, "SetWindowDisplayAffinity", w.BOOL, [w.HWND, w.DWORD])
@@ -206,15 +242,23 @@ class Hud:
                 message = w.MSG()
                 while user.PeekMessageW(ctypes.byref(message), None, 0, 0, 1):
                     if message.message == 0x0312 and message.wParam == 1:  # WM_HOTKEY
-                        self.visible = not self.visible
-                        if not self.visible:
-                            user.ShowWindow(hwnd, 0)
-                            shown = False
+                        self._requested = not self._requested
                     else:
                         user.TranslateMessage(ctypes.byref(message))
                         user.DispatchMessageW(ctypes.byref(message))
                 with self._lock:
-                    lines, position = display_lines(self._sample), self._position
+                    if active_chord != self._chord:
+                        if hotkey:
+                            user.UnregisterHotKey(hwnd, 1)
+                        active_chord = self._chord
+                        hotkey = user.RegisterHotKey(hwnd, 1, *active_chord)
+                        self.warning = "" if hotkey else f"{self.hotkey} unavailable (already registered)"
+                    lines = display_lines(self._sample, self.fields, self.hotkey)
+                    position = self._position
+                    self.visible = self._requested and self._allowed
+                if shown and not self.visible:
+                    user.ShowWindow(hwnd, 0)
+                    shown = False
                 state = lines, position
                 now = time.monotonic()
                 changed = state != last_drawn
