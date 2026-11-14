@@ -69,9 +69,15 @@ New-Folder (Join-Path $Root 'results') 'ReadAndExecute'
 $steps += 'request folders made'
 
 # 3. The task. On demand only, this user, highest privileges, hidden.
+#    Started through conhost --headless: an elevated task that runs
+#    powershell.exe directly gets a visible console window for a moment on
+#    every job (-WindowStyle Hidden only hides it after it has appeared).
 $broker = Join-Path $Program 'broker.ps1'
-$action = New-ScheduledTaskAction -Execute 'powershell.exe' `
-    -Argument "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$broker`""
+$sys32 = Join-Path $env:SystemRoot 'System32'
+$conhost = Join-Path $sys32 'conhost.exe'
+$posh = Join-Path $sys32 'WindowsPowerShell\v1.0\powershell.exe'
+$action = New-ScheduledTaskAction -Execute $conhost `
+    -Argument "--headless `"$posh`" -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$broker`""
 $principal = New-ScheduledTaskPrincipal -UserId $me.Name -LogonType Interactive -RunLevel Highest
 $settings = New-ScheduledTaskSettingsSet -MultipleInstances Parallel -AllowStartIfOnBatteries `
     -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Hours 12) -Hidden

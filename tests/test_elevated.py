@@ -72,6 +72,16 @@ class ListsAgree(unittest.TestCase):
         self.assertEqual(jobs, set(elevated.OPS))
         self.assertIn(f"$Version = {elevated.HELPER_VERSION}", text)
 
+    def test_the_task_runs_without_a_console_window(self):
+        # Measured on a real PC: an elevated task running powershell.exe
+        # directly flashed a console window on every job.
+        text = (BROKER.parent / "install.ps1").read_text(encoding="utf-8")
+        action = re.search(r"New-ScheduledTaskAction -Execute (\S+)\s*`\s*-Argument \"([^\n]*)\"", text)
+        self.assertIsNotNone(action)
+        self.assertEqual(action.group(1), "$conhost")
+        self.assertTrue(action.group(2).startswith("--headless "))
+        self.assertIn("'conhost.exe'", text)
+
     def test_the_broker_never_runs_request_text(self):
         text = BROKER.read_text(encoding="utf-8")
         for danger in ("Invoke-Expression", "iex ", "[scriptblock]::Create", "-EncodedCommand"):
