@@ -10515,30 +10515,32 @@ function renderKeyboard() {
   const rows = KB_ROWS.map(row =>
     '<div class="kb-row">' + row.map(kbCap).join("") + "</div>").join("");
   box.innerHTML =
-    '<div class="kb-workspace"><div class="kb-scene" id="kb-scene"><div class="kb-rig">' +
+    '<div class="kb-workspace"><div class="kb-scene" id="kb-scene">' +
+    '<div class="kb-legend" aria-label="Key colors">' +
+    '<span><i class="dot script"></i>your scripts</span>' +
+    '<span><i class="dot custom"></i>changed from CS2 default</span>' +
+    '<span><i class="dot bound"></i>CS2 default</span>' +
+    '<span><i class="dot free"></i>free</span>' +
+    '<span><i class="dot missing"></i>missing default</span>' +
+    '<span><i class="dot selected"></i>selected</span>' +
+    (keyData.live?.available ? '<span class="kb-live"><i class="dot adrift"></i>' +
+      keyData.live.differences.length + ' differ from live CS2</span>' : '') +
+    kbMissingLegend(activeProfile, missingList, showPanel) + '</div><div class="kb-rig">' +
     kbPiece('board', '<div class="kb-stage"><div class="kb-board">' + rows + '</div></div>') +
     kbPiece('mouse', '<div class="kb-mouse">' + mouseModel() + '</div>') +
     '</div></div><div class="kb-focus-row"><div id="kb-focus" class="kb-mode" role="group" aria-label="Device focus"></div>' +
     '<button class="kb-help" aria-label="About device focus" title="Fade the other device so you can focus on one. Faded devices can\'t be clicked.">?</button></div><div class="kb-settings">' +
     '<section class="kb-card kb-inspector" aria-label="Assignment inspector">' +
     kbCardTitle('Assignment', 'Select a control to inspect its binding or assign a command.') + kbDetail() + '</section>' +
-    '<section class="kb-card">' + kbCardTitle('Key colors', 'Colors show binding sources. Rings mark differences and selection.') +
-    '<div class="kb-legend">' +
-    '<span><i class="dot script"></i>your scripts</span>' +
-    '<span><i class="dot custom"></i>changed from CS2 default</span>' +
-    '<span><i class="dot bound"></i>CS2 default</span>' +
-    '<span><i class="dot free"></i>free</span>' +
-    '<span><i class="dot missing"></i>missing default</span>' +
-    '<span><i class="dot selected"></i>selected control</span>' +
-    (keyData.live?.available ? '<span class="kb-live"><i class="dot adrift"></i>' +
-      keyData.live.differences.length + ' differ from live CS2</span>' : '') +
-    kbMissingLegend(activeProfile, missingList, showPanel) + '</div>' +
-    kbMissingPanel(activeProfile, missingList, showPanel) + '</section>' +
     '<section class="kb-card">' + kbCardTitle('Mouse', 'Choose your side-button count. Select a mouse zone above to assign it.') +
     kbShapePicker() + '<div class="kb-mouse-bindings">' +
     ['mouse1','mouse2','mouse3','mouse4','mouse5', ...(mouseShape === 'four' ? ['mouse6','mouse7'] : []), 'mwheelup','mwheeldown'].map(code =>
       '<div><span>' + esc(code) + '</span><code>' + esc(kbLookup(code, code)?.command || 'Free') + '</code></div>').join('') +
-    '</div></section><section class="kb-card kb-how">' + kbCardTitle('How it works', 'Assignments are saved through the current configuration collection.') +
+    '</div></section>' +
+    (showPanel ? '<section class="kb-card">' + kbCardTitle('Missing defaults',
+      'Stock CS2 binds this profile does not set. They keep the standard layout.') +
+      kbMissingPanel(activeProfile, missingList, showPanel) + '</section>' : '') +
+    '<section class="kb-card kb-how">' + kbCardTitle('How it works', 'Assignments are saved through the current configuration collection.') +
     '<p>Select a control to inspect it. Drag a command onto a key to assign it.</p></section></div></div>';
   $('kb-focus').innerHTML = [['both','Both'],['board','Keyboard'],['mouse','Mouse']].map(([mode,label]) =>
     '<button data-kbfocus="' + mode + '" aria-pressed="' + (kbFocus === mode) + '">' + label + '</button>').join('');

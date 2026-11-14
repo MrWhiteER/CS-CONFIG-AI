@@ -49,6 +49,8 @@ function checkLayout(name){
  const toggle=$('kb-focus').getBoundingClientRect(),help=document.querySelector('.kb-focus-row > .kb-help').getBoundingClientRect();
  check(name+' focus below stage and above cards',toggle.top>=scene.bottom&&toggle.bottom<cards[0].top);
  check(name+' focus centered with adjacent help',Math.abs((toggle.left+toggle.right)-(scene.left+scene.right))<2&&help.left>toggle.right&&help.left-toggle.right<12);
+ const legend=document.querySelector('.kb-scene > .kb-legend')?.getBoundingClientRect();
+ check(name+' legend in stage above devices',!!legend&&legend.top>=scene.top&&legend.bottom<=scene.bottom&&legend.left>=scene.left&&legend.right<=scene.right&&devices.every(b=>b.top>=legend.bottom)&&document.querySelectorAll('.kb-legend').length===1);
  check(name+' dotted stage',getComputedStyle($('kb-scene')).backgroundImage.includes('radial-gradient'));
  check(name+' corner help', [...document.querySelectorAll('.kb-card')].every(card=>{const c=card.getBoundingClientRect(),h=card.querySelector('.kb-help').getBoundingClientRect();return h.right<c.right&&c.right-h.right<14&&h.top>c.top&&h.top-c.top<14;}));
 
