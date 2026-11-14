@@ -1,0 +1,68 @@
+11/14 17:12:10 [SteamNetSockets] [#560514102 pipe] connected
+11/14 17:12:10 [SteamNetSockets] [#536440598 pipe] connected
+11/14 17:12:10 [Client] Map: "<empty>"
+11/14 17:16:52 Measured RTT to 53 POPs.  mm_dedicated_search_maxping=40
+11/14 17:16:52   dfjr: 4ms via direct route
+11/14 17:16:52   -- below this line ping exceeds mm_dedicated_search_maxping --
+11/14 17:16:52   sgp: 79ms via direct route
+11/14 17:16:52   fra: 104ms via direct route
+11/14 17:16:52   dfra: 105ms via fra (front=104ms, back=1ms) 8ms faster than direct ping of 113ms
+11/14 17:16:52   par: 108ms via dfjr (front=4ms, back=104ms)
+11/14 17:16:52   fsn: 109ms via fra (front=104ms, back=5ms)
+11/14 17:16:52   ams: 110ms via fra (front=104ms, back=6ms) 9ms faster than direct ping of 119ms
+11/14 17:16:52   maa2: 110ms via sgp (front=78ms, back=32ms) 14ms faster than direct ping of 124ms
+11/14 17:16:52   hkg: 111ms via sgp (front=78ms, back=33ms) 11ms faster than direct ping of 122ms
+11/14 17:16:52   dxb: 114ms via direct route
+11/14 17:16:52   dlhr: 115ms via par (front=108ms, back=7ms)
+11/14 17:16:52   lhr: 115ms via fra (front=104ms, back=11ms) 2ms faster than direct ping of 117ms
+11/14 17:16:52   vie: 115ms via fra (front=104ms, back=11ms) 4ms faster than direct ping of 119ms
+11/14 17:16:52   dvie: 118ms via fra (front=104ms, back=14ms) 7ms faster than direct ping of 125ms
+11/14 17:16:52   mad: 118ms via direct route
+11/14 17:16:52   waw: 122ms via fra (front=104ms, back=18ms) 16ms faster than direct ping of 138ms
+11/14 17:16:52   dsto: 124ms via fra (front=104ms, back=20ms)
+11/14 17:16:52   sto2: 126ms via fra (front=104ms, back=22ms) 16ms faster than direct ping of 142ms
+11/14 17:16:52   sto: 126ms via fra (front=104ms, back=22ms) 18ms faster than direct ping of 144ms
+11/14 17:16:52   bom2: 127ms via sgp (front=78ms, back=49ms) 6ms faster than direct ping of 133ms
+11/14 17:16:52   hel: 132ms via fra (front=104ms, back=28ms)
+11/14 17:16:52   gum: 143ms via sgp (front=78ms, back=65ms) 50ms faster than direct ping of 193ms
+11/14 17:16:52   pvg: 144ms via pvgm (front=144ms, back=0ms)
+11/14 17:16:52   pvgm: 145ms via direct route
+11/14 17:16:52   pvgt: 146ms via pvgm (front=144ms, back=2ms) 153ms faster than direct ping of 299ms
+11/14 17:16:52   seo: 147ms via sgp (front=78ms, back=69ms) 38ms faster than direct ping of 185ms
+11/14 17:16:52   pvgu: 148ms via pvgm (front=144ms, back=4ms)
+11/14 17:16:52   pek: 157ms via pekm (front=157ms, back=0ms)
+11/14 17:16:52   pekt: 157ms via pekm (front=157ms, back=0ms)
+11/14 17:16:52   peku: 157ms via pekm (front=157ms, back=0ms)
+11/14 17:16:52   pekm: 157ms via direct route
+11/14 17:16:52   tyo: 160ms via sgp (front=78ms, back=82ms)
+11/14 17:16:52   tgd: 164ms via tgdm (front=164ms, back=0ms)
+11/14 17:16:52   tgdm: 164ms via direct route
+11/14 17:16:52   ctu: 170ms via ctum (front=170ms, back=0ms)
+11/14 17:16:52   ctuu: 171ms via ctum (front=170ms, back=1ms) 188ms faster than direct ping of 359ms
+11/14 17:16:52   ctut: 171ms via ctum (front=170ms, back=1ms)
+11/14 17:16:52   ctum: 171ms via direct route
+11/14 17:16:52   syd: 171ms via sgp (front=78ms, back=93ms) 4ms faster than direct ping of 175ms
+11/14 17:16:52   tgdt: 180ms via tgdm (front=164ms, back=16ms)
+11/14 17:16:52   iad: 184ms via par (front=108ms, back=76ms)
+11/14 17:16:52   tgdu: 189ms via tgdm (front=164ms, back=25ms) 203ms faster than direct ping of 392ms
+11/14 17:16:52   atl: 199ms via par (front=108ms, back=91ms) 11ms faster than direct ping of 210ms
+11/14 17:16:52   ord: 206ms via par (front=108ms, back=98ms)
+11/14 17:16:52   dfw: 215ms via par (front=108ms, back=107ms) 2ms faster than direct ping of 217ms
+11/14 17:16:52   eat: 239ms via par (front=108ms, back=131ms)
+11/14 17:16:52   lax: 248ms via par (front=108ms, back=140ms) 8ms faster than direct ping of 256ms
+11/14 17:16:52   sea: 252ms via par (front=108ms, back=144ms)
+11/14 17:16:52   jnb: 273ms via par (front=108ms, back=165ms)
+11/14 17:16:52   lim: 292ms via direct route
+11/14 17:16:52   gru: 302ms via par (front=108ms, back=194ms) 4ms faster than direct ping of 306ms
+11/14 17:16:52   scl: 322ms via lim (front=292ms, back=30ms)
+11/14 17:16:52   eze: 329ms via par (front=108ms, back=221ms)
+11/14 17:16:52 Confirmed best official datacenter ping: 80 ms
+11/14 17:16:57 [SteamNetSockets] [#3210374821 SDR server steamid:90297448253593624 vport 0] Selecting sgp#111 (103.10.124.118:27033) as primary.  (Ping = 79 = 78+1+0 (front+interior+remote).  Rank=1 Score=86)
+11/14 17:16:57 [SteamNetSockets] [#3210374821 SDR server steamid:90297448253593624 vport 0] connected
+11/14 17:16:57 [SteamNetSockets] [#3210374821 SDR server steamid:90297448253593624 vport 0] Selecting maa2#64 (155.133.225.18:27078) as backup #1 (Ping = 156 = 124+32+0 (front+interior+remote).  Rank=2 Score=168)
+11/14 17:17:02 [Client] Map: "de_dust2"
+11/14 17:17:19 [Networking] Summary of connection [#3210374821 SDR server steamid:90297448253593624 vport 0 'server']:
+11/14 17:17:19 [Networking]         Remote host is in data center 'sgp'
+11/14 17:17:19 [SteamNetSockets] [#2981621943 pipe] connected
+11/14 17:17:19 [SteamNetSockets] [#2002499082 pipe] connected
+11/14 17:17:20 [Client] Map: "<empty>"

@@ -276,19 +276,26 @@ class Reasons(Isolated):
 
 
 class Console(Isolated):
-    def test_assumed_fixture_requires_connected_context_and_ignores_primary_relay(self):
+    def test_real_cs2_log_names_the_server_and_the_queue_reason(self):
+        """Lines from a real CS2 console.log (Nov 2026): queued from Dubai, landed in Singapore."""
+        config = {"pops": {c: {} for c in ("dfjr", "sgp", "dxb", "fra", "maa2", "par")}}
         parser = sw.ConsoleParser()
-        events = [parser.feed(line, CONFIG) for line in (FIXTURES / "server_lock_console_assumed.log").read_text().splitlines()]
-        events = [e for e in events if e]
-        self.assertEqual([e["region"] for e in events], ["bom2"])
-        self.assertIn("awaiting", events[0]["source"])
+        lines = (FIXTURES / "server_lock_console_real.log").read_text(encoding="utf-8").splitlines()
+        events = [e for e in (parser.feed(line, config) for line in lines) if e]
+        self.assertEqual([e["region"] for e in events], ["sgp"])
+        queue = events[0]["queue"]
+        self.assertEqual((queue["max_ping"], queue["best_official"], queue["under"]), (40, 80, ["dfjr"]))
+        self.assertEqual(queue["pings"]["dxb"], 114)
+        reason = sw.queue_reason(queue, ["dxb"])
+        self.assertEqual(reason["code"], "queue_max_ping")
+        self.assertIn("114 ms", reason["text"])
 
-    def test_standalone_unknown_failed_and_disconnect_summaries_are_ignored(self):
+    def test_lines_that_do_not_locate_a_server_are_ignored(self):
         for lines in (("[Networking] Remote host is in data center 'dxb'",),
-                      ("[#1 SDR server steamid:9] connected", "problem detected locally", "[Networking] Remote host is in data center 'dxb'"),
-                      ("[#1 SDR server steamid:9] connected", "[Networking] Remote host is in data center 'madeup'"),
-                      ("Summary of connection [#1 SDR server]", "[Networking] Remote host is in data center 'bom'"),
-                      ("Connected to 155.133.226.68:27015", "Selecting bom#1 as primary")):
+                      ("Summary of connection [#1 SDR server]", "[Networking] Remote host is in data center 'madeup'"),
+                      ("Connected to 155.133.226.68:27015", "Selecting dxb#1 as primary"),
+                      ("[#1 SDR server steamid:9 vport 0] Selecting dxb#1 (1.2.3.4:27015) as primary.  "
+                       "(Ping = 150 = 80+60+10 (front+interior+remote).  Rank=1 Score=1)",)):
             parser = sw.ConsoleParser()
             self.assertFalse(any(parser.feed(line, CONFIG) for line in lines))
 
@@ -300,7 +307,7 @@ class Console(Isolated):
             watch.poll(log, True, CONFIG, ["dxb"], {"status": "locked", "present": True}, False, 30, {})
         poll()
         with log.open("a") as handle:
-            handle.write("[#1 SDR server steamid:9] connected\n[Networking] Remote host is in data center 'bom")
+            handle.write("Summary of connection [#1 SDR server steamid:9]:\n[Networking] Remote host is in data center 'bom")
         poll()
         self.assertEqual(watch.history, [])
         with log.open("a") as handle:
@@ -309,7 +316,7 @@ class Console(Isolated):
         poll()
         self.assertEqual(len(watch.history), 1)
         self.assertEqual(watch.notice["region"], "bom2")
-        log.write_text("[#2 SDR server] connected\n[Networking] Remote host is in data center 'dxb'\n")
+        log.write_text("Summary of connection [#2 SDR server]:\n[Networking] Remote host is in data center 'dxb'\n")
         poll()
         self.assertEqual(len(watch.history), 2)
         # Attaching a new observer doesn't replay a previous session's file.
@@ -323,7 +330,7 @@ class Console(Isolated):
         def poll():
             watch.poll(log, True, CONFIG, ["bom", "bom2"], {}, False, None, {})
         poll()
-        log.write_text("".join(f"[#{i} SDR server] connected\n[Networking] Remote host is in data center 'bom2'\n" for i in range(25)))
+        log.write_text("".join(f"Summary of connection [#{i} SDR server]:\n[Networking] Remote host is in data center 'bom2'\n" for i in range(25)))
         poll()
         self.assertEqual(len(watch.history), 20)
         self.assertIsNone(watch.notice)
@@ -338,11 +345,12 @@ class Console(Isolated):
             watch.poll(log, True, CONFIG, ["dxb"], {"status": "locked", "present": True}, False, 30, survey)
         with patch.object(sw.time, "time", return_value=1000):
             poll()
-            log.write_text("[#1 SDR server] connected\n")
+            log.write_text("[#1 SDR server steamid:9 vport 0] Selecting fra#1 (1.2.3.4:27015) as primary.  "
+                           "(Ping = 150 = 80+60+10 (front+interior+remote).  Rank=1 Score=1)\n")
             poll()
             survey = {"updated_at": 999, "regions": [{"code": "dxb", "ping_ms": 15, "loss": 0}]}
             with log.open("a") as handle:
-                handle.write("[Networking] Remote host is in data center 'bom2'\n")
+                handle.write("Summary of connection [#1 SDR server]:\n[Networking] Remote host is in data center 'bom2'\n")
             poll()
         self.assertEqual(watch.history[-1]["reason"]["code"], "reachability")
 

@@ -1,10 +1,19 @@
 """Read-only console.log tail and deliberately conservative server diagnosis.
 
-ASSUMPTION (needs Edy's current CS2 log): a connected client socket dump can
-contain [Networking] Remote host is in data center 'dxb'. We require client
-connection context and never interpret Selecting/primary/backup relay lines as
-the destination datacenter. An IP address or SteamID alone cannot locate an SDR
-gameserver. No process handles, injection, GSI installation or network lookups.
+Format verified against a real CS2 console.log (-condebug), Nov 2026:
+
+* At queue time CS2 prints ``Measured RTT to N POPs.  mm_dedicated_search_maxping=M``,
+  one ``  code: Nms via ...`` line per POP (a ``-- below this line ping exceeds
+  mm_dedicated_search_maxping --`` marker splits them) and ``Confirmed best
+  official datacenter ping: N ms``.
+* On connecting to a match it selects a relay:
+  ``[#id SDR server ...] Selecting sgp#111 (...) as primary.  (Ping = 79 = 78+1+0
+  (front+interior+remote)``. When interior+remote is a few ms, the server sits
+  at that relay's POP.
+* When the connection closes, ``Summary of connection [#id SDR server ...]`` is
+  followed by ``Remote host is in data center 'sgp'``: the authoritative answer.
+
+No process handles, injection, GSI installation or network lookups.
 """
 from __future__ import annotations
 
@@ -13,6 +22,10 @@ import re
 import time
 from pathlib import Path
 
+_STAMP = re.compile(r"^\d\d/\d\d \d\d:\d\d:\d\d ")
+# Interior+remote at or under this many ms means "the server is at this relay".
+NEAR_MS = 10
+
 
 class ConsoleParser:
     def __init__(self):
@@ -20,34 +33,97 @@ class ConsoleParser:
 
     def reset(self):
         self.server = None
-        self.remaining = 0
-        self.reported = False
+        self.reported = {}          # server id -> region already reported
+        self.queue = None           # last completed queue-time measurement
+        self._building = None
+        self._summary = None
+        self._summary_left = 0
+
+    def _known(self, code, config):
+        pops = config.get("pops", {}) if isinstance(config, dict) else {}
+        return code if code in pops else None
+
+    def _event(self, server, code, source):
+        if self.reported.get(server) == code:
+            return None
+        self.reported[server] = code
+        return {"region": code, "server": server, "source": source,
+                "queue": dict(self.queue) if self.queue else None}
 
     def feed(self, line, config):
-        # Failed attempts and disconnect summaries must not become matches.
-        if re.search(r"problem detected|closed by|Closing Steam Net Connection|disconnected|Summary of connection", line, re.I):
-            self.reset()
+        line = _STAMP.sub("", line.rstrip("\r"))
+
+        # Queue-time ping table.
+        start = re.search(r"Measured RTT to \d+ POPs\.\s+mm_dedicated_search_maxping=(\d+)", line)
+        if start:
+            self._building = {"max_ping": int(start[1]), "pings": {}, "under": [], "best_official": None}
+            self._below = False
             return None
-        connected = re.search(r"\[#(\d+) SDR server[^\]]*\]\s+connected\b", line, re.I)
-        bound = re.search(r"\[Networking\]\s+Socket 'client' bound to .*?\[#(\d+) SDR server", line, re.I)
-        if connected or bound:
-            identity = (connected or bound)[1]
-            if self.server != identity:
-                self.reported = False
-            self.server, self.remaining = identity, 80
+        if self._building is not None:
+            if "below this line ping exceeds" in line:
+                self._below = True
+                return None
+            row = re.match(r"\s+([a-z0-9]+): (\d+)ms via", line)
+            if row:
+                self._building["pings"][row[1]] = int(row[2])
+                if not self._below:
+                    self._building["under"].append(row[1])
+                return None
+            best = re.search(r"Confirmed best official datacenter ping: (\d+) ms", line)
+            if best:
+                self._building["best_official"] = int(best[1])
+                self.queue, self._building = self._building, None
+                return None
+            if re.match(r"\s", line) or line.startswith("Obtained direct RTT") or line.startswith("("):
+                return None
+            # Anything else ends the table even without the closing line.
+            self.queue, self._building = self._building, None
+
+        # Relay chosen on connect: the server is at that POP when the back
+        # half of the route is only a few ms.
+        chosen = re.search(r"\[#(\d+) SDR server[^\]]*\] Selecting ([a-z0-9]+)#\d+ \([^)]*\) as primary\."
+                           r"\s+\(Ping = \d+ = \d+\+(\d+)\+(\d+) \(front\+interior\+remote\)", line)
+        if chosen:
+            self.server = chosen[1]
+            if int(chosen[3]) + int(chosen[4]) <= NEAR_MS:
+                code = self._known(chosen[2], config)
+                if code:
+                    return self._event(chosen[1], code, "console.log: relay chosen on connect")
             return None
-        if not self.remaining:
+
+        # Authoritative answer when the connection closes.
+        summary = re.search(r"Summary of connection \[#(\d+) SDR server", line)
+        if summary:
+            self._summary, self._summary_left = summary[1], 8
             return None
-        self.remaining -= 1
-        match = re.search(r"\[Networking\]\s+Remote host is in data center ['\"]([a-z0-9_-]+)['\"]", line, re.I)
-        if match and not self.reported:
-            code = match[1].lower()
-            pops = config.get("pops", {}) if isinstance(config, dict) else {}
-            if code not in pops:
-                return None  # Unknown code is not a geolocation guess.
-            self.reported = True
-            return {"region": code, "server": self.server, "source": "console.log (format awaiting local verification)"}
+        if self._summary and self._summary_left:
+            self._summary_left -= 1
+            where = re.search(r"Remote host is in data center ['\"]([a-z0-9_-]+)['\"]", line, re.I)
+            if where:
+                server, self._summary = self._summary, None
+                code = self._known(where[1].lower(), config)
+                if code:
+                    self.server = server
+                    return self._event(server, code, "console.log: connection summary")
         return None
+
+
+def queue_reason(queue, expected):
+    """What CS2 itself measured when it queued, in plain words, or None."""
+    if not queue or queue.get("max_ping") is None:
+        return None
+    limit, best = queue["max_ping"], queue.get("best_official")
+    mine = [queue["pings"][c] for c in expected if c in queue.get("pings", {})]
+    tail = f" Your ping to your chosen region was {min(mine)} ms." if mine else ""
+    if best is not None and best > limit:
+        return {"code": "queue_max_ping",
+                "text": f"No official CS2 server was under your matchmaking max ping ({limit} ms) when you queued; "
+                        f"the closest official one was {best} ms, so CS2 widened the search.{tail}"}
+    if mine and min(mine) > limit:
+        return {"code": "queue_region_slow",
+                "text": f"When you queued, your ping to your chosen region was {min(mine)} ms, above your "
+                        f"matchmaking max ping ({limit} ms), so CS2 did not treat it as a near server."}
+    return None
 
 
 def likely_reason(actual, expected, firewall, restart, max_ping, survey, now=None):
@@ -136,7 +212,7 @@ class MatchWatch:
             self.was_running = running
             self.status = "console.log unavailable. Enable -condebug, restart CS2 and join a match."
             return
-        self.status = "Watching new console connections; log format awaits verification on this PC."
+        self.status = "Watching CS2 console for new matches."
         lines = (self.carry + chunk).split(b"\n")
         self.carry = lines.pop()[-16384:]
         for raw in lines:
@@ -149,8 +225,10 @@ class MatchWatch:
                 continue
             self.last_server = event["server"]
             wrong = event["region"] not in expected
-            reason = likely_reason(event["region"], expected, firewall, restart, max_ping,
-                                   self.queue_survey or {}, now) if wrong else {"code": "expected", "text": "Detected the expected region."}
+            reason = ((queue_reason(event.get("queue"), expected)
+                       or likely_reason(event["region"], expected, firewall, restart, max_ping,
+                                        self.queue_survey or {}, now))
+                      if wrong else {"code": "expected", "text": "Detected the expected region."})
             row = {"id": f"{time.time_ns()}-{event['server']}", "time": now,
                    "region": event["region"], "expected": list(expected), "reason": reason,
                    "source": event["source"], "wrong": wrong}

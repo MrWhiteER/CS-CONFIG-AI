@@ -50,7 +50,7 @@ function createServerRegionLock({panel, chip, api, esc, tone, changed}) {
       '<p>'+esc(state.advice?.text||'Saved matchmaking max ping: unavailable.')+'</p>'+
       '<details'+(expanded?' open':'')+'><summary id="sl-more">Server detection & recent matches</summary><p>'+esc(state.monitor||'Checking console log…')+'</p>'+
       (!state.condebug?'<p>Close Steam and CS2, then enable console logging for the active account. Console logs stay on your PC.</p><button type="button" class="btn small" id="sl-log">Enable -condebug</button>':'<p>Console logging is enabled. Restart CS2 after enabling it.</p>')+
-      '<p>Only new connections with an explicit server datacenter are detected. Relay routes and server IPs alone are not enough. Current CS2 log format still needs verification.</p>'+
+      '<p>Reads which data centre each new match is in, and the pings CS2 measured when you queued.</p>'+
       '<ol class="sl-history">'+[...(state.history||[])].reverse().map(h=>'<li><time>'+esc(new Date(h.time*1000).toLocaleString())+'</time><b>'+esc(h.region.toUpperCase())+' · expected '+esc(h.expected.join(' / ').toUpperCase())+'</b><span>'+esc(h.reason.text)+'</span></li>').join('')+'</ol>'+(!state.history?.length?'<p>No new matches detected yet.</p>':'')+'</details>';
     info.querySelector('.sl-status').classList.toggle('sl-error',messageError||!!state.error);
     info.scrollTop = infoScroll;
