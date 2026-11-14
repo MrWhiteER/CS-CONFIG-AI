@@ -354,18 +354,25 @@ class ServerLock:
         self.watch.poll(context.get("console_path"), running, config, expected, firewall,
                         restart, context.get("max_ping"), survey)
         ready = helper_ready()
+        lock_blocked = ""
         try:
             cs2_program(context.get("program"))
-            build_plan(config, regions[0]["code"] if regions else "dxb")
-            can_lock = ready
         except ValueError:
-            can_lock = False
+            lock_blocked = "CS2 was not found on this PC, so there is nothing to lock."
+        if not lock_blocked:
+            try:
+                build_plan(config, regions[0]["code"] if regions else "dxb")
+            except ValueError:
+                lock_blocked = "Refresh the server list first."
+        if not lock_blocked and not ready:
+            lock_blocked = SETUP_MESSAGE
+        can_lock = not lock_blocked
         pending = (self.intent or {}).get("pending")
         with self.lock:
             self.data.update(firewall=firewall, checking=False, processes=processes,
                              restart_needed=restart, history=self.watch.history,
                              notice=self.watch.notice, monitor=self.watch.status,
-                             condebug=context.get("condebug", False), can_lock=can_lock,
+                             condebug=context.get("condebug", False), can_lock=can_lock, lock_blocked=lock_blocked,
                              needs_setup=not ready, pending=copy.deepcopy(pending),
                              console_path=str(context.get("console_path") or ""),
                              advice=ping_advice(context.get("max_ping"), region), checked_at=time.time())

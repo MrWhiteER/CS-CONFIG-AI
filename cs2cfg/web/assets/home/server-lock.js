@@ -23,7 +23,7 @@ function createServerRegionLock({panel, chip, api, esc, tone, changed}) {
   }
   function rowAction(r) {
     const selected = state.firewall.code === r.code && state.firewall.present;
-    return '<button type="button" class="sl-row-lock'+(selected?' sl-selected':'')+'" data-lock-code="'+esc(r.code)+'" aria-label="Play only here: '+esc(r.city)+'" title="'+(selected?'Re-apply lock to ':'Play only here: ')+esc(r.city)+(r.code==='dxb'?' (suggested)':'')+'"'+(state.busy||state.checking||!state.can_lock?' disabled':'')+'>'+lockIcon+'</button>';
+    return '<button type="button" class="sl-row-lock'+(selected?' sl-selected':'')+'" data-lock-code="'+esc(r.code)+'" aria-label="Play only here: '+esc(r.city)+'" title="'+(!state.can_lock&&state.lock_blocked?esc(state.lock_blocked):(selected?'Re-apply lock to ':'Play only here: ')+esc(r.city)+(r.code==='dxb'?' (suggested)':''))+'"'+(state.busy||state.checking||!state.can_lock?' disabled':'')+'>'+lockIcon+'</button>';
   }
   function decorate(pingData) {
     const f = state.firewall;
@@ -45,7 +45,7 @@ function createServerRegionLock({panel, chip, api, esc, tone, changed}) {
       (state.pending?'<p>Will apply when CS2 closes'+(state.pending.action==='unlock'?': unlock.':': lock to '+esc(state.pending.city||state.pending.code)+'.')+'</p><button type="button" class="btn small" id="sl-cancel-pending"'+(state.busy?' disabled':'')+'>Cancel pending change</button>':'')+
       (state.needs_setup?'<p>The region lock needs the one-time setup permission. In Settings, choose “Run setup again”.</p><button type="button" class="btn small" id="sl-setup">Settings</button>':'')+
       (f.status==='outdated'||f.status==='damaged'||f.status==='missing'?'<button type="button" class="btn small" id="sl-reapply"'+(state.busy||!state.can_lock?' disabled':'')+'>Re-apply lock</button>':'')+
-      '<p class="sl-status" role="status">'+esc(message||state.error||state.detail||f.error||'')+'</p>'+
+      '<p class="sl-status" role="status">'+esc(message||state.error||state.detail||f.error||(!state.checking&&!state.needs_setup&&!state.can_lock?state.lock_blocked||'':''))+'</p>'+
       (state.restart_needed!==false && f.present?'<p>Restart Steam and CS2 to re-measure relays.'+(state.restart_needed===null?' Process restart time could not be verified.':' A process is still running from before the lock.')+'</p>':'')+
       '<p>'+esc(state.advice?.text||'Saved matchmaking max ping: unavailable.')+'</p>'+
       '<details'+(expanded?' open':'')+'><summary id="sl-more">Server detection & recent matches</summary><p>'+esc(state.monitor||'Checking console log…')+'</p>'+
