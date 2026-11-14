@@ -3977,7 +3977,7 @@ def _sync_auto(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
 
 def _firstrun(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     """Everything the setup wizard shows, in one call. Reads only."""
-    from . import audio, cloud, firstrun, profiles
+    from . import audio, cloud, elevated, firstrun, profiles
     from .cli import load_prefs
 
     state.refresh()
@@ -3999,6 +3999,7 @@ def _firstrun(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
         "cloud": cloud.status(),
         "sync": _sync_loop(state).last,
         "cfg": firstrun.cfg_access(_game_cfg_root(state)),
+        "helper": elevated.status(),
         "sound": sound,
         "presets": firstrun.presets(state.machine, state.kb),
         "apps": firstrun.known_apps(libraries, ui),
@@ -4006,6 +4007,30 @@ def _firstrun(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
         "current": {k: ui.get(k) for k in ("intent", "theme", "audio_output",
                                            "audio_input", "cfg_write_ok", "sync_auto")},
     }
+
+
+def _helper_status(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Whether the one-time administrator helper is in place."""
+    from . import elevated
+
+    return {"ok": True, **elevated.status()}
+
+
+def _helper_install(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """The one administrator prompt: put the helper in place.
+
+    Also makes this PC's CS2 cfg folder writable and joins Performance Log
+    Users, so nothing later has to ask again. See cs2cfg/elevated.py.
+    """
+    from . import elevated, temps
+
+    result = elevated.install(_game_cfg_root(state))
+    if result.get("ok"):
+        try:
+            temps.start_helper()      # sensors behind administrator, no prompt now
+        except Exception:
+            pass
+    return {**result, **elevated.status()}
 
 
 def _firstrun_finish(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -4019,6 +4044,15 @@ def _firstrun_finish(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     ui = profiles.ui_for(prefs, account)
     libraries = steam.find_libraries(state.steam_root) if state.steam_root else []
     answers = body.get("answers") if isinstance(body.get("answers"), dict) else body
+
+    # Permission given but the helper not put in place yet (the page normally
+    # does that on the permission step itself): this is the one prompt.
+    helper: Dict[str, Any] = {}
+    if answers.get("cfg_write"):
+        from . import elevated
+
+        if not elevated.ready() and sys.platform == "win32":
+            helper = elevated.install(_game_cfg_root(state))
 
     changes = firstrun.answers_to_changes(answers, ui,
                                           firstrun.known_apps(libraries, ui))
@@ -4035,7 +4069,7 @@ def _firstrun_finish(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
 
     # Permission may just have been given: files waiting on it can land now.
     _sync_loop(state).nudge()
-    return {"ok": True, "saved": sorted(changes),
+    return {"ok": True, "saved": sorted(changes), "helper": helper,
             "ui": profiles.ui_for(load_prefs(), account)}
 
 
@@ -4452,6 +4486,8 @@ def make_handler(state: State):
         "/api/demos/pick": _demo_pick,
         "/api/firstrun": _firstrun,
         "/api/firstrun/finish": _firstrun_finish,
+        "/api/helper": _helper_status,
+        "/api/helper/install": _helper_install,
         "/api/sync": _sync_status,
         "/api/sync/now": _sync_now,
         "/api/sync/auto": _sync_auto,
@@ -4866,6 +4902,16 @@ def serve(port: int = 8765, cfg_folder: str = "mrwhiteer",
         audio.shared().set_pin(_audio_pin_from_prefs())
     except Exception:
         pass                    # never let a sound preference stop the app
+
+    # Sensors that need administrator, read through the helper setup put in
+    # place. Started here because it no longer costs a prompt.
+    try:
+        from . import elevated, temps
+
+        if elevated.ready():
+            temps.start_helper()
+    except Exception:
+        pass
 
     # Settings follow the Steam account between PCs without a button. The
     # loop does nothing until somebody is signed in, and never raises.
