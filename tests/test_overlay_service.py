@@ -267,7 +267,8 @@ class ServiceLifecycle(unittest.TestCase):
         with mock.patch("cs2cfg.overlay.service.PresentMon") as capture:
             service.configure(settings.read({"overlay_enabled": True, "overlay_hotkey": "Alt+F12"}))
         service._hud.configure.assert_called_once_with(fields=list(settings.FIELDS), hotkey="Alt+F12",
-                                                       panel_hotkey="Ctrl+Alt+P")
+                                                       panel_hotkey="Ctrl+Alt+P",
+                                                       exclude_from_capture=True, auto_visible=False)
         self.assertEqual(service.summary()["frame_count"], 1)
         service._thread.join.assert_not_called()
         capture.assert_not_called()

@@ -5014,6 +5014,32 @@ def make_handler(state: State):
             self._send_json({"error": "not found"}, 404)
 
         def do_POST(self) -> None:
+            if self.path.split("?", 1)[0] == "/api/overlay/gsi":
+                from .overlay.gsi import MAX_BODY
+
+                # Valve uses its cfg secret rather than the browser API token.
+                # Reject before reading, then close so excess bytes cannot be reused.
+                self.close_connection = True
+                if not self._host_ok() or self.client_address[0] != "127.0.0.1":
+                    self._send_json({"error": "host not allowed"}, 403)
+                    return
+                try:
+                    length = int(self.headers.get("Content-Length", "0"))
+                    if self.headers.get("Transfer-Encoding") or not 0 < length <= MAX_BODY:
+                        self._send_json({"error": "invalid body size"}, 413)
+                        return
+                    self.connection.settimeout(2)
+                    raw = self.rfile.read(length)
+                    if len(raw) != length:
+                        raise ValueError("Incomplete GSI body")
+                    state.overlay.receive_gsi(raw)
+                except PermissionError:
+                    self._send_json({"error": "invalid GSI token"}, 403)
+                except (ValueError, OSError):
+                    self._send_json({"error": "invalid GSI body"}, 400)
+                else:
+                    self._send_json({"ok": True})
+                return
             # Drain the body first, before any check that might reject the
             # request. On a keep-alive connection an unread body stays in the
             # socket and gets parsed as the start of the next request, which
@@ -5101,5 +5127,14 @@ def serve(port: int = 8765, cfg_folder: str = "mrwhiteer",
     from .cli import load_prefs
     from .overlay.settings import read as overlay_settings
 
+    def overlay_install():
+        if state.cs2_install is None:
+            try:
+                state.cs2_install = steam.find_cs2_install(state.steam_root or steam.find_steam_root())
+            except steam.SteamError:
+                return None
+        return state.cs2_install
+
+    state.overlay.bind_gsi(overlay_install, server.server_address[1])
     state.overlay.configure(overlay_settings(load_prefs().get("ui")))
     return server, state

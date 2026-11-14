@@ -6440,13 +6440,13 @@ const startup = (() => {
       </div>
 
       <div class="subpane hidden" data-sub="overlay">
-        <section class="panel wide" id="overlay-card">
+        <div class="wide" id="overlay-card">
           <h2>Performance overlay</h2>
           <p class="sub">Show a small, click-through HUD over CS2 in Fullscreen Windowed.
             Frame rate, frame time and freezes are saved with your session history.
             The app keeps running in the notification area when you close its window.</p>
           <div id="overlay-out"></div>
-        </section>
+        </div>
       </div>
 
       <!-- The other programs that run alongside the game. Crosshair X was
@@ -8402,8 +8402,24 @@ document.addEventListener("click", e => {
 // app page, including when it is hidden in the notification area.
 async function loadOverlay() {
   const box = $("overlay-out");
-  try { renderOverlay(await api("/api/overlay", {})); }
+  try {
+    const preview = new URLSearchParams(location.search).get('overlayPreview');
+    renderOverlay(preview ? overlaySettingsSample(preview) : await api('/api/overlay', {}));
+  }
   catch (err) { box.innerHTML = '<p class="sub warn">' + esc(err.message || String(err)) + '</p>'; }
+}
+
+// Read-only screenshot fixtures use the production renderer and no extra timers.
+function overlaySettingsSample(mode) {
+  const running = mode === 'live';
+  return {settings: {overlay_enabled: mode !== 'off', overlay_corner: 'top_left',
+    overlay_fields: ['fps', 'one_percent_low', 'frame_time_ms', 'cpu_percent', 'gpu_percent', 'gpu_temp_c'],
+    overlay_hotkey: 'Ctrl+Alt+O', overlay_panel_hotkey: 'Ctrl+Alt+P', overlay_auto_hide: true,
+    overlay_hide_from_capture: true, overlay_always_visible: false},
+    status: mode === 'off' ? 'disabled' : running ? 'ok' : 'waiting_for_game', game_running: running,
+    frame_capture_ready: running, frame_capture_hint: running ? '' : 'Sign out of Windows and back in once to enable frame stats',
+    frame_capture_hint_dismissible: !running,
+    display: {fps:'286.4', one_percent_low:'192.8', frame_time_ms:'3.5 ms', cpu_percent:'31.0%', gpu_percent:'76.0%', gpu_temp_c:'64.0 C'}};
 }
 
 function renderOverlay(d) {
@@ -8417,51 +8433,61 @@ function renderOverlay(d) {
     untrusted: "PresentMon failed its integrity check. Fetch it again, or reinstall the app.",
     stopped: "Capture stopped. Toggle the overlay off and on to retry.",
     error: "Capture failed. Toggle the overlay off and on to retry."};
+  const toggle = (key, title, help) => '<label class="opt"><input type="checkbox" id="' + key.replaceAll('_', '-') + '"' +
+    (s[key] ? ' checked' : '') + '><span>' + title + (help ? '<br><span class="sub2">' + help + '</span>' : '') + '</span></label>';
+  const shortcut = (id, title, value) => '<div class="row"><label class="k" for="' + id + '">' + title + '</label><span class="v">' +
+    '<input id="' + id + '" type="text" maxlength="32" value="' + esc(value) + '" aria-describedby="overlay-hotkey-help"></span></div>';
+  const card = (title, body) => '<section class="panel"><h2>' + title + '</h2>' + body + '</section>';
+  const live = s.overlay_enabled && d.game_running;
   $("overlay-out").innerHTML =
-    '<label class="opt"><input type="checkbox" id="overlay-enabled"' +
-      (s.overlay_enabled ? ' checked' : '') + '> Enable performance overlay</label>' +
-    '<p class="sub2">' + esc(states[d.status] || d.status) +
-      (d.hud_warning ? ' · ' + esc(d.hud_warning) : '') +
-      (d.panel_warning ? ' · ' + esc(d.panel_warning) : '') +
-      (d.error ? ' · ' + esc(d.error) : '') + '</p>' +
-    (d.notice ? '<div class="note"><div class="d">' + esc(d.notice) +
-      ' <button class="btn small" id="overlay-borderless">Use borderless next launch</button></div></div>' : '') +
-    (d.frame_capture_hint ? '<div class="note"><div class="d">' + esc(d.frame_capture_hint) +
-      (d.frame_capture_hint_dismissible ?
-        ' <button class="btn small" id="overlay-dismiss-sign-out">Dismiss</button>' : '') +
-      '</div></div>' : '') +
-    Object.entries(labels).map(([k,v]) => '<div class="row"><span class="k">' + v +
-      '</span><span class="v">' + esc(d.display[k]) + '</span></div>').join('') +
-    '<div class="row"><label class="k" for="overlay-corner">Corner</label><span class="v">' +
-      '<select id="overlay-corner">' + Object.entries({top_left:"Top left", top_right:"Top right",
-        bottom_left:"Bottom left", bottom_right:"Bottom right"}).map(([k,v]) =>
-        '<option value="' + k + '"' + (s.overlay_corner === k ? ' selected' : '') + '>' + v + '</option>').join('') +
-      '</select></span></div>' +
-    '<div class="row"><label class="k" for="overlay-hotkey">Show / hide shortcut</label><span class="v">' +
-      '<input id="overlay-hotkey" type="text" maxlength="32" value="' + esc(s.overlay_hotkey) +
-      '" aria-describedby="overlay-hotkey-help"></span></div>' +
-    '<div class="row"><label class="k" for="overlay-panel-hotkey">Panel shortcut</label><span class="v">' +
-      '<input id="overlay-panel-hotkey" type="text" maxlength="32" value="' + esc(s.overlay_panel_hotkey) +
-      '" aria-describedby="overlay-hotkey-help"></span></div>' +
-    '<p class="sub2" id="overlay-hotkey-help">Ctrl, Alt or Shift plus a letter, digit or F1–F24. ' +
-      'Hiding the HUD keeps recording. Unavailable shortcuts are reported here.</p>' +
-    '<div role="group" aria-label="HUD fields">' + Object.entries(labels).map(([k,v]) =>
-      '<label class="opt"><input type="checkbox" data-overlay-field="' + k + '"' +
-        (s.overlay_fields.includes(k) ? ' checked' : '') + '> ' + v + '</label>').join('') + '</div>' +
-    '<div class="actions"><button class="btn primary" id="overlay-save">Save overlay settings</button>' +
-      '<button class="btn" id="overlay-refresh">Refresh status</button></div>' +
-    '<p class="sub2" id="overlay-said" role="status"></p>';
+    card('Performance overlay', toggle('overlay_enabled', 'Enable overlay', '') +
+      '<p class="sub2" role="status">' + esc(states[d.status] || d.status) + '</p>' +
+      [d.hud_warning, d.panel_warning, d.error, d.gsi_notice].filter(Boolean).map(x => '<p class="sub2">' + esc(x) + '</p>').join('') +
+      (d.notice ? '<div class="note"><div class="d">' + esc(d.notice) + '</div><div class="actions">' +
+        '<button class="btn small" id="overlay-borderless">Use borderless next launch</button></div></div>' : '')) + '<div class="grid2">' +
+    card('HUD',
+      '<div class="row"><label class="k" for="overlay-corner">Corner</label><span class="v"><select id="overlay-corner">' +
+      Object.entries({top_left:'Top left', top_right:'Top right', bottom_left:'Bottom left', bottom_right:'Bottom right'}).map(([k,v]) =>
+        '<option value="' + k + '"' + (s.overlay_corner === k ? ' selected' : '') + '>' + v + '</option>').join('') + '</select></span></div>' +
+      shortcut('overlay-hotkey', 'HUD hotkey', s.overlay_hotkey) +
+      '<p class="sub2" id="overlay-hotkey-help">Ctrl, Alt or Shift + a letter, digit or F1-F24. The HUD hotkey toggles a manual show/hide override until CS2 closes.</p>' +
+      '<h3>Fields shown</h3><div role="group" aria-label="HUD fields">' + Object.entries(labels).map(([k,v]) =>
+        '<label class="opt"><input type="checkbox" data-overlay-field="' + k + '"' +
+        (s.overlay_fields.includes(k) ? ' checked' : '') + '> ' + v + '</label>').join('') + '</div>') +
+    card('Panel', shortcut('overlay-panel-hotkey', 'Panel hotkey', s.overlay_panel_hotkey) +
+      '<p class="sub2">Profiles, performance history and stutters. Opening the panel brings up the cursor; closing it returns to CS2.</p>') +
+    card('Behaviour',
+      toggle('overlay_auto_hide', 'Auto hide', 'Show between rounds, in warmup and while dead.') +
+      toggle('overlay_hide_from_capture', 'Hide from capture', 'Exclude the HUD and panel from supported capture tools.') +
+      toggle('overlay_always_visible', 'Always visible', 'Override Auto hide while CS2 is focused.') +
+      '<p class="sub2">Auto hide waits for game state if it is missing or out of date. Always visible still requires Fullscreen Windowed.</p>') +
+    card('Frame stats',
+      '<p class="sub2">' + (live ? (d.frame_capture_ready ? 'Frame capture ready.' : 'Resource stats available; frame capture needs setup.') :
+        (s.overlay_enabled ? 'Start CS2, then refresh to see live values.' : 'Enable the overlay and start CS2 to see live values.')) + '</p>' +
+      (live ? Object.entries(labels).map(([k,v]) => '<div class="row"><span class="k">' + v +
+        '</span><span class="v">' + esc(d.display[k]) + '</span></div>').join('') : '') +
+      (d.frame_capture_hint ? '<div class="note info"><div class="t">Frame capture access</div><div class="d">' + esc(d.frame_capture_hint) + '</div>' +
+        (d.frame_capture_hint_dismissible ? '<div class="actions"><button class="btn small" id="overlay-dismiss-sign-out">Dismiss reminder</button></div>' : '') + '</div>' : '')) +
+    '</div><div class="actions"><button class="btn primary" id="overlay-save">Save overlay settings</button>' +
+    '<button class="btn" id="overlay-refresh">Refresh status</button></div><p class="sub2" id="overlay-said" role="status"></p>';
+  if (new URLSearchParams(location.search).has('overlayPreview')) {
+    document.querySelectorAll('#overlay-out button').forEach(x => { x.disabled = true; });
+    $("overlay-said").textContent = 'Sample data for screenshots. Settings are not saved.';
+  }
 }
 
 document.addEventListener("click", async e => {
   const button = e.target.closest("#overlay-save, #overlay-refresh, #overlay-dismiss-sign-out, #overlay-borderless");
-  if (!button) return;
+  if (!button || new URLSearchParams(location.search).has("overlayPreview")) return;
   button.disabled = true;
   try {
     if (button.id === "overlay-refresh") await loadOverlay();
     else if (button.id === "overlay-save") {
       const answer = await api("/api/overlay/settings", {
         overlay_enabled: $("overlay-enabled").checked,
+        overlay_auto_hide: $("overlay-auto-hide").checked,
+        overlay_hide_from_capture: $("overlay-hide-from-capture").checked,
+        overlay_always_visible: $("overlay-always-visible").checked,
         overlay_corner: $("overlay-corner").value,
         overlay_hotkey: $("overlay-hotkey").value.trim(),
         overlay_panel_hotkey: $("overlay-panel-hotkey").value.trim(),
@@ -15640,7 +15666,11 @@ function applyPrefs(ui) {
   if (xhairData) renderCrosshairX();
   if (wgData) renderMachine();
   const requestedTab = new URLSearchParams(location.search).get('tab');
-  if (requestedTab === 'keyboard' || requestedTab === 'settings') setTab(requestedTab);
+  if (new URLSearchParams(location.search).has('overlayPreview')) {
+    settingsSub = 'overlay';
+    setTab('settings');
+    loadOverlay();
+  } else if (requestedTab === 'keyboard' || requestedTab === 'settings') setTab(requestedTab);
   else if (ui.tab) setTab(ui.tab);
   if (ui.account) {
 

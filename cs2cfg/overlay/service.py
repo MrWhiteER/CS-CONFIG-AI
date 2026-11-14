@@ -13,6 +13,7 @@ import time
 from collections import Counter, deque
 
 from . import permissions, settings
+from .gsi import AutoHide, install_token, parse_payload, remove_cfg, write_cfg
 from .presentmon import Aggregator, PresentMon, STATUS_TEXT
 
 WINDOWED_MODES = frozenset({
@@ -53,7 +54,47 @@ class OverlayService:
         self._status = "disabled"
         self._notice = self._error = ""
         self._capture_denied = False
+        self._game_state = AutoHide()
+        self._gsi_context = None
+        self._gsi_token = ""
+        self._gsi_install = None
+        self._gsi_notice = ""
         self._reset_totals()
+
+    def bind_gsi(self, install, port):
+        # Called after the existing server binds, including a dynamically chosen port.
+        self._gsi_context = (install, port)
+
+    def _configure_gsi(self, enabled):
+        if not self._gsi_context:
+            return
+        install, port = self._gsi_context
+        self._gsi_notice = ""
+        try:
+            install = (install() if callable(install) else install) if enabled else self._gsi_install
+            if enabled and install:
+                from ..paths import user_data_dir
+                self._gsi_token = install_token(user_data_dir())
+                self._gsi_install = install
+                write_cfg(install, port, self._gsi_token)
+            elif not enabled and install:
+                remove_cfg(install)
+            elif enabled:
+                self._gsi_notice = "CS2 install not found. Auto hide is waiting for game state."
+        except OSError as exc:
+            self._gsi_notice = f"Game state configuration unavailable: {exc}"
+        if not enabled:
+            self._gsi_token = ""
+            self._game_state = AutoHide()
+
+    def receive_gsi(self, raw):
+        with self._lock:
+            if not self._settings["overlay_enabled"]:
+                raise PermissionError("Overlay is disabled")
+            state = parse_payload(raw, self._gsi_token)
+            self._game_state.update(state)
+            if self._hud:
+                self._configure_hud(self._settings)
 
     def _reset_totals(self) -> None:
         self._frame_count = 0
@@ -67,9 +108,14 @@ class OverlayService:
     def configure(self, ui: dict) -> None:
         wanted = settings.read(ui, strict=True)
         with self._control:
+            if (wanted["overlay_enabled"] != self._settings["overlay_enabled"]
+                    or not self._thread):
+                self._configure_gsi(wanted["overlay_enabled"])
             if wanted["overlay_enabled"] and self._thread and self._thread.is_alive():
                 with self._lock:
                     self._settings = wanted
+                    if self.panel:
+                        self.panel.configure_capture()
                     if self._hud:
                         self._configure_hud(wanted)
                 return
@@ -90,6 +136,7 @@ class OverlayService:
     def stop(self) -> None:
         with self._control:
             self._shutdown()
+            self._configure_gsi(False)
             with self._lock:
                 self._settings["overlay_enabled"] = False
                 self._status = "disabled"
@@ -140,6 +187,8 @@ class OverlayService:
             return copy.deepcopy({
                 "settings": self._settings, "status": self._status,
                 "notice": self._notice, "error": self._error,
+                "gsi_notice": self._gsi_notice,
+                "gsi_ready": self._game_state.received is not None,
                 "frame_capture_ready": ready, "frame_capture_hint": hint,
                 "frame_capture_hint_dismissible": hint == permissions.SIGN_OUT_HINT,
                 "display": display_values({**(current or {}), "frame_capture_ready": ready}),
@@ -252,6 +301,7 @@ class OverlayService:
 
         with self._lock:
             self._history.clear()
+            self._game_state = AutoHide()
             self._events.clear()
             self._reset_totals()
             self._started = time.time()
@@ -268,6 +318,7 @@ class OverlayService:
         self._cpu, self._gpu = Monitor(), Nvml()
         self._cpu.cpu_percent()
         self._hud = Hud(corner=self._settings["overlay_corner"],
+                        exclude_from_capture=self._settings["overlay_hide_from_capture"],
                         fields=self._settings["overlay_fields"],
                         hotkey=self._settings["overlay_hotkey"],
                         panel_hotkey=self._settings["overlay_panel_hotkey"],
@@ -305,7 +356,11 @@ class OverlayService:
 
     def _configure_hud(self, wanted):
         self._hud.configure(fields=wanted["overlay_fields"], hotkey=wanted["overlay_hotkey"],
-                            panel_hotkey=wanted["overlay_panel_hotkey"])
+                            panel_hotkey=wanted["overlay_panel_hotkey"],
+                            exclude_from_capture=wanted["overlay_hide_from_capture"],
+                            auto_visible=self._game_state.visible(
+                                auto_hide=wanted["overlay_auto_hide"],
+                                always_visible=wanted["overlay_always_visible"]))
 
     def panel_allowed(self):
         return bool(self._settings["overlay_enabled"] and self._hwnd)
@@ -361,6 +416,7 @@ class OverlayService:
                                     if not borderless or (self._modes and not hud_allowed(True, self._modes))
                                     else "")
                 self._hud.set_allowed(allowed and window.foreground_hwnd() == found.hwnd)
+                self._configure_hud(self._settings)
                 self._hud.update(sample, hud_position(found.rect, self._settings["overlay_corner"]))
                 next_tick += 1
                 if next_tick < time.monotonic():

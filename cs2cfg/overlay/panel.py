@@ -7,6 +7,7 @@ import threading
 from ctypes import wintypes as w
 
 from .regionlock import RegionLock
+from .capture import configure_panel
 
 
 def return_to_game(hwnd):
@@ -63,7 +64,12 @@ class Panel:
     def loaded(self):
         with self._lock:
             self._loaded = True
+            self.configure_capture()
             self._script(self.visible)
+
+    def configure_capture(self):
+        if self.window and self._loaded:
+            configure_panel(self.window, self.service._settings["overlay_hide_from_capture"])
 
     def _script(self, active):
         if self.window and self._loaded:

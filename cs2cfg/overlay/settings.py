@@ -6,6 +6,9 @@ FIELDS = ("fps", "one_percent_low", "frame_time_ms", "cpu_percent", "gpu_percent
 CORNERS = ("top_left", "top_right", "bottom_left", "bottom_right")
 DEFAULTS = {
     "overlay_enabled": False,
+    "overlay_auto_hide": True,
+    "overlay_always_visible": False,
+    "overlay_hide_from_capture": True,
     "overlay_corner": "top_left",
     "overlay_fields": list(FIELDS),
     "overlay_hotkey": "Ctrl+Alt+O",
@@ -41,7 +44,7 @@ def read(ui: dict | None = None, *, strict: bool = False) -> dict:
             continue
         value = ui[key]
         valid = True
-        if key in ("overlay_enabled", "overlay_sign_out_hint_dismissed"):
+        if isinstance(DEFAULTS[key], bool):
             valid = isinstance(value, bool)
         elif key == "overlay_corner":
             valid = value in CORNERS
