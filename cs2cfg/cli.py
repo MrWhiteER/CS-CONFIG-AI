@@ -1336,6 +1336,16 @@ def cmd_gui(ctx: Context) -> int:
     return launch_gui(ctx.args)
 
 
+def cmd_overlay_probe(ctx: Context) -> int:
+    from .overlay.probe import run
+
+    try:
+        return run(ctx.args.seconds, ctx.args.no_hud, ctx.args.exclude_from_capture)
+    except (OSError, RuntimeError) as exc:
+        print(ctx.out.red(f"  Overlay probe: {exc}"))
+        return 1
+
+
 # ---------------------------------------------------------------------------
 # Argument parsing
 # ---------------------------------------------------------------------------
@@ -1578,12 +1588,21 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("gui", parents=[shared], help="open the graphical interface")
 
+    overlay = sub.add_parser("overlay-probe", parents=[shared],
+                             help="measure the external PresentMon overlay prototype")
+    overlay.add_argument("--seconds", type=int, help="stop after N seconds (positive integer)")
+    overlay.add_argument("--no-hud", action="store_true", help="capture without a HUD window")
+    overlay.add_argument("--exclude-from-capture", action="store_true",
+                         help="ask Windows to exclude the HUD from screen capture")
+
     return parser
 
 
 def main(argv: Optional[List[str]] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.command == "overlay-probe" and args.seconds is not None and args.seconds <= 0:
+        parser.error("--seconds must be a positive integer")
 
     if not args.command:
         args.command = "gui" if os.environ.get("CS2CFG_DEFAULT_GUI") else "scan"
@@ -1635,6 +1654,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         "cfg": cmd_cfg,
         "cfg-rename": cmd_cfg_rename,
         "gui": cmd_gui,
+        "overlay-probe": cmd_overlay_probe,
     }
 
     try:
