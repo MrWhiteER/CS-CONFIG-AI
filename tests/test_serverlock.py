@@ -13,28 +13,37 @@ from cs2cfg import serverlock as sl, serverping as sp, serverwatch as sw, webui
 
 FIXTURES = Path(__file__).parent / "fixtures"
 CONFIG = json.loads((FIXTURES / "server_lock_sdr.json").read_text(encoding="utf-8"))
+PROGRAM = r"C:\Games\Counter-Strike Global Offensive\game\bin\win64\cs2.exe"
+
+
+def intent(code="dxb"):
+    return sl.build_plan(CONFIG, code) | {"applied_at": 100}
 
 
 def observed(code="dxb"):
-    plan = sl.build_plan(CONFIG, code)
-    meta = {k: plan[k] for k in ("code", "city", "codes", "revision")}
-    meta["applied_at"] = 100
+    regions = sl.build_plan(CONFIG, code)["regions"] if code else []
     return {"ok": True, "service": "Running", "processes": [],
-            "profiles": [{"enabled": "True", "local_rules": "NotConfigured"}] * 3,
-            "rules": [{"group": sl.GROUP, "description": sl.MARKER + json.dumps(meta),
+            "profiles": [{"enabled": "True", "local_rules": "NotConfigured"} for _ in range(3)],
+            "rules": [{"group": sl.GROUP, "display_name": sl.DISPLAY_PREFIX + r["name"],
                        "enabled": "True", "direction": "Outbound", "action": "Block", "profile": "Any",
-                       "protocol": "UDP", "program": "Any", "service": "Any", "local": ["Any"],
-                       "local_port": "Any", "remote_port": "Any", "remote": plan["addresses"]}]}
+                       "protocol": "Any", "program": PROGRAM, "service": "Any", "local": ["Any"],
+                       "local_port": "Any", "remote_port": "Any", "remote": r["cidrs"]} for r in regions]}
 
 
 class Isolated(unittest.TestCase):
     def setUp(self):
-        # A missed mock fails loudly instead of sending a probe or raising UAC.
+        # A missed mock fails loudly instead of changing the firewall or probing.
         for obj, name in ((sl.quickfix, "_run_elevated"), (sl.quickfix, "_powershell"),
                           (sp, "urlopen"), (sp.netcheck, "_ping_once")):
             p = patch.object(obj, name, side_effect=AssertionError("Unexpected external effect: " + name))
             p.start()
             self.addCleanup(p.stop)
+        self.helper = MagicMock(spec=["ready", "run"])
+        self.helper.ready.return_value = True
+        self.helper.run.side_effect = AssertionError("Unexpected helper request")
+        p = patch.object(sl, "elevated", self.helper)
+        p.start()
+        self.addCleanup(p.stop)
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
         self.root = Path(temp.name)
@@ -45,12 +54,23 @@ class BlockList(Isolated):
         plan = sl.build_plan(CONFIG, "dxb")
         self.assertEqual(plan["addresses"], ["155.133.226.68", "155.133.226.69", "155.133.226.70", "155.133.226.71"])
         self.assertEqual(plan["codes"], ["dxb"])
+        self.assertEqual(plan["regions"], [
+            {"name": "bom", "cidrs": ["155.133.226.68/32"]},
+            {"name": "bom2", "cidrs": ["155.133.226.69/32"]},
+            {"name": "dfjr", "cidrs": ["155.133.226.70/32"]},
+            {"name": "hidden", "cidrs": ["155.133.226.71/32"]}])
 
     def test_numbered_variants_are_all_allowed(self):
         plan = sl.build_plan(CONFIG, "bom")
         self.assertEqual(plan["codes"], ["bom", "bom2"])
         self.assertNotIn("155.133.226.69", plan["addresses"])
         self.assertNotIn("185.25.183.163", plan["addresses"])
+        self.assertFalse({"bom", "bom2"} & {r["name"] for r in plan["regions"]})
+
+    def test_no_empty_region_when_all_its_ips_are_shared(self):
+        config = copy.deepcopy(CONFIG)
+        config["pops"]["shared"] = {"relays": [{"ipv4": "185.25.183.163"}]}
+        self.assertNotIn("shared", [r["name"] for r in sl.build_plan(config, "dxb")["regions"]])
 
     def test_incomplete_fallback_invalid_selection_and_malformed_addresses_fail(self):
         for config, code in ((sp.FALLBACK, "dxb"), ({}, "dxb"), (CONFIG, "fake")):
@@ -61,6 +81,36 @@ class BlockList(Isolated):
             config["pops"]["hidden"]["relays"][0]["ipv4"] = bad
             with self.assertRaises(ValueError):
                 sl.build_plan(config, "dxb")
+
+    def test_helper_region_count_limits(self):
+        config = {"revision": 1, "pops": {"dxb": CONFIG["pops"]["dxb"]}}
+        with self.assertRaisesRegex(ValueError, "1-64"):
+            sl.build_plan(config, "dxb")
+        for n in range(64):
+            config["pops"][f"pop{n}"] = {"relays": [{"ipv4": "8.8.8.8"}]}
+        self.assertEqual(len(sl.build_plan(config, "dxb")["regions"]), 64)
+        config["pops"]["extra"] = {"relays": [{"ipv4": "8.8.4.4"}]}
+        with self.assertRaisesRegex(ValueError, "1-64"):
+            sl.build_plan(config, "dxb")
+
+    def test_helper_cidr_limit_counts_addresses_per_pop(self):
+        config = {"revision": 1, "pops": {"dxb": CONFIG["pops"]["dxb"]}}
+        relays = [{"ipv4": f"8.10.{n // 256}.{n % 256}"} for n in range(1001)]
+        config["pops"].update(a={"relays": relays[:1000]}, b={"relays": relays[:1000]})
+        self.assertEqual(sum(len(r["cidrs"]) for r in sl.build_plan(config, "dxb")["regions"]), 2000)
+        config["pops"]["a"]["relays"] = relays
+        with self.assertRaisesRegex(ValueError, "2000 CIDR"):
+            sl.build_plan(config, "dxb")
+
+    def test_helper_name_limits(self):
+        for name in ("x" * 49, "", "bad;name", "bad\n", "Dubai\u00e9"):
+            config = copy.deepcopy(CONFIG)
+            config["pops"][name] = config["pops"].pop("hidden")
+            with self.subTest(name=name), self.assertRaisesRegex(ValueError, "name format"):
+                sl.build_plan(config, "dxb")
+        config = copy.deepcopy(CONFIG)
+        config["pops"]["A Z_-.()"] = config["pops"].pop("hidden")
+        self.assertIn("A Z_-.()", [r["name"] for r in sl.build_plan(config, "dxb")["regions"]])
 
     def test_read_only_directory_accessor_never_fetches_and_does_not_use_fallback(self):
         path = self.root / "cache.json"
@@ -75,95 +125,113 @@ class BlockList(Isolated):
 
 
 class Firewall(Isolated):
-    def test_script_is_one_udp_remote_list_rule_for_all_programs_and_exact_group(self):
-        script = sl.apply_script(sl.build_plan(CONFIG, "dxb"), 100)
-        self.assertEqual(script.count("New-NetFirewallRule"), 1)
-        for expected in ("-Direction Outbound", "-Action Block", "-Protocol UDP", "-Program Any", "-Service Any",
-                         "-Profile Any", "-PolicyStore PersistentStore", "-RemoteAddress @(", sl.GROUP, sl.MARKER):
-            self.assertIn(expected, script)
-        self.assertNotIn("185.25.183.163", script)
-        self.assertNotIn("185.25.183.179", script)
-        self.assertIn("Where-Object { $_.Group -ceq $group }", script)
-        self.assertIn("foreach ($rule in $created)", script)  # rollback on failure
-        self.assertLess(script.index("New-NetFirewallRule"), script.index("foreach ($rule in $old)"))
-        self.assertNotIn("netsh", script.lower())
+    original_powershell = staticmethod(sl.quickfix._powershell)
 
-    def test_unlock_is_group_scoped_and_cannot_remove_other_rules(self):
-        script = sl.unlock_script()
-        self.assertIn(sl.GROUP, script)
-        self.assertIn("Where-Object { $_.Group -ceq $group }", script)
-        self.assertIn("$rule | Remove-NetFirewallRule", script)
-        self.assertNotIn("New-NetFirewallRule", script)
-        self.assertNotIn("reset", script.lower())
-
-    def test_apply_time_is_evaluated_in_elevated_helper_after_uac(self):
-        script = sl.apply_script(sl.build_plan(CONFIG, "dxb"))
-        self.assertIn("$metadata.applied_at = ([datetime]::UtcNow", script)
-        self.assertLess(script.index("$metadata.applied_at ="), script.index("New-NetFirewallRule"))
+    def parse(self, raw=None, config=None, saved=True):
+        return sl.parse_state(observed() if raw is None else raw, CONFIG if config is None else config,
+                              intent() if saved else None, PROGRAM)
 
     def test_read_command_with_mocked_subprocess(self):
-        # Exercise the actual wrapper, but subprocess.run is still a stand-in.
         with patch.object(sl.quickfix, "_powershell", wraps=self.original_powershell), \
              patch.object(sl.quickfix.subprocess, "run", return_value=types.SimpleNamespace(stdout=json.dumps(observed()))) as run:
-            result = sl.inspect_firewall()
-        self.assertTrue(result["ok"])
+            self.assertTrue(sl.inspect_firewall()["ok"])
         command = run.call_args.args[0]
         self.assertIn("-NonInteractive", command)
         self.assertIn("-PolicyStore ActiveStore", command[-1])
+        self.assertIn("display_name=$_.DisplayName", command[-1])
         self.assertNotIn("Remove-NetFirewallRule", command[-1])
         self.assertNotIn("New-NetFirewallRule", command[-1])
 
-    # Capture before setUp replaces the function.
-    original_powershell = staticmethod(sl.quickfix._powershell)
-
     def test_real_rules_are_required_not_a_saved_flag(self):
-        self.assertEqual(sl.parse_state({"ok": True, "rules": []}, CONFIG)["status"], "unlocked")
-        saved = {"code": "dxb", "codes": ["dxb"], "city": "Dubai"}
-        result = sl.parse_state({"ok": True, "rules": []}, CONFIG, saved)
+        self.assertEqual(self.parse(observed(None), saved=False)["status"], "unlocked")
+        result = self.parse(observed(None))
         self.assertEqual(result["status"], "missing")
         self.assertFalse(result["active"])
 
-    def test_valid_rules_and_windows_host_masks(self):
+    def test_valid_helper_rules_without_description_and_windows_host_masks(self):
         raw = observed()
-        raw["rules"][0]["protocol"] = "17"
-        raw["rules"][0]["remote"] = [a + "/32" for a in raw["rules"][0]["remote"]]
-        result = sl.parse_state(raw, CONFIG)
+        for r in raw["rules"]:
+            r["protocol"] = "256"
+            r["program"] = PROGRAM.upper()
+            r["remote"] = [a.removesuffix("/32") for a in r["remote"]]
+        result = self.parse(raw)
         self.assertEqual(result["status"], "locked")
         self.assertTrue(result["active"])
         self.assertEqual(result["city"], "Dubai")
 
-    def test_revision_or_address_change_is_outdated(self):
+    def test_revision_or_directory_address_change_is_outdated(self):
         config = copy.deepcopy(CONFIG)
         config["revision"] += 1
-        self.assertEqual(sl.parse_state(observed(), config)["status"], "outdated")
-        raw = observed()
-        raw["rules"][0]["remote"].pop()
-        self.assertEqual(sl.parse_state(raw, CONFIG)["status"], "outdated")
+        self.assertEqual(self.parse(config=config)["status"], "outdated")
+        config["pops"]["hidden"]["relays"][0]["ipv4"] = "8.8.8.8"
+        self.assertEqual(self.parse(config=config)["status"], "outdated")
 
-    def test_disabled_or_narrowed_filters_and_firewall_off_are_not_active(self):
-        for key, value in (("enabled", "False"), ("direction", "Inbound"), ("protocol", "TCP"),
-                           ("program", "cs2.exe"), ("profile", "Private"), ("remote_port", "27015")):
+    def test_changed_addresses_pop_names_missing_or_duplicate_rules_are_damaged(self):
+        mutations = [lambda r:r.pop(), lambda r:r.append(copy.deepcopy(r[0])),
+                     lambda r:r[0].update(remote=["8.8.8.8/32"]),
+                     lambda r:r[0].update(display_name=sl.DISPLAY_PREFIX + "fake"),
+                     lambda r:r[0].update(remote=["155.133.226.0/24"]),
+                     lambda r:r[0].update(remote=[])]
+        for mutate in mutations:
+            raw = observed()
+            mutate(raw["rules"])
+            result = self.parse(raw)
+            self.assertEqual(result["status"], "damaged")
+            self.assertFalse(result["active"])
+
+    def test_disabled_narrowed_filters_wrong_program_and_firewall_off_are_not_active(self):
+        for key, value in (("enabled", "False"), ("direction", "Inbound"), ("protocol", "UDP"),
+                           ("program", "Any"), ("program", "cs2.exe"),
+                           ("program", PROGRAM.replace("C:", "D:")), ("action", "Allow"),
+                           ("service", "Steam"), ("local", ["8.8.8.8"]),
+                           ("profile", "Private"), ("local_port", "27015"), ("remote_port", "27015")):
             raw = observed()
             raw["rules"][0][key] = value
-            self.assertFalse(sl.parse_state(raw, CONFIG)["active"], key)
+            result = self.parse(raw)
+            self.assertFalse(result["active"], key)
+            self.assertEqual(result["code"], "dxb")
         for field, value in (("enabled", "False"), ("local_rules", "False")):
             raw = observed()
             raw["profiles"][0][field] = value
-            self.assertFalse(sl.parse_state(raw, CONFIG)["active"])
+            self.assertFalse(self.parse(raw)["active"])
+        raw = observed()
+        raw["service"] = "Stopped"
+        self.assertFalse(self.parse(raw)["active"])
+
+    def test_inference_without_intent_requires_unique_kept_region_and_complete_rules(self):
+        for code in ("dxb", "bom", "dfjr"):
+            result = sl.parse_state(observed(code), CONFIG, program=PROGRAM)
+            self.assertEqual(result["status"], "locked")
+            self.assertEqual(result["code"], code)
+            self.assertTrue(result["inferred"])
+            self.assertIsNone(result["applied_at"])
+        raw = observed()
+        raw["rules"] = [r for r in raw["rules"] if not r["display_name"].endswith("dfjr")]
+        result = self.parse(raw, saved=False)
+        self.assertEqual(result["status"], "damaged")
+        self.assertIn("cannot be inferred uniquely", result["error"])
+        raw = observed()
+        raw["rules"][0]["remote"] = ["8.8.8.8/32"]
+        self.assertEqual(self.parse(raw, saved=False)["status"], "damaged")
 
     def test_unreadable_or_malformed_state_does_not_claim_unlock(self):
         for raw in ({}, {"ok": False, "error": "denied"}, {"ok": True, "rules": [None]}):
-            self.assertIsNone(sl.parse_state(raw, CONFIG)["present"])
+            self.assertIsNone(self.parse(raw)["present"])
         raw = observed()
-        raw["rules"][0]["description"] = "unexpected"
-        self.assertEqual(sl.parse_state(raw, CONFIG)["status"], "damaged")
+        raw["rules"][0]["display_name"] = "unexpected"
+        self.assertEqual(self.parse(raw)["status"], "damaged")
+        self.assertFalse(sl.parse_state(observed(), CONFIG, intent(), None)["active"])
+
+    def test_address_digest_is_checked(self):
+        saved = intent() | {"address_digest": "wrong"}
+        self.assertEqual(sl.parse_state(observed(), CONFIG, saved, PROGRAM)["status"], "damaged")
 
     def test_restart_checks_process_start_times_even_after_app_restart(self):
-        state = sl.parse_state(observed(), CONFIG)
+        state = self.parse()
         self.assertTrue(sl.restart_needed(state, [{"name": "steam", "started": 50}]))
         self.assertFalse(sl.restart_needed(state, [{"name": "steam", "started": 101}]))
         self.assertIsNone(sl.restart_needed(state, [{"name": "cs2", "started": None}]))
-
+        self.assertIsNone(sl.restart_needed(self.parse(saved=False), []))
 
 class Reasons(Isolated):
     def reason(self, **overrides):
@@ -280,8 +348,24 @@ class Console(Isolated):
 
 
 class Operations(Isolated):
+    def setUp(self):
+        super().setUp()
+        self.raw = observed(None)
+        self.run_thread = patch.object(sl.threading, "Thread", side_effect=lambda **kw:
+            types.SimpleNamespace(start=lambda:kw["target"](*kw.get("args", ()))))
+        self.run_thread.start()
+        self.addCleanup(self.run_thread.stop)
+        p = patch.object(sl, "inspect_firewall", side_effect=lambda:self.raw)
+        p.start()
+        self.addCleanup(p.stop)
+        self.helper.run.side_effect = self.helper_run
+
+    def helper_run(self, op, args=None, *, wait=True):
+        self.raw = observed("dxb") if op == "firewall.lock" else observed(None)
+        return {"ok": True}
+
     def service(self):
-        return sl.ServerLock(self.root, lambda:{}, lambda:CONFIG, lambda:{})
+        return sl.ServerLock(self.root, lambda:{"program": PROGRAM}, lambda:CONFIG, lambda:{})
 
     def test_apply_requires_review_and_directory_cannot_change_between_review_and_apply(self):
         service = self.service()
@@ -298,62 +382,292 @@ class Operations(Isolated):
         with patch.object(sl.time, "time", return_value=service.prepared[1] + 301):
             with self.assertRaisesRegex(ValueError, "Review"):
                 service.begin("apply", review["plan_id"])
+        self.helper.run.assert_not_called()
 
-    def test_change_uses_one_elevation_and_readback_and_cancel_does_not_claim_lock(self):
-        service = self.service()
-        service.operation.acquire()
-        with patch.object(sl.quickfix, "_run_elevated", return_value={"ok": False, "declined": True, "error": "declined"}) as elevated, \
-             patch.object(sl, "inspect_firewall", return_value={"ok": True, "rules": []}):
-            service._change("mock script", "apply")
-        elevated.assert_called_once_with("mock script")
-        self.assertEqual(service.snapshot()["firewall"]["status"], "unlocked")
-        self.assertIn("declined", service.snapshot()["error"])
-        self.assertFalse(service.snapshot()["busy"])
-
-    def test_success_is_not_claimed_until_firewall_confirms(self):
-        service = self.service()
-        service.operation.acquire()
-        with patch.object(sl.quickfix, "_run_elevated", return_value={"ok": True}), \
-             patch.object(sl, "inspect_firewall", return_value={"ok": False, "error": "denied"}):
-            service._change("mock", "apply")
-        self.assertFalse(service.snapshot()["firewall"]["active"])
-        self.assertIn("did not confirm", service.snapshot()["error"])
-
-    def test_valid_review_applies_once_and_restores_actual_state_after_app_restart(self):
+    def test_exact_helper_apply_arguments_and_local_metadata_survive_restart(self):
         service = self.service()
         review = service.prepare("dxb")
-        def immediate(**kwargs):
-            return types.SimpleNamespace(start=lambda:kwargs["target"](*kwargs.get("args", ())))
-        with patch.object(sl.quickfix, "_run_elevated", return_value={"ok": True}) as elevated, \
-             patch.object(sl, "inspect_firewall", return_value=observed()), \
-             patch.object(sl.threading, "Thread", side_effect=immediate):
-            service.begin("apply", review["plan_id"])
-        elevated.assert_called_once()
+        service.begin("apply", review["plan_id"])
+        self.helper.run.assert_called_once_with("firewall.lock", {"program": PROGRAM, "regions": [
+            {"name": "bom", "cidrs": ["155.133.226.68/32"]},
+            {"name": "bom2", "cidrs": ["155.133.226.69/32"]},
+            {"name": "dfjr", "cidrs": ["155.133.226.70/32"]},
+            {"name": "hidden", "cidrs": ["155.133.226.71/32"]}]}, wait=True)
         self.assertEqual(service.snapshot()["firewall"]["status"], "locked")
         self.assertEqual(service.snapshot()["error"], "")
+        saved = json.loads((self.root / "server-lock-selection.json").read_text())
+        for key in ("code", "codes", "city", "revision", "address_digest", "regions"):
+            self.assertEqual(saved[key], intent()[key])
+        self.assertGreater(saved["applied_at"], 100)
         restarted = self.service()
-        with patch.object(sl, "inspect_firewall", return_value={"ok": True, "rules": []}):
-            restarted.refresh()
+        restarted.refresh()
+        self.assertEqual(restarted.snapshot()["firewall"]["status"], "locked")
+        self.raw = observed(None)
+        restarted.refresh()
         self.assertEqual(restarted.snapshot()["firewall"]["status"], "missing")
         self.assertFalse(restarted.snapshot()["firewall"]["active"])
 
-    def test_previous_region_is_not_success_for_a_different_requested_lock(self):
+    def test_exact_unlock_operation_and_intent_cleared_only_on_verified_success(self):
         service = self.service()
-        service.operation.acquire()
-        with patch.object(sl.quickfix, "_run_elevated", return_value={"ok": True}), \
-             patch.object(sl, "inspect_firewall", return_value=observed("bom")):
-            service._change("mock", "apply", "dxb")
+        service._remember(intent())
+        self.helper.run.side_effect = None
+        self.helper.run.return_value = {"ok": False, "error": "helper failed"}
+        service.begin("unlock")
+        self.helper.run.assert_called_once_with("firewall.unlock", wait=True)
+        self.assertEqual(service.snapshot()["firewall"]["status"], "missing")
+        self.assertIn("helper failed", service.snapshot()["error"])
+        self.helper.run.return_value = {"ok": True}
+        service.begin("unlock")
+        self.assertIsNone(service.intent)
+        self.assertEqual(service.snapshot()["firewall"]["status"], "unlocked")
+        self.assertIn("Restart Steam and CS2", service.snapshot()["detail"])
+
+    def test_helper_success_without_real_rules_is_not_success(self):
+        service = self.service()
+        self.helper.run.side_effect = None
+        self.helper.run.return_value = {"ok": True}
+        service.begin("apply", code="dxb")
+        self.assertFalse(service.snapshot()["firewall"]["active"])
+        self.assertIn("did not confirm", service.snapshot()["error"])
+        self.raw = observed("bom")
+        service.begin("apply", code="dxb")
         self.assertTrue(service.snapshot()["error"])
 
-    def test_unlock_removes_saved_intent_only_after_success(self):
+    def test_missing_module_or_not_ready_never_prompts_and_returns_needs_setup(self):
+        for helper in (None, self.helper):
+            self.helper.ready.return_value = False
+            with patch.object(sl, "elevated", helper):
+                service = self.service()
+                self.assertTrue(service.prepare("dxb")["needs_setup"])
+                for action in ("apply", "unlock"):
+                    result = service.begin(action, code="dxb" if action == "apply" else None)
+                    self.assertTrue(result["needs_setup"])
+                    self.assertIn("Run setup again", result["detail"])
+            self.helper.run.assert_not_called()
+
+    def test_run_needs_setup_is_reported_without_fallback_or_changed_selection(self):
         service = self.service()
-        service._remember({"code": "dxb", "codes": ["dxb"], "city": "Dubai"})
-        for success in (False, True):
-            service.operation.acquire()
-            with patch.object(sl.quickfix, "_run_elevated", return_value={"ok": success, "error": "declined"}), \
-                 patch.object(sl, "inspect_firewall", return_value={"ok": True, "rules": []}):
-                service._change("mock", "unlock")
-            self.assertEqual(service.snapshot()["firewall"]["status"], "unlocked" if success else "missing")
+        service._remember(intent("bom"))
+        self.raw = observed("bom")
+        self.helper.run.side_effect = None
+        self.helper.run.return_value = {"ok": False, "needs_setup": True}
+        for action in ("apply", "unlock"):
+            result = service.begin(action, code="dxb" if action == "apply" else None)
+            self.assertTrue(result["needs_setup"])
+            self.assertIn("Run setup again", result["detail"])
+            self.assertEqual(service.intent["code"], "bom")
+            self.assertFalse(result["busy"])
+
+    def test_setup_missing_is_reported_before_directory_or_install_discovery(self):
+        self.helper.ready.return_value = False
+        service = self.service()
+        service.directory = MagicMock(side_effect=AssertionError("No directory needed without setup"))
+        service.context = MagicMock(side_effect=AssertionError("No install needed without setup"))
+        self.assertTrue(service.begin("apply", code="dxb")["needs_setup"])
+        self.assertTrue(service.begin("unlock")["needs_setup"])
+        self.helper.run.assert_not_called()
+
+    def test_steam_started_during_helper_execution_still_needs_restart(self):
+        service = self.service()
+        now = [100]
+        def run(*args, **kwargs):
+            self.raw = observed()
+            self.raw["processes"] = [{"name": "steam", "started": 150}]
+            now[0] = 200
+            return {"ok": True}
+        self.helper.run.side_effect = run
+        with patch.object(sl.time, "time", side_effect=lambda:now[0]):
+            result = service.begin("apply", code="dxb")
+        self.assertTrue(result["restart_needed"])
+        self.assertEqual(service.intent["applied_at"], 200)
+
+    def test_helper_exception_releases_worker_and_never_uses_fallback(self):
+        service = self.service()
+        self.helper.run.side_effect = OSError("helper unavailable")
+        service.begin("unlock")
+        self.assertIn("helper unavailable", service.snapshot()["error"])
+        self.assertFalse(service.snapshot()["busy"])
+        self.assertTrue(service.operation.acquire(blocking=False))
+        service.operation.release()
+
+    def test_install_program_is_required_and_limits_fail_before_helper(self):
+        service = self.service()
+        service.context = lambda:{"program": "cs2.exe"}
+        result = service.begin("apply", code="dxb")
+        self.assertIn("full install path", result["error"])
+        self.helper.run.assert_not_called()
+        config = copy.deepcopy(CONFIG)
+        config["pops"]["bad;name"] = config["pops"].pop("hidden")
+        service.directory = lambda:config
+        with self.assertRaisesRegex(ValueError, "name format"):
+            service.begin("apply", code="dxb")
+        self.helper.run.assert_not_called()
+
+    def test_unknown_process_state_prevents_change(self):
+        service = self.service()
+        for raw in ({"ok": False, "error": "denied"}, {"ok": True, "rules": []}):
+            self.raw = raw
+            result = service.begin("unlock")
+            self.assertIn("whether CS2 is running", result["error"])
+        self.helper.run.assert_not_called()
+
+    def test_queue_apply_persists_and_observer_runs_it_once_after_game_closes(self):
+        service = self.service()
+        self.raw["processes"] = [{"name": "CS2", "started": 50}]
+        result = service.begin("apply", code="dxb")
+        self.assertEqual(result["pending"]["action"], "apply")
+        self.assertEqual(result["detail"], "Will apply when CS2 closes")
+        self.assertEqual(result["firewall"]["status"], "unlocked")
+        self.helper.run.assert_not_called()
+        restarted = self.service()
+        self.assertEqual(restarted.snapshot()["pending"]["code"], "dxb")
+        restarted._observe_once()
+        self.helper.run.assert_not_called()
+        self.raw["processes"] = []
+        restarted._observe_once()
+        restarted._observe_once()
+        self.helper.run.assert_called_once()
+        self.assertIsNone(restarted.snapshot()["pending"])
+        self.assertEqual(restarted.snapshot()["firewall"]["status"], "locked")
+
+    def test_new_requests_replace_pending_and_cancel_does_not_unlock_current_rules(self):
+        service = self.service()
+        service._remember(intent())
+        self.raw = observed()
+        self.raw["processes"] = [{"name": "cs2.exe", "started": 50}]
+        service.begin("apply", code="bom")
+        self.assertEqual(service.snapshot()["pending"]["code"], "bom")
+        service.begin("unlock")
+        self.assertEqual(service.snapshot()["pending"]["action"], "unlock")
+        self.assertEqual(service.snapshot()["firewall"]["code"], "dxb")
+        service.begin("apply", code="dfjr")
+        self.assertEqual(service.snapshot()["pending"]["code"], "dfjr")
+        self.assertIsNone(service.cancel()["pending"])
+        self.assertEqual(self.service().intent["code"], "dxb")
+        self.raw["processes"] = []
+        service._observe_once()
+        self.helper.run.assert_not_called()
+        self.assertEqual(service.snapshot()["firewall"]["status"], "locked")
+
+    def test_queued_unlock_runs_once_and_failed_helper_is_not_retried(self):
+        service = self.service()
+        service._remember(intent())
+        self.raw = observed()
+        self.raw["processes"] = [{"name": "cs2", "started": 50}]
+        service.begin("unlock")
+        self.assertEqual(self.service().snapshot()["pending"]["action"], "unlock")
+        self.raw["processes"] = []
+        self.helper.run.side_effect = None
+        self.helper.run.return_value = {"ok": False, "error": "failed"}
+        service._observe_once()
+        service._observe_once()
+        self.helper.run.assert_called_once_with("firewall.unlock", wait=True)
+        self.assertIsNone(service.snapshot()["pending"])
+
+    def test_queued_unlock_success_clears_intent(self):
+        service = self.service()
+        service._remember(intent())
+        self.raw = observed()
+        self.raw["processes"] = [{"name": "cs2", "started": 50}]
+        service.begin("unlock")
+        self.raw["processes"] = []
+        service._observe_once()
+        service._observe_once()
+        self.helper.run.assert_called_once_with("firewall.unlock", wait=True)
+        self.assertIsNone(service.intent)
+        self.assertEqual(service.snapshot()["firewall"]["status"], "unlocked")
+
+    def test_changed_directory_invalidates_queued_plan_and_does_not_retry(self):
+        service = self.service()
+        self.raw["processes"] = [{"name": "cs2", "started": 50}]
+        service.begin("apply", code="dxb")
+        config = copy.deepcopy(CONFIG)
+        config["revision"] += 1
+        service.directory = lambda:config
+        self.raw["processes"] = []
+        with self.assertRaisesRegex(ValueError, "directory changed"):
+            service._observe_once()
+        self.assertIsNone(service.snapshot()["pending"])
+        service._observe_once()
+        self.helper.run.assert_not_called()
+
+    def test_queue_waits_for_setup_and_unknown_process_state(self):
+        service = self.service()
+        self.raw["processes"] = [{"name": "cs2", "started": 50}]
+        service.begin("apply", code="dxb")
+        self.raw = {"ok": False, "error": "denied"}
+        service._observe_once()
+        self.assertIsNotNone(service.snapshot()["pending"])
+        self.raw = observed(None)
+        self.helper.ready.return_value = False
+        service._observe_once()
+        self.assertTrue(service.snapshot()["needs_setup"])
+        self.helper.run.assert_not_called()
+        self.helper.ready.return_value = True
+        service._observe_once()
+        self.helper.run.assert_called_once()
+
+    def test_persistence_failure_cannot_claim_a_queued_or_applied_lock(self):
+        service = self.service()
+        self.raw["processes"] = [{"name": "cs2", "started": 50}]
+        with patch.object(Path, "write_text", side_effect=OSError("disk full")):
+            result = service.begin("apply", code="dxb")
+        self.assertIn("disk full", result["error"])
+        self.assertIsNone(result["pending"])
+        self.helper.run.assert_not_called()
+
+    def test_inferred_selection_is_saved_with_unknown_apply_time(self):
+        service = self.service()
+        self.raw = observed()
+        service.refresh()
+        self.assertEqual(self.service().intent["address_digest"], intent()["address_digest"])
+        self.assertIsNone(self.service().intent["applied_at"])
+
+    def test_stable_python_api_uses_the_same_service_without_review(self):
+        service = self.service()
+        service.survey = lambda:{"regions": [{"code": "dxb", "ping_ms": 18, "loss": 0, "status": "good"}]}
+        with patch.object(sl, "shared", return_value=service):
+            rows = sl.list_regions()
+            self.assertEqual(next(r for r in rows if r["code"] == "dxb")["ping_ms"], 18)
+            self.assertEqual(next(r for r in rows if r["code"] == "bom")["status"], "unknown")
+            self.assertTrue(sl.request_lock("dxb")["firewall"]["active"])
+            self.assertEqual(sl.lock_status()["firewall"]["code"], "dxb")
+            self.assertIsNone(sl.request_unlock()["pending"])
+            self.assertEqual(sl.lock_status()["firewall"]["status"], "unlocked")
+        self.assertEqual([c.args[0] for c in self.helper.run.call_args_list], ["firewall.lock", "firewall.unlock"])
+
+    def test_helper_runs_on_the_change_worker_with_default_timeout(self):
+        service = self.service()
+        with patch.object(sl.threading, "Thread") as thread:
+            self.assertTrue(service.begin("unlock")["busy"])
+            self.helper.run.assert_not_called()
+            worker = thread.call_args.kwargs
+        self.assertEqual(worker["name"], "server-lock-change")
+        worker["target"](*worker["args"])
+        self.helper.run.assert_called_once_with("firewall.unlock", wait=True)
+        self.assertFalse(service.snapshot()["busy"])
+
+    def test_run_needs_setup_consumes_queued_attempt_without_retry(self):
+        service = self.service()
+        self.raw["processes"] = [{"name": "cs2", "started": 50}]
+        service.begin("apply", code="dxb")
+        self.raw["processes"] = []
+        self.helper.run.side_effect = None
+        self.helper.run.return_value = {"ok": False, "needs_setup": True}
+        service._observe_once()
+        self.assertTrue(service.snapshot()["needs_setup"])
+        self.assertIsNone(service.snapshot()["pending"])
+        service._observe_once()
+        self.helper.run.assert_called_once()
+
+    def test_list_regions_keeps_existing_survey_when_full_directory_is_unavailable(self):
+        service = self.service()
+        service.directory = lambda:None
+        service.survey = lambda:{"regions": [{"code": "dxb", "ping_ms": 18, "status": "good"}]}
+        rows = service.list_regions()
+        self.assertEqual(rows[0]["ping_ms"], 18)
+        rows[0]["ping_ms"] = 99
+        self.assertEqual(service.list_regions()[0]["ping_ms"], 18)
 
 
 class Api(Isolated):
@@ -391,6 +705,51 @@ class Api(Isolated):
         service.snapshot.return_value = {"busy": False}
         handler.do_GET()
         service.snapshot.assert_called_once()
+
+    def test_cancel_route_is_token_protected_and_only_cancels_pending(self):
+        handler, service = self.handler("/api/servers/lock/cancel", {}, token="wrong")
+        handler.do_POST()
+        service.cancel.assert_not_called()
+        self.assertEqual(handler._send_json.call_args.args[1], 403)
+        handler, service = self.handler("/api/servers/lock/cancel", {})
+        service.cancel.return_value = {"pending": None}
+        handler.do_POST()
+        service.cancel.assert_called_once_with()
+        service.begin.assert_not_called()
+
+    def test_prepare_can_return_needs_setup_without_a_plan(self):
+        handler, service = self.handler("/api/servers/lock/prepare", {"code": "dxb"})
+        service.prepare.return_value = {"needs_setup": True, "detail": sl.SETUP_MESSAGE}
+        handler.do_POST()
+        self.assertTrue(handler._send_json.call_args.args[0]["needs_setup"])
+
+    def test_http_and_python_share_one_service_and_same_install_discovery(self):
+        from cs2cfg import cli, paths, whoami
+        state = types.SimpleNamespace(server_lock=None, server_ping=None, steam_root=Path(r"C:\Steam"),
+                                      cs2_install=Path(PROGRAM).parents[3], users=[])
+        with patch.object(sl, "_shared", None), \
+             patch.object(paths, "user_data_dir", return_value=self.root), \
+             patch.object(sl.ServerLock, "start") as start, \
+             patch.object(webui.steam, "list_users", return_value=[]), \
+             patch.object(cli, "load_prefs", return_value={}), \
+             patch.object(whoami, "current", return_value=(None, "")):
+            service = webui._server_lock_service(state)
+            self.assertIs(service, sl.shared())
+            self.assertIs(service, webui._server_lock_service(state))
+            start.assert_called_once()
+            context = service.context()
+        self.assertEqual(context["program"], PROGRAM)
+        self.assertEqual(context["console_path"], state.cs2_install / "game" / "csgo" / "console.log")
+
+    def test_ui_attaches_existing_python_service_without_another_observer(self):
+        from cs2cfg import paths
+        state = types.SimpleNamespace(server_lock=None, server_ping=None)
+        with patch.object(sl, "_shared", None), \
+             patch.object(paths, "user_data_dir", return_value=self.root), \
+             patch.object(sl.ServerLock, "start") as start:
+            python_service = sl.shared()
+            self.assertIs(webui._server_lock_service(state), python_service)
+            start.assert_called_once()
 
     def test_enabling_log_preserves_launch_options_and_uses_backup_writer(self):
         user = types.SimpleNamespace(account_id="123")
