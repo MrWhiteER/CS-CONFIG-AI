@@ -134,8 +134,9 @@ for(const mode of ['board','mouse']){
 }
 kbSetFocus('both');await new Promise(r=>setTimeout(r,450));kbSetFocus('mouse');
 const ghostBinds=calls.filter(c=>c.route==='/api/cfg/bind').length;await drop('+jump','KeyW');check('ghost rejects drops',calls.filter(c=>c.route==='/api/cfg/bind').length===ghostBinds);kbSetFocus('both');await new Promise(r=>setTimeout(r,450));
-document.querySelector('[data-kbghost="mouse"]').click();check('eye ghosts mouse',kbFocus==='board');document.querySelector('[data-kbghost="mouse"]').click();check('eye restores mouse',kbFocus==='both');
-const ghostToggle=document.querySelector('[data-kbghost-toggle="board"]');ghostToggle.checked=true;ghostToggle.dispatchEvent(new Event('change',{bubbles:true}));check('view toggle ghosts keyboard',kbFocus==='mouse');kbSetFocus('both');
+check('one focus control only',document.querySelectorAll('[data-kbghost],[data-kbghost-toggle],.kb-eye').length===0&&document.querySelectorAll('#kb-focus').length===1);
+check('one shape picker only',document.querySelectorAll('.ms-pick').length===1&&!document.querySelector('.kb-piece .ms-pick'));
+document.querySelector('[data-kbfocus="mouse"]').click();check('toggle ghosts keyboard',kbFocus==='mouse');kbSetFocus('both');
 check('focus preference persisted',calls.some(c=>c.route==='/api/prefs'&&c.body.kb_focus==='mouse'));
 document.querySelector('[data-kbsw]').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}));check('profile context menu retained',document.querySelectorAll('[data-kbsw-menu]').length===4);kbswMenu=null;renderKbSwitcher();
 document.querySelector('[data-kbsw]').click();await settle();check('profile switch API preserved',calls.some(c=>c.route==='/api/cfg/layouts/apply'));

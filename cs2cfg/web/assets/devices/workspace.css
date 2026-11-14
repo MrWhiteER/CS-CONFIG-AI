@@ -105,9 +105,6 @@ html[data-theme="daylight"] [data-panel="keyboard"],html[data-theme="paper"] [da
 .kb-rig { display:grid; grid-template-columns:840px 360px; align-items:center; gap:32px; padding:20px 16px; width:1264px; box-sizing:border-box; flex:none; zoom:var(--kb-scale,1); }
 .kb-piece { min-width:0; position:relative; user-select:none; }
 .kb-device-head { display:flex; align-items:center; justify-content:space-between; padding:0 8px; margin-bottom:12px; height:28px; color:var(--muted); font:500 12px system-ui; letter-spacing:.04em; }
-.kb-eye { width:28px; height:28px; display:grid; place-items:center; border:1px solid var(--line); border-radius:5px; color:var(--muted); background:var(--panel-2); cursor:pointer; }
-.kb-eye .kb-ico-art { width:16px; height:16px; }
-.kb-eye[aria-pressed="true"] { color:var(--accent); border-color:var(--accent); }
 .kb-device-body { transition:opacity 180ms ease,filter 180ms ease; }
 .is-ghost .kb-device-body { opacity:.18; filter:saturate(.65); pointer-events:none; }
 [data-panel="keyboard"] .kb-stage { width:840px; display:flex; align-items:center; justify-content:center; padding:16px 0 24px; overflow:visible; }
@@ -133,11 +130,6 @@ html[data-theme="daylight"] [data-panel="keyboard"],html[data-theme="paper"] [da
 .kb-help { display:grid; place-items:center; width:17px; height:17px; border-radius:50%; border:1px solid var(--line); background:transparent; color:var(--muted); font:11px system-ui; cursor:help; }
 .kb-inspector { position:relative; }
 .kb-card p { color:var(--muted); font-size:12px; line-height:1.7; margin:0; }
-.kb-view-toggle { display:flex; align-items:center; gap:10px; padding:10px 0; font-size:12px; cursor:pointer; }
-.kb-view-toggle input { appearance:none; width:30px; height:18px; border:1px solid var(--line); border-radius:20px; background:var(--panel-2); position:relative; cursor:pointer; flex:none; }
-.kb-view-toggle input::after { content:''; position:absolute; width:10px; height:10px; border-radius:50%; background:var(--muted); left:3px; top:3px; }
-.kb-view-toggle input:checked { background:var(--accent-dim); border-color:var(--accent); }
-.kb-view-toggle input:checked::after { left:15px; background:var(--accent); }
 .kb-mouse-bindings { margin-top:14px; }
 .kb-mouse-bindings div { display:flex; justify-content:space-between; gap:12px; padding:5px 0; border-bottom:1px solid var(--line); color:var(--muted); font-size:11px; }
 .kb-mouse-bindings code { color:var(--ink); overflow-wrap:anywhere; }
