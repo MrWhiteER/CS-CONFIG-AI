@@ -1,18 +1,55 @@
-# Performance overlay (Step 2)
+# Performance overlay (Step 3)
 
 ## Enable in the app
 
-Open **Settings > Overlay**, check **Enable performance overlay**, then save.
+Open **Settings > Overlay**, check **Enable overlay**, then save.
 It is **off by default**. The choices apply to this machine across Steam
 accounts. Choose any corner, the displayed fields, and a shortcut (default
-**Ctrl+Alt+O**). The shortcut toggles HUD visibility while capture continues.
+**Ctrl+Alt+O**). The shortcut toggles a manual HUD show/hide override until CS2 closes, while capture continues.
 Field, corner and shortcut edits take effect without resetting capture.
 The session panel opens with **Ctrl+Alt+P** while CS2 is running in the desktop
 app. Configure its shortcut separately in **Settings > Overlay**. The two
 shortcuts must differ. A shortcut already registered by another app is reported
 in the overlay status. The browser fallback supports the preview below; live
-panel hotkeys require the desktop window. Game-state and round-based visibility
-are reserved for Step 3.
+panel hotkeys require the desktop window.
+
+## Game state and visibility
+
+**Auto hide** defaults on. The HUD shows during warmup, freeze time and round
+end, and while dead (including spectating another player). It hides during a
+live round while alive. Missing or stale game state (over 15 seconds without a
+heartbeat) keeps it hidden. The HUD hotkey toggles a manual show/hide override
+for this game session. **Always visible** overrides Auto hide; turning Auto hide
+off also shows it throughout the round. Fullscreen Windowed and focus checks
+still apply, including to manual overrides.
+
+On enable, the app finds CS2 using its existing Steam install detection and
+writes only `<CS2 install>/game/csgo/cfg/gamestate_integration_cs2cfg.cfg`.
+Disabling the overlay or closing the server removes that file. Other CS2 files
+are untouched by this integration. CS2 reads GSI configs at startup: enable the
+overlay before launching CS2, or restart CS2 after enabling it mid-session.
+If the install is missing or the cfg folder cannot be written, Settings shows
+the error; capture and manual visibility remain available. Toggle off/on after
+fixing the install or permissions to retry.
+
+Valve's [Game State Integration](https://developer.valvesoftware.com/wiki/Counter-Strike:_Global_Offensive_Game_State_Integration)
+POSTs to `http://127.0.0.1:<app-port>/api/overlay/gsi` on the existing server.
+The cfg asks only for provider, map, round, player_id and player_state. The
+receiver retains just the fields needed for visibility, authenticates with a
+random per-install secret and a constant-time comparison, limits bodies to
+64 KiB, rejects streaming bodies, and bounds body reads to two seconds. The
+separate secret lives in `overlay-gsi-token` in the app data directory and is
+never returned by the overlay API. No browser API token is needed by CS2.
+
+**Hide from capture** defaults on. The HUD and panel request Windows capture
+exclusion (`0x11`); turning it off clears that affinity on both windows. This
+does not affect the main app window. Unsupported systems silently retain
+normal capture behavior. Support depends on Windows and the capture tool.
+
+Settings groups HUD position/fields/shortcut, panel shortcut, behavior and
+frame-stats access into the app's existing cards. Live readings appear only
+while enabled with CS2 running. Open Settings again or use **Refresh status**
+to reread them; no Settings refresh timer runs.
 
 ## Session panel
 
@@ -56,6 +93,14 @@ enable the overlay, start capture, query the region module or modify profiles.
 The 2/5/10 minute controls work; actions are disabled. It has no refresh timers.
 Use a viewport around 1000 × 800 for a screenshot, or resize to inspect layout.
 With the desktop server you can use the same path on its assigned local port.
+
+For Settings screenshots, open **http://127.0.0.1:8765/?overlayPreview=off**.
+Use `overlayPreview=live` for running-game sample values, or
+`overlayPreview=waiting` for the sign-out hint. These modes select Settings >
+Overlay, use the production renderer, disable overlay actions, and never enable
+the service or save overlay settings. Other app startup features still run;
+for an entirely isolated screenshot server, set `CS2CFG_DATA`, `APPDATA` and
+`LOCALAPPDATA` to disposable directories before starting it.
 
 ## Capture and lifecycle
 
@@ -108,7 +153,7 @@ the existing token-protected `POST /api/overlay`. It does not initiate capture.
 dismissal. The snapshot includes `frame_capture_ready`, `frame_capture_hint`,
 `frame_capture_hint_dismissible` and formatted `display` values, where missing
 fields are **—**; numeric samples retain `null` for missing measurements. No
-permission-request endpoint or GSI endpoint is created. The desktop panel uses
+permission-request endpoint is created; GSI has its separate cfg-secret endpoint. The desktop panel uses
 the same authenticated server, with `POST /api/overlay/panel` for its own
 visibility-gated region operations and close/navigation actions.
 
@@ -152,6 +197,10 @@ Machine-wide preferences under `ui` in `config.json`:
 | `overlay_corner` | `"top_left"` |
 | `overlay_fields` | `["fps", "one_percent_low", "frame_time_ms", "cpu_percent", "gpu_percent", "gpu_temp_c"]` |
 | `overlay_hotkey` | `"Ctrl+Alt+O"` |
+| `overlay_panel_hotkey` | `"Ctrl+Alt+P"` |
+| `overlay_auto_hide` | `true` |
+| `overlay_always_visible` | `false` |
+| `overlay_hide_from_capture` | `true` |
 | `overlay_sign_out_hint_dismissed` | `false` |
 
 The dashboard now reads GPU load, VRAM and temperature through the same ctypes
@@ -230,7 +279,7 @@ on an event and the Windows message queue between changes.
 
 `--exclude-from-capture` requests `SetWindowDisplayAffinity` with
 `WDA_EXCLUDEFROMCAPTURE` (`0x11`). Windows/capture-tool support varies; a failed
-request is reported. Leave it off for the initial measurement.
+request silently falls back to normal capture. Leave it off for the initial measurement.
 
 ## PresentMon provenance and command
 
@@ -353,7 +402,13 @@ idle smoke test.
 ## Tests
 
 ```powershell
-python -m unittest discover -s tests
+# Isolate all app-data writes; the tests never need the real CS2 install.
+$testData = Join-Path $env:TEMP ('cs2cfg-overlay-tests-' + [guid]::NewGuid())
+New-Item -ItemType Directory -Path $testData | Out-Null
+$env:LOCALAPPDATA = Join-Path $testData 'local'
+$env:APPDATA = Join-Path $testData 'roaming'
+$env:CS2CFG_DATA = Join-Path $testData 'app'
+py -m unittest discover -s tests
 ```
 
 The tests cover the parser, aggregator, status classifier, executable discovery
@@ -366,5 +421,8 @@ gates and the optional region module's missing, busy, pending and error paths.
 The unittest browser-script harness also checks timer cancellation, late
 responses, graph throttling, profile messages and permission hints when Node is
 already on PATH; those optional checks skip otherwise. It needs no npm packages.
+GSI tests cover cfg write/removal and secret persistence in temporary directories,
+authentication/body/Host gates on the existing HTTP handler, payload filtering,
+auto-hide transitions/staleness, settings defaults, and capture affinity.
 They use unittest and mocks, and need no CS2, PresentMon, administrator
 privileges, GPU or display. Win32 integration modules still require Windows.

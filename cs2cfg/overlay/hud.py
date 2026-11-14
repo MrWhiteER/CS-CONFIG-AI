@@ -9,13 +9,13 @@ import time
 from ctypes import wintypes as w
 
 from .settings import FIELDS, hotkey as parse_hotkey
+from .capture import WDA_EXCLUDEFROMCAPTURE, set_capture_exclusion
 
 WS_EX_LAYERED = 0x00080000
 WS_EX_TRANSPARENT = 0x00000020
 WS_EX_TOPMOST = 0x00000008
 WS_EX_TOOLWINDOW = 0x00000080
 WS_EX_NOACTIVATE = 0x08000000
-WDA_EXCLUDEFROMCAPTURE = 0x00000011
 WIDTH, HEIGHT = 640, 120
 
 
@@ -88,6 +88,8 @@ class Hud:
         self.on_panel = on_panel
         self.visible = False
         self._requested = True
+        self._manual = False
+        self._auto_visible = True
         self._allowed = True
         self.warning = ""
         self.error = ""
@@ -133,11 +135,15 @@ class Hud:
             if self._wake:
                 self._kernel.SetEvent(self._wake)
 
-    def configure(self, *, fields, hotkey: str, panel_hotkey="Ctrl+Alt+P") -> None:
+    def configure(self, *, fields, hotkey: str, panel_hotkey="Ctrl+Alt+P",
+                  exclude_from_capture=None, auto_visible=True) -> None:
         chord = parse_hotkey(hotkey)
         with self._lock:
             self.fields, self.hotkey, self._chord = tuple(fields), hotkey, chord
             self._panel_chord = parse_hotkey(panel_hotkey)
+            self._auto_visible = auto_visible
+            if exclude_from_capture is not None:
+                self.exclude = exclude_from_capture
             if self._wake:
                 self._kernel.SetEvent(self._wake)
 
@@ -248,13 +254,8 @@ class Hud:
             shortcuts = Hotkeys(user, hwnd)
             shortcuts.configure(self._chord, self._panel_chord if self.on_panel else None)
             self.warning = shortcuts.warning
-            if self.exclude:
-                try:
-                    bind(user, "SetWindowDisplayAffinity", w.BOOL, [w.HWND, w.DWORD])
-                    if not user.SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE):
-                        raise ctypes.WinError(ctypes.get_last_error())
-                except (AttributeError, OSError) as exc:
-                    self.warning += f" Capture exclusion unavailable: {exc}"
+            set_capture_exclusion(hwnd, self.exclude)
+            excluded = self.exclude
             dc = gdi.CreateCompatibleDC(None)
             info = BITMAPINFO()
             info.header = BITMAPINFOHEADER(size=ctypes.sizeof(BITMAPINFOHEADER), width=WIDTH,
@@ -278,7 +279,8 @@ class Hud:
                 message = w.MSG()
                 while user.PeekMessageW(ctypes.byref(message), None, 0, 0, 1):
                     if message.message == 0x0312 and message.wParam == 1:  # WM_HOTKEY
-                        self._requested = not self._requested
+                        self._requested = not self.visible
+                        self._manual = True
                     elif message.message == 0x0312 and message.wParam == 2 and self.on_panel:
                         try:
                             self.on_panel()
@@ -294,7 +296,10 @@ class Hud:
                         self.warning = shortcuts.warning
                     lines = display_lines(self._sample, self.fields, self.hotkey)
                     position = self._position
-                    self.visible = self._requested and self._allowed
+                    if excluded != self.exclude:
+                        set_capture_exclusion(hwnd, self.exclude)
+                        excluded = self.exclude
+                    self.visible = self._allowed and (self._requested if self._manual else self._auto_visible)
                 if shown and not self.visible:
                     user.ShowWindow(hwnd, 0)
                     shown = False

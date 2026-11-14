@@ -51,6 +51,7 @@ MACHINE_KEYS = frozenset({
     "overlay_enabled", "overlay_corner", "overlay_fields", "overlay_hotkey",
     "overlay_sign_out_hint_dismissed",
     "overlay_panel_hotkey",
+    "overlay_auto_hide", "overlay_always_visible", "overlay_hide_from_capture",
 })
 
 # The account whose settings are shown, which is itself machine-wide: it is a
