@@ -1,0 +1,8 @@
+[SteamNetSockets] [#123 SDR server steamid:90176009364316185 vport 0] connected
+[SteamNetSockets] Selecting dxb#1 (185.25.183.163:27015) as primary
+[Networking] Socket 'client' bound to '=[A:1:1298931737:24218]' [#123 SDR server steamid:90176009364316185 vport 0]
+[Networking]         Remote host is in data center 'bom2'
+[Networking]         Remote host is in data center 'bom2'
+[NetSteamConn] Closing Steam Net Connection on socket 'client'
+[Networking] Summary of connection [#123 SDR server steamid:90176009364316185 vport 0]:
+[Networking]         Remote host is in data center 'dxb'
