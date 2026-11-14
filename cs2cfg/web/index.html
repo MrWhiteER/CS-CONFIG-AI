@@ -1940,6 +1940,7 @@
 #sp-summary { display:flex; align-items:center; gap:6px; min-width:0; overflow:hidden; }
 .sp-summary-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .sp-summary-ms { flex:none; color:var(--sp-ping-tone,var(--faint)); }
+.sp-summary-note { flex:none; color:var(--sp-ping-tone,var(--faint)); font-size:.85em; letter-spacing:.06em; opacity:.85; }
 .sp-chip > :not(#sp-summary) { flex:none; }
 .sp-chip:hover,.sp-chip[aria-expanded="true"] { border-color:var(--accent); }
 .sp-glyph { width:22px; height:22px; flex:none; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
@@ -14565,12 +14566,20 @@ const serverPingWidget = (() => {
     if(focusCode) [...list.children].find(r=>r.dataset.code===focusCode)?.focus({preventScroll:true});
     paintValues();
     const best = regions.find(r=>r.ping_ms!=null), preferred = regions.find(r=>r.code===(data.preferred_code||'dxb'));
+    // The pill answers one question: is my server up, and how is it from here?
+    // Online/no reply is stated outright; slow or lossy is a plain word after the ping.
+    const silent = preferred && preferred.status==='unknown';
     const degraded = preferred && ['bad','down','unknown'].includes(preferred.status);
-    const prefix = degraded ? preferred.city.toUpperCase()+' '+(preferred.status==='bad'?'DEGRADED':preferred.status.toUpperCase())+' \u00b7 best: ' : '';
-    summary.innerHTML = best ? '<span class="sp-summary-name">'+esc(prefix+shortName(best).toUpperCase())+'</span><span class="sp-summary-ms">'+Math.round(best.ping_ms)+' ms</span>' : '<span class="sp-summary-name">'+(data.running?'Measuring regions\u2026':data.regions.length?'Relay ping unknown':'Server regions')+'</span>';
-    chip.title = (best ? prefix+best.city+' ('+best.country+') \u00b7 '+Math.round(best.ping_ms)+' ms. ' : '')+"Ping to Valve's relay in this city. In-game ping is usually within a few ms.";
+    const shown = preferred && preferred.ping_ms!=null ? preferred : best;
+    const quality = r => r.loss>0 ? 'PACKET LOSS' : r.status==='bad' ? 'SLOW' : '';
+    let name, ms = shown ? Math.round(shown.ping_ms)+' ms' : '', note = '';
+    if (preferred && preferred.ping_ms!=null) { name = preferred.city.toUpperCase()+' ONLINE'; note = quality(preferred); }
+    else if (silent) name = preferred.city.toUpperCase()+' NO REPLY'+(best?' · best: '+shortName(best).toUpperCase():'');
+    else if (best) name = shortName(best).toUpperCase();
+    summary.innerHTML = shown ? '<span class="sp-summary-name">'+esc(name)+'</span><span class="sp-summary-ms">'+ms+'</span>'+(note?'<span class="sp-summary-note">'+note+'</span>':'') : '<span class="sp-summary-name">'+(data.running?'Measuring regions…':data.regions.length?'Relay ping unknown':'Server regions')+'</span>';
+    chip.title = (preferred && preferred.ping_ms!=null ? preferred.city+' is online: '+Math.round(preferred.ping_ms)+' ms'+(note?' ('+note.toLowerCase()+')':'')+'. ' : silent ? preferred.city+' did not reply to ping. That is not proof it is down. ' : '')+(best && best!==preferred ? 'Lowest ping: '+best.city+' ('+best.country+') '+Math.round(best.ping_ms)+' ms. ' : '')+"Ping to Valve's relay in this city. In-game ping is usually within a few ms.";
     chip.style.setProperty('--sp-tone',tone(degraded ? preferred.ping_ms : best?.ping_ms));
-    chip.style.setProperty('--sp-ping-tone',tone(best?.ping_ms));
+    chip.style.setProperty('--sp-ping-tone',tone(shown?.ping_ms));
     document.getElementById('sp-chip-icon').innerHTML = glyph(data.running?'measuring':degraded?preferred.status:best?.status||'unknown');
     chip.classList.toggle('sp-measuring',data.running);
     refresh.disabled = data.running;
