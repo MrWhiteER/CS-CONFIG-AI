@@ -310,7 +310,7 @@ def show_error(message: str, detail: str = "") -> None:
 # Window
 # ---------------------------------------------------------------------------
 
-def _launch_webview(url: str, icon: Optional[Path], on_closed: Callable[[], None]) -> bool:
+def _launch_webview(url: str, icon: Optional[Path], on_closed: Callable[[], None], overlay=None) -> bool:
     """Native window via pywebview. Returns False if unavailable."""
     try:
         import webview
@@ -327,6 +327,24 @@ def _launch_webview(url: str, icon: Optional[Path], on_closed: Callable[[], None
             confirm_close=False,
         )
         window.events.closed += on_closed
+        from .overlay.panel import Panel
+
+        service = overlay
+        if service is not None:
+            def open_tab(tab):
+                window.load_url(url + "?tab=" + tab)
+                window.show()
+
+            panel = Panel(service, lambda: webview.create_window(
+                "CS2 Auto Config — Session panel", url + "overlay-panel.html",
+                width=1000, height=800, min_size=(760, 560), on_top=True,
+                focus=True, background_color="#0c0812", confirm_close=False),
+                keyboard=lambda: open_tab("keyboard"),
+                setup=lambda: open_tab("settings"))
+            service.panel = panel
+            if service._hud:
+                service._hud.on_panel = panel.toggle
+            window.events.closed += panel.destroy
         _keep_running_in_the_tray(window, icon)
 
         kwargs = {}
@@ -530,7 +548,7 @@ def run(
         def on_closed() -> None:
             closed.set()
 
-        opened = _launch_webview(server.url, icon, on_closed)
+        opened = _launch_webview(server.url, icon, on_closed, overlay=server.state.overlay)
 
         if not opened and fallback_to_browser:
             if _launch_browser_app_window(server.url):

@@ -223,6 +223,13 @@ class TestSwitchingProfiles(LayoutsWebCase):
         after = (self.cfg_root / "mrwhiteer/mainsettings/key_binds.vcfg").read_bytes()
         self.assertEqual(before, after)
 
+    def test_unchanged_profile_still_returns_apply_keys_for_panel(self):
+        self.switch("mrwhiteer/lan/warmup.vcfg")
+        with mock.patch.object(cfgscan, "existing_apply_script", return_value={"bound_to": ["f8"]}):
+            result = self.switch("mrwhiteer/lan/warmup.vcfg")
+        self.assertFalse(result["changed"])
+        self.assertEqual(result["apply_keys"], ["f8"])
+
     def test_an_unknown_profile_file_is_refused(self):
         result = self.switch("mrwhiteer/does/not/exist.vcfg")
         self.assertFalse(result["ok"])

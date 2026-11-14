@@ -8422,6 +8422,7 @@ function renderOverlay(d) {
       (s.overlay_enabled ? ' checked' : '') + '> Enable performance overlay</label>' +
     '<p class="sub2">' + esc(states[d.status] || d.status) +
       (d.hud_warning ? ' · ' + esc(d.hud_warning) : '') +
+      (d.panel_warning ? ' · ' + esc(d.panel_warning) : '') +
       (d.error ? ' · ' + esc(d.error) : '') + '</p>' +
     (d.notice ? '<div class="note"><div class="d">' + esc(d.notice) +
       ' <button class="btn small" id="overlay-borderless">Use borderless next launch</button></div></div>' : '') +
@@ -8438,6 +8439,9 @@ function renderOverlay(d) {
       '</select></span></div>' +
     '<div class="row"><label class="k" for="overlay-hotkey">Show / hide shortcut</label><span class="v">' +
       '<input id="overlay-hotkey" type="text" maxlength="32" value="' + esc(s.overlay_hotkey) +
+      '" aria-describedby="overlay-hotkey-help"></span></div>' +
+    '<div class="row"><label class="k" for="overlay-panel-hotkey">Panel shortcut</label><span class="v">' +
+      '<input id="overlay-panel-hotkey" type="text" maxlength="32" value="' + esc(s.overlay_panel_hotkey) +
       '" aria-describedby="overlay-hotkey-help"></span></div>' +
     '<p class="sub2" id="overlay-hotkey-help">Ctrl, Alt or Shift plus a letter, digit or F1–F24. ' +
       'Hiding the HUD keeps recording. Unavailable shortcuts are reported here.</p>' +
@@ -8460,6 +8464,7 @@ document.addEventListener("click", async e => {
         overlay_enabled: $("overlay-enabled").checked,
         overlay_corner: $("overlay-corner").value,
         overlay_hotkey: $("overlay-hotkey").value.trim(),
+        overlay_panel_hotkey: $("overlay-panel-hotkey").value.trim(),
         overlay_fields: [...document.querySelectorAll('[data-overlay-field]:checked')].map(x => x.dataset.overlayField),
       });
       renderOverlay(answer);
@@ -15634,7 +15639,9 @@ function applyPrefs(ui) {
   renderThemes();
   if (xhairData) renderCrosshairX();
   if (wgData) renderMachine();
-  if (ui.tab) setTab(ui.tab);
+  const requestedTab = new URLSearchParams(location.search).get('tab');
+  if (requestedTab === 'keyboard' || requestedTab === 'settings') setTab(requestedTab);
+  else if (ui.tab) setTab(ui.tab);
   if (ui.account) {
 
   }

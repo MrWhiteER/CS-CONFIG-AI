@@ -9,6 +9,7 @@ DEFAULTS = {
     "overlay_corner": "top_left",
     "overlay_fields": list(FIELDS),
     "overlay_hotkey": "Ctrl+Alt+O",
+    "overlay_panel_hotkey": "Ctrl+Alt+P",
     "overlay_sign_out_hint_dismissed": False,
 }
 
@@ -60,4 +61,6 @@ def read(ui: dict | None = None, *, strict: bool = False) -> dict:
                 raise ValueError(f"Invalid {key}.")
             continue
         out[key] = value
+    if strict and hotkey(out["overlay_hotkey"]) == hotkey(out["overlay_panel_hotkey"]):
+        raise ValueError("HUD and panel shortcuts must be different.")
     return out

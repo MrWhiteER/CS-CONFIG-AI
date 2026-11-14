@@ -755,6 +755,23 @@ def _overlay(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     return {"ok": True, **state.overlay.snapshot(int(body.get("seconds") or 600))}
 
 
+def _overlay_panel(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    panel = state.overlay.panel
+    if panel is None:
+        return {"ok": False, "error": "Panel requires the desktop app"}
+    action = str(body.get("action") or "poll")
+    if action == "close":
+        panel.hide()
+        return {"ok": True}
+    if action in ("keyboard", "setup"):
+        navigate = getattr(panel, action)
+        if panel.visible and navigate:
+            panel.hide(restore=False)
+            navigate()
+        return {"ok": True}
+    return {"ok": True, **panel.data(action, body.get("code"))}
+
+
 def _overlay_settings(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     from .cli import load_prefs, save_prefs
     from .overlay import settings
@@ -1543,7 +1560,9 @@ def _cfg_layouts_apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
 
     if not applied:
         empty = not cfgscan._profile_own_binds(result, profile_file)
+        apply_info = cfgscan.existing_apply_script(result)
         return {"ok": True, "changed": False, "empty": empty, "file": profile_file,
+                "apply_keys": sorted((apply_info or {}).get("bound_to") or []),
                 "label": label, "applied": [], "skipped": [keys.label(k) for k in skipped]}
 
     # The first time any of these keys is ever overridden, remember what it
@@ -4666,6 +4685,7 @@ def make_handler(state: State):
         "/api/quit": _quit,
         "/api/history": _history,
         "/api/overlay": _overlay,
+        "/api/overlay/panel": _overlay_panel,
         "/api/overlay/settings": _overlay_settings,
     }
 

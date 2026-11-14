@@ -48,6 +48,7 @@ class OverlayService:
         self._aggregator = None
         self._capture = self._hud = self._gpu = self._cpu = self._recorder = None
         self._hwnd = None
+        self.panel = None
         self._modes = {}
         self._status = "disabled"
         self._notice = self._error = ""
@@ -70,7 +71,7 @@ class OverlayService:
                 with self._lock:
                     self._settings = wanted
                     if self._hud:
-                        self._hud.configure(fields=wanted["overlay_fields"], hotkey=wanted["overlay_hotkey"])
+                        self._configure_hud(wanted)
                 return
             self._shutdown()
             with self._lock:
@@ -94,6 +95,8 @@ class OverlayService:
                 self._status = "disabled"
 
     def _shutdown(self) -> None:
+        if self.panel:
+            self.panel.hide()
         self._stop.set()
         if self._thread:
             self._thread.join(timeout=30)
@@ -143,6 +146,7 @@ class OverlayService:
                 "game_running": self._hwnd is not None,
                 "hud_visible": bool(self._hud and self._hud.visible),
                 "hud_warning": (self._hud.error or self._hud.warning) if self._hud else "",
+                "panel_warning": self.panel.error if self.panel else "",
                 "current": current,
                 "history": [sample for sample in self._history if sample["at"] >= cutoff],
                 "events": sorted(self._events, key=lambda e: e["at"], reverse=True),
@@ -265,19 +269,22 @@ class OverlayService:
         self._cpu.cpu_percent()
         self._hud = Hud(corner=self._settings["overlay_corner"],
                         fields=self._settings["overlay_fields"],
-                        hotkey=self._settings["overlay_hotkey"])
+                        hotkey=self._settings["overlay_hotkey"],
+                        panel_hotkey=self._settings["overlay_panel_hotkey"],
+                        on_panel=self.panel.toggle if self.panel else None)
         self._hud.set_allowed(False)
         try:
             self._hud.start()
             with self._lock:
-                self._hud.configure(fields=self._settings["overlay_fields"],
-                                    hotkey=self._settings["overlay_hotkey"])
+                self._configure_hud(self._settings)
         except (OSError, RuntimeError) as exc:
             self._error = f"HUD: {exc}"
 
     def _end_game(self) -> None:
         from .. import telemetry
 
+        if self.panel:
+            self.panel.hide(restore=False)
         # Independent cleanup: a failed native resource cannot strand capture.
         for resource, method in ((self._hud, "stop"), (self._capture, "stop"), (self._gpu, "close")):
             if resource:
@@ -295,6 +302,16 @@ class OverlayService:
             self._capture = self._hud = self._gpu = self._cpu = self._recorder = None
             self._aggregator = None
             self._hwnd = None
+
+    def _configure_hud(self, wanted):
+        self._hud.configure(fields=wanted["overlay_fields"], hotkey=wanted["overlay_hotkey"],
+                            panel_hotkey=wanted["overlay_panel_hotkey"])
+
+    def panel_allowed(self):
+        return bool(self._settings["overlay_enabled"] and self._hwnd)
+
+    def game_hwnd(self):
+        return self._hwnd
 
     def _run(self) -> None:
         from .. import window

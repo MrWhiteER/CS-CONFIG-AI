@@ -19,6 +19,38 @@ WDA_EXCLUDEFROMCAPTURE = 0x00000011
 WIDTH, HEIGHT = 640, 120
 
 
+class Hotkeys:
+    """Register a pair together so exchanging their chords also works."""
+
+    def __init__(self, user, hwnd):
+        self.user, self.hwnd = user, hwnd
+        self.desired = None
+        self.registered = []
+        self.warning = ""
+
+    def configure(self, hud, panel=None):
+        desired = hud, panel
+        if self.desired == desired:
+            return
+        self.close()
+        self.desired = desired
+        warnings = []
+        for identifier, chord in enumerate(desired, 1):
+            if chord is None:
+                continue
+            if self.user.RegisterHotKey(self.hwnd, identifier, *chord):
+                self.registered.append(identifier)
+            else:
+                warnings.append(f"{'HUD' if identifier == 1 else 'Panel'} shortcut unavailable (already registered)")
+        self.warning = "; ".join(warnings)
+
+    def close(self):
+        for identifier in self.registered:
+            self.user.UnregisterHotKey(self.hwnd, identifier)
+        self.registered = []
+        self.desired = None
+
+
 def display_values(sample: dict) -> dict[str, str]:
     """Shared HUD/API formatting; unavailable frame data stays missing."""
     def number(key: str, suffix: str = "") -> str:
@@ -47,10 +79,13 @@ def display_lines(sample: dict, fields=FIELDS, hotkey="Ctrl+Alt+O") -> tuple[str
 
 class Hud:
     def __init__(self, exclude_from_capture: bool = False, *, corner="top_left",
-                 fields=FIELDS, hotkey="Ctrl+Alt+O") -> None:
+                 fields=FIELDS, hotkey="Ctrl+Alt+O", panel_hotkey="Ctrl+Alt+P",
+                 on_panel=None) -> None:
         self.exclude = exclude_from_capture
         self.corner, self.fields, self.hotkey = corner, tuple(fields), hotkey
         self._chord = parse_hotkey(hotkey)
+        self._panel_chord = parse_hotkey(panel_hotkey)
+        self.on_panel = on_panel
         self.visible = False
         self._requested = True
         self._allowed = True
@@ -98,10 +133,11 @@ class Hud:
             if self._wake:
                 self._kernel.SetEvent(self._wake)
 
-    def configure(self, *, fields, hotkey: str) -> None:
+    def configure(self, *, fields, hotkey: str, panel_hotkey="Ctrl+Alt+P") -> None:
         chord = parse_hotkey(hotkey)
         with self._lock:
             self.fields, self.hotkey, self._chord = tuple(fields), hotkey, chord
+            self._panel_chord = parse_hotkey(panel_hotkey)
             if self._wake:
                 self._kernel.SetEvent(self._wake)
 
@@ -189,7 +225,8 @@ class Hud:
             return user.DefWindowProcW(hwnd, message, wp, lp)
 
         hwnd = dc = bitmap = old_bitmap = old_font = wake = None
-        registered = hotkey = False
+        registered = False
+        shortcuts = None
         instance = kernel.GetModuleHandleW(None)
         name = f"CS2CFGOverlay-{id(self)}"
         try:
@@ -208,10 +245,9 @@ class Hud:
                                         20, 20, WIDTH, HEIGHT, None, None, instance, None)
             if not hwnd:
                 raise ctypes.WinError(ctypes.get_last_error())
-            hotkey = user.RegisterHotKey(hwnd, 1, *self._chord)
-            active_chord = self._chord
-            if not hotkey:
-                self.warning = f"{self.hotkey} unavailable (already registered)"
+            shortcuts = Hotkeys(user, hwnd)
+            shortcuts.configure(self._chord, self._panel_chord if self.on_panel else None)
+            self.warning = shortcuts.warning
             if self.exclude:
                 try:
                     bind(user, "SetWindowDisplayAffinity", w.BOOL, [w.HWND, w.DWORD])
@@ -243,16 +279,19 @@ class Hud:
                 while user.PeekMessageW(ctypes.byref(message), None, 0, 0, 1):
                     if message.message == 0x0312 and message.wParam == 1:  # WM_HOTKEY
                         self._requested = not self._requested
+                    elif message.message == 0x0312 and message.wParam == 2 and self.on_panel:
+                        try:
+                            self.on_panel()
+                        except Exception as exc:
+                            self.warning = f"Panel: {exc}"
                     else:
                         user.TranslateMessage(ctypes.byref(message))
                         user.DispatchMessageW(ctypes.byref(message))
                 with self._lock:
-                    if active_chord != self._chord:
-                        if hotkey:
-                            user.UnregisterHotKey(hwnd, 1)
-                        active_chord = self._chord
-                        hotkey = user.RegisterHotKey(hwnd, 1, *active_chord)
-                        self.warning = "" if hotkey else f"{self.hotkey} unavailable (already registered)"
+                    desired = self._chord, self._panel_chord if self.on_panel else None
+                    if shortcuts.desired != desired:
+                        shortcuts.configure(*desired)
+                        self.warning = shortcuts.warning
                     lines = display_lines(self._sample, self.fields, self.hotkey)
                     position = self._position
                     self.visible = self._requested and self._allowed
@@ -290,8 +329,8 @@ class Hud:
         finally:
             self.visible = False
             if hwnd:
-                if hotkey:
-                    user.UnregisterHotKey(hwnd, 1)
+                if shortcuts:
+                    shortcuts.close()
                 user.DestroyWindow(hwnd)
             if old_font:
                 gdi.SelectObject(dc, old_font)
