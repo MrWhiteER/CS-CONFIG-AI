@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CS2 Auto Config · Session panel</title>
+<link rel="stylesheet" href="assets/overlay/panel.css">
+</head><body>
+<main>
+  <header><div><small>CS2 AUTO CONFIG</small><h1>Session panel</h1></div><span id="shortcut">Ctrl+Alt+P</span><button id="close" aria-label="Close panel">✕</button></header>
+  <p id="preview" hidden>DESIGN PREVIEW · Sample data · Changes are disabled</p>
+  <p id="error" role="status"></p>
+  <div class="workspace">
+    <div class="telemetry">
+      <section aria-labelledby="performance-title">
+        <div class="section-head"><h2 id="performance-title">Performance</h2><span id="capture-state">Waiting for data</span></div>
+        <div id="frame-hint" role="status" hidden><span></span> <button id="dismiss" hidden>Dismiss</button><a href="/?tab=settings" id="setup-link">Open app setup</a></div>
+        <div class="figures"><div class="current"><strong id="fps">—</strong><span>FPS</span></div><dl><div><dt>Average</dt><dd id="average">—</dd></div><div><dt>1% low</dt><dd id="low">—</dd></div><div><dt>Worst frame</dt><dd id="worst">—</dd></div></dl></div>
+        <div class="graph-head"><span>Frame time <small>(ms)</small></span><div role="group" aria-label="History range"><button data-range="120" aria-pressed="true">2 min</button><button data-range="300" aria-pressed="false">5 min</button><button data-range="600" aria-pressed="false">10 min</button></div></div>
+        <svg id="graph" viewBox="0 0 620 180" role="img" aria-label="Frame-time history"><text x="50" y="90">Waiting for frame data</text></svg>
+        <div class="graph-foot"><span id="range-label">2 minutes ago</span><span>Now</span></div>
+        <dl class="resources"><div><dt>CPU load</dt><dd id="cpu">—</dd></div><div><dt>GPU load</dt><dd id="gpu">—</dd></div><div><dt>GPU temp</dt><dd id="temp">—</dd></div></dl>
+        <p id="notice"></p>
+      </section>
+      <section aria-labelledby="events-title"><h2 id="events-title">Stutters and freezes</h2><div class="event-scroll"><table><thead><tr><th>Time</th><th>Duration</th><th>Type</th></tr></thead><tbody id="events"><tr><td colspan="3">No events this session</td></tr></tbody></table></div></section>
+    </div>
+    <aside>
+      <section aria-labelledby="profiles-title"><h2 id="profiles-title">Profiles</h2>
+        <label for="setups">Setup</label><div class="picker"><select id="setups" disabled><option>No saved setups</option></select><button id="use-setup" class="primary" disabled>Use</button></div>
+        <p class="help">Sets your choices for the app’s next Apply.</p>
+        <label for="layouts">Keyboard / mouse layout</label><div class="picker"><select id="layouts" disabled><option>No saved layouts</option></select><button id="use-layout" class="primary" disabled>Use</button></div>
+        <p id="profile-note" role="status">Switch a layout, then load it in game.</p><a id="keyboard" href="/?tab=keyboard">Open Keyboard tab ↗</a>
+      </section>
+      <section aria-labelledby="region-title"><h2 id="region-title">Server region lock</h2><p id="region-text" role="status">Coming soon</p><div id="region-controls" hidden><label for="regions">Region</label><select id="regions"></select><div class="region-actions"><button id="lock-region" class="primary">Lock</button><button id="unlock-region">Unlock</button></div><a href="/?tab=settings">Open app setup ↗</a></div></section>
+    </aside>
+  </div>
+</main>
+<script>window.overlayToken = '__CS2CFG_TOKEN__';</script><script src="assets/overlay/panel.js"></script>
+</body></html>

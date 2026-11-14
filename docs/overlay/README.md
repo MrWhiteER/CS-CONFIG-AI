@@ -1,4 +1,4 @@
-# Performance overlay (Step 1)
+# Performance overlay (Step 2)
 
 ## Enable in the app
 
@@ -7,8 +7,57 @@ It is **off by default**. The choices apply to this machine across Steam
 accounts. Choose any corner, the displayed fields, and a shortcut (default
 **Ctrl+Alt+O**). The shortcut toggles HUD visibility while capture continues.
 Field, corner and shortcut edits take effect without resetting capture.
-No panel, second shortcut, game-state receiver, or round-based visibility is
-included in Step 1.
+The session panel opens with **Ctrl+Alt+P** while CS2 is running in the desktop
+app. Configure its shortcut separately in **Settings > Overlay**. The two
+shortcuts must differ. A shortcut already registered by another app is reported
+in the overlay status. The browser fallback supports the preview below; live
+panel hotkeys require the desktop window. Game-state and round-based visibility
+are reserved for Step 3.
+
+## Session panel
+
+Opening activates the panel so you can use the cursor. Close with **Escape**,
+the panel's close button, its window X, or its shortcut again. Closing stops all
+panel JavaScript timers, aborts pending view requests, hides the window and
+returns focus to CS2 while this app is foreground. If you switched to another
+app, it leaves focus there. Game exit hides the panel without changing focus;
+disabling the overlay also hides it. The window is created only on first open
+and reused. Refreshes run once per second while visible (including graph draws,
+well below the 10 Hz cap); there is no panel Python polling worker.
+
+- **Profiles:** choose a saved setup for the app's next Apply, or switch a saved
+  keyboard/mouse layout using the existing file-writing API. After switching a
+  layout, press the shown Apply Saved Settings key in game. If no key is bound,
+  follow **Open Keyboard tab** to bind it. No input is sent to CS2.
+- **Performance:** current FPS; session average, 1% low and worst frame; a
+  frame-time graph of one-second summaries for 2, 5 or 10 minutes; CPU/GPU load
+  and GPU temperature. Missing readings stay blank. The setup/sign-out hint and
+  persistent sign-out dismissal appear here while resource stats keep working.
+- **Stutters and freezes:** newest first, local time, duration, and frame spike
+  or not responding. The list is bounded by the existing service's 200 events.
+- **Server region lock:** currently **Coming soon**, since the optional
+  `cs2cfg.serverlock` module is absent on this branch. When merged, the adapter
+  offers a region picker and Lock/Unlock, displays setup, pending, restart and
+  error messages, and checks asynchronous completion at most once per second
+  while busy and the panel is open. It only delegates to that module's four
+  public functions. Opening the panel is the first possible status query.
+
+### Screenshot preview (no CS2 required)
+
+Start the existing local server from the repository:
+
+```powershell
+python -m cs2cfg web --port 8765
+```
+
+Open **http://127.0.0.1:8765/overlay-panel.html?preview=1** in a browser. This
+developer preview uses local sample data through the same renderer; it does not
+enable the overlay, start capture, query the region module or modify profiles.
+The 2/5/10 minute controls work; actions are disabled. It has no refresh timers.
+Use a viewport around 1000 × 800 for a screenshot, or resize to inspect layout.
+With the desktop server you can use the same path on its assigned local port.
+
+## Capture and lifecycle
 
 Use **Refresh status** after starting CS2 to check access and HUD warnings.
 Settings is read on entry or explicit refresh; there is no overlay JavaScript
@@ -53,13 +102,15 @@ to the existing tray keeps the service alive. The app's other existing features
 have their own lifecycle independently of this overlay setting.
 
 `snapshot(seconds=120|300|600)` exposes detached JSON-ready current data,
-history, events, status and summary for the later panel. The HTTP equivalent is
+history, events, status and summary for the panel. The HTTP equivalent is
 the existing token-protected `POST /api/overlay`. It does not initiate capture.
 `POST /api/overlay/settings` validates and saves settings, including hint
 dismissal. The snapshot includes `frame_capture_ready`, `frame_capture_hint`,
 `frame_capture_hint_dismissible` and formatted `display` values, where missing
 fields are **—**; numeric samples retain `null` for missing measurements. No
-permission-request endpoint, GSI endpoint or panel window is created.
+permission-request endpoint or GSI endpoint is created. The desktop panel uses
+the same authenticated server, with `POST /api/overlay/panel` for its own
+visibility-gated region operations and close/navigation actions.
 
 Without frame permission, the service skips PresentMon and continues CPU/GPU
 sampling, HUD updates and telemetry stalls. A real PresentMon access-denied
@@ -309,6 +360,11 @@ The tests cover the parser, aggregator, status classifier, executable discovery
 and SHA256 gate, bounded service history, event merge, lifecycle, shared
 telemetry, default-off settings, token membership, setup-helper hints, persistent
 sign-out dismissal, inert permission requests, resource/stall collection without
-frame access, NVML/fallback selection, HUD/API dashes and benchmark math.
+frame access, NVML/fallback selection, HUD/API dashes and benchmark math. Panel
+tests cover lazy creation, hide/disable/exit, focus ownership, shortcuts, API
+gates and the optional region module's missing, busy, pending and error paths.
+The unittest browser-script harness also checks timer cancellation, late
+responses, graph throttling, profile messages and permission hints when Node is
+already on PATH; those optional checks skip otherwise. It needs no npm packages.
 They use unittest and mocks, and need no CS2, PresentMon, administrator
 privileges, GPU or display. Win32 integration modules still require Windows.
