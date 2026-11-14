@@ -1,7 +1,9 @@
 /* Offline browser checks of the production wizard, using synthetic API replies.
-   No Steam session, preferences or game files are touched. No dependencies.
+   No Steam session, preferences, helper installation or game files are touched.
+   All API routes below return synthetic data. No app server. No dependencies.
    node tools/check_setup_wizard.cjs
-   Optional previews: SETUP_STEP, SETUP_THEME, SETUP_VIEWPORT, CHROME_PATH. */
+   Optional previews: SETUP_STEP (region adds synthetic data), SETUP_HELPER=ready,
+   SETUP_THEME, SETUP_VIEWPORT, SETUP_REDUCED, CHROME_PATH. */
 const fs = require('fs'), os = require('os'), path = require('path');
 const cp = require('child_process'), url = require('url'), assert = require('assert');
 const root = path.resolve(__dirname, '..');
@@ -28,10 +30,14 @@ ${source.match(/const WAY_ICONS = \{[\s\S]*?\n\};/)[0]}
 let lastScan = null, cloudData = null, cloudPoll = null, prefsReady = false, audioData = null;
 let prefsNow = {}, failures = {}, calls = [], statuses = [], pollCount = 0;
 let syncReply = {ok:true,action:'none'}, loginOpened = true, remoteCurrent = null, syncDelay = 0;
+let helperReply = null, helperDelay = 40, fixDelay = 40;
+const readyHelper = {supported:true,installed:true,current:true,version:1,wanted:1};
+const regionsFixture = [{id:'dubai',label:'Dubai'},{id:'frankfurt',name:'Frankfurt'},{id:'singapore',label:'Singapore'}];
 const fixture = {
   ok:true,needed:true,steps:['sync','permission','sound','preset','apps','theme'],
   cloud:{configured:true,signed_in:false},sync:{},
   cfg:{path:'C:\\\\Games\\\\Counter-Strike 2\\\\game\\\\csgo\\\\cfg',exists:true,writable:true,reason:''},
+  helper:{supported:true,installed:false,current:false,version:0,wanted:1},
   sound:{output:[{id:'out-headset',name:'Gaming headset',default:true},{id:'out-speakers',name:'Desktop speakers'}],input:[{id:'in-mic',name:'USB microphone',default:true}]},
   presets:[{id:'competitive',label:'Competitive',fps:410,bottleneck:'CPU',blurb:'Highest frame rate and clearest picture for spotting players.'},{id:'balanced',label:'Balanced',fps:320,bottleneck:'CPU',blurb:'Good-looking and smooth. The default.'},{id:'quality',label:'Visual',fps:225,bottleneck:'GPU',blurb:'Best picture this PC can hold at a playable frame rate.'}],
   apps:[{id:'discord',name:'Discord',with_game:true},{id:'crosshairx',name:'Crosshair X',with_game:false},{id:'faceit-client',name:'FACEIT',with_game:true}],
@@ -41,13 +47,24 @@ let response = structuredClone(fixture);
 function status(text,error) { statuses.push({text,error}); }
 function applyPrefs(ui) { prefsNow = {...ui}; applyTheme(ui.theme); }
 function renderCloud() {} function loadAudio() {} function loadCompanions() {} function loadMachine() {} function previewPlan() {}
+const tempAlarm = {};
+function homeTween(el,key,value,paint) { if(el)paint(value); } function homeCancel() {} function homeNumber() {}
 async function api(route,body) {
   calls.push({route,body:structuredClone(body)});
   if (failures[route]) throw new Error(failures[route]);
   if (route === '/api/firstrun') return structuredClone(response);
+  if (route === '/api/helper') return {ok:true,...structuredClone(response.helper)};
+  if (route === '/api/helper/install') {
+    await new Promise(r=>setTimeout(r,helperDelay));
+    const result = helperReply || {ok:true,...readyHelper};
+    if (result.ok) response.helper = structuredClone(result);
+    return structuredClone(result);
+  }
+  if (route === '/api/fix/survey') return {ok:true,fixes:[{id:'net.flush',family:'network',title:'Flush DNS',blurb:'Clear stale addresses.',needs_admin:true}]};
+  if (route === '/api/fix/run') { await new Promise(r=>setTimeout(r,fixDelay));return {ok:false,declined:true,detail:'Synthetic result. Nothing ran.'}; }
   if (route === '/api/firstrun/finish') {
     const a=body.answers;
-    for (const [answer,key] of Object.entries({preset:'intent',theme:'theme',cfg_write:'cfg_write_ok',sync:'sync_auto'})) if (Object.hasOwn(a,answer)) response.current[key]=a[answer];
+    for (const [answer,key] of Object.entries({preset:'intent',theme:'theme',cfg_write:'cfg_write_ok',sync:'sync_auto',region_lock:'region_lock'})) if (Object.hasOwn(a,answer)) response.current[key]=a[answer];
     response.needed=false;return {ok:true,ui:structuredClone(response.current)};
   }
   if (route === '/api/prefs') return {ui:structuredClone(response.current)};
@@ -61,15 +78,17 @@ async function api(route,body) {
   throw Error('Unexpected API: '+route);
 }
 ${slice('/* First-run setup.','/* The Machine card:')}
+${slice('/* Administrator helper status','// --- live system readout')}
 document.querySelector('.boot-screen')?.remove();
 document.documentElement.classList.remove('setup-checking');
 const checks=[];
 function check(name,value) { checks.push({name,ok:!!value});if(!value) throw Error(name); }
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-const reset=()=>{ response=structuredClone(fixture);failures={};calls=[];syncReply={ok:true,action:'none'};remoteCurrent=null;syncDelay=0; };
+const reset=()=>{ response=structuredClone(fixture);helperStatus=null;helperReply=null;helperDelay=40;failures={};calls=[];syncReply={ok:true,action:'none'};remoteCurrent=null;syncDelay=0;fixData=null;fixStates.clear(); };
 const tap=selector=>{ const el=document.querySelector(selector);if(!el)throw Error('Missing '+selector);el.click(); };
 const move=async(skip=false)=>{ await setupMove(1,skip); };
 async function close() { await finishSetupWizard(); }
+async function helperSettled() { for(let i=0;i<200&&setupSession?.helperBusy;i++)await sleep(5);check('helper request settles',!setupSession?.helperBusy); }
 async function suite() {
   reset();
   const gating=checkFirstRun();await sleep(30);
@@ -78,7 +97,28 @@ async function suite() {
   check('Steam step has a single primary decision',getComputedStyle($('setup-steam')).display!=='none'&&getComputedStyle($('setup-steam-link')).display==='none'&&getComputedStyle($('setup-sync-retry')).display==='none');
   check('all six progress segments are present',$('setup-progress').children.length===6);
   await move(true);check('skip sync leaves it unanswered',!Object.hasOwn(setupSession.answers,'sync'));
-  tap('[data-setup-permission="allow"]');await move();
+  await loadFixes(true);
+  const lockedTemps = {can_elevate:true,parts:[{label:'Board',part:'board',known:false,unavailable:'Administrator required'}]};
+  renderTemps(lockedTemps);
+  check('Fix It reads helper status and warns before setup',calls.some(c=>c.route==='/api/helper')&&document.querySelector('.fix-chip[data-helper-warning]')?.hidden===false&&$('temps-note').textContent.includes('one administrator prompt'));
+  check('region step is hidden without a catalogue',!setupSession.steps.includes('region')&&!$('setup-progress').textContent.includes('Server region'));
+  check('permission shows cfg path and five capabilities',document.querySelector('.setup-path').textContent.includes(response.cfg.path)&&document.querySelectorAll('.setup-helper-list li').length===5);
+  tap('[data-setup-permission="allow"]');
+  check('Allow calls only the synthetic helper install',calls.at(-1).route==='/api/helper/install'&&setupSession.helperBusy);
+  check('waiting state directs user to Windows taskbar',$('setup-helper-status').textContent.includes('taskbar')&&$('setup-helper-status').getAttribute('aria-busy')==='true');
+  check('waiting message scrolls into view on short screens',$('setup-helper-status').getBoundingClientRect().bottom<=$('setup-viewport').getBoundingClientRect().bottom+1);
+  await move();await close();tap('[data-setup-permission="allow"]');
+  check('pending prompt blocks navigation close and duplicate installs',setupCurrentStep()==='permission'&&calls.filter(c=>c.route==='/api/helper/install').length===1&&!calls.some(c=>c.route==='/api/firstrun/finish')&&!Object.hasOwn(setupSession.answers,'cfg_write'));
+  await helperSettled();
+  check('successful install saves Allow and refreshes helper status',setupSession.answers.cfg_write===true&&calls.slice(calls.findIndex(c=>c.route==='/api/helper/install')+1).some(c=>c.route==='/api/helper')&&helperReady());
+  check('successful step ticks coverage and offers Next only',document.querySelector('.setup-helper-list.is-ready')&&$('setup-progress').querySelector('[aria-current]').classList.contains('is-done')&&!document.querySelector('[data-setup-permission]')&&$('setup-back').hidden&&$('setup-skip').hidden&&!$('setup-next').disabled);
+  check('install immediately hides existing Fix It and sensor warnings',[...document.querySelectorAll('[data-helper-warning]')].every(el=>el.hidden&&getComputedStyle(el).display==='none'));
+  renderFixes();renderTemps(lockedTemps);
+  check('ready helper keeps warnings hidden after panels render',[...document.querySelectorAll('[data-helper-warning]')].every(el=>el.hidden&&getComputedStyle(el).display==='none'));
+  let fixJob=runFix(document.querySelector('[data-fix="net.flush"]'));
+  check('ready helper omits administrator approval from fix progress',!$(fixProgId('net.flush')).textContent.includes('administrator approval'));
+  await fixJob;
+  await move();
   check('Windows sound defaults preselected',$('setup-audio-output').value==='out-headset'&&$('setup-audio-input').value==='in-mic');
   await move(true);await sleep(800);
   check('hardware chips reuse scan data',$('setup-hardware').textContent.includes('RTX 4070')&&$('setup-hardware').textContent.includes('i7-13700K'));
@@ -99,7 +139,52 @@ async function suite() {
   const finishCalls=calls.filter(c=>c.route==='/api/firstrun/finish').length;await checkFirstRun();check('completed setup does not auto-open twice',!setupSession&&calls.filter(c=>c.route==='/api/firstrun/finish').length===finishCalls);
   reset();response.cloud.configured=false;await openSetupWizard({step:'sync'});
   check('unconfigured cloud silently skips sync',setupCurrentStep()==='permission'&&!setupSession.steps.includes('sync'));
+  check('hidden steps do not leave progress segments or counts',$('setup-progress').children.length===5&&$('setup-progress').getAttribute('aria-label').includes('step 1 of 5')&&$('setup-content').querySelector('.setup-eyebrow').textContent.startsWith('01'));
   await close();check('closing untouched setup saves no defaults',JSON.stringify(calls.find(c=>c.route==='/api/firstrun/finish').body.answers)==='{}');
+  reset();helperReply={ok:false,declined:true,error:'The operation was cancelled.'};await openSetupWizard({step:'permission'});
+  tap('[data-setup-permission="allow"]');await helperSettled();
+  check('declined prompt is explained plainly and can continue',$('setup-helper-status').textContent.includes('Windows permission was declined')&&!$('setup-next').disabled&&setupSession.answers.cfg_write===false);
+  await move();await close();
+  check('decline finishes without granting cfg access or retrying install',calls.find(c=>c.route==='/api/firstrun/finish').body.answers.cfg_write===false&&calls.filter(c=>c.route==='/api/helper/install').length===1);
+  reset();helperReply={ok:false,error:'The helper files could not be copied.'};await openSetupWizard({step:'permission'});
+  tap('[data-setup-permission="allow"]');await helperSettled();
+  check('failed install shows backend reason and permits continuing',$('setup-helper-status').textContent.includes(helperReply.error)&&!$('setup-next').disabled&&setupSession.answers.cfg_write===false);
+  await close();
+  reset();failures['/api/helper/install']='Windows could not be reached.';await openSetupWizard({step:'permission'});
+  tap('[data-setup-permission="allow"]');await helperSettled();
+  check('request failure never leaves Allow in finish payload',setupSession.answers.cfg_write===false&&$('setup-helper-status').textContent.includes('Windows could not be reached.'));
+  await close();
+  reset();helperReply={ok:true,installed:false,current:false};await openSetupWizard({step:'permission'});
+  tap('[data-setup-permission="allow"]');await helperSettled();
+  check('incomplete install cannot grant cfg access',setupSession.answers.cfg_write===false&&$('setup-helper-status').textContent.includes('not ready yet')&&!$('setup-next').disabled);await close();
+  reset();failures['/api/helper']='Status refresh offline';await openSetupWizard({step:'permission'});
+  tap('[data-setup-permission="allow"]');await helperSettled();
+  check('offline status refresh retains confirmed install status',helperReady()&&setupSession.answers.cfg_write===true&&document.querySelector('.setup-helper-list.is-ready'));await close();
+  reset();response.helper=structuredClone(readyHelper);response.current.cfg_write_ok=false;await openSetupWizard({step:'permission'});
+  check('already current helper shows completed step and Next only',document.querySelector('.setup-helper-list.is-ready')&&!document.querySelector('[data-setup-permission]')&&$('setup-skip').hidden&&$('setup-back').hidden&&!$('setup-next').disabled);
+  await move();await close();
+  check('already ready helper saves cfg permission without reinstall',calls.find(c=>c.route==='/api/firstrun/finish').body.answers.cfg_write===true&&!calls.some(c=>c.route==='/api/helper/install'));
+  reset();response.current.cfg_write_ok=true;response.helper={...readyHelper,current:false,version:0};await openSetupWizard({step:'permission'});
+  await loadFixes(true);renderTemps(lockedTemps);
+  check('outdated helper still offers Allow and admin warnings',!!document.querySelector('[data-setup-permission="allow"]')&&document.querySelector('.fix-chip[data-helper-warning]').hidden===false);
+  fixJob=runFix(document.querySelector('[data-fix="net.flush"]'));
+  check('outdated helper retains fix progress warning',$(fixProgId('net.flush')).textContent.includes('administrator approval may be required'));await fixJob;
+  await move();await close();
+  check('legacy saved Allow never silently installs on Finish',!Object.hasOwn(calls.find(c=>c.route==='/api/firstrun/finish').body.answers,'cfg_write'));
+  reset();await openSetupWizard({step:'permission'});tap('[data-setup-permission="later"]');await close();
+  check('Not now saves false without calling install',calls.find(c=>c.route==='/api/firstrun/finish').body.answers.cfg_write===false&&!calls.some(c=>c.route==='/api/helper/install'));
+  reset();response.regions=structuredClone(regionsFixture);await openSetupWizard({step:'preset'});await move(true);
+  check('region appears immediately after preset when catalogue is present',setupCurrentStep()==='region'&&$('setup-progress').children.length===7&&$('setup-progress').getAttribute('aria-label').includes('step 5 of 7'));
+  check('region explains CS2 scope and how to change it',$('setup-content').textContent.includes('Every other region is blocked for CS2 only')&&$('setup-content').textContent.includes('overlay or the app'));
+  tap('[data-setup-region="dubai"]');await move();
+  check('region continues to companions',setupCurrentStep()==='apps'&&$('setup-content').querySelector('.setup-eyebrow').textContent.startsWith('06'));
+  await close();check('selected region id is sent on finish',calls.find(c=>c.route==='/api/firstrun/finish').body.answers.region_lock==='dubai');
+  reset();response.regions=structuredClone(regionsFixture);response.current.region_lock='frankfurt';await openSetupWizard({step:'region'});
+  check('direct region entry works and prefills saved lock',setupCurrentStep()==='region'&&document.querySelector('[data-setup-region="frankfurt"]').getAttribute('aria-pressed')==='true');
+  tap('[data-setup-region=""]');await close();check('all regions choice sends explicit null',calls.find(c=>c.route==='/api/firstrun/finish').body.answers.region_lock===null);
+  reset();response.regions=structuredClone(regionsFixture);await openSetupWizard({step:'region'});tap('[data-setup-region="dubai"]');await move(true);await close();
+  check('skipping region leaves the answer absent',!Object.hasOwn(calls.find(c=>c.route==='/api/firstrun/finish').body.answers,'region_lock'));
+  reset();response.regions=[];await openSetupWizard({step:'region'});check('empty catalogue keeps region hidden',!setupSession.steps.includes('region'));await close();
   reset();response.current={intent:'quality',theme:'daylight',audio_output:'out-speakers',audio_input:'missing-mic',cfg_write_ok:false,sync_auto:false};
   await openSetupWizard({step:'sound'});
   check('rerun prefills saved devices including disconnected pins',$('setup-audio-output').value==='out-speakers'&&$('setup-audio-input').selectedOptions[0].textContent.includes('not connected'));
@@ -144,7 +229,7 @@ async function suite() {
   calls=[];syncReply={ok:true,action:'push'};tap('#sync-now');await sleep(30);check('Sync now uses expected endpoint',calls[0].route==='/api/sync/now'&&$('sync-label').textContent==='Synced to cloud');
   $('sync-auto').checked=false;$('sync-auto').dispatchEvent(new Event('change',{bubbles:true}));await sleep(20);check('auto toggle sends on boolean',calls.some(c=>c.route==='/api/sync/auto'&&c.body.on===false));
   failures['/api/sync/auto']='Offline';$('sync-auto').checked=true;$('sync-auto').dispatchEvent(new Event('change',{bubbles:true}));await sleep(20);check('failed auto update rolls back UI',!$('sync-auto').checked&&!$('sync-auto').disabled);failures={};
-  reset();await openSetupWizard({step:'preset'});
+  reset();response.regions=structuredClone(regionsFixture);await openSetupWizard({step:'preset'});
   for (const [id] of THEMES) {
     applyTheme(id);
     for (const step of SETUP_STEPS) {
@@ -166,11 +251,15 @@ async function suite() {
 (async()=>{try {
   if (!${JSON.stringify(preview)}) await suite();
   reset();response.current.theme=${JSON.stringify(theme)};
+  if (${JSON.stringify(preview)} === 'region') response.regions=structuredClone(regionsFixture);
+  if (${JSON.stringify(process.env.SETUP_HELPER || '')} === 'ready') response.helper=structuredClone(readyHelper);
   await openSetupWizard({step:${JSON.stringify(preview || 'preset')}});await sleep(900);
   // Headless virtual time advances timers independently of CSS animation time.
   // Settle finite effects for an honest screenshot of the final layout.
   for (const animation of document.getAnimations()) if (animation.effect?.target?.closest('.setup-wizard') && Number.isFinite(animation.effect.getComputedTiming().endTime)) animation.finish();
-  document.body.insertAdjacentHTML('beforeend','<pre id="setup-checks" hidden>'+JSON.stringify({passed:checks.length,checks})+'</pre>');
+  const nav=$('setup-next').getBoundingClientRect();
+  check('preview navigation fits viewport',nav.bottom<=innerHeight&&nav.right<=innerWidth);
+  document.body.insertAdjacentHTML('beforeend','<pre id="setup-checks" hidden>'+JSON.stringify({passed:checks.length,viewport:{width:innerWidth,height:innerHeight,next:nav.toJSON()},checks})+'</pre>');
 } catch(error) {document.body.insertAdjacentHTML('beforeend','<pre id="setup-checks">'+JSON.stringify({error:error.stack,checks})+'</pre>');}})();
 `;
 let html = source.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, '');
@@ -180,10 +269,11 @@ html = html.replace('<head>', '<head><base href="' + url.pathToFileURL(path.join
 html = html.replace('</body>', '<script>' + code + '</script></body>');
 const file = path.join(work,'fixture.html'); fs.writeFileSync(file,html);
 const chrome = process.env.CHROME_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
-const args = ['--headless','--no-sandbox','--disable-gpu','--allow-file-access-from-files','--hide-scrollbars','--user-data-dir='+path.join(work,'chrome'),'--window-size='+(process.env.SETUP_VIEWPORT || '1440,1000'),'--virtual-time-budget=25000'];
+const args = ['--headless','--no-sandbox','--disable-gpu','--allow-file-access-from-files','--hide-scrollbars','--user-data-dir='+path.join(work,'chrome'),'--window-size='+(process.env.SETUP_VIEWPORT || '1440,1000'),'--virtual-time-budget=45000'];
 if (process.env.SETUP_REDUCED) args.push('--force-prefers-reduced-motion');
 const target = url.pathToFileURL(file).href;
-const out = cp.execFileSync(chrome,[...args,'--dump-dom',target],{maxBuffer:8e6,stdio:['ignore','pipe','ignore']}).toString();
+// Capture the same document that ran the checks, rather than a second session.
+const out = cp.execFileSync(chrome,[...args,'--dump-dom','--screenshot='+path.join(work,'preview.png'),target],{maxBuffer:8e6,stdio:['ignore','pipe','ignore']}).toString();
 fs.writeFileSync(path.join(work,'dom.html'),out);
 const result = [...out.matchAll(/<pre id="setup-checks"[^>]*>(.*?)<\/pre>/gs)].at(-1);
 assert(result,'No browser results; inspect '+work);
@@ -191,7 +281,6 @@ const report = JSON.parse(result[1].replaceAll('&gt;','>').replaceAll('&lt;','<'
 if (report.error) console.error(report.error,report.checks.filter(c=>!c.ok));
 assert(!report.error,'Browser checks failed; inspect '+work);
 console.log(`Browser checks: ${report.passed} passed`);
-cp.execFileSync(chrome,[...args,'--screenshot='+path.join(work,'preview.png'),target],{stdio:'ignore'});
 console.log('Screenshot and fixture: '+work);
 
 // Exercise the entire unextracted page too: definitions and event hooks from
@@ -215,6 +304,6 @@ if (!preview) {
   const boot = JSON.parse(found[1].replaceAll('&gt;','>').replaceAll('&lt;','<').replaceAll('&amp;','&'));
   assert.deepStrictEqual(boot.errors,[],'Full-page JavaScript errors');
   assert.deepStrictEqual(boot.calls,[{route:'/api/firstrun',method:'POST'}],'Only setup may run before first-run completion');
-  assert(boot.open&&boot.inert&&boot.title==='Give your config a home.','First-run gate is visible over an inert app');
+  assert(boot.open&&boot.inert&&boot.title==='Allow once.','First-run gate is visible over an inert app');
   console.log('Full-page boot: passed (POST first-run precedes all other app work)');
 }

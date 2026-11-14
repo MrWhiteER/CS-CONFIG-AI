@@ -5517,13 +5517,13 @@
 /* First run: one decision on a full-window stage. Motion stays on compositor
    properties; even theme previews fade a frozen copy rather than tween colours. */
 html.setup-checking .app { visibility:hidden; }
-.setup-wizard[hidden], .setup-wizard [hidden], .sync-control [hidden] { display:none !important; }
+.setup-wizard[hidden], .setup-wizard [hidden], .sync-control [hidden], [data-helper-warning][hidden] { display:none !important; }
 .setup-wizard { position:fixed; inset:0; z-index:20000; display:grid; place-items:center; padding:32px; isolation:isolate; background:var(--bg); color:var(--ink); font-family:var(--body); }
 .setup-atmosphere { position:absolute; inset:0; overflow:hidden; pointer-events:none; z-index:-1; }
 .setup-atmosphere::before, .setup-atmosphere::after { content:''; position:absolute; width:80vmax; height:80vmax; border-radius:50%; background:radial-gradient(ellipse,var(--accent-dim),transparent 65%); animation:setup-drift 18s ease-in-out infinite alternate; }
 .setup-atmosphere::before { left:-35%; top:-65%; }.setup-atmosphere::after { right:-40%; bottom:-70%; animation-delay:-9s; }
 .setup-particles { position:absolute; inset:0; opacity:.3; background-image:radial-gradient(var(--accent) 1px,transparent 1px); background-size:83px 83px; mask-image:linear-gradient(transparent, var(--ink),transparent); animation:setup-drift 24s ease-in-out infinite alternate-reverse; }
-.setup-shell { width:min(1100px,100%); height:min(780px,100%); display:flex; flex-direction:column; position:relative; min-height:0; background:var(--panel); border:1px solid var(--line); border-radius:var(--component-radius,14px); box-shadow:var(--floating-shadow); backdrop-filter:var(--panel-blur); animation:setup-arrive 320ms ease-out both; }
+.setup-shell { width:min(1100px,100%); height:min(780px,calc(100dvh - 64px)); display:flex; flex-direction:column; position:relative; min-height:0; background:var(--panel); border:1px solid var(--line); border-radius:var(--component-radius,14px); box-shadow:var(--floating-shadow); backdrop-filter:var(--panel-blur); animation:setup-arrive 320ms ease-out both; }
 .setup-shell::before, .setup-shell::after { content:''; pointer-events:none; position:absolute; width:30px; height:30px; border-color:var(--accent); opacity:.6; }
 .setup-shell::before { top:-1px; left:-1px; border-top:2px solid var(--accent); border-left:2px solid var(--accent); border-top-left-radius:inherit; }.setup-shell::after { bottom:-1px; right:-1px; border-right:2px solid var(--accent); border-bottom:2px solid var(--accent); border-bottom-right-radius:inherit; }
 .setup-top { display:flex; align-items:center; gap:12px; padding:24px 32px 18px; }
@@ -5533,12 +5533,13 @@ html.setup-checking .app { visibility:hidden; }
 .setup-close { width:36px; height:36px; display:grid; place-items:center; color:var(--muted); border:1px solid var(--line); background:var(--bg-2); border-radius:var(--control-radius,6px); }
 .setup-close:hover { color:var(--ink); background:var(--chip); }
 .setup-wizard svg, .sync-control svg { width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; flex:none; }
-.setup-progress { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); list-style:none; gap:8px; margin:0; padding:0 32px 20px; }
+.setup-progress { display:grid; grid-template-columns:repeat(var(--setup-count,6),minmax(0,1fr)); list-style:none; gap:8px; margin:0; padding:0 32px 20px; }
 .setup-progress li { color:var(--muted); font-size:10px; letter-spacing:.04em; position:relative; padding-top:13px; }
 .setup-progress li::before, .setup-progress li::after { content:''; position:absolute; top:0; left:0; width:100%; height:3px; background:var(--line); border-radius:3px; }
 .setup-progress li::after { background:var(--accent); transform:scaleX(0); transform-origin:left; transition:transform 320ms ease-out; }
 .setup-progress .is-done::after { transform:scaleX(1); }.setup-progress [aria-current="step"] { color:var(--accent); }
 .setup-progress [aria-current="step"]::after { transform:scaleX(.6); animation:setup-pulse 2s ease-in-out infinite; }
+.setup-progress .is-done[aria-current="step"]::after { transform:scaleX(1); animation:none; }
 .setup-progress .is-skipped::after { background:var(--muted); transform:scaleX(.25); opacity:.4; }
 .setup-viewport { flex:1; min-height:0; overflow:auto; overscroll-behavior:contain; padding:24px 46px 28px; border-top:1px solid var(--line); }
 .setup-step { min-height:100%; display:flex; flex-direction:column; justify-content:center; }
@@ -5573,10 +5574,25 @@ html.setup-checking .app { visibility:hidden; }
 .setup-tick svg g { transform:scaleX(0); transform-origin:left; }[aria-pressed="true"] .setup-tick svg g { animation:setup-line 240ms 70ms ease-out forwards; }
 .setup-path { display:flex; align-items:flex-start; gap:12px; padding:15px 18px; border:1px solid var(--line); border-radius:var(--control-radius,7px); background:var(--sunk); margin:0 0 18px; }
 .setup-path svg { color:var(--accent); }.setup-path code { font:11px/1.65 var(--mono); overflow-wrap:anywhere; }
+.setup-helper-list { list-style:none; margin:0; padding:0; display:grid; gap:8px; }
+.setup-helper-list li { display:flex; align-items:center; gap:12px; padding:10px 14px; border:1px solid var(--line); background:var(--panel-2); border-radius:var(--control-radius,7px); font-size:12px; }
+.setup-helper-list li > svg { width:18px; height:18px; color:var(--accent); }
+.setup-helper-list .setup-tick { position:static; margin-left:auto; flex:none; }
+.setup-helper-list.is-ready .setup-tick { border-color:var(--good); color:var(--good); }
+.setup-helper-list.is-ready .setup-tick svg { opacity:1; transform:scale(1); animation:setup-select 300ms calc(var(--scan-index,0)*70ms) both; }
+.setup-helper-list.is-ready .setup-tick svg g { transform:scaleX(1); }
+.setup-helper-status { min-height:64px; }.setup-helper-status p { line-height:1.65; }
+.setup-helper-status.is-ready { animation:setup-success 650ms ease-out both; }
+.setup-helper-status.is-ready b { color:var(--good); }
+.setup-helper-wait { display:inline-flex; vertical-align:middle; margin-right:8px; color:var(--accent); animation:setup-orbit 2s linear infinite; }
+.setup-helper-wait svg { width:16px; height:16px; }
+.setup-choice:disabled { opacity:.55; cursor:wait; }.setup-choice:disabled:hover { transform:none; }
+.setup-regions { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr)); gap:12px; }
+.setup-region > svg { color:var(--accent); margin-bottom:14px; }
 .setup-note { color:var(--muted); font-size:12px; line-height:1.65; margin:8px 0; overflow-wrap:anywhere; }.setup-note.warn { color:var(--warn); }
 .setup-notice { padding:14px 16px; border-left:2px solid var(--accent); background:var(--accent-dim); border-radius:0 var(--control-radius) var(--control-radius) 0; }
 .setup-notice b { display:block; margin-bottom:4px; font-size:13px; }.setup-notice p { margin:0; font-size:12px; color:var(--muted); }
-.setup-sync-result.is-success { animation:setup-success 650ms ease-out both; }.setup-sync-result .setup-success-check { display:inline-flex; color:var(--good); vertical-align:middle; margin-right:6px; }
+.setup-sync-result.is-success { animation:setup-success 650ms ease-out both; }.setup-sync-result .setup-success-check, .setup-helper-status .setup-success-check { display:inline-flex; color:var(--good); vertical-align:middle; margin-right:6px; }
 .setup-toggle { display:flex; align-items:center; gap:14px; padding:17px 18px; background:var(--panel-2); border:1px solid var(--line); border-radius:var(--component-radius,12px); cursor:pointer; }
 .setup-toggle > span:nth-last-child(2) { flex:1; min-width:0; }.setup-toggle b { display:block; font-size:13px; font-weight:600; }.setup-toggle small { display:block; color:var(--muted); font-size:11px; margin-top:3px; }
 .setup-toggle input { appearance:none; -webkit-appearance:none; width:38px; height:22px; flex:none; border:1px solid var(--line); border-radius:20px; background:var(--chip); position:relative; cursor:pointer; margin:0; }
@@ -5620,6 +5636,8 @@ html.setup-checking .app { visibility:hidden; }
 @keyframes setup-finish { to { opacity:0; } }@keyframes setup-shrink { to { transform:scale(.97); } }
 @media(max-width:800px) { .setup-wizard { padding:14px; }.setup-top { padding:18px 22px; }.setup-progress { padding:0 22px 16px; }.setup-viewport { padding:24px; }.setup-foot { padding:16px 22px; }.setup-foot-note { display:none; }.setup-foot #setup-skip { margin-left:auto; }.setup-split { gap:20px; grid-template-columns:minmax(0,.7fr) minmax(0,1fr); }.setup-presets { gap:10px; }.setup-preset { padding:15px; }.setup-themes { gap:8px; }.setup-theme { padding:7px; }.setup-fps { font-size:28px; } }
 @media(max-width:580px) { .setup-wizard { padding:0; }.setup-shell { height:100%; border:0; border-radius:0; }.setup-top-note { display:none; }.setup-close { margin-left:auto; }.setup-progress { gap:5px; }.setup-progress li { font-size:9px; }.setup-split { grid-template-columns:1fr; }.setup-visual { display:none; }.setup-presets { grid-template-columns:1fr; }.setup-preset { min-height:0; display:grid; grid-template-columns:1fr 1fr; gap:4px 12px; }.setup-preset > svg { display:none; }.setup-preset b { font-size:18px; }.setup-preset p { grid-column:1/-1; }.setup-fps { font-size:25px; margin:0; }.setup-limit { grid-column:1/-1; margin-top:6px; }.setup-themes { grid-template-columns:repeat(2,minmax(0,1fr)); }.setup-swatch { height:62px; }.setup-lead { font-size:13px; }.setup-restart { align-items:flex-start; flex-direction:column; }.sync-indicator { max-width:140px; } }
+@media(max-width:800px) { .setup-shell { height:min(780px,calc(100dvh - 28px)); } }
+@media(max-width:580px) { .setup-shell { height:100dvh; } }
 @media(prefers-reduced-motion:reduce) { .setup-wizard *, .setup-wizard *::before, .setup-wizard *::after, .sync-control *, .sync-control *::after { animation:none !important; transition:none !important; }.setup-wizard .setup-particles { display:none; }.setup-step.setup-enter { animation:setup-theme-fade 100ms ease-out reverse both !important; }.setup-step.setup-exit, .setup-wizard.is-finishing { animation:setup-theme-fade 100ms ease-out both !important; }.setup-wizard .setup-choice:hover { transform:none; }[aria-pressed="true"] .setup-tick svg g { transform:scaleX(1); } }
 @media(prefers-reduced-motion:reduce) { .setup-eyebrow::before { transform:scaleX(1); } }
 </style>
@@ -5733,6 +5751,10 @@ const startup = (() => {
     <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></symbol>
     <symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 00-5.4 5.4L4 17v3h3l5.3-5.3a4 4 0 005.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></symbol>
     <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h10M18 18h2"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="16" cy="18" r="2"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="m12 3 8 3v6c0 4-4 7-8 9-4-2-8-5-8-9V6z"/><path d="m8 12 3 3 5-6"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 15v2m5-6v6m5-10v10"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18M5 7h14M5 17h14"/></symbol>
+    <symbol id="i-sync" viewBox="0 0 24 24"><path d="M20 8a9 9 0 0 0-15-3L3 7m0-5v5h5M4 16a9 9 0 0 0 15 3l2-2m0 5v-5h-5"/></symbol>
   </defs>
 </svg>
 
@@ -8427,6 +8449,18 @@ document.addEventListener("click", e => {
   if (e.target.closest("#audio-refresh")) loadAudio(true);
 });
 
+/* Administrator helper status is shared by setup, Fix It and sensor notes. */
+let helperStatus = null;
+function helperReady(value = helperStatus) { return !!(value && value.installed && value.current); }
+function updateHelperStatus(value) {
+  if (value) helperStatus = value;
+  document.querySelectorAll('[data-helper-warning]').forEach(el => { el.hidden = helperReady(); });
+}
+async function refreshHelperStatus() {
+  try { updateHelperStatus(await api('/api/helper',{})); } catch (err) { /* keep the last known status */ }
+  return helperStatus;
+}
+
 /* ---------------------------------------------------------------------------
    Fix It.
 
@@ -8509,7 +8543,7 @@ async function loadFixes(force) {
   $("fix-refresh").textContent = "Checking...";
   if (box && !fixData) box.innerHTML = '<div class="fix-banner" role="status">Checking...  reading devices and current settings...</div>';
   try {
-    fixData = await api("/api/fix/survey", {});
+    [fixData] = await Promise.all([api("/api/fix/survey", {}), refreshHelperStatus()]);
     renderFixes();
   } catch (err) {
     if (box) { box.querySelector(".fix-survey-error")?.remove(); box.insertAdjacentHTML("afterbegin", '<p class="fix-banner fix-survey-error" role="alert">Could not read the machine: ' + esc(String(err && err.message || err)) + '. Use Check current settings to retry.</p>'); }
@@ -8565,7 +8599,7 @@ function fixTile(fix, inner) {
   const copy = FIX_COPY[fix.id] || [fix.blurb, fix.danger, "Working"];
   const shield = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6zM12 8v5m0 3v1"/></svg>';
   const pause = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7v10M16 7v10"/><circle cx="12" cy="12" r="10"/></svg>';
-  const tags = (fix.needs_admin ? '<span class="fix-chip">' + shield + 'Administrator</span>' : '') +
+  const tags = (fix.needs_admin ? '<span class="fix-chip" data-helper-warning' + (helperReady() ? ' hidden' : '') + '>' + shield + 'Administrator</span>' : '') +
     (fix.disruptive && !fix.allowed_in_game ? '<span class="fix-chip">' + pause + 'Close CS2 first</span>' : '');
   return '<section class="fix-tile" data-tool="' + esc(fix.id) + '" data-family="' + esc(fix.family) + '">' +
     '<div class="fix-head">' + fixIcon(fix) + '<div class="fix-title"><span class="fix-fam">' + esc(FIX_FAMILY_NAME[fix.family] || fix.family) + '</span><h3>' + esc(fix.title) + '</h3></div></div>' +
@@ -8751,7 +8785,7 @@ async function runFix(button) {
 
   button.disabled = true;
   fixStates.set(id, {phase:"fixing"}); paintFixState(id);
-  const bar = fixProgress(id, (FIX_COPY[id] || [,,"Working"])[2] + (fix.needs_admin ? " · administrator approval may be required" : ""));
+  const bar = fixProgress(id, (FIX_COPY[id] || [,,"Working"])[2] + (fix.needs_admin && !helperReady() ? " · administrator approval may be required" : ""));
   try {
     const r = await api("/api/fix/run", body);
     const good = !!r.ok;
@@ -8882,7 +8916,7 @@ function renderTemps(data) {
   if (note) {
     note.innerHTML = (locked && data.can_elevate)
       ? '<button class="btn small" id="temps-unlock">Read drive &amp; board sensors</button>' +
-        '<span class="sub"> one administrator prompt; the app itself stays as it is</span>'
+        '<span class="sub" data-helper-warning' + (helperReady() ? ' hidden' : '') + '> one administrator prompt; the app itself stays as it is</span>'
       : "";
   }
 
@@ -12765,9 +12799,9 @@ document.addEventListener("click", async e => {
 /* First-run setup. Drafts live only here: Next accepts a step's defaults,
    direct choices count as answers, and Skip removes that step's answer.
    Nothing previews through /api/prefs, including the live theme preview. */
-const SETUP_STEPS = ["sync", "permission", "sound", "preset", "apps", "theme"];
-const SETUP_LABELS = { sync:"Steam sync", permission:"Permission", sound:"Sound", preset:"Game preset", apps:"Companions", theme:"Theme" };
-const SETUP_KEYS = { sync:"sync", permission:"cfg_write", sound:"sound", preset:"preset", apps:"apps", theme:"theme" };
+const SETUP_STEPS = ["sync", "permission", "sound", "preset", "region", "apps", "theme"];
+const SETUP_LABELS = { sync:"Steam sync", permission:"Allow once", sound:"Sound", preset:"Game preset", region:"Server region", apps:"Companions", theme:"Theme" };
+const SETUP_KEYS = { sync:"sync", permission:"cfg_write", sound:"sound", preset:"preset", region:"region_lock", apps:"apps", theme:"theme" };
 const setupReduced = window.matchMedia("(prefers-reduced-motion: reduce)");
 let setupSession = null, setupOpening = null;
 const setupDelay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -12785,14 +12819,22 @@ function setupSource(last) { return setupPlain(last.source, "your other PC"); }
 function setupFileCount(last) {
   return Math.max(0, Number(last.files) || (Array.isArray(last.written) ? last.written.length : Number(last.written) || 0) + (Number(last.waiting) || 0));
 }
+// The region backend is optional. A usable catalogue is the feature flag;
+// this branch does not return it, so it never offers a choice it cannot save.
+function setupRegions(data) {
+  return Array.isArray(data.regions) ? data.regions.filter(r => r && typeof r.id === 'string' && r.id && (r.label || r.name)) : [];
+}
 function setupDraft(data) {
   const current = data.current || {}, sound = data.sound || {};
   const device = kind => current['audio_' + kind] || sound['pinned_' + kind] ||
     ((sound[kind] || []).find(d => d.default) || {}).id || "";
   return { sync:current.sync_auto !== false,
-    permission:typeof current.cfg_write_ok === "boolean" ? current.cfg_write_ok : null,
+    // A saved Allow from an older setup must never trigger the finish handler's
+    // install fallback. Only a ready helper can turn this answer true.
+    permission:helperReady(data.helper) ? true : current.cfg_write_ok === false ? false : null,
     sound:{ output:device("output"), input:device("input") },
     preset:["competitive","balanced","quality"].includes(current.intent) ? current.intent : "balanced",
+    region:setupRegions(data).some(r => r.id === current.region_lock) ? current.region_lock : null,
     apps:(data.apps || []).filter(a => a.with_game).map(a => a.id),
     theme:THEMES.some(t => t[0] === current.theme) ? current.theme : "violet" };
 }
@@ -12824,26 +12866,32 @@ function setupSoundControl(s, kind, title, icon, index) {
 }
 function setupStepHTML(s) {
   const step = setupCurrentStep(s), d = s.data, draft = s.draft;
-  if (step === "sync") return setupHeading("01 / YOUR SETTINGS", "Pick up where you left off.", "Bring your settings with your Steam account, then make this PC yours.") +
+  const heading = (label,title,lead) => setupHeading(String(s.index+1).padStart(2,'0') + ' / ' + label,title,lead);
+  if (step === "sync") return heading("YOUR SETTINGS", "Pick up where you left off.", "Bring your settings with your Steam account, then make this PC yours.") +
     '<div class="setup-split">' + setupVisual("sync") + '<div class="setup-stack"><div id="setup-sync-result" class="setup-sync-result" role="status"></div>' +
     '<button type="button" id="setup-steam" class="setup-action primary">' + WAY_ICONS.steam + 'Sign in with Steam</button>' +
     '<a id="setup-steam-link" class="setup-action" target="_blank" rel="noopener noreferrer" hidden>Continue in your browser</a>' +
     '<button type="button" id="setup-sync-retry" class="setup-action" hidden>Try sync again</button>' +
     '<label class="setup-toggle"><span><b>Keep this PC in sync automatically</b><small>Your settings follow you between PCs</small></span><input id="setup-sync-auto" type="checkbox"' + (draft.sync ? ' checked' : '') + '></label></div></div>';
   if (step === "permission") {
-    const cfg = d.cfg || {};
-    return setupHeading("02 / READY TO WRITE", "Give your config a home.", "The app writes your config files into CS2’s cfg folder:") +
+    const cfg = d.cfg || {}, ready = helperReady(d.helper), busy = !!s.helperBusy;
+    return heading("ONE-TIME PERMISSION", "Allow once.", "CS CONFIG AI asks Windows for permission one time, so fixes, sensors and the server lock never ask again.") +
       '<div class="setup-path">' + setupIcon("folder") + '<code>' + esc(cfg.path || "CS2’s cfg folder has not been found yet.") + '</code></div>' +
-      '<div class="setup-split">' + setupVisual("permission") + '<div class="setup-stack">' +
-      '<button type="button" class="setup-choice" data-setup-permission="allow" aria-pressed="' + (draft.permission === true) + '">' + setupTick() + '<b>Allow</b><p>Let the app put your config files in place.</p></button>' +
-      '<button type="button" class="setup-choice" data-setup-permission="later" aria-pressed="' + (draft.permission === false) + '">' + setupTick() + '<b>Not now</b><p>Keep choosing your setup. Files can wait.</p></button>' +
-      (!cfg.writable ? '<p class="setup-note warn">' + esc(setupPlain(cfg.reason, "Windows would not let the app write there. You can continue and allow access later.")) + '</p>' : '<p class="setup-note">Folder found and ready. You can change this permission later.</p>') + '</div></div>';
+      '<div class="setup-split"><ul class="setup-helper-list' + (ready ? ' is-ready' : '') + '" aria-label="What this permission covers">' +
+      [['folder','CS2 cfg folder'],['shield','Fixes without prompts'],['device','Sensors'],['chart','Overlay counters'],['globe','Server lock']].map(([icon,label],i) =>
+        '<li class="setup-scan" style="--scan-index:' + i + '">' + setupIcon(icon) + '<span>' + label + '</span>' + setupTick() + '</li>').join('') + '</ul><div class="setup-stack">' +
+      (ready ? '' : '<button type="button" class="setup-choice" data-setup-permission="allow" aria-pressed="false"' + (busy ? ' disabled' : '') + '>' + setupTick() + '<b>Allow</b><p>Set up the administrator helper with one Windows prompt.</p></button>' +
+      '<button type="button" class="setup-choice" data-setup-permission="later" aria-pressed="' + (draft.permission === false) + '"' + (busy ? ' disabled' : '') + '>' + setupTick() + '<b>Not now</b><p>Keep choosing your setup. Allow access later in Settings.</p></button>') +
+      '<div id="setup-helper-status" class="setup-notice setup-helper-status' + (ready ? ' is-ready' : '') + '" role="status" aria-live="polite" aria-busy="' + busy + '"><b>' +
+      (busy ? '<span class="setup-helper-wait" aria-hidden="true">' + setupIcon('sync') + '</span>Waiting for Windows…' : ready ? '<span class="setup-success-check">' + setupCheck() + '</span>Permission is ready.' : s.helperError ? esc(s.helperDeclined ? 'Windows permission was declined.' : 'The helper could not be set up.') : 'One prompt. Ready for every launch.') +
+      '</b><p>' + esc(busy ? 'Check your taskbar for the Windows prompt. Choose Yes to allow the helper.' : ready ? 'The administrator helper is installed and up to date. Overlay counters take effect at your next Windows sign-in.' : s.helperError ? s.helperError + ' You can continue and allow access later in Settings.' : 'The app stays open while Windows asks. Your game launches normally through Steam.') + '</p></div>' +
+      (!cfg.writable ? '<p class="setup-note' + (ready ? '' : ' warn') + '">' + esc(setupPlain(cfg.reason, "CS2’s cfg folder is not writable yet. You can continue and check it later.")) + '</p>' : '') + '</div></div>';
   }
-  if (step === "sound") return setupHeading("03 / SOUND CHECK", "Hear it. Call it.", "Choose your headset or speakers and your microphone. We’ll keep them in place if Windows switches devices.") +
+  if (step === "sound") return heading("SOUND CHECK", "Hear it. Call it.", "Choose your headset or speakers and your microphone. We’ll keep them in place if Windows switches devices.") +
     '<div class="setup-split">' + setupVisual("sound") + '<div class="setup-stack">' +
     setupSoundControl(s,"output","Speakers / headset","speaker",0) + setupSoundControl(s,"input","Microphone","microphone",1) +
     ((d.sound || {}).error ? '<p class="setup-note warn">Sound devices could not be read. You can continue and choose them in Settings.</p>' : '<p class="setup-note">Windows defaults are selected for a new setup. Your saved choices are kept when you run setup again.</p>') + '</div></div>';
-  if (step === "preset") return setupHeading("04 / TUNED FOR THIS PC", "Find your advantage.", "More frames, more detail, or a little of both. Choose how you want CS2 to feel.") +
+  if (step === "preset") return heading("TUNED FOR THIS PC", "Find your advantage.", "More frames, more detail, or a little of both. Choose how you want CS2 to feel.") +
     '<div class="setup-hardware" id="setup-hardware"></div><div class="setup-presets">' + (d.presets || []).map(p => {
       const fps = p.fps !== null && p.fps !== undefined && Number.isFinite(Number(p.fps)) && Number(p.fps) >= 0;
       const limit = /gpu/i.test(p.bottleneck || '') ? 'GPU' : /cpu/i.test(p.bottleneck || '') ? 'CPU' : '';
@@ -12852,12 +12900,15 @@ function setupStepHTML(s) {
         (fps ? '<span class="setup-fps" aria-label="About ' + Number(p.fps) + ' FPS">~<span data-setup-fps="' + Number(p.fps) + '" aria-hidden="true">' + (setupReduced.matches ? Number(p.fps) : 0) + '</span><small aria-hidden="true">FPS</small></span>' : '<span class="setup-fps unavailable">Estimate unavailable</span>') +
         '<p>' + esc(p.blurb) + '</p>' + (limit ? '<span class="setup-limit">Limited by ' + limit + '</span>' : '') + '</button>';
     }).join('') + '</div><p class="setup-note">Estimated frames per second. Actual performance varies by map and what’s running.</p>';
-  if (step === "apps") return setupHeading("05 / YOUR PRE-GAME LINEUP", "Bring your squad of apps.", "Choose what starts before the game. One launch, everything ready.") +
+  if (step === "region") return heading("OPTIONAL / YOUR SERVERS", "Lock to one server region.", "Choose one region to play in. Every other region is blocked for CS2 only. Change it any time in the overlay or the app.") +
+    '<div class="setup-regions">' + [{id:null,label:'Keep all regions open',blurb:'No server region lock.'},...setupRegions(d)].map((r,i) =>
+      '<button type="button" class="setup-choice setup-region setup-scan" style="--scan-index:' + i + '" data-setup-region="' + esc(r.id || '') + '" aria-pressed="' + (draft.region === r.id) + '">' + setupIcon(r.id ? 'globe' : 'shield') + setupTick() + '<b>' + esc(r.label || r.name) + '</b><p>' + esc(r.blurb || 'Play here. Block every other region for CS2.') + '</p></button>').join('') + '</div><p class="setup-note">Optional. Skip to leave your current region choice as it is.</p>';
+  if (step === "apps") return heading("YOUR PRE-GAME LINEUP", "Bring your squad of apps.", "Choose what starts before the game. One launch, everything ready.") +
     '<div class="setup-split">' + setupVisual("apps") + '<div class="setup-apps">' + ((d.apps || []).length ? d.apps.map((a,i) =>
       '<label class="setup-toggle setup-scan" style="--scan-index:' + i + '"><span class="setup-app-icon setup-app-icon-fallback" aria-hidden="true">' + (a.id.startsWith('faceit') ? '<span class="fc-logo"></span>' : setupIcon(a.id === 'crosshairx' ? 'crosshair' : 'gamepad')) + '</span>' +
       '<img class="setup-app-icon" src="/companion-icon/' + encodeURIComponent(a.id) + '.png" alt="" data-setup-app-icon hidden><span><b>' + esc(a.name) + '<span class="setup-app-found" aria-hidden="true">' + setupCheck() + '</span></b><small>Start before CS2</small></span><input type="checkbox" data-setup-app="' + esc(a.id) + '" aria-label="Start ' + esc(a.name) + ' before CS2"' + (draft.apps.includes(a.id) ? ' checked' : '') + '></label>').join('') :
       '<div class="setup-notice"><b>You’re ready to go.</b><p>No companion apps found on this PC. You can add any program later in Companions.</p></div>') + '</div></div>';
-  return setupHeading("06 / MAKE IT YOURS", "Set the mood.", "Ten looks. Your call. Pick one to see your whole setup change.") +
+  return heading("MAKE IT YOURS", "Set the mood.", "Ten looks. Your call. Pick one to see your whole setup change.") +
     '<div class="setup-themes">' + THEMES.filter(t => (d.themes || THEMES.map(t => t[0])).includes(t[0])).map(([id,name,blurb,bg,panel,accent]) =>
       '<button type="button" class="setup-choice setup-theme" data-setup-theme="' + id + '" aria-pressed="' + (draft.theme === id) + '" title="' + esc(name + ' · ' + blurb) + '">' +
       '<span class="setup-swatch" style="--sw-bg:' + bg + ';--sw-panel:' + panel + ';--sw-accent:' + accent + '" aria-hidden="true"><i></i><span><em></em><em></em></span></span>' + setupTick() + '<b>' + esc(name) + '</b></button>').join('') + '</div><p class="setup-note">Your config, your colours. Finish when it feels like home.</p>';
@@ -12888,12 +12939,18 @@ function setupCountFPS(s) {
 function renderSetup(s, focus = true) {
   if (!setupAlive(s)) return;
   const step = setupCurrentStep(s);
-  $('setup-progress').innerHTML = SETUP_STEPS.map(id => '<li' + (id === step ? ' aria-current="step"' : '') +
-    ' class="' + (s.skipped.has(id) || !s.steps.includes(id) ? 'is-skipped' : Object.hasOwn(s.answers,SETUP_KEYS[id]) ? 'is-done' : '') + '">' + SETUP_LABELS[id] + '</li>').join('');
+  $('setup-progress').style.setProperty('--setup-count',s.steps.length);
+  $('setup-progress').setAttribute('aria-label','Setup progress: step ' + (s.index+1) + ' of ' + s.steps.length);
+  $('setup-progress').innerHTML = s.steps.map(id => '<li' + (id === step ? ' aria-current="step"' : '') +
+    ' class="' + (id === 'permission' && helperReady(s.data.helper) ? 'is-done' : s.skipped.has(id) ? 'is-skipped' : Object.hasOwn(s.answers,SETUP_KEYS[id]) ? 'is-done' : '') + '">' + SETUP_LABELS[id] + '</li>').join('');
   const content = $('setup-content'); content.innerHTML = setupStepHTML(s);
   content.className = 'setup-step setup-enter';
   $('setup-viewport').scrollTop = 0;
   $('setup-back').disabled = s.index === 0;
+  const permissionDone = step === 'permission' && helperReady(s.data.helper);
+  $('setup-back').hidden = permissionDone; $('setup-skip').hidden = permissionDone;
+  for (const id of ['setup-close','setup-back','setup-skip','setup-next']) if (s.helperBusy) $(id).disabled = true;
+  document.querySelector('.setup-foot-note').textContent = 'Step ' + (s.index+1) + ' of ' + s.steps.length + '. Change any choice later in Settings.';
   $('setup-next').innerHTML = s.index === s.steps.length-1 ? 'Finish ' + setupIcon('play') : 'Next <span aria-hidden="true">&rarr;</span>';
   $('setup-error').textContent = '';
   if (step === 'sync') {
@@ -12919,6 +12976,41 @@ function setupChoose(s, name, value, button) {
   $('setup-content').querySelectorAll('[' + attr + ']').forEach(b => b.setAttribute('aria-pressed',String(b === button)));
   if (button) { button.classList.remove('setup-picked'); void button.offsetWidth; button.classList.add('setup-picked'); }
 }
+async function setupInstallHelper(s) {
+  if (!setupAlive(s) || s.helperBusy || helperReady(s.data.helper)) return;
+  s.helperBusy = true; s.helperError = ''; s.helperDeclined = false;
+  // Never leave a previous Allow in the finish payload while Windows is asking.
+  delete s.answers.cfg_write; s.draft.permission = null;
+  renderSetup(s,false);
+  $('setup-helper-status').scrollIntoView({block:'nearest',behavior:'instant'});
+  try {
+    const result = await api('/api/helper/install',{});
+    if (result.declined) {
+      s.helperDeclined = true;
+      throw new Error('You chose not to allow the Windows administrator prompt.');
+    }
+    if (!result.ok) throw new Error(result.error || result.reason || result.detail || 'Windows could not install the administrator helper.');
+    updateHelperStatus(result);
+    // Install returns status too; retain it if this read-only refresh is offline.
+    const refreshed = await refreshHelperStatus();
+    s.data.helper = refreshed;
+    if (!helperReady(refreshed)) throw new Error('Windows finished setup, but the administrator helper is not ready yet.');
+    s.skipped.delete('permission'); s.draft.permission = true; s.answers.cfg_write = true;
+  } catch (err) {
+    s.helperError = setupPlain(err.message,'Windows could not finish setting up the helper.');
+    s.draft.permission = false; s.answers.cfg_write = false;
+  } finally {
+    s.helperBusy = false;
+    if (setupAlive(s)) {
+      for (const id of ['setup-close','setup-back','setup-skip','setup-next']) $(id).disabled = false;
+      renderSetup(s,false);
+      if (setupCurrentStep(s) === 'permission') {
+        $('setup-helper-status').scrollIntoView({block:'nearest',behavior:'instant'});
+        $('setup-next').focus({preventScroll:true});
+      }
+    }
+  }
+}
 function setupPreviewTheme(s, id, button) {
   if (s.themeGhost) s.themeGhost.remove();
   if (!setupReduced.matches) {
@@ -12932,7 +13024,7 @@ function setupPreviewTheme(s, id, button) {
 }
 async function setupMove(direction, skip = false) {
   const s = setupSession;
-  if (!setupAlive(s) || s.moving) return;
+  if (!setupAlive(s) || s.moving || s.helperBusy) return;
   const step = setupCurrentStep(s);
   if (direction > 0) {
     if (skip) {
@@ -13039,12 +13131,13 @@ async function openSetupWizard({step, data} = {}) {
   if (setupOpening) return setupOpening;
   if (setupSession) {
     const index = setupSession.steps.indexOf(step);
-    if (index >= 0 && !setupSession.finishing && !setupSession.moving) { setupSession.index = index; renderSetup(setupSession); }
+    if (index >= 0 && !setupSession.finishing && !setupSession.moving && !setupSession.helperBusy) { setupSession.index = index; renderSetup(setupSession); }
     return setupSession;
   }
   setupOpening = (async () => {
     const snapshot = data || await api('/api/firstrun',{});
-    const steps = SETUP_STEPS.filter(id => id !== 'sync' || (snapshot.cloud || {}).configured);
+    updateHelperStatus(snapshot.helper);
+    const steps = SETUP_STEPS.filter(id => (id !== 'sync' || (snapshot.cloud || {}).configured) && (id !== 'region' || setupRegions(snapshot).length));
     const s = {data:snapshot,steps,index:Math.max(0,steps.indexOf(step)),draft:setupDraft(snapshot),answers:{},skipped:new Set(),baseTheme:setupDraft(snapshot).theme,returnFocus:document.activeElement};
     s.closed = new Promise(resolve => { s.resolve = resolve; });
     setupSession = s;
@@ -13060,7 +13153,7 @@ async function openSetupWizard({step, data} = {}) {
 window.openSetupWizard = openSetupWizard;
 async function finishSetupWizard() {
   const s = setupSession;
-  if (!setupAlive(s)) return;
+  if (!setupAlive(s) || s.helperBusy) return;
   s.finishing = true; clearTimeout(s.loginTimer); clearTimeout(s.fpsEnd); cancelAnimationFrame(s.fpsFrame);
   const controls = [...$('setup-wizard').querySelectorAll('button,input,select,a')];
   controls.forEach(el => { if ('disabled' in el) el.disabled = true; });
@@ -13086,6 +13179,8 @@ async function finishSetupWizard() {
     s.finishing = false; controls.forEach(el => { if ('disabled' in el) el.disabled = false; });
     s.loginPending = false; s.loginURL = '';
     if (setupCurrentStep(s) === 'sync') renderSetupSync(s);
+    // Restore the ready helper view after a failed save, including Next only.
+    if (setupCurrentStep(s) === 'permission') renderSetup(s,false);
     $('setup-back').disabled = s.index === 0;
     $('setup-next').textContent = s.index === s.steps.length-1 ? 'Finish' : 'Next';
     $('setup-error').textContent = setupPlain(err.message,'Your setup could not be saved. Please try again.');
@@ -13098,6 +13193,7 @@ async function checkFirstRun() {
   document.querySelector('.app').inert = true;
   try {
     const data = await api('/api/firstrun',{});
+    updateHelperStatus(data.helper);
     if (data.needed) {
       document.querySelector('.app').inert = false;
       const s = await openSetupWizard({data});
@@ -13114,10 +13210,14 @@ $('setup-close').addEventListener('click',finishSetupWizard);
 $('setup-again').addEventListener('click',() => openSetupWizard().catch(() => status('Setup could not be opened. Please try again.',true)));
 $('setup-content').addEventListener('click',e => {
   const s = setupSession;
-  if (!setupAlive(s) || s.moving) return;
+  if (!setupAlive(s) || s.moving || s.helperBusy) return;
   const button = e.target.closest('button'); if (!button) return;
-  if (button.hasAttribute('data-setup-permission')) setupChoose(s,'permission',button.dataset.setupPermission === 'allow',button);
+  if (button.hasAttribute('data-setup-permission')) {
+    if (button.dataset.setupPermission === 'allow') setupInstallHelper(s);
+    else setupChoose(s,'permission',false,button);
+  }
   if (button.hasAttribute('data-setup-preset')) setupChoose(s,'preset',button.dataset.setupPreset,button);
+  if (button.hasAttribute('data-setup-region')) setupChoose(s,'region',button.dataset.setupRegion || null,button);
   if (button.hasAttribute('data-setup-theme')) setupPreviewTheme(s,button.dataset.setupTheme,button);
   if (button.id === 'setup-steam') setupSteamLogin(s);
   if (button.id === 'setup-sync-retry') setupSync(s);
@@ -13143,7 +13243,7 @@ document.addEventListener('keydown',e => {
     e.stopImmediatePropagation(); return;
   }
   if (e.key === 'Enter' && !e.repeat && !e.altKey && !e.ctrlKey && !e.metaKey && !e.target.closest('button,a,input,select,textarea')) { e.preventDefault(); setupMove(1); }
-  const group = e.target.closest('.setup-presets,.setup-themes');
+  const group = e.target.closest('.setup-presets,.setup-themes,.setup-regions');
   if (group && ['ArrowLeft','ArrowRight','Home','End'].includes(e.key)) {
     const buttons = [...group.querySelectorAll('button')], index = buttons.indexOf(e.target.closest('button'));
     const next = e.key === 'Home' ? 0 : e.key === 'End' ? buttons.length-1 : (index+(e.key === 'ArrowRight' ? 1 : -1)+buttons.length)%buttons.length;
