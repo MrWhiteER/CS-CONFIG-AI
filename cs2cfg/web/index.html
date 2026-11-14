@@ -5633,6 +5633,7 @@ html.setup-checking .app { visibility:hidden; }
 @media (max-height: 860px) {
   .setup-helper-list { grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; }
   .setup-helper-list li { padding:7px 10px; gap:8px; }
+  .setup-helper-list + .setup-stack { gap:8px; }.setup-helper-list + .setup-stack .setup-choice { padding:14px 18px; }
 }
 .setup-helper-status { min-height:64px; }.setup-helper-status p { line-height:1.65; }
 .setup-helper-status.is-ready { animation:setup-success 650ms ease-out both; }
