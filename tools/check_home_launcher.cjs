@@ -9,6 +9,7 @@ let code=`const $=id=>document.getElementById(id); const esc=x=>String(x??'').re
 code+=slice('/* Launcher motion:','function renderPlan(');
 code+=slice('/* Every card uses','async function previewPlan()');
 code+=slice('function ring(value','function meter(');
+code+=slice('/* Administrator helper status','/* ------');
 code+=slice('// Horizontal thermal strips','// --- live system readout');
 code+=`document.documentElement.dataset.boot='ready';document.querySelector('.boot-screen').remove();$('preview').addEventListener('click',()=>previews++);
 const checks=[];function check(name,ok){checks.push({name,ok});if(!ok)throw Error(name)}

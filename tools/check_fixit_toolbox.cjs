@@ -17,7 +17,7 @@ let answer={ok:true,fixes:${JSON.stringify(fixes)},adapters:[{name:'Ethernet',sp
 let response={ok:true,detail:'Mock repair completed'},pending=null,surveyWait=null,readError=false,accept=true,confirmations=[],launches=0;
 window.confirm=text=>{confirmations.push(text);return accept};$('play').addEventListener('click',()=>launches++);
 async function api(route,body){calls.push({route,body});if(route==='/api/fix/survey'){if(surveyWait)return new Promise(r=>surveyWait=r);if(readError)throw Error('mock survey unavailable');return structuredClone(answer)}if(route!=='/api/fix/run')throw Error('Unexpected endpoint '+route);if(pending)return new Promise(r=>pending=r);if(response instanceof Error)throw response;return structuredClone(response)}
-`+slice('let fixData = null;','// Horizontal thermal strips')+`
+`+slice('/* Administrator helper status','/* ------')+slice('let fixData = null;','// Horizontal thermal strips')+`
 document.documentElement.dataset.boot='ready';document.querySelector('.boot-screen')?.remove();document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('hidden',p.dataset.panel!=='fix'));
 const tile=id=>document.querySelector('[data-tool="'+id+'"]'),btn=id=>document.querySelector('[data-fix="'+id+'"]');
 (async()=>{try{
