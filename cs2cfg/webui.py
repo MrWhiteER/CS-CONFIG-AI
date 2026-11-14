@@ -711,7 +711,7 @@ def _save_prefs(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     allowed = (
         "intent", "target_fps", "account", "write_video", "write_cfg",
         "write_launch", "link_autoexec", "stretch_mode", "patch_video",
-        "cfg_folder", "tab", "favourites", "mouse_shape", "kb_layout", "kb_shown",
+        "cfg_folder", "tab", "favourites", "mouse_shape", "kb_layout", "kb_shown", "kb_focus",
         "update_auto_download", "update_skip", "rail_width", "pinned_account",
         # Named setups are written through their own endpoint, but the page
         # also sends them back with everything else when preferences are

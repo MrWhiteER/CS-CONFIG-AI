@@ -3,64 +3,6 @@ let kbOpenInspector = false;
 let kbAssignedCode = null;
 let kbWorkspaceObserver = null;
 
-function kbFitLayout(scene) {
-  // Measure the complete pieces, including the mouse callout gutters and the
-  // keyboard's perspective padding. Old renderer dimensions do not apply.
-  const width = scene.clientWidth;
-  if (!width) return false; // A hidden tab has no geometry yet.
-  const board = scene.querySelector('[data-piece="board"]');
-  const mouse = scene.querySelector('[data-piece="mouse"]');
-  const gap = board && mouse ? 24 : 0;
-  const scale = Math.min(1.15, (width - 2 * KB_EDGE - gap) /
-    ((board?.offsetWidth || 0) + (mouse?.offsetWidth || 0) || 1));
-  let x = KB_EDGE;
-  for (const [name, el] of [['board', board], ['mouse', mouse]]) {
-    if (!el) continue;
-    kbLayout[name] = {x, y:65, s:scale};
-    x += el.offsetWidth * scale + gap;
-  }
-  kbLayout.version = KB_LAYOUT_VERSION;
-  return true;
-}
-
-function kbLoadLayout(saved) {
-  // Keep the payload under the existing kb_layout preference/API. A geometry
-  // version replaces the fragile check for one exact old default position.
-  kbLayout = saved && typeof saved === 'object'
-    ? JSON.parse(JSON.stringify(saved)) : JSON.parse(JSON.stringify(KB_HOME));
-  for (const name of ['board', 'mouse']) {
-    const at = kbLayout[name];
-    if (!at || !['x','y','s'].every(k => Number.isFinite(at[k])) || at.s <= 0)
-      kbLayout[name] = {...KB_HOME[name]};
-  }
-  renderKeyboard.placed = false;
-}
-
-function kbLayoutFits(scene) {
-  const boxes = [];
-  for (const name of ['board', 'mouse']) {
-    const el = scene.querySelector('[data-piece="'+name+'"]');
-    if (!el) continue;
-    const at = kbLayout[name];
-    const box = {x:at.x, y:at.y, w:el.offsetWidth*at.s, h:el.offsetHeight*at.s};
-    if (![box.x,box.y,box.w,box.h].every(Number.isFinite) || at.s <= 0 ||
-        box.x < KB_EDGE-1 || box.y < 65 ||
-        box.x+box.w > scene.clientWidth-KB_EDGE+1 || box.y+box.h > 2000) return false;
-    boxes.push(box);
-  }
-  return boxes.length < 2 || !boxes.some((a,i) => boxes.slice(i+1).some(b =>
-    a.x < b.x+b.w+8 && a.x+a.w+8 > b.x && a.y < b.y+b.h+8 && a.y+a.h+8 > b.y));
-}
-
-function kbEnsureLayout(scene, initial = false) {
-  if (!scene?.clientWidth) return;
-  if (kbLayout.version !== KB_LAYOUT_VERSION || !kbLayoutFits(scene)) {
-    if (kbFitLayout(scene)) kbSaveLayout();
-  }
-  if (initial) renderKeyboard.placed = true;
-  ['board','mouse'].forEach(kbPlace);
-}
-
 function kbDecorateWorkspace() {
   const out = document.getElementById('kb-out');
   if (!out) return;
@@ -80,21 +22,15 @@ function kbDecorateWorkspace() {
     if (dot) dot.parentElement.insertAdjacentHTML('beforeend','<b class="kb-state-count">'+count+'</b>');
   });
   out.querySelectorAll('.kbsw-tab .kb-ico-art').forEach(el => el.classList.add('kbsw-device-icon'));
-  if (!kbWorkspaceObserver && typeof ResizeObserver !== 'undefined') {
-    kbWorkspaceObserver = new ResizeObserver(() => {
-      const scene = document.getElementById('kb-scene');
-      if (!scene) return;
-      if (scene.clientWidth === kbDecorateWorkspace.width) return;
-      kbDecorateWorkspace.width = scene.clientWidth;
-      kbEnsureLayout(scene, !renderKeyboard.placed);
-    });
-  }
-  // The rail, breakpoint and device column can resize independently of kb-out.
-  // renderKeyboard replaces the scene, so reattach to the current desk.
-  if (kbWorkspaceObserver) {
-    kbWorkspaceObserver.disconnect();
-    kbWorkspaceObserver.observe(document.getElementById('kb-scene'));
-  }
+  const scene = document.getElementById('kb-scene');
+  // A single zoom participates in normal flow, including the stage height.
+  const scaleStage = () => {
+    if (scene.clientWidth) scene.style.setProperty('--kb-scale', Math.min(1.25, scene.clientWidth * .88 / 1264));
+  };
+  scaleStage();
+  if (kbWorkspaceObserver) kbWorkspaceObserver.disconnect();
+  kbWorkspaceObserver = new ResizeObserver(scaleStage);
+  kbWorkspaceObserver.observe(scene);
 }
 
 (function kbCommandInteraction() {
@@ -124,7 +60,8 @@ function kbDecorateWorkspace() {
     }
     drag.ghost.style.left=Math.min(innerWidth-200,e.clientX+16)+'px';
     drag.ghost.style.top=e.clientY+16+'px';
-    const target = document.elementFromPoint(e.clientX,e.clientY)?.closest('#kb-out [data-kbcode]');
+    const hit = document.elementFromPoint(e.clientX,e.clientY)?.closest('#kb-out [data-kbcode]');
+    const target = hit && !hit.closest('.is-ghost') ? hit : null;
     if (drag.target!==target) {
       if (drag.target) drag.target.classList.remove('kb-drop-target');
       drag.target=target;
@@ -138,7 +75,7 @@ function kbDecorateWorkspace() {
     clearDrag(false);
     if (!ghost) return; // A click still assigns to the selected control.
     suppressUntil=performance.now()+400;
-    if (!target || kbBusy) return;
+    if (!target || target.closest('.is-ghost') || kbBusy) return;
     pickedKey={code:target.dataset.kbcode,label:target.dataset.kblabel};
     kbOptions=null; kbOpenInspector=true;
     kbAssign({code:pickedKey.code,command}, a=>pickedKey.label+' now runs '+a.command);
@@ -151,15 +88,15 @@ function kbDecorateWorkspace() {
   document.addEventListener('keydown',e=>{
     if(e.key==='Escape'){clearDrag();hidePreview();}
     const zone=e.target.closest('.ms-zone');
-    if(zone && (e.key==='Enter'||e.key===' ')){
+    if(zone && !zone.closest('.is-ghost') && (e.key==='Enter'||e.key===' ')){
       e.preventDefault();zone.dispatchEvent(new MouseEvent('click',{bubbles:true}));
     }
   });
   function showPreview(el) {
     hidePreview();
-    if (drag || kbBusy) return;
+    if (drag || kbBusy || el.closest('.is-ghost')) return;
     timer=setTimeout(()=>{
-      if (!el.isConnected) return;
+      if (!el.isConnected || el.closest('.is-ghost')) return;
       preview=document.createElement('div'); preview.className='kb-hover-preview';
       const label=document.createElement('b');label.textContent=el.dataset.kblabel;
       preview.append(label,document.createTextNode(el.dataset.kbpreview||'Free'));
