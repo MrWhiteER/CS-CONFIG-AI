@@ -3892,6 +3892,41 @@ def _faceit_apps_launch(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     return faceit_apps.launch(ui, str(body.get("app") or ""))
 
 
+def _match_state(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """The match waiting to be accepted, if any, and whether alerts are on."""
+    from . import matchwatch
+
+    return {"ok": True, "alert": matchwatch.current(),
+            "enabled": matchwatch.enabled()}
+
+
+def _match_accept(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """The alert's Accept: CS2 is clicked, FACEIT is only brought forward."""
+    from . import matchwatch
+
+    return matchwatch.accept()
+
+
+def _match_dismiss(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import matchwatch
+
+    matchwatch.dismiss()
+    return {"ok": True}
+
+
+def _match_settings(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Turn the match-found alert on or off. App-wide, not per account."""
+    from . import matchwatch
+    from .cli import load_prefs, save_prefs
+
+    prefs = load_prefs()
+    if "enabled" in body:
+        prefs["match_alert"] = bool(body.get("enabled"))
+        save_prefs(prefs)
+        matchwatch.set_enabled(prefs["match_alert"])
+    return {"ok": True, "enabled": bool(prefs.get("match_alert", True))}
+
+
 def _companions_start(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     """Start one companion, by the id its tile was drawn with."""
     from . import companions, profiles
@@ -4594,6 +4629,10 @@ def make_handler(state: State):
         "/api/demos/identities": _demo_identities,
         "/api/faceit": _faceit,
         "/api/faceit/forget": _faceit_forget,
+        "/api/match/state": _match_state,
+        "/api/match/accept": _match_accept,
+        "/api/match/dismiss": _match_dismiss,
+        "/api/match/settings": _match_settings,
         "/api/faceit/apps": _faceit_apps,
         "/api/faceit/apps/set": _faceit_apps_set,
         "/api/faceit/apps/launch": _faceit_apps_launch,
