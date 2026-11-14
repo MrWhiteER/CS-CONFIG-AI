@@ -82,6 +82,14 @@ user32.DefWindowProcW.restype = LRESULT
 user32.DefWindowProcW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM,
                                   wintypes.LPARAM]
 user32.CreateWindowExW.restype = wintypes.HWND
+# Declared in full: on 64-bit Windows an undeclared HWND is cut to 32 bits and
+# CreateWindowExW overflows (what the first run on a real PC hit).
+user32.CreateWindowExW.argtypes = [
+    wintypes.DWORD, wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.DWORD,
+    ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+    wintypes.HWND, wintypes.HMENU, wintypes.HINSTANCE, wintypes.LPVOID]
+user32.RegisterShellHookWindow.argtypes = [wintypes.HWND]
+kernel32.GetModuleHandleW.restype = wintypes.HMODULE
 user32.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
 user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
 

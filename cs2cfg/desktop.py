@@ -328,6 +328,7 @@ def _launch_webview(url: str, icon: Optional[Path], on_closed: Callable[[], None
         )
         window.events.closed += on_closed
         _keep_running_in_the_tray(window, icon)
+        _watch_for_matches(url)
 
         kwargs = {}
         if icon and icon.exists():
@@ -422,6 +423,85 @@ def _keep_running_in_the_tray(window, icon: Optional[Path]) -> bool:
 
     window.events.closing += on_closing
     return True
+
+
+ALERT_TITLE = f"{APP_NAME} - Match found"
+
+
+def _watch_for_matches(url: str) -> None:
+    """Pop a small always-on-top window on the main monitor when a match is
+    found in FACEIT or CS2. See cs2cfg/matchwatch.py for how it is noticed."""
+    if sys.platform != "win32":
+        return
+    try:
+        import webview
+
+        from . import matchwatch
+        from .cli import load_prefs
+    except Exception:
+        return
+
+    matchwatch.set_enabled(bool(load_prefs().get("match_alert", True)))
+    held = {"window": None}
+    lock = threading.Lock()
+
+    def close() -> None:
+        with lock:
+            win, held["window"] = held["window"], None
+        if win is not None:
+            try:
+                win.destroy()
+            except Exception:
+                pass
+
+    def open_alert() -> None:
+        close()
+        width, height = 460, 300
+        try:
+            user32 = ctypes.WinDLL("user32", use_last_error=True)
+            # The primary monitor always starts at 0,0.
+            screen_w = user32.GetSystemMetrics(0)
+            screen_h = user32.GetSystemMetrics(1)
+        except Exception:
+            screen_w, screen_h = 1920, 1080
+        x = max(0, (screen_w - width) // 2)
+        y = max(0, int(screen_h * 0.28))
+        try:
+            win = webview.create_window(
+                ALERT_TITLE, url.rstrip("/") + "/alert.html",
+                width=width, height=height, x=x, y=y,
+                resizable=False, frameless=True, on_top=True,
+                focus=True, confirm_close=False)
+        except Exception:
+            return
+        with lock:
+            held["window"] = win
+
+        def raise_it() -> None:
+            try:
+                focus_existing_window(ALERT_TITLE, same_process=True)
+            except Exception:
+                pass
+        try:
+            win.events.shown += lambda: threading.Timer(0.15, raise_it).start()
+        except Exception:
+            pass
+        try:
+            import winsound
+
+            winsound.PlaySound("SystemExclamation",
+                               winsound.SND_ALIAS | winsound.SND_ASYNC)
+        except Exception:
+            pass
+
+    def on_event(what, _alert) -> None:
+        if what == "start":
+            threading.Thread(target=open_alert, daemon=True).start()
+        elif what == "end":
+            threading.Thread(target=close, daemon=True).start()
+
+    matchwatch.add_listener(on_event)
+    matchwatch.start()
 
 
 def _launch_browser_app_window(url: str) -> bool:
