@@ -5562,8 +5562,153 @@
 
 <link rel="stylesheet" href="assets/devices/workspace.css">
 <link rel="stylesheet" href="assets/fixit/toolbox.css">
+<style>
+/* First run: one decision on a full-window stage. Motion stays on compositor
+   properties; even theme previews fade a frozen copy rather than tween colours. */
+html.setup-checking .app { visibility:hidden; }
+.setup-wizard[hidden], .setup-wizard [hidden], .sync-control [hidden], [data-helper-warning][hidden] { display:none !important; }
+.setup-wizard { position:fixed; inset:0; z-index:20000; display:grid; place-items:center; padding:32px; isolation:isolate; background:var(--bg); color:var(--ink); font-family:var(--body); }
+.setup-atmosphere { position:absolute; inset:0; overflow:hidden; pointer-events:none; z-index:-1; }
+.setup-atmosphere::before, .setup-atmosphere::after { content:''; position:absolute; width:80vmax; height:80vmax; border-radius:50%; background:radial-gradient(ellipse,var(--accent-dim),transparent 65%); animation:setup-drift 18s ease-in-out infinite alternate; }
+.setup-atmosphere::before { left:-35%; top:-65%; }.setup-atmosphere::after { right:-40%; bottom:-70%; animation-delay:-9s; }
+.setup-particles { position:absolute; inset:0; opacity:.3; background-image:radial-gradient(var(--accent) 1px,transparent 1px); background-size:83px 83px; mask-image:linear-gradient(transparent, var(--ink),transparent); animation:setup-drift 24s ease-in-out infinite alternate-reverse; }
+.setup-shell { width:min(1100px,100%); height:min(780px,calc(100dvh - 64px)); display:flex; flex-direction:column; position:relative; min-height:0; background:var(--panel); border:1px solid var(--line); border-radius:var(--component-radius,14px); box-shadow:var(--floating-shadow); backdrop-filter:var(--panel-blur); animation:setup-arrive 320ms ease-out both; }
+.setup-shell::before, .setup-shell::after { content:''; pointer-events:none; position:absolute; width:30px; height:30px; border-color:var(--accent); opacity:.6; }
+.setup-shell::before { top:-1px; left:-1px; border-top:2px solid var(--accent); border-left:2px solid var(--accent); border-top-left-radius:inherit; }.setup-shell::after { bottom:-1px; right:-1px; border-right:2px solid var(--accent); border-bottom:2px solid var(--accent); border-bottom-right-radius:inherit; }
+.setup-top { display:flex; align-items:center; gap:12px; padding:24px 32px 18px; }
+.setup-brand { display:flex; align-items:center; gap:10px; font:600 13px var(--display); letter-spacing:.12em; }.setup-brand .config-mark { width:25px; height:25px; }
+.setup-top-note { margin-left:auto; color:var(--muted); font:10px var(--mono); letter-spacing:.1em; text-transform:uppercase; }
+.setup-wizard button, .sync-control button { font-family:inherit; cursor:pointer; }
+.setup-close { width:36px; height:36px; display:grid; place-items:center; color:var(--muted); border:1px solid var(--line); background:var(--bg-2); border-radius:var(--control-radius,6px); }
+.setup-close:hover { color:var(--ink); background:var(--chip); }
+.setup-wizard svg, .sync-control svg { width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; flex:none; }
+.setup-progress { display:grid; grid-template-columns:repeat(var(--setup-count,6),minmax(0,1fr)); list-style:none; gap:8px; margin:0; padding:0 32px 20px; }
+.setup-progress li { color:var(--muted); font-size:10px; letter-spacing:.04em; position:relative; padding-top:13px; }
+.setup-progress li::before, .setup-progress li::after { content:''; position:absolute; top:0; left:0; width:100%; height:3px; background:var(--line); border-radius:3px; }
+.setup-progress li::after { background:var(--accent); transform:scaleX(0); transform-origin:left; transition:transform 320ms ease-out; }
+.setup-progress .is-done::after { transform:scaleX(1); }.setup-progress [aria-current="step"] { color:var(--accent); }
+.setup-progress [aria-current="step"]::after { transform:scaleX(.6); animation:setup-pulse 2s ease-in-out infinite; }
+.setup-progress .is-done[aria-current="step"]::after { transform:scaleX(1); animation:none; }
+.setup-progress .is-skipped::after { background:var(--muted); transform:scaleX(.25); opacity:.4; }
+.setup-viewport { flex:1; min-height:0; overflow:auto; overscroll-behavior:contain; padding:24px 46px 28px; border-top:1px solid var(--line); }
+.setup-step { min-height:100%; display:flex; flex-direction:column; justify-content:center; }
+.setup-step.setup-enter { animation:setup-enter 160ms ease-out both; }.setup-step.setup-exit { animation:setup-exit 160ms ease-in both; pointer-events:none; }
+.setup-eyebrow { display:flex; align-items:center; gap:10px; color:var(--accent); font:11px var(--mono); letter-spacing:.14em; text-transform:uppercase; margin:0 0 14px; }
+.setup-eyebrow::before { content:''; width:28px; height:1px; background:var(--accent); transform:scaleX(0); transform-origin:left; animation:setup-line 500ms ease-out both; }
+.setup-step h1 { margin:0; font:600 clamp(30px,4vw,46px)/1.08 var(--display); letter-spacing:-.025em; color:var(--ink); text-transform:none; }
+.setup-step h1:focus { outline:none; }
+.setup-lead { color:var(--muted); font-size:14px; line-height:1.7; max-width:650px; margin:14px 0 26px; }
+.setup-split { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.15fr); align-items:center; gap:38px; }
+.setup-visual { position:relative; min-height:200px; display:grid; place-items:center; color:var(--accent); background:radial-gradient(ellipse,var(--accent-dim),transparent 68%); }
+.setup-visual > svg { width:min(100%,280px); height:220px; stroke-width:1; }.setup-orbit { transform-origin:140px 110px; animation:setup-orbit 36s linear infinite; }
+.setup-visual .setup-visual-core { fill:var(--panel-2); stroke:var(--accent); stroke-width:1.5; }
+.setup-visual-caption { position:absolute; bottom:0; color:var(--muted); font:10px var(--mono); letter-spacing:.12em; text-transform:uppercase; }
+.setup-stack { display:grid; gap:12px; min-width:0; }
+.setup-action { display:inline-flex; justify-content:center; align-items:center; gap:10px; min-height:44px; padding:11px 20px; border-radius:var(--control-radius,7px); border:1px solid var(--line); background:var(--bg-2); color:var(--ink); font-size:12px; font-weight:600; text-decoration:none; transition:transform 180ms ease-out,opacity 180ms ease-out; }
+.setup-action:hover:not(:disabled) { transform:translateY(-2px); border-color:var(--accent); }.setup-action.primary { color:var(--on-accent); background:var(--accent); border-color:var(--accent); box-shadow:0 5px 24px var(--accent-dim); }
+.setup-action:disabled { opacity:.45; cursor:default; }.setup-action.quiet { background:transparent; border-color:transparent; color:var(--muted); }
+.setup-wizard :is(button,a,select,input):focus-visible, .sync-control :is(button,input):focus-visible { outline:2px solid var(--accent); outline-offset:4px; }
+.setup-wizard :is(select,input):focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-dim); }
+.setup-foot { display:flex; align-items:center; gap:12px; padding:20px 32px; border-top:1px solid var(--line); }
+.setup-foot-note { color:var(--muted); font-size:11px; flex:1; }.setup-foot #setup-next { min-width:120px; }
+.setup-choice { position:relative; text-align:left; padding:20px; color:var(--ink); border:1px solid var(--line); border-radius:var(--component-radius,12px); background:var(--panel-2); transition:transform 180ms ease-out,opacity 180ms ease-out; min-width:0; }
+.setup-choice::after { content:''; position:absolute; inset:-1px; border:1px solid var(--accent); border-radius:inherit; pointer-events:none; box-shadow:0 0 28px var(--accent-dim); opacity:0; transition:opacity 180ms ease-out; }
+.setup-choice:hover { transform:translateY(-4px); }.setup-choice:hover::after { opacity:.5; }.setup-choice[aria-pressed="true"]::after { opacity:1; }
+.setup-choice.setup-picked { animation:setup-select 240ms ease-out; }
+.setup-choice b { display:block; font-size:16px; margin:0 28px 7px 0; }.setup-choice p { color:var(--muted); font-size:12px; line-height:1.65; margin:0; }
+.setup-tick { position:absolute; right:16px; top:17px; display:grid; place-items:center; width:22px; height:22px; border:1px solid var(--line); border-radius:50%; color:var(--accent); background:var(--bg); }
+.setup-tick svg { width:15px; height:15px; transform:scale(0); opacity:0; transition:transform 220ms ease-out,opacity 220ms ease-out; }
+[aria-pressed="true"] .setup-tick { border-color:var(--accent); }[aria-pressed="true"] .setup-tick svg { transform:scale(1); opacity:1; }
+/* A clipped group reveals the SVG stroke using transform, without animating paint. */
+.setup-tick svg g { transform:scaleX(0); transform-origin:left; }[aria-pressed="true"] .setup-tick svg g { animation:setup-line 240ms 70ms ease-out forwards; }
+.setup-path { display:flex; align-items:flex-start; gap:12px; padding:15px 18px; border:1px solid var(--line); border-radius:var(--control-radius,7px); background:var(--sunk); margin:0 0 18px; }
+.setup-path svg { color:var(--accent); }.setup-path code { font:11px/1.65 var(--mono); overflow-wrap:anywhere; }
+.setup-helper-list { list-style:none; margin:0; padding:0; display:grid; gap:8px; }
+.setup-helper-list li { display:flex; align-items:center; gap:12px; padding:10px 14px; border:1px solid var(--line); background:var(--panel-2); border-radius:var(--control-radius,7px); font-size:12px; }
+.setup-helper-list li > svg { width:18px; height:18px; color:var(--accent); }
+.setup-helper-list .setup-tick { position:static; margin-left:auto; flex:none; }
+.setup-helper-list.is-ready .setup-tick { border-color:var(--good); color:var(--good); }
+.setup-helper-list.is-ready .setup-tick svg { opacity:1; transform:scale(1); animation:setup-select 300ms calc(var(--scan-index,0)*70ms) both; }
+.setup-helper-list.is-ready .setup-tick svg g { transform:scaleX(1); }
+/* Short windows (1280x800 and below): two compact columns, so all five fit without a scroll. */
+@media (max-height: 860px) {
+  .setup-helper-list { grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; }
+  .setup-helper-list li { padding:7px 10px; gap:8px; }
+  .setup-helper-list + .setup-stack { gap:8px; }.setup-helper-list + .setup-stack .setup-choice { padding:14px 18px; }
+}
+.setup-helper-status { min-height:64px; }.setup-helper-status p { line-height:1.65; }
+.setup-helper-status.is-ready { animation:setup-success 650ms ease-out both; }
+.setup-helper-status.is-ready b { color:var(--good); }
+.setup-helper-wait { display:inline-flex; vertical-align:middle; margin-right:8px; color:var(--accent); animation:setup-orbit 2s linear infinite; }
+.setup-helper-wait svg { width:16px; height:16px; }
+.setup-choice:disabled { opacity:.55; cursor:wait; }.setup-choice:disabled:hover { transform:none; }
+.setup-regions { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr)); gap:12px; }
+.setup-region > svg { color:var(--accent); margin-bottom:14px; }
+.setup-note { color:var(--muted); font-size:12px; line-height:1.65; margin:8px 0; overflow-wrap:anywhere; }.setup-note.warn { color:var(--warn); }
+.setup-notice { padding:14px 16px; border-left:2px solid var(--accent); background:var(--accent-dim); border-radius:0 var(--control-radius) var(--control-radius) 0; }
+.setup-notice b { display:block; margin-bottom:4px; font-size:13px; }.setup-notice p { margin:0; font-size:12px; color:var(--muted); }
+.setup-sync-result.is-success { animation:setup-success 650ms ease-out both; }.setup-sync-result .setup-success-check, .setup-helper-status .setup-success-check { display:inline-flex; color:var(--good); vertical-align:middle; margin-right:6px; }
+.setup-toggle { display:flex; align-items:center; gap:14px; padding:17px 18px; background:var(--panel-2); border:1px solid var(--line); border-radius:var(--component-radius,12px); cursor:pointer; }
+.setup-toggle > span:nth-last-child(2) { flex:1; min-width:0; }.setup-toggle b { display:block; font-size:13px; font-weight:600; }.setup-toggle small { display:block; color:var(--muted); font-size:11px; margin-top:3px; }
+.setup-toggle input { appearance:none; -webkit-appearance:none; width:38px; height:22px; flex:none; border:1px solid var(--line); border-radius:20px; background:var(--chip); position:relative; cursor:pointer; margin:0; }
+.setup-toggle input::after { content:''; position:absolute; width:14px; height:14px; left:3px; top:3px; background:var(--muted); border-radius:50%; transition:transform 180ms ease-out; }
+.setup-toggle input:checked { border-color:var(--accent); background:var(--accent); }.setup-toggle input:checked::after { background:var(--on-accent); transform:translateX(16px); }
+.setup-device { display:grid; grid-template-columns:44px minmax(0,1fr) 20px; gap:14px; align-items:center; padding:22px; background:var(--panel-2); border:1px solid var(--line); border-radius:var(--component-radius,12px); }
+.setup-device > svg { width:32px; height:32px; color:var(--accent); }.setup-device > .setup-device-check { width:18px; height:18px; color:var(--good); animation:setup-select 300ms calc(var(--scan-index,0)*70ms + 180ms) both; }
+.setup-device label { display:block; font-size:12px; font-weight:600; margin-bottom:9px; }.setup-device select { width:100%; padding:10px 12px; background:var(--bg); color:var(--ink); border:1px solid var(--line); border-radius:var(--control-radius,6px); clip-path:none; font:12px var(--body); }
+.setup-scan { animation:setup-scan 360ms calc(var(--scan-index,0)*70ms) ease-out both; }
+.setup-hardware { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 20px; }.setup-hardware span { display:flex; align-items:center; gap:8px; border:1px solid var(--line); background:var(--chip); border-radius:var(--chip-radius,5px); color:var(--muted); padding:8px 12px; font:11px var(--mono); }.setup-hardware svg { width:16px; height:16px; color:var(--accent); }
+.setup-presets { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
+.setup-preset { overflow:hidden; padding:20px; display:flex; flex-direction:column; min-height:245px; }.setup-preset::before { content:''; position:absolute; inset:0; opacity:.14; pointer-events:none; background:linear-gradient(130deg,transparent 30%,var(--accent-dim) 70%); }
+.setup-preset[data-setup-preset="competitive"]::before { background:repeating-linear-gradient(130deg,transparent 0 25px,var(--accent-dim) 26px 27px,transparent 28px 60px); animation:setup-speed 5s ease-in-out infinite; }
+.setup-preset > svg { width:36px; height:36px; margin:5px 0 24px; color:var(--accent); }.setup-preset b { font:600 21px var(--display); margin-bottom:14px; }
+.setup-fps { display:flex; align-items:baseline; gap:5px; margin:0 0 15px; color:var(--accent); font:600 34px var(--display); font-variant-numeric:tabular-nums; letter-spacing:-.03em; }.setup-fps small { font:10px var(--mono); letter-spacing:.08em; }.setup-fps.unavailable { font:12px var(--body); letter-spacing:0; min-height:41px; align-items:center; }
+.setup-preset p { flex:1; }.setup-limit { color:var(--muted); font-size:10px; margin-top:15px; }
+.setup-apps { display:grid; gap:10px; }.setup-app-icon { width:36px; height:36px; flex:none; object-fit:contain; }.setup-app-icon-fallback { display:grid; place-items:center; background:var(--accent-dim); color:var(--accent); border-radius:8px; }
+.setup-app-found { display:inline-flex; vertical-align:middle; margin-left:6px; color:var(--good); animation:setup-select 300ms calc(var(--scan-index,0)*70ms + 180ms) both; }.setup-app-found svg { width:13px; height:13px; }
+.setup-themes { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:12px; }.setup-theme { padding:10px; }.setup-theme b { font-size:12px; margin:10px 0 2px; }.setup-theme .setup-tick { top:17px; right:17px; }
+.setup-theme:not([aria-pressed="true"]) .setup-tick { opacity:0; }
+.setup-swatch { height:73px; border-radius:var(--control-radius,5px); padding:9px; display:grid; grid-template-columns:12px 1fr; gap:5px; background:var(--sw-bg); border:1px solid var(--line); color:var(--sw-accent); }.setup-swatch > i { background:var(--sw-panel); border-radius:2px; }.setup-swatch > span { display:grid; align-content:end; gap:5px; padding:7px; background:var(--sw-panel); border-radius:2px; }.setup-swatch em { display:block; width:65%; height:3px; background:var(--sw-accent); opacity:.5; }.setup-swatch em:last-child { width:43%; opacity:1; }
+.setup-theme-ghost { position:fixed; pointer-events:none; z-index:20001; margin:0; animation:setup-theme-fade 400ms ease-out both; }.setup-theme-ghost *, .setup-theme-ghost *::before, .setup-theme-ghost *::after { animation:none !important; transition:none !important; }
+.setup-wizard.is-finishing { animation:setup-finish 280ms ease-in forwards; pointer-events:none; }.setup-wizard.is-finishing .setup-shell { animation:setup-shrink 280ms ease-in forwards; }
+.setup-error { margin:0; padding:0 32px 12px; color:var(--warn); font-size:12px; }.setup-error:empty { display:none; }
+.setup-paused *, .setup-paused *::before, .setup-paused *::after { animation-play-state:paused !important; }
+.setup-restart { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:18px 22px; margin:0 0 16px; border:1px solid var(--line); background:var(--panel); border-radius:var(--component-radius); }.setup-restart b { display:block; font-size:13px; }.setup-restart p { margin:3px 0 0; color:var(--muted); font-size:12px; }
+.sync-control { position:relative; flex:none; }.sync-indicator { display:flex; align-items:center; gap:7px; padding:6px 10px; max-width:210px; background:var(--bg-2); color:var(--muted); border:1px solid var(--line); border-radius:var(--chip-radius,6px); font-size:10px; min-height:31px; }.sync-indicator svg { width:15px; height:15px; }.sync-indicator span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }.sync-indicator[data-state="ready"] svg { color:var(--good); }.sync-indicator[data-state="waiting"] svg { color:var(--warn); }.sync-indicator[data-state="busy"] svg { color:var(--accent); animation:setup-orbit 2s linear infinite; transform-origin:center; }
+.sync-popover { position:absolute; top:calc(100% + 10px); right:0; z-index:100; width:min(330px,calc(100vw - 40px)); padding:18px; color:var(--ink); background:var(--glass-3); backdrop-filter:var(--panel-blur); border:1px solid var(--line); border-radius:var(--component-radius,12px); box-shadow:var(--floating-shadow); animation:setup-scan 180ms ease-out both; }.sync-popover h3 { margin:0 0 8px; font-size:14px; }.sync-popover p { color:var(--muted); font-size:12px; line-height:1.6; margin:0 0 12px; overflow-wrap:anywhere; }.sync-popover .setup-toggle { padding:12px 0 0; margin-top:12px; background:none; border:0; border-top:1px solid var(--line); border-radius:0; }.sync-popover .setup-toggle b { font-size:11px; }
+@keyframes setup-drift { from { transform:translate3d(-12px,-10px,0) scale(.98); } to { transform:translate3d(24px,20px,0) scale(1.06); } }
+@keyframes setup-orbit { to { transform:rotate(360deg); } }
+@keyframes setup-arrive { from { opacity:0; transform:translateY(12px) scale(.99); } to { opacity:1; transform:none; } }
+@keyframes setup-enter { from { opacity:0; transform:translateX(calc(var(--setup-direction,1)*24px)); } to { opacity:1; transform:none; } }
+@keyframes setup-exit { from { opacity:1; transform:none; } to { opacity:0; transform:translateX(calc(var(--setup-direction,1)*-24px)); } }
+@keyframes setup-select { 0% { transform:scale(.97); } 65% { transform:scale(1.015); } 100% { transform:scale(1); } }
+@keyframes setup-line { to { transform:scaleX(1); } }
+@keyframes setup-pulse { 50% { opacity:.4; } }
+@keyframes setup-scan { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+@keyframes setup-success { 0% { opacity:0; transform:translateY(12px) scale(.97); } 55% { opacity:1; transform:translateY(0) scale(1.02); } 100% { transform:none; } }
+@keyframes setup-speed { 0%,65% { transform:translateX(-15%); opacity:.1; } 100% { transform:translateX(15%); opacity:.25; } }
+@keyframes setup-theme-fade { from { opacity:1; } to { opacity:0; } }
+@keyframes setup-finish { to { opacity:0; } }@keyframes setup-shrink { to { transform:scale(.97); } }
+@media(max-width:800px) { .setup-wizard { padding:14px; }.setup-top { padding:18px 22px; }.setup-progress { padding:0 22px 16px; }.setup-viewport { padding:24px; }.setup-foot { padding:16px 22px; }.setup-foot-note { display:none; }.setup-foot #setup-skip { margin-left:auto; }.setup-split { gap:20px; grid-template-columns:minmax(0,.7fr) minmax(0,1fr); }.setup-presets { gap:10px; }.setup-preset { padding:15px; }.setup-themes { gap:8px; }.setup-theme { padding:7px; }.setup-fps { font-size:28px; } }
+@media(max-width:580px) { .setup-wizard { padding:0; }.setup-shell { height:100%; border:0; border-radius:0; }.setup-top-note { display:none; }.setup-close { margin-left:auto; }.setup-progress { gap:5px; }.setup-progress li { font-size:9px; }.setup-split { grid-template-columns:1fr; }.setup-visual { display:none; }.setup-presets { grid-template-columns:1fr; }.setup-preset { min-height:0; display:grid; grid-template-columns:1fr 1fr; gap:4px 12px; }.setup-preset > svg { display:none; }.setup-preset b { font-size:18px; }.setup-preset p { grid-column:1/-1; }.setup-fps { font-size:25px; margin:0; }.setup-limit { grid-column:1/-1; margin-top:6px; }.setup-themes { grid-template-columns:repeat(2,minmax(0,1fr)); }.setup-swatch { height:62px; }.setup-lead { font-size:13px; }.setup-restart { align-items:flex-start; flex-direction:column; }.sync-indicator { max-width:140px; } }
+@media(max-width:800px) { .setup-shell { height:min(780px,calc(100dvh - 28px)); } }
+@media(max-width:580px) { .setup-shell { height:100dvh; } }
+@media(prefers-reduced-motion:reduce) { .setup-wizard *, .setup-wizard *::before, .setup-wizard *::after, .sync-control *, .sync-control *::after { animation:none !important; transition:none !important; }.setup-wizard .setup-particles { display:none; }.setup-step.setup-enter { animation:setup-theme-fade 100ms ease-out reverse both !important; }.setup-step.setup-exit, .setup-wizard.is-finishing { animation:setup-theme-fade 100ms ease-out both !important; }.setup-wizard .setup-choice:hover { transform:none; }[aria-pressed="true"] .setup-tick svg g { transform:scaleX(1); } }
+@media(prefers-reduced-motion:reduce) { .setup-eyebrow::before { transform:scaleX(1); } }
+</style>
 </head>
 <body>
+<script>document.documentElement.classList.add("setup-checking");</script>
+<div id="setup-wizard" class="setup-wizard" role="dialog" aria-modal="true" aria-labelledby="setup-title" hidden>
+  <div class="setup-atmosphere" aria-hidden="true"><div class="setup-particles"></div></div>
+  <div class="setup-shell">
+    <div class="setup-top"><span class="setup-brand"><span class="config-mark" aria-hidden="true"></span>CS CONFIG AI</span><span class="setup-top-note">Your PC. Your game.</span><button type="button" id="setup-close" class="setup-close" aria-label="Save answers and close setup" title="Save answers and close (Esc)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
+    <ol id="setup-progress" class="setup-progress" aria-label="Setup progress"></ol>
+    <div id="setup-viewport" class="setup-viewport"><div id="setup-content" class="setup-step"></div></div>
+    <p id="setup-error" class="setup-error" role="alert"></p>
+    <div class="setup-foot"><button type="button" id="setup-back" class="setup-action">Back</button><span class="setup-foot-note">Make it yours. Change any choice later in Settings.</span><button type="button" id="setup-skip" class="setup-action quiet">Skip</button><button type="button" id="setup-next" class="setup-action primary">Next <span aria-hidden="true">&rarr;</span></button></div>
+  </div>
+</div>
 <!-- Startup readiness dismisses this veil; independent JS/CSS deadlines always uncover it. -->
 <div class="boot-screen" aria-hidden="true">
   <div class="boot-content">
@@ -5662,6 +5807,10 @@ const startup = (() => {
     <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></symbol>
     <symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 00-5.4 5.4L4 17v3h3l5.3-5.3a4 4 0 005.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></symbol>
     <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h10M18 18h2"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="16" cy="18" r="2"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="m12 3 8 3v6c0 4-4 7-8 9-4-2-8-5-8-9V6z"/><path d="m8 12 3 3 5-6"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 15v2m5-6v6m5-10v10"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18M5 7h14M5 17h14"/></symbol>
+    <symbol id="i-sync" viewBox="0 0 24 24"><path d="M20 8a9 9 0 0 0-15-3L3 7m0-5v5h5M4 16a9 9 0 0 0 15 3l2-2m0 5v-5h-5"/></symbol>
   </defs>
 </svg>
 
@@ -5783,6 +5932,15 @@ const startup = (() => {
       <span class="spacer"></span>
       <div class="modebadge" id="mode-badge"></div>
       <div class="scorebar" id="scorebar"></div>
+      <div class="sync-control" id="sync-control">
+        <button type="button" id="sync-indicator" class="sync-indicator" aria-expanded="false" aria-controls="sync-popover" title="Sync with your Steam account"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 3M4 15l2 3a7 7 0 0 0 12-1"/></svg><span id="sync-label">Sync</span></button>
+        <div id="sync-popover" class="sync-popover" role="region" aria-label="Sync with your Steam account" hidden>
+          <h3>Your Steam account</h3><p id="sync-detail" aria-live="polite">Checking sync status&hellip;</p>
+          <button type="button" id="sync-permission" class="setup-action" hidden>Allow config files</button>
+          <button type="button" id="sync-now" class="setup-action">Sync now</button>
+          <label class="setup-toggle"><span><b>Sync automatically</b><small>Keep this PC up to date</small></span><input type="checkbox" id="sync-auto" aria-label="Sync automatically" checked></label>
+        </div>
+      </div>
     </div>
 
     <div id="status">Detecting hardware&hellip;</div>
@@ -6221,6 +6379,7 @@ const startup = (() => {
 
 
       <div class="settings-box">
+      <div class="setup-restart"><div><b>Your first-run setup</b><p>Revisit sound, your game preset, companions and more.</p></div><button type="button" class="btn" id="setup-again">Run setup again</button></div>
       <div class="segwrap">
         <div class="segbar" id="settings-subtabs" role="tablist">
           <div class="seg-thumb" id="seg-thumb"></div>
@@ -8347,6 +8506,18 @@ document.addEventListener("click", e => {
   if (e.target.closest("#audio-refresh")) loadAudio(true);
 });
 
+/* Administrator helper status is shared by setup, Fix It and sensor notes. */
+let helperStatus = null;
+function helperReady(value = helperStatus) { return !!(value && value.installed && value.current); }
+function updateHelperStatus(value) {
+  if (value) helperStatus = value;
+  document.querySelectorAll('[data-helper-warning]').forEach(el => { el.hidden = helperReady(); });
+}
+async function refreshHelperStatus() {
+  try { updateHelperStatus(await api('/api/helper',{})); } catch (err) { /* keep the last known status */ }
+  return helperStatus;
+}
+
 /* ---------------------------------------------------------------------------
    Fix It.
 
@@ -8429,7 +8600,7 @@ async function loadFixes(force) {
   $("fix-refresh").textContent = "Checking...";
   if (box && !fixData) box.innerHTML = '<div class="fix-banner" role="status">Checking...  reading devices and current settings...</div>';
   try {
-    fixData = await api("/api/fix/survey", {});
+    [fixData] = await Promise.all([api("/api/fix/survey", {}), refreshHelperStatus()]);
     renderFixes();
   } catch (err) {
     if (box) { box.querySelector(".fix-survey-error")?.remove(); box.insertAdjacentHTML("afterbegin", '<p class="fix-banner fix-survey-error" role="alert">Could not read the machine: ' + esc(String(err && err.message || err)) + '. Use Check current settings to retry.</p>'); }
@@ -8485,7 +8656,7 @@ function fixTile(fix, inner) {
   const copy = FIX_COPY[fix.id] || [fix.blurb, fix.danger, "Working"];
   const shield = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6zM12 8v5m0 3v1"/></svg>';
   const pause = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7v10M16 7v10"/><circle cx="12" cy="12" r="10"/></svg>';
-  const tags = (fix.needs_admin ? '<span class="fix-chip">' + shield + 'Administrator</span>' : '') +
+  const tags = (fix.needs_admin ? '<span class="fix-chip" data-helper-warning' + (helperReady() ? ' hidden' : '') + '>' + shield + 'Administrator</span>' : '') +
     (fix.disruptive && !fix.allowed_in_game ? '<span class="fix-chip">' + pause + 'Close CS2 first</span>' : '');
   return '<section class="fix-tile" data-tool="' + esc(fix.id) + '" data-family="' + esc(fix.family) + '">' +
     '<div class="fix-head">' + fixIcon(fix) + '<div class="fix-title"><span class="fix-fam">' + esc(FIX_FAMILY_NAME[fix.family] || fix.family) + '</span><h3>' + esc(fix.title) + '</h3></div></div>' +
@@ -8671,7 +8842,7 @@ async function runFix(button) {
 
   button.disabled = true;
   fixStates.set(id, {phase:"fixing"}); paintFixState(id);
-  const bar = fixProgress(id, (FIX_COPY[id] || [,,"Working"])[2] + (fix.needs_admin ? " · administrator approval may be required" : ""));
+  const bar = fixProgress(id, (FIX_COPY[id] || [,,"Working"])[2] + (fix.needs_admin && !helperReady() ? " · administrator approval may be required" : ""));
   try {
     const r = await api("/api/fix/run", body);
     const good = !!r.ok;
@@ -8802,7 +8973,7 @@ function renderTemps(data) {
   if (note) {
     note.innerHTML = (locked && data.can_elevate)
       ? '<button class="btn small" id="temps-unlock">Read drive &amp; board sensors</button>' +
-        '<span class="sub"> one administrator prompt; the app itself stays as it is</span>'
+        '<span class="sub" data-helper-warning' + (helperReady() ? ' hidden' : '') + '> one administrator prompt; the app itself stays as it is</span>'
       : "";
   }
 
@@ -12682,6 +12853,513 @@ document.addEventListener("click", async e => {
   try { await api("/api/prefs", { theme: want }); } catch (err) { /* reported below */ }
 });
 
+/* First-run setup. Drafts live only here: Next accepts a step's defaults,
+   direct choices count as answers, and Skip removes that step's answer.
+   Nothing previews through /api/prefs, including the live theme preview. */
+const SETUP_STEPS = ["sync", "permission", "sound", "preset", "region", "apps", "theme"];
+const SETUP_LABELS = { sync:"Steam sync", permission:"Allow once", sound:"Sound", preset:"Game preset", region:"Server region", apps:"Companions", theme:"Theme" };
+const SETUP_KEYS = { sync:"sync", permission:"cfg_write", sound:"sound", preset:"preset", region:"region_lock", apps:"apps", theme:"theme" };
+const setupReduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+let setupSession = null, setupOpening = null;
+const setupDelay = ms => new Promise(resolve => setTimeout(resolve, ms));
+function setupIcon(name) { return '<svg viewBox="0 0 24 24" aria-hidden="true">' + (name === 'microphone' ? '<rect x="8" y="3" width="8" height="12" rx="4"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8"/>' : '<use href="#i-' + name + '"></use>') + '</svg>'; }
+function setupCheck() { return '<svg viewBox="0 0 24 24" aria-hidden="true"><g><path d="m5 12 4 4 10-10"/></g></svg>'; }
+function setupTick() { return '<span class="setup-tick" aria-hidden="true">' + setupCheck() + '</span>'; }
+// Server reasons sometimes include an OS error containing a path. The cfg path
+// has its own explicit place in Permission; diagnostics elsewhere stay human.
+function setupPlain(value, fallback = "Please try again.") {
+  const text = String(value || "").trim();
+  if (!text || /[a-z]:[\\/]|\\\\|\b\d{12,}\b|(?:^|\s)\/[^\s]+/i.test(text)) return fallback;
+  return text;
+}
+function setupSource(last) { return setupPlain(last.source, "your other PC"); }
+function setupFileCount(last) {
+  return Math.max(0, Number(last.files) || (Array.isArray(last.written) ? last.written.length : Number(last.written) || 0) + (Number(last.waiting) || 0));
+}
+// The region backend is optional. A usable catalogue is the feature flag;
+// this branch does not return it, so it never offers a choice it cannot save.
+function setupRegions(data) {
+  return Array.isArray(data.regions) ? data.regions.filter(r => r && typeof r.id === 'string' && r.id && (r.label || r.name)) : [];
+}
+function setupDraft(data) {
+  const current = data.current || {}, sound = data.sound || {};
+  const device = kind => current['audio_' + kind] || sound['pinned_' + kind] ||
+    ((sound[kind] || []).find(d => d.default) || {}).id || "";
+  return { sync:current.sync_auto !== false,
+    // A saved Allow from an older setup must never trigger the finish handler's
+    // install fallback. Only a ready helper can turn this answer true.
+    permission:helperReady(data.helper) ? true : current.cfg_write_ok === false ? false : null,
+    sound:{ output:device("output"), input:device("input") },
+    preset:["competitive","balanced","quality"].includes(current.intent) ? current.intent : "balanced",
+    region:setupRegions(data).some(r => r.id === current.region_lock) ? current.region_lock : null,
+    apps:(data.apps || []).filter(a => a.with_game).map(a => a.id),
+    theme:THEMES.some(t => t[0] === current.theme) ? current.theme : "violet" };
+}
+function setupCurrentStep(s = setupSession) { return s && s.steps[s.index]; }
+function setupAlive(s) { return !!s && setupSession === s && !s.finishing; }
+function setupHeading(eyebrow, title, lead) {
+  return '<p class="setup-eyebrow">' + esc(eyebrow) + '</p><h1 id="setup-title" tabindex="-1">' +
+    esc(title) + '</h1><p class="setup-lead">' + esc(lead) + '</p>';
+}
+function setupVisual(kind) {
+  const art = kind === "sync"
+    ? '<rect class="setup-visual-core" x="44" y="76" width="64" height="45" rx="5"/><path d="M61 132h30m-15-11v11M111 99h48m-6-5 6 5-6 5"/><circle class="setup-visual-core" cx="194" cy="99" r="32"/><circle cx="202" cy="89" r="10"/><circle cx="181" cy="112" r="7"/><path d="m187 108 8-11m-26 13 7 3"/>'
+    : kind === "permission"
+      ? '<path class="setup-visual-core" d="M75 70h45l12 13h73v65H75Z"/><path d="M91 100h65m-65 12h42"/><circle class="setup-visual-core" cx="179" cy="139" r="25"/><path d="m168 139 7 7 14-15"/>'
+      : kind === "sound"
+        ? '<path class="setup-visual-core" d="M91 116v-12a49 49 0 0 1 98 0v12M92 100h16v40H92a8 8 0 0 1-8-8v-24a8 8 0 0 1 8-8Zm96 0h-16v40h16a8 8 0 0 0 8-8v-24a8 8 0 0 0-8-8Z"/><path d="M185 142v12h-36m-7-5h10v10h-10"/>'
+        : '<rect class="setup-visual-core" x="105" y="75" width="70" height="70" rx="14"/><path d="m132 93 26 17-26 17Z"/><rect x="57" y="94" width="28" height="32" rx="6"/><rect x="195" y="94" width="28" height="32" rx="6"/><path d="M85 110h20m70 0h20"/>';
+  return '<div class="setup-visual" aria-hidden="true"><svg viewBox="0 0 280 220"><g class="setup-orbit" opacity=".3"><circle cx="140" cy="110" r="93" stroke-dasharray="3 12"/><path d="M140 10v15m0 170v15M40 110h15m170 0h15"/></g><circle cx="140" cy="110" r="76" opacity=".12"/>' + art + '</svg><span class="setup-visual-caption">' +
+    ({sync:"Your settings, wherever you play",permission:"Ready for your next launch",sound:"Hear every detail",apps:"Your pre-game lineup"})[kind] + '</span></div>';
+}
+function setupSoundControl(s, kind, title, icon, index) {
+  const list = (s.data.sound || {})[kind] || [], chosen = s.draft.sound[kind];
+  let options = '<option value="">' + (list.length ? 'Use the Windows default' : 'No device found — keep Windows default') + '</option>';
+  if (chosen && !list.some(d => d.id === chosen)) options += '<option value="' + esc(chosen) + '" selected>Saved device (not connected)</option>';
+  options += list.map(d => '<option value="' + esc(d.id) + '"' + (chosen === d.id ? ' selected' : '') + '>' + esc(d.name) + (d.default ? ' · Windows default' : '') + '</option>').join('');
+  return '<div class="setup-device setup-scan" style="--scan-index:' + index + '">' + setupIcon(icon) +
+    '<div><label for="setup-audio-' + kind + '">' + title + '</label><select id="setup-audio-' + kind + '" data-setup-audio="' + kind + '">' + options + '</select></div>' +
+    (list.length ? setupCheck().replace('<svg ', '<svg class="setup-device-check" ') : '<span></span>') + '</div>';
+}
+function setupStepHTML(s) {
+  const step = setupCurrentStep(s), d = s.data, draft = s.draft;
+  const heading = (label,title,lead) => setupHeading(String(s.index+1).padStart(2,'0') + ' / ' + label,title,lead);
+  if (step === "sync") return heading("YOUR SETTINGS", "Pick up where you left off.", "Bring your settings with your Steam account, then make this PC yours.") +
+    '<div class="setup-split">' + setupVisual("sync") + '<div class="setup-stack"><div id="setup-sync-result" class="setup-sync-result" role="status"></div>' +
+    '<button type="button" id="setup-steam" class="setup-action primary">' + WAY_ICONS.steam + 'Sign in with Steam</button>' +
+    '<a id="setup-steam-link" class="setup-action" target="_blank" rel="noopener noreferrer" hidden>Continue in your browser</a>' +
+    '<button type="button" id="setup-sync-retry" class="setup-action" hidden>Try sync again</button>' +
+    '<label class="setup-toggle"><span><b>Keep this PC in sync automatically</b><small>Your settings follow you between PCs</small></span><input id="setup-sync-auto" type="checkbox"' + (draft.sync ? ' checked' : '') + '></label></div></div>';
+  if (step === "permission") {
+    const cfg = d.cfg || {}, ready = helperReady(d.helper), busy = !!s.helperBusy;
+    return heading("ONE-TIME PERMISSION", "Allow once.", "CS CONFIG AI asks Windows for permission one time, so fixes, sensors and the server lock never ask again.") +
+      '<div class="setup-path">' + setupIcon("folder") + '<code>' + esc(cfg.path || "CS2’s cfg folder has not been found yet.") + '</code></div>' +
+      '<div class="setup-split"><ul class="setup-helper-list' + (ready ? ' is-ready' : '') + '" aria-label="What this permission covers">' +
+      [['folder','CS2 cfg folder'],['shield','Fixes without prompts'],['device','Sensors'],['chart','Overlay counters'],['globe','Server lock']].map(([icon,label],i) =>
+        '<li class="setup-scan" style="--scan-index:' + i + '">' + setupIcon(icon) + '<span>' + label + '</span>' + setupTick() + '</li>').join('') + '</ul><div class="setup-stack">' +
+      (ready ? '' : '<button type="button" class="setup-choice" data-setup-permission="allow" aria-pressed="false"' + (busy ? ' disabled' : '') + '>' + setupTick() + '<b>Allow</b><p>Set up the administrator helper with one Windows prompt.</p></button>' +
+      '<button type="button" class="setup-choice" data-setup-permission="later" aria-pressed="' + (draft.permission === false) + '"' + (busy ? ' disabled' : '') + '>' + setupTick() + '<b>Not now</b><p>Keep choosing your setup. Allow access later in Settings.</p></button>') +
+      '<div id="setup-helper-status" class="setup-notice setup-helper-status' + (ready ? ' is-ready' : '') + '" role="status" aria-live="polite" aria-busy="' + busy + '"><b>' +
+      (busy ? '<span class="setup-helper-wait" aria-hidden="true">' + setupIcon('sync') + '</span>Waiting for Windows…' : ready ? '<span class="setup-success-check">' + setupCheck() + '</span>Permission is ready.' : s.helperError ? esc(s.helperDeclined ? 'Windows permission was declined.' : 'The helper could not be set up.') : 'One prompt. Ready for every launch.') +
+      '</b><p>' + esc(busy ? 'Check your taskbar for the Windows prompt. Choose Yes to allow the helper.' : ready ? 'The administrator helper is installed and up to date. Overlay counters take effect at your next Windows sign-in.' : s.helperError ? s.helperError + ' You can continue and allow access later in Settings.' : 'The app stays open while Windows asks. Your game launches normally through Steam.') + '</p></div>' +
+      (!cfg.writable ? '<p class="setup-note' + (ready ? '' : ' warn') + '">' + esc(setupPlain(cfg.reason, "CS2’s cfg folder is not writable yet. You can continue and check it later.")) + '</p>' : '') + '</div></div>';
+  }
+  if (step === "sound") return heading("SOUND CHECK", "Hear it. Call it.", "Choose your headset or speakers and your microphone. We’ll keep them in place if Windows switches devices.") +
+    '<div class="setup-split">' + setupVisual("sound") + '<div class="setup-stack">' +
+    setupSoundControl(s,"output","Speakers / headset","speaker",0) + setupSoundControl(s,"input","Microphone","microphone",1) +
+    ((d.sound || {}).error ? '<p class="setup-note warn">Sound devices could not be read. You can continue and choose them in Settings.</p>' : '<p class="setup-note">Windows defaults are selected for a new setup. Your saved choices are kept when you run setup again.</p>') + '</div></div>';
+  if (step === "preset") return heading("TUNED FOR THIS PC", "Find your advantage.", "More frames, more detail, or a little of both. Choose how you want CS2 to feel.") +
+    '<div class="setup-hardware" id="setup-hardware"></div><div class="setup-presets">' + (d.presets || []).map(p => {
+      const fps = p.fps !== null && p.fps !== undefined && Number.isFinite(Number(p.fps)) && Number(p.fps) >= 0;
+      const limit = /gpu/i.test(p.bottleneck || '') ? 'GPU' : /cpu/i.test(p.bottleneck || '') ? 'CPU' : '';
+      return '<button type="button" class="setup-choice setup-preset" data-setup-preset="' + esc(p.id) + '" aria-pressed="' + (draft.preset === p.id) + '">' + setupTick() +
+        '<svg viewBox="0 0 22 22" aria-hidden="true">' + (MODE_ART[p.id] || '') + '</svg><b>' + esc(p.id === 'quality' ? 'Visual' : p.label) + '</b>' +
+        (fps ? '<span class="setup-fps" aria-label="About ' + Number(p.fps) + ' FPS">~<span data-setup-fps="' + Number(p.fps) + '" aria-hidden="true">' + (setupReduced.matches ? Number(p.fps) : 0) + '</span><small aria-hidden="true">FPS</small></span>' : '<span class="setup-fps unavailable">Estimate unavailable</span>') +
+        '<p>' + esc(p.blurb) + '</p>' + (limit ? '<span class="setup-limit">Limited by ' + limit + '</span>' : '') + '</button>';
+    }).join('') + '</div><p class="setup-note">Estimated frames per second. Actual performance varies by map and what’s running.</p>';
+  if (step === "region") return heading("OPTIONAL / YOUR SERVERS", "Lock to one server region.", "Choose one region to play in. Every other region is blocked for CS2 only. Change it any time in the overlay or the app.") +
+    '<div class="setup-regions">' + [{id:null,label:'Keep all regions open',blurb:'No server region lock.'},...setupRegions(d)].map((r,i) =>
+      '<button type="button" class="setup-choice setup-region setup-scan" style="--scan-index:' + i + '" data-setup-region="' + esc(r.id || '') + '" aria-pressed="' + (draft.region === r.id) + '">' + setupIcon(r.id ? 'globe' : 'shield') + setupTick() + '<b>' + esc(r.label || r.name) + '</b><p>' + esc(r.blurb || 'Play here. Block every other region for CS2.') + '</p></button>').join('') + '</div><p class="setup-note">Optional. Skip to leave your current region choice as it is.</p>';
+  if (step === "apps") return heading("YOUR PRE-GAME LINEUP", "Bring your squad of apps.", "Choose what starts before the game. One launch, everything ready.") +
+    '<div class="setup-split">' + setupVisual("apps") + '<div class="setup-apps">' + ((d.apps || []).length ? d.apps.map((a,i) =>
+      '<label class="setup-toggle setup-scan" style="--scan-index:' + i + '"><span class="setup-app-icon setup-app-icon-fallback" aria-hidden="true">' + (a.id.startsWith('faceit') ? '<span class="fc-logo"></span>' : setupIcon(a.id === 'crosshairx' ? 'crosshair' : 'gamepad')) + '</span>' +
+      '<img class="setup-app-icon" src="/companion-icon/' + encodeURIComponent(a.id) + '.png" alt="" data-setup-app-icon hidden><span><b>' + esc(a.name) + '<span class="setup-app-found" aria-hidden="true">' + setupCheck() + '</span></b><small>Start before CS2</small></span><input type="checkbox" data-setup-app="' + esc(a.id) + '" aria-label="Start ' + esc(a.name) + ' before CS2"' + (draft.apps.includes(a.id) ? ' checked' : '') + '></label>').join('') :
+      '<div class="setup-notice"><b>You’re ready to go.</b><p>No companion apps found on this PC. You can add any program later in Companions.</p></div>') + '</div></div>';
+  return heading("MAKE IT YOURS", "Set the mood.", "Ten looks. Your call. Pick one to see your whole setup change.") +
+    '<div class="setup-themes">' + THEMES.filter(t => (d.themes || THEMES.map(t => t[0])).includes(t[0])).map(([id,name,blurb,bg,panel,accent]) =>
+      '<button type="button" class="setup-choice setup-theme" data-setup-theme="' + id + '" aria-pressed="' + (draft.theme === id) + '" title="' + esc(name + ' · ' + blurb) + '">' +
+      '<span class="setup-swatch" style="--sw-bg:' + bg + ';--sw-panel:' + panel + ';--sw-accent:' + accent + '" aria-hidden="true"><i></i><span><em></em><em></em></span></span>' + setupTick() + '<b>' + esc(name) + '</b></button>').join('') + '</div><p class="setup-note">Your config, your colours. Finish when it feels like home.</p>';
+}
+function renderSetupHardware(s) {
+  if (!setupAlive(s) || setupCurrentStep(s) !== 'preset' || !$('setup-hardware')) return;
+  const scan = lastScan;
+  $('setup-hardware').innerHTML = scan && (scan.cpu || scan.gpu)
+    ? [['CPU',scan.cpu && scan.cpu.name,'device'],['GPU',scan.gpu && scan.gpu.name,'gpu']].filter(x => x[1]).map(([kind,name,icon]) => '<span>' + setupIcon(icon) + esc(kind + ' · ' + name) + '</span>').join('')
+    : '<span>' + setupIcon('device') + (s.hardwareFailed ? 'Hardware details unavailable' : 'Reading your CPU and GPU…') + '</span>';
+}
+function setupCountFPS(s) {
+  cancelAnimationFrame(s.fpsFrame); clearTimeout(s.fpsEnd);
+  const numbers = [...$('setup-content').querySelectorAll('[data-setup-fps]')];
+  if (setupReduced.matches) { numbers.forEach(n => { n.textContent = n.dataset.setupFps; }); return; }
+  const start = performance.now();
+  const tick = now => {
+    if (!setupAlive(s) || setupCurrentStep(s) !== 'preset') return;
+    if (document.hidden) { numbers.forEach(n => { n.textContent = n.dataset.setupFps; }); return; }
+    const t = Math.min(1,(now-start)/720), ease = 1-Math.pow(1-t,3);
+    numbers.forEach(n => { n.textContent = Math.round(Number(n.dataset.setupFps)*ease); });
+    if (t < 1) s.fpsFrame = requestAnimationFrame(tick);
+  };
+  s.fpsFrame = requestAnimationFrame(tick);
+  // Settle even when the host throttles animation frames during a resize.
+  s.fpsEnd = setTimeout(() => { if (setupAlive(s) && setupCurrentStep(s) === 'preset') { cancelAnimationFrame(s.fpsFrame); numbers.forEach(n => { n.textContent = n.dataset.setupFps; }); } },760);
+}
+function renderSetup(s, focus = true) {
+  if (!setupAlive(s)) return;
+  const step = setupCurrentStep(s);
+  $('setup-progress').style.setProperty('--setup-count',s.steps.length);
+  $('setup-progress').setAttribute('aria-label','Setup progress: step ' + (s.index+1) + ' of ' + s.steps.length);
+  $('setup-progress').innerHTML = s.steps.map(id => '<li' + (id === step ? ' aria-current="step"' : '') +
+    ' class="' + (id === 'permission' && helperReady(s.data.helper) ? 'is-done' : s.skipped.has(id) ? 'is-skipped' : Object.hasOwn(s.answers,SETUP_KEYS[id]) ? 'is-done' : '') + '">' + SETUP_LABELS[id] + '</li>').join('');
+  const content = $('setup-content'); content.innerHTML = setupStepHTML(s);
+  content.className = 'setup-step setup-enter';
+  $('setup-viewport').scrollTop = 0;
+  $('setup-back').disabled = s.index === 0;
+  const permissionDone = step === 'permission' && helperReady(s.data.helper);
+  $('setup-back').hidden = permissionDone; $('setup-skip').hidden = permissionDone;
+  for (const id of ['setup-close','setup-back','setup-skip','setup-next']) if (s.helperBusy) $(id).disabled = true;
+  document.querySelector('.setup-foot-note').textContent = 'Step ' + (s.index+1) + ' of ' + s.steps.length + '. Change any choice later in Settings.';
+  $('setup-next').innerHTML = s.index === s.steps.length-1 ? 'Finish ' + setupIcon('play') : 'Next <span aria-hidden="true">&rarr;</span>';
+  $('setup-error').textContent = '';
+  if (step === 'sync') {
+    renderSetupSync(s);
+    if ((s.data.cloud || {}).signed_in && !(s.data.cloud || {}).needs_steam && !s.synced && !s.syncBusy && !s.syncError) setupSync(s);
+  }
+  if (step === 'preset') {
+    renderSetupHardware(s); setupCountFPS(s);
+    if (!lastScan && !s.hardwareJob) s.hardwareJob = api('/api/scan').then(scan => { lastScan = scan; renderSetupHardware(s); }).catch(() => { s.hardwareFailed = true; renderSetupHardware(s); });
+  }
+  content.querySelectorAll('[data-setup-app-icon]').forEach(img => {
+    const loaded = () => { img.hidden = false; img.previousElementSibling.hidden = true; };
+    img.addEventListener('load',loaded,{once:true});
+    if (img.complete && img.naturalWidth) loaded();
+  });
+  if (focus) $('setup-title').focus({preventScroll:true});
+}
+function setupChoose(s, name, value, button) {
+  s.skipped.delete(name);
+  s.draft[name] = value;
+  s.answers[SETUP_KEYS[name]] = value;
+  const attr = 'data-setup-' + name;
+  $('setup-content').querySelectorAll('[' + attr + ']').forEach(b => b.setAttribute('aria-pressed',String(b === button)));
+  if (button) { button.classList.remove('setup-picked'); void button.offsetWidth; button.classList.add('setup-picked'); }
+}
+async function setupInstallHelper(s) {
+  if (!setupAlive(s) || s.helperBusy || helperReady(s.data.helper)) return;
+  s.helperBusy = true; s.helperError = ''; s.helperDeclined = false;
+  // Never leave a previous Allow in the finish payload while Windows is asking.
+  delete s.answers.cfg_write; s.draft.permission = null;
+  renderSetup(s,false);
+  $('setup-helper-status').scrollIntoView({block:'nearest',behavior:'instant'});
+  try {
+    const result = await api('/api/helper/install',{});
+    if (result.declined) {
+      s.helperDeclined = true;
+      throw new Error('You chose not to allow the Windows administrator prompt.');
+    }
+    if (!result.ok) throw new Error(result.error || result.reason || result.detail || 'Windows could not install the administrator helper.');
+    updateHelperStatus(result);
+    // Install returns status too; retain it if this read-only refresh is offline.
+    const refreshed = await refreshHelperStatus();
+    s.data.helper = refreshed;
+    if (!helperReady(refreshed)) throw new Error('Windows finished setup, but the administrator helper is not ready yet.');
+    s.skipped.delete('permission'); s.draft.permission = true; s.answers.cfg_write = true;
+  } catch (err) {
+    s.helperError = setupPlain(err.message,'Windows could not finish setting up the helper.');
+    s.draft.permission = false; s.answers.cfg_write = false;
+  } finally {
+    s.helperBusy = false;
+    if (setupAlive(s)) {
+      for (const id of ['setup-close','setup-back','setup-skip','setup-next']) $(id).disabled = false;
+      renderSetup(s,false);
+      if (setupCurrentStep(s) === 'permission') {
+        $('setup-helper-status').scrollIntoView({block:'nearest',behavior:'instant'});
+        $('setup-next').focus({preventScroll:true});
+      }
+    }
+  }
+}
+function setupPreviewTheme(s, id, button) {
+  if (s.themeGhost) s.themeGhost.remove();
+  if (!setupReduced.matches) {
+    const ghost = $('setup-wizard').cloneNode(true), tokens = getComputedStyle(document.documentElement);
+    ghost.removeAttribute('id'); ghost.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+    ghost.inert = true; ghost.setAttribute('aria-hidden','true'); ghost.classList.add('setup-theme-ghost');
+    for (const key of tokens) if (key.startsWith('--')) ghost.style.setProperty(key,tokens.getPropertyValue(key));
+    document.body.append(ghost); s.themeGhost = ghost; setTimeout(() => ghost.remove(),420);
+  }
+  setupChoose(s,'theme',id,button); applyTheme(id);
+}
+async function setupMove(direction, skip = false) {
+  const s = setupSession;
+  if (!setupAlive(s) || s.moving || s.helperBusy) return;
+  const step = setupCurrentStep(s);
+  if (direction > 0) {
+    if (skip) {
+      delete s.answers[SETUP_KEYS[step]]; s.skipped.add(step);
+      s.draft[step] = setupDraft(s.data)[step];
+      if (step === 'theme') applyTheme(s.baseTheme);
+    } else {
+      s.skipped.delete(step);
+      if (step !== 'permission' || s.draft.permission !== null) s.answers[SETUP_KEYS[step]] = structuredClone(s.draft[step]);
+    }
+    if (s.index === s.steps.length-1) { await finishSetupWizard(); return; }
+  }
+  s.moving = true;
+  $('setup-content').style.setProperty('--setup-direction',direction);
+  $('setup-content').className = 'setup-step setup-exit';
+  await setupDelay(setupReduced.matches ? 100 : 160);
+  if (!setupAlive(s)) return;
+  s.index = Math.max(0,Math.min(s.steps.length-1,s.index+direction));
+  renderSetup(s);
+  await setupDelay(setupReduced.matches ? 100 : 160);
+  s.moving = false;
+}
+function setupSyncMessage(s, message, success = false, detail = '') {
+  if (!setupAlive(s) || setupCurrentStep(s) !== 'sync') return;
+  const box = $('setup-sync-result');
+  box.classList.toggle('is-success',success);
+  box.innerHTML = '<div class="setup-notice"><b>' + (success ? '<span class="setup-success-check">' + setupCheck() + '</span>' : '') + esc(message) + '</b>' + (detail ? '<p>' + esc(detail) + '</p>' : '') + '</div>';
+}
+function renderSetupSync(s) {
+  if (!setupAlive(s) || setupCurrentStep(s) !== 'sync') return;
+  const signed = !!(s.data.cloud || {}).signed_in && !(s.data.cloud || {}).needs_steam;
+  $('setup-steam').hidden = signed;
+  $('setup-steam').disabled = !!s.loginPending;
+  $('setup-steam-link').hidden = !s.loginURL;
+  if (s.loginURL) $('setup-steam-link').href = s.loginURL;
+  $('setup-sync-retry').hidden = !signed || !s.syncError;
+  const last = s.data.sync || {};
+  if (s.syncBusy) setupSyncMessage(s,'Bringing your settings together…',false,'Checking your Steam account for your latest setup.');
+  else if (s.syncError) setupSyncMessage(s,s.syncError,false,'You can try again or continue with this PC’s settings.');
+  else if (last.action === 'pull') setupSyncMessage(s,'Brought over your settings from ' + setupSource(last) + ': ' + setupFileCount(last) + ' files',true,'The game preset and theme are prefilled from your other PC.' + (last.waiting > 0 ? ' Your config files will wait for permission in the next step.' : ''));
+  else if (signed && s.synced) setupSyncMessage(s,'Your Steam account is connected.',true,last.action === 'push' ? 'Your settings are saved and ready to follow you.' : 'This PC has your latest settings.');
+  else if (signed) setupSyncMessage(s,'Your Steam account is connected.',true,'Ready to check for your settings.');
+  else setupSyncMessage(s,s.loginPending ? 'Finish signing in in your browser.' : 'Your settings. Every PC.',false,s.loginPending ? 'Come back here when Steam has signed you in.' : 'Sign in with Steam to bring your setup with you.');
+}
+async function setupSync(s) {
+  if (!setupAlive(s) || s.syncBusy) return;
+  s.syncBusy = true; s.syncError = ''; renderSetupSync(s);
+  try {
+    const r = await api('/api/sync/now',{});
+    if (!setupAlive(s)) return;
+    s.data.sync = r.last || {};
+    if (r.last && r.last.ok === false) throw new Error(r.last.reason || 'Sync could not finish.');
+    s.synced = true;
+    // A pull may have changed intent/theme. Refresh prefills without replacing
+    // any choice already answered in this session, nor machine-local drafts.
+    if (s.data.sync.action === 'pull') {
+      const fresh = await api('/api/firstrun',{});
+      if (!setupAlive(s)) return;
+      s.data.current = fresh.current; s.data.cfg = fresh.cfg;
+      const defaults = setupDraft(s.data);
+      for (const key of ['preset','theme']) if (!Object.hasOwn(s.answers,SETUP_KEYS[key])) s.draft[key] = defaults[key];
+      s.baseTheme = defaults.theme;
+      if (!Object.hasOwn(s.answers,'theme')) applyTheme(s.baseTheme);
+    }
+    syncStatusData = {auto:s.draft.sync,last:s.data.sync}; renderSyncStatus();
+  } catch (err) {
+    if (setupAlive(s)) s.syncError = setupPlain(err.message,'Sync could not finish.');
+  } finally { s.syncBusy = false; renderSetupSync(s); }
+}
+async function setupSteamLogin(s) {
+  if (!setupAlive(s) || s.loginPending) return;
+  s.loginPending = true; s.syncError = ''; renderSetupSync(s);
+  // The app underneath is inert. Stop its account-panel poll so there is only
+  // one claimant of the existing browser sign-in session.
+  clearInterval(cloudPoll); cloudPoll = null;
+  try {
+    const r = await api('/api/cloud/login',{provider:'steam',link:!!(s.data.cloud || {}).needs_steam});
+    if (!setupAlive(s)) return;
+    if (!r.opened && r.url) {
+      const url = new URL(r.url);
+      if (['https:','http:'].includes(url.protocol)) s.loginURL = url.href;
+    }
+    renderSetupSync(s);
+    const deadline = Date.now()+5*60*1000;
+    const poll = async () => {
+      if (!setupAlive(s)) return;
+      try {
+        const result = await api('/api/cloud/poll',{});
+        if (!setupAlive(s)) return;
+        if (result.waiting && Date.now()<deadline) { s.loginTimer = setTimeout(poll,2000); return; }
+        if (result.waiting || result.nothing) throw new Error('Sign-in did not finish. Please try again.');
+        s.loginPending = false; s.loginURL = '';
+        s.data.cloud = await api('/api/cloud',{});
+        if (!setupAlive(s)) return;
+        cloudData = s.data.cloud; renderCloud();
+        if (!s.data.cloud.signed_in || s.data.cloud.needs_steam) throw new Error('Sign in with your Steam account to sync.');
+        await setupSync(s);
+      } catch (err) { if (setupAlive(s)) { s.loginPending = false; s.syncError = setupPlain(err.message,'Sign-in did not finish. Please try again.'); renderSetupSync(s); } }
+    };
+    s.loginTimer = setTimeout(poll,1000);
+  } catch (err) { if (setupAlive(s)) { s.loginPending = false; s.syncError = setupPlain(err.message,'Steam sign-in could not start.'); renderSetupSync(s); } }
+}
+async function openSetupWizard({step, data} = {}) {
+  if (setupOpening) return setupOpening;
+  if (setupSession) {
+    const index = setupSession.steps.indexOf(step);
+    if (index >= 0 && !setupSession.finishing && !setupSession.moving && !setupSession.helperBusy) { setupSession.index = index; renderSetup(setupSession); }
+    return setupSession;
+  }
+  setupOpening = (async () => {
+    const snapshot = data || await api('/api/firstrun',{});
+    updateHelperStatus(snapshot.helper);
+    const steps = SETUP_STEPS.filter(id => (id !== 'sync' || (snapshot.cloud || {}).configured) && (id !== 'region' || setupRegions(snapshot).length));
+    const s = {data:snapshot,steps,index:Math.max(0,steps.indexOf(step)),draft:setupDraft(snapshot),answers:{},skipped:new Set(),baseTheme:setupDraft(snapshot).theme,returnFocus:document.activeElement};
+    s.closed = new Promise(resolve => { s.resolve = resolve; });
+    setupSession = s;
+    const app = document.querySelector('.app'); s.appWasInert = app.inert; app.inert = true;
+    $('setup-wizard').hidden = false; $('setup-wizard').classList.remove('is-finishing');
+    for (const id of ['setup-close','setup-back','setup-skip','setup-next']) $(id).disabled = false;
+    $('setup-wizard').classList.toggle('setup-paused',document.hidden);
+    applyTheme(s.baseTheme); renderSetup(s);
+    return s;
+  })();
+  try { return await setupOpening; } finally { setupOpening = null; }
+}
+window.openSetupWizard = openSetupWizard;
+async function finishSetupWizard() {
+  const s = setupSession;
+  if (!setupAlive(s) || s.helperBusy) return;
+  s.finishing = true; clearTimeout(s.loginTimer); clearTimeout(s.fpsEnd); cancelAnimationFrame(s.fpsFrame);
+  const controls = [...$('setup-wizard').querySelectorAll('button,input,select,a')];
+  controls.forEach(el => { if ('disabled' in el) el.disabled = true; });
+  $('setup-error').textContent = ''; $('setup-next').textContent = 'Saving…';
+  try {
+    const saved = await api('/api/firstrun/finish',{answers:structuredClone(s.answers)});
+    let ui = saved.ui;
+    try { ui = (await api('/api/prefs')).ui || ui; } catch (err) { /* finish already returns the authoritative saved prefs */ }
+    applyPrefs(ui); applyTheme((ui || {}).theme || s.baseTheme);
+    $('setup-wizard').classList.add('is-finishing');
+    await setupDelay(setupReduced.matches ? 100 : 280);
+    $('setup-wizard').hidden = true;
+    if (s.themeGhost) s.themeGhost.remove();
+    document.querySelector('.app').inert = s.appWasInert;
+    setupSession = null; s.resolve();
+    if (s.returnFocus && s.returnFocus.isConnected && s.returnFocus !== document.body) s.returnFocus.focus({preventScroll:true});
+    else { const play = $('play'); if (play) play.focus({preventScroll:true}); }
+    // Refresh the affected panels on reruns; the normal startup does this on
+    // first run, after this promise resolves, without duplicate probes.
+    if (prefsReady) { audioData = null; loadAudio(true); loadCompanions(); loadMachine(); previewPlan(); }
+    pollSyncStatus();
+  } catch (err) {
+    s.finishing = false; controls.forEach(el => { if ('disabled' in el) el.disabled = false; });
+    s.loginPending = false; s.loginURL = '';
+    if (setupCurrentStep(s) === 'sync') renderSetupSync(s);
+    // Restore the ready helper view after a failed save, including Next only.
+    if (setupCurrentStep(s) === 'permission') renderSetup(s,false);
+    $('setup-back').disabled = s.index === 0;
+    $('setup-next').textContent = s.index === s.steps.length-1 ? 'Finish' : 'Next';
+    $('setup-error').textContent = setupPlain(err.message,'Your setup could not be saved. Please try again.');
+    $('setup-next').focus({preventScroll:true});
+  }
+}
+async function checkFirstRun() {
+  // This gate runs before scan, preference restoration, starter creation or
+  // any other startup task. No background writer races the permission step.
+  document.querySelector('.app').inert = true;
+  try {
+    const data = await api('/api/firstrun',{});
+    updateHelperStatus(data.helper);
+    if (data.needed) {
+      document.querySelector('.app').inert = false;
+      const s = await openSetupWizard({data});
+      document.documentElement.classList.remove('setup-checking');
+      await s.closed;
+    }
+  } catch (err) { status('Setup could not be checked. You can run it again in Settings.',true); }
+  finally { document.querySelector('.app').inert = false; document.documentElement.classList.remove('setup-checking'); }
+}
+$('setup-back').addEventListener('click',() => setupMove(-1));
+$('setup-skip').addEventListener('click',() => setupMove(1,true));
+$('setup-next').addEventListener('click',() => setupMove(1));
+$('setup-close').addEventListener('click',finishSetupWizard);
+$('setup-again').addEventListener('click',() => openSetupWizard().catch(() => status('Setup could not be opened. Please try again.',true)));
+$('setup-content').addEventListener('click',e => {
+  const s = setupSession;
+  if (!setupAlive(s) || s.moving || s.helperBusy) return;
+  const button = e.target.closest('button'); if (!button) return;
+  if (button.hasAttribute('data-setup-permission')) {
+    if (button.dataset.setupPermission === 'allow') setupInstallHelper(s);
+    else setupChoose(s,'permission',false,button);
+  }
+  if (button.hasAttribute('data-setup-preset')) setupChoose(s,'preset',button.dataset.setupPreset,button);
+  if (button.hasAttribute('data-setup-region')) setupChoose(s,'region',button.dataset.setupRegion || null,button);
+  if (button.hasAttribute('data-setup-theme')) setupPreviewTheme(s,button.dataset.setupTheme,button);
+  if (button.id === 'setup-steam') setupSteamLogin(s);
+  if (button.id === 'setup-sync-retry') setupSync(s);
+});
+$('setup-content').addEventListener('change',e => {
+  const s = setupSession, el = e.target;
+  if (!setupAlive(s) || s.moving) return;
+  if (el.id === 'setup-sync-auto') { s.draft.sync = el.checked; s.answers.sync = el.checked; }
+  if (el.dataset.setupAudio) { s.draft.sound[el.dataset.setupAudio] = el.value; s.answers.sound = {...s.draft.sound}; }
+  if (el.hasAttribute('data-setup-app')) { s.draft.apps = [...$('setup-content').querySelectorAll('[data-setup-app]:checked')].map(input => input.dataset.setupApp); s.answers.apps = [...s.draft.apps]; }
+});
+// Capture shortcuts before the underlying application's global keyboard hooks.
+document.addEventListener('keydown',e => {
+  const s = setupSession;
+  if (!s) return;
+  if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); finishSetupWizard(); return; }
+  if (e.key === 'Tab') {
+    const focusable = [...$('setup-wizard').querySelectorAll('button:not(:disabled),select:not(:disabled),input:not(:disabled),a[href]')].filter(el => el.getClientRects().length && !el.closest('[inert]'));
+    const first = focusable[0], last = focusable.at(-1), current = document.activeElement;
+    if (!first) { e.preventDefault(); return; }
+    if (e.shiftKey && (current === first || !focusable.includes(current))) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && (current === last || !focusable.includes(current))) { e.preventDefault(); first.focus(); }
+    e.stopImmediatePropagation(); return;
+  }
+  if (e.key === 'Enter' && !e.repeat && !e.altKey && !e.ctrlKey && !e.metaKey && !e.target.closest('button,a,input,select,textarea')) { e.preventDefault(); setupMove(1); }
+  const group = e.target.closest('.setup-presets,.setup-themes,.setup-regions');
+  if (group && ['ArrowLeft','ArrowRight','Home','End'].includes(e.key)) {
+    const buttons = [...group.querySelectorAll('button')], index = buttons.indexOf(e.target.closest('button'));
+    const next = e.key === 'Home' ? 0 : e.key === 'End' ? buttons.length-1 : (index+(e.key === 'ArrowRight' ? 1 : -1)+buttons.length)%buttons.length;
+    e.preventDefault(); buttons[next].focus(); buttons[next].click();
+  }
+  e.stopImmediatePropagation();
+},true);
+document.addEventListener('visibilitychange',() => { $('setup-wizard').classList.toggle('setup-paused',document.hidden); });
+
+/* The compact sync indicator shares the same last-round response as setup. */
+let syncStatusData = null, syncStatusBusy = false, syncPollBusy = false, syncTimer = null;
+function syncStatusText(data) {
+  const last = (data || {}).last || {};
+  if (last.waiting > 0) return {state:'waiting',label:'Files waiting for permission',detail:Number(last.waiting) + " config files are waiting for permission to write to CS2’s cfg folder."};
+  if (last.ok === false) return {state:'idle',label:setupPlain(last.reason,'Sync is unavailable'),detail:setupPlain(last.reason,'Sync is unavailable. Please try again.')};
+  if (last.action === 'push') return {state:'ready',label:'Synced to cloud',detail:'Your settings are saved with your Steam account.'};
+  if (last.action === 'pull') return {state:'ready',label:'Updated from ' + setupSource(last),detail:'Updated from ' + setupSource(last) + '.'};
+  if (last.ok) return {state:'ready',label:'In sync',detail:'This PC has your latest settings.'};
+  return {state:'idle',label:'Sync',detail:'Sync your settings with your Steam account.'};
+}
+function renderSyncStatus() {
+  const state = syncStatusBusy ? {state:'busy',label:'Syncing…',detail:'Checking your latest settings…'} : syncStatusText(syncStatusData);
+  $('sync-label').textContent = state.label; $('sync-indicator').dataset.state = state.state;
+  $('sync-indicator').title = state.detail; $('sync-detail').textContent = state.detail;
+  $('sync-permission').hidden = state.state !== 'waiting';
+  $('sync-now').disabled = syncStatusBusy;
+  // Do not replace an optimistic toggle while its own request is in flight.
+  if (!$('sync-auto').disabled) $('sync-auto').checked = !syncStatusData || syncStatusData.auto !== false;
+}
+async function pollSyncStatus() {
+  if (syncPollBusy || syncStatusBusy || document.hidden) return;
+  syncPollBusy = true;
+  try { syncStatusData = await api('/api/sync',{}); renderSyncStatus(); }
+  catch (err) { syncStatusData = {auto:(syncStatusData || {}).auto,last:{ok:false,reason:'Sync status could not be checked.'}}; renderSyncStatus(); }
+  finally { syncPollBusy = false; }
+}
+function startSyncWatch() { if (!syncTimer) { pollSyncStatus(); syncTimer = setInterval(pollSyncStatus,45000); } }
+function closeSyncPopover(restore = false) { $('sync-popover').hidden = true; $('sync-indicator').setAttribute('aria-expanded','false'); if (restore) $('sync-indicator').focus(); }
+$('sync-indicator').addEventListener('click',() => { const open = $('sync-popover').hidden; $('sync-popover').hidden = !open; $('sync-indicator').setAttribute('aria-expanded',String(open)); if (open) pollSyncStatus(); });
+document.addEventListener('click',e => { if (!e.target.closest('#sync-control')) closeSyncPopover(); });
+$('sync-control').addEventListener('keydown',e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeSyncPopover(true); } });
+$('sync-permission').addEventListener('click',() => { closeSyncPopover(); openSetupWizard({step:'permission'}).catch(() => status('Setup could not be opened. Please try again.',true)); });
+$('sync-now').addEventListener('click',async () => {
+  if (syncStatusBusy) return;
+  syncStatusBusy = true; renderSyncStatus();
+  try {
+    const r = await api('/api/sync/now',{}); syncStatusData = {auto:(syncStatusData || {}).auto,last:r.last};
+    if ((r.last || {}).action === 'pull') { applyPrefs((await api('/api/prefs')).ui); audioData = null; loadCompanions(); loadMachine(); previewPlan(); }
+  } catch (err) { syncStatusData = {auto:(syncStatusData || {}).auto,last:{ok:false,reason:setupPlain(err.message,'Sync could not finish.')}}; }
+  finally { syncStatusBusy = false; renderSyncStatus(); }
+});
+$('sync-auto').addEventListener('change',async e => {
+  const input = e.target, previous = !input.checked;
+  input.disabled = true;
+  try { const r = await api('/api/sync/auto',{on:input.checked}); syncStatusData = {...syncStatusData,auto:r.auto}; }
+  catch (err) { input.checked = previous; $('sync-detail').textContent = 'That choice could not be saved. Please try again.'; }
+  finally { input.disabled = false; }
+});
+
 /* The Machine card: which half of the machine is asked to do less, and what
    Windows itself has been told about the game.
 
@@ -15489,6 +16167,8 @@ $("rescan").addEventListener("click", () => scan(true));
 // A launch outlives the page, so reattach to one already in flight after a
 // refresh rather than pretending nothing is happening.
 (async () => {
+  await checkFirstRun();
+  startSyncWatch();
   setStretchMode(stretchMode);
   // prefs also calls State.refresh(). Starting it alongside scan can run the
   // expensive hardware probe twice before either request populates the cache.
@@ -15522,7 +16202,7 @@ $("rescan").addEventListener("click", () => scan(true));
       let created = false;
       await startup.run("starter", async () => {
         const first = await checkStarter();
-        if (first && first.ok && !first.complete &&
+        if (prefsNow.cfg_write_ok === true && first && first.ok && !first.complete &&
             !first.present.length && !first.autoexec &&
             !($("cfg-folder") && $("cfg-folder").value.trim())) {
           created = !!(await makeStarter(true));

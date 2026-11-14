@@ -221,6 +221,20 @@ def _game_running() -> bool:
         return False
 
 
+def _helper(op: str, args: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+    """Do it through the one-time helper, if setup installed it.
+
+    None means the helper is not there, and the caller falls back to its own
+    one-off prompt -- so a PC that skipped setup keeps working as before. See
+    :mod:`cs2cfg.elevated` for why no prompt is needed once it is.
+    """
+    from . import elevated
+
+    if not elevated.ready():
+        return None
+    return elevated.run(op, args)
+
+
 def _run_elevated(body: str, timeout: float = ELEVATED_TIMEOUT) -> Dict[str, Any]:
     """Run one script as administrator and wait for what it reported.
 
@@ -319,6 +333,9 @@ def adapters() -> List[Dict[str, Any]]:
 
 
 def _fix_flush_dns() -> Dict[str, Any]:
+    done = _helper("dns.flush")
+    if done is not None:
+        return done
     return _run_elevated(
         "  ipconfig /flushdns | Out-Null\n"
         "  $out.ok = $true\n"
@@ -332,6 +349,9 @@ def _fix_restart_adapter(name: str) -> Dict[str, Any]:
         return {"ok": False, "blocked": True,
                 "error": "CS2 is running. Restarting the adapter now would "
                          "disconnect you mid-match. Close the game first."}
+    done = _helper("adapter.restart", {"name": name})
+    if done is not None:
+        return done
     safe = name.replace("'", "''")
     return _run_elevated(
         f"  $a = Get-NetAdapter -Name '{safe}' -ErrorAction Stop\n"
@@ -516,6 +536,9 @@ def _fix_restart_device(instance_id: str) -> Dict[str, Any]:
     if not entry["restartable"]:
         return {"ok": False, "blocked": True, "error": entry["why_not"]}
 
+    done = _helper("device.restart", {"instance_id": instance_id})
+    if done is not None:
+        return done
     safe = instance_id.replace("'", "''")
     # The enable is in a finally of its own: Disable-PnpDevice persists across
     # reboots, so a disable that does not reach its enable does not inconvenience
@@ -574,6 +597,9 @@ def sound_devices() -> Dict[str, Any]:
 
 
 def _fix_restart_audio() -> Dict[str, Any]:
+    done = _helper("audio.restart")
+    if done is not None:
+        return done
     return _run_elevated(
         "  Restart-Service -Name audiosrv -Force -ErrorAction Stop\n"
         "  Start-Sleep -Seconds 2\n"
@@ -950,9 +976,13 @@ def _fix_toggle_defender(_body: Dict[str, Any]) -> Dict[str, Any]:
     now_excluded = any(path.lower() == p.lower() for p in _defender_exclusions())
     verb = "Remove-MpPreference" if now_excluded else "Add-MpPreference"
     escaped = path.replace("'", "''")
-    result = _run_elevated(
-        f"{verb} -ExclusionPath '{escaped}'\n"
-        "$out.ok = $true\n")
+    result = _helper("defender.cs2", {
+        "program": str(Path(install) / "game" / "bin" / "win64" / "cs2.exe"),
+        "on": not now_excluded})
+    if result is None:
+        result = _run_elevated(
+            f"{verb} -ExclusionPath '{escaped}'\n"
+            "$out.ok = $true\n")
     if not result.get("ok"):
         return result
     return {"ok": True, "excluded": not now_excluded,
@@ -1116,13 +1146,15 @@ def _powercfg_setactive(scheme: str) -> Dict[str, Any]:
     plain = _powercfg(["/setactive", scheme])
     if plain["ok"]:
         return {"ok": True}
-    elevated = _run_elevated(
-        # Through cmd rather than called directly: PowerShell wraps a native
-        # command's own stderr as an ErrorRecord rather than plain text,
-        # which is how the real reason powercfg refused was getting lost.
-        f'$msg = cmd /c "powercfg /setactive {scheme} 2>&1"\n'
-        "if ($LASTEXITCODE -ne 0) { throw ($msg -join \"`n\") }\n"
-        "$out.ok = $true\n")
+    elevated = _helper("power.set", {"guid": scheme})
+    if elevated is None:
+        elevated = _run_elevated(
+            # Through cmd rather than called directly: PowerShell wraps a
+            # native command's own stderr as an ErrorRecord rather than plain
+            # text, which is how the real reason powercfg refused was lost.
+            f'$msg = cmd /c "powercfg /setactive {scheme} 2>&1"\n'
+            "if ($LASTEXITCODE -ne 0) { throw ($msg -join \"`n\") }\n"
+            "$out.ok = $true\n")
     if elevated.get("ok"):
         return {"ok": True}
     # Whichever attempt has something to say. A decline is its own answer and

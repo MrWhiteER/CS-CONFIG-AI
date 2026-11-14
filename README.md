@@ -577,6 +577,24 @@ exit, so the rest of Windows is not stuck at 4:3 while you are not playing.
 
 ---
 
+## First run, and a second PC
+
+A fresh install opens on a short setup before anything else: sign in with
+Steam to sync, allow the app to write into CS2's cfg folder, pick the default
+headset and microphone, choose Competitive, Balanced or Visual (each showing
+the frame rate this PC is estimated to reach), tick which companion apps start
+before the game (FACEIT, Crosshair X, Discord, whatever else is found), and
+pick a theme. Every step can be skipped and run again from Settings.
+
+Once signed in with Steam, settings follow the account between PCs on their
+own, every couple of minutes while the app is open. What travels is the
+account's preferences and its config files (the collection folder, the folder
+the app generates into, and `autoexec.cfg`). What stays is anything about the
+hardware: `cs2_video.txt` and the launch options are rebuilt for each PC from
+the preset that travelled, and sound devices and program paths belong to the
+PC they are on. Every pull is backed up first, and files only land once the
+app has been allowed to write to that PC's cfg folder. See `cs2cfg/autosync.py`.
+
 ## Backups
 
 Every `apply` writes one backup set covering all three files, because they are

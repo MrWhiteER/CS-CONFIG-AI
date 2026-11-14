@@ -30,6 +30,7 @@ ICON = str(_appicon.write_ico(pathlib.Path("build") / "cs2cfg.ico"))
 # by import analysis — they have to be listed.
 datas = collect_data_files("webview") + [
     ("cs2cfg/probe.ps1", "cs2cfg"),
+    ("cs2cfg/helper/*.ps1", "cs2cfg/helper"),
     ("cs2cfg/knowledge/*.json", "cs2cfg/knowledge"),
     ("cs2cfg/web/*", "cs2cfg/web"),
     ("cs2cfg/web/assets/brand/*", "cs2cfg/web/assets/brand"),

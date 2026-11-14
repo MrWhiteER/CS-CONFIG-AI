@@ -70,6 +70,7 @@ class State:
         self.updates: Optional[Any] = None   # updates.Checker, started on demand
         self.demo: Optional[Any] = None      # _DemoJob, while one is downloading
         self.faceit: Optional[Dict[str, Any]] = None  # cached profile + history
+        self.sync: Optional[Any] = None      # autosync.Loop, once started
         self.server_ping: Optional[Any] = None  # on-demand Valve relay survey
 
     def refresh(self, rescan: bool = False) -> None:
@@ -3979,6 +3980,213 @@ def _settle_win_graphics(state: State, wanted: bool) -> Dict[str, Any]:
         return {"ok": False, "error": str(exc)}
 
 
+
+# --- first-run setup and automatic sync -------------------------------------
+
+def _game_cfg_root(state: State) -> Optional[Path]:
+    state.refresh()
+    return steam.cfg_dir(state.cs2_install) if state.cs2_install else None
+
+
+def _sync_round(state: State, force: bool = False) -> Dict[str, Any]:
+    """One automatic sync round for the account this window is showing."""
+    from . import autosync, cloud
+    from .cli import load_prefs, save_prefs
+
+    # Checked before anything touches Steam or the hardware: a PC that is not
+    # signed in pays nothing for this running in the background.
+    if not cloud.signed_in():
+        return {"ok": False, "action": "none", "at": time.time(),
+                "reason": "sign in with Steam to sync"}
+    return autosync.run(_active_account(state), _game_cfg_root(state),
+                        state.cfg_folder, load_prefs=load_prefs,
+                        save_prefs=save_prefs, force=force)
+
+
+def _sync_loop(state: State):
+    from . import autosync
+
+    loop = getattr(state, "sync", None)
+    if loop is None:
+        loop = autosync.Loop(lambda force=False: _sync_round(state, force))
+        state.sync = loop
+    return loop
+
+
+def _sync_status(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """What the last automatic round did, and whether rounds are running."""
+    from . import autosync, profiles
+    from .cli import load_prefs
+
+    ui = profiles.ui_for(load_prefs(), _active_account(state))
+    return {"ok": True, "auto": ui.get(autosync.AUTO_KEY) is not False,
+            "last": _sync_loop(state).last}
+
+
+def _sync_now(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    return {"ok": True, "last": _sync_loop(state).once(force=True)}
+
+
+def _sync_auto(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import autosync
+    from .cli import load_prefs, save_prefs
+
+    prefs = load_prefs()
+    prefs.setdefault("ui", {})[autosync.AUTO_KEY] = bool(body.get("on", True))
+    save_prefs(prefs)
+    if body.get("on", True):
+        _sync_loop(state).nudge()
+    return {"ok": True, "auto": bool(body.get("on", True))}
+
+
+def _setup_regions() -> List[Dict[str, Any]]:
+    """Regions for the wizard's optional lock step, once the lock exists.
+
+    Empty -- which keeps the step hidden -- whenever the region lock is not
+    in this build or the helper it needs is not installed yet.
+    """
+    from . import elevated
+
+    try:
+        from . import serverlock  # type: ignore[attr-defined]
+    except ImportError:
+        return []
+    if not elevated.ready():
+        return []
+    try:
+        regions = serverlock.list_regions()
+    except Exception:
+        return []
+    out = []
+    for r in regions or []:
+        code = str((r or {}).get("code") or "")
+        if not code:
+            continue
+        ping = r.get("ping_ms")
+        place = ", ".join(x for x in (str(r.get("city") or ""), str(r.get("country") or "")) if x)
+        out.append({"id": code, "label": place or code.upper(),
+                    "blurb": (f"About {round(ping)} ms from here. " if ping is not None else "")
+                             + "Play here. Block every other region for CS2.",
+                    "ping_ms": ping})
+    out.sort(key=lambda x: (x["ping_ms"] is None, x["ping_ms"] or 0))
+    return out
+
+
+def _setup_region_lock(code: Any) -> Dict[str, Any]:
+    """Apply the wizard's region choice through the region lock, if present."""
+    try:
+        from . import serverlock  # type: ignore[attr-defined]
+    except ImportError:
+        return {}
+    try:
+        if code:
+            serverlock.request_lock(str(code))
+        return {"ok": True, "region": code or None}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+
+def _firstrun(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Everything the setup wizard shows, in one call. Reads only."""
+    from . import audio, cloud, elevated, firstrun, profiles
+    from .cli import load_prefs
+
+    state.refresh()
+    prefs = load_prefs()
+    account = _active_account(state)
+    ui = profiles.ui_for(prefs, account)
+    libraries = steam.find_libraries(state.steam_root) if state.steam_root else []
+
+    try:
+        sound = audio.summary()
+    except Exception as exc:          # no audio stack is not a reason to fail
+        sound = {"error": str(exc)}
+
+    return {
+        "ok": True,
+        "needed": firstrun.needed(prefs),
+        "steps": list(firstrun.STEPS),
+        "account": account,
+        "cloud": cloud.status(),
+        "sync": _sync_loop(state).last,
+        "cfg": firstrun.cfg_access(_game_cfg_root(state)),
+        "helper": elevated.status(),
+        "sound": sound,
+        "presets": firstrun.presets(state.machine, state.kb),
+        "apps": firstrun.known_apps(libraries, ui),
+        "themes": list(firstrun.THEMES),
+        "regions": _setup_regions(),
+        "current": {k: ui.get(k) for k in ("intent", "theme", "audio_output",
+                                           "audio_input", "cfg_write_ok", "sync_auto")},
+    }
+
+
+def _helper_status(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Whether the one-time administrator helper is in place."""
+    from . import elevated
+
+    return {"ok": True, **elevated.status()}
+
+
+def _helper_install(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """The one administrator prompt: put the helper in place.
+
+    Also makes this PC's CS2 cfg folder writable and joins Performance Log
+    Users, so nothing later has to ask again. See cs2cfg/elevated.py.
+    """
+    from . import elevated, temps
+
+    result = elevated.install(_game_cfg_root(state))
+    if result.get("ok"):
+        try:
+            temps.start_helper()      # sensors behind administrator, no prompt now
+        except Exception:
+            pass
+    return {**result, **elevated.status()}
+
+
+def _firstrun_finish(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Save the wizard's answers, put the sound devices in place, then sync."""
+    from . import firstrun, profiles
+    from .cli import load_prefs, save_prefs
+
+    state.refresh()
+    account = _active_account(state)
+    prefs = load_prefs()
+    ui = profiles.ui_for(prefs, account)
+    libraries = steam.find_libraries(state.steam_root) if state.steam_root else []
+    answers = body.get("answers") if isinstance(body.get("answers"), dict) else body
+
+    # Permission given but the helper not put in place yet (the page normally
+    # does that on the permission step itself): this is the one prompt.
+    helper: Dict[str, Any] = {}
+    if answers.get("cfg_write"):
+        from . import elevated
+
+        if not elevated.ready() and sys.platform == "win32":
+            helper = elevated.install(_game_cfg_root(state))
+
+    changes = firstrun.answers_to_changes(answers, ui,
+                                          firstrun.known_apps(libraries, ui))
+    profiles.remember(prefs, account, changes)
+    save_prefs(prefs)
+
+    sound = answers.get("sound")
+    if isinstance(sound, dict) and (sound.get("output") or sound.get("input")):
+        try:
+            _audio_pin(state, {"output": sound.get("output") or "",
+                               "input": sound.get("input") or "", "enforce": True})
+        except Exception:
+            pass                       # saved anyway; the keeper retries
+
+    region = _setup_region_lock(answers.get("region_lock")) if answers.get("region_lock") else {}
+
+    # Permission may just have been given: files waiting on it can land now.
+    _sync_loop(state).nudge()
+    return {"ok": True, "saved": sorted(changes), "helper": helper, "region": region,
+            "ui": profiles.ui_for(load_prefs(), account)}
+
+
 # --- the cloud account ------------------------------------------------------
 
 def _cloud(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
@@ -4394,6 +4602,13 @@ def make_handler(state: State):
         "/api/demos/waiting": _demo_waiting,
         "/api/demos/page": _demo_page,
         "/api/demos/pick": _demo_pick,
+        "/api/firstrun": _firstrun,
+        "/api/firstrun/finish": _firstrun_finish,
+        "/api/helper": _helper_status,
+        "/api/helper/install": _helper_install,
+        "/api/sync": _sync_status,
+        "/api/sync/now": _sync_now,
+        "/api/sync/auto": _sync_auto,
         "/api/cloud": _cloud,
         "/api/cloud/login": _cloud_login,
         "/api/cloud/poll": _cloud_poll,
@@ -4810,6 +5025,23 @@ def serve(port: int = 8765, cfg_folder: str = "mrwhiteer",
         audio.shared().set_pin(_audio_pin_from_prefs())
     except Exception:
         pass                    # never let a sound preference stop the app
+
+    # Sensors that need administrator, read through the helper setup put in
+    # place. Started here because it no longer costs a prompt.
+    try:
+        from . import elevated, temps
+
+        if elevated.ready():
+            temps.start_helper()
+    except Exception:
+        pass
+
+    # Settings follow the Steam account between PCs without a button. The
+    # loop does nothing until somebody is signed in, and never raises.
+    try:
+        _sync_loop(state).start()
+    except Exception:
+        pass
 
     server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(state))
     server.daemon_threads = True
