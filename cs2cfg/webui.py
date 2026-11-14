@@ -2655,28 +2655,7 @@ def _server_lock_service(state: State):
         cached = serverping.ServerPing(root / "sdr-relays.json")
 
         def context():
-            # This observer has its own read-only discovery. Calling
-            # _active_account/State.refresh here would race the UI's hardware
-            # scan on startup and needlessly probe the whole machine.
-            from . import whoami
-            from .cli import load_prefs
-            result = {"max_ping": None, "console_path": None, "condebug": False}
-            try:
-                steam_root = state.steam_root or steam.find_steam_root()
-                install = state.cs2_install or steam.find_cs2_install(steam_root)
-                result["console_path"] = install / "game" / "csgo" / "console.log"
-                users = state.users or steam.list_users(steam_root)
-                known = [u.account_id for u in users]
-                pinned = str(load_prefs().get("ui", {}).get("pinned_account") or "")
-                account = pinned if pinned in known else whoami.current(steam_root, known)[0]
-                user = next((u for u in users if u.account_id == account), users[0] if users else None)
-                if user is None:
-                    return result
-                result["max_ping"] = serverping.read_max_ping(user.video_cfg.parent / "cs2_user_convars_0_slot0.vcfg")
-                result["condebug"] = bool(re.search(r"(?:^|\s)-condebug(?=\s|$)", steam.read_launch_options(user), re.I))
-            except (steam.SteamError, OSError):
-                pass
-            return result
+            return serverlock.discover_context(state)
 
         def directory():
             survey = state.server_ping or cached
@@ -2685,8 +2664,7 @@ def _server_lock_service(state: State):
         def survey():
             return state.server_ping.snapshot() if state.server_ping else {}
 
-        state.server_lock = serverlock.ServerLock(root, context, directory, survey)
-        state.server_lock.start()
+        state.server_lock = serverlock.shared(context, directory, survey)
     return state.server_lock
 
 
@@ -2702,6 +2680,10 @@ def _servers_lock_change(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     if body.get("confirmed") is not True:
         raise ValueError("Review the region lock warning first.")
     return _server_lock_service(state).begin(body.get("action"), body.get("plan_id"))
+
+
+def _servers_lock_cancel(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    return _server_lock_service(state).cancel()
 
 
 def _servers_log_enable(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
@@ -4397,6 +4379,7 @@ def make_handler(state: State):
         "/api/servers/ping/start": _servers_ping_start,
         "/api/servers/lock/prepare": _servers_lock_prepare,
         "/api/servers/lock/change": _servers_lock_change,
+        "/api/servers/lock/cancel": _servers_lock_cancel,
         "/api/servers/log/enable": _servers_log_enable,
         "/api/audio": _audio,
         "/api/audio/pin": _audio_pin,
@@ -4837,7 +4820,7 @@ def serve(port: int = 8765, cfg_folder: str = "mrwhiteer",
           cfg_name: str = "autoperf.vcfg") -> Tuple[ThreadingHTTPServer, State]:
     state = State(cfg_folder, cfg_name)
     # Read real firewall state at startup, even if the Play tab is never opened.
-    # This worker only reads local files/process metadata/firewall policy.
+    # This worker reads local state and drains explicitly queued changes after CS2 closes.
     _server_lock_service(state)
 
     # Pick the sound pin up now rather than when somebody first opens the page.

@@ -12,6 +12,8 @@ function createServerRegionLock({panel, chip, api, esc, tone, changed}) {
   function detailText() {
     const f = state.firewall;
     if(state.checking) return 'Checking Windows Firewall…';
+    if(state.pending) return 'Will apply when CS2 closes';
+    if(state.needs_setup) return 'Region lock needs one-time setup permission';
     if(f.status === 'locked') return 'Locked to '+f.city;
     if(f.status === 'outdated') return 'Lock is out of date, re-apply';
     if(f.status === 'missing') return 'Lock rules are missing';
@@ -40,6 +42,8 @@ function createServerRegionLock({panel, chip, api, esc, tone, changed}) {
     const expanded = !!info.querySelector('details')?.open;
     info.innerHTML = '<div class="sl-state"><strong>'+lockIcon+esc(detailText())+'</strong>'+
       (f.present||f.status==='missing'||(!state.checking&&f.status==='unknown')?'<button type="button" class="btn small" id="sl-unlock"'+(state.busy?' disabled':'')+'>Unlock</button>':'')+'</div>'+
+      (state.pending?'<p>Will apply when CS2 closes'+(state.pending.action==='unlock'?': unlock.':': lock to '+esc(state.pending.city||state.pending.code)+'.')+'</p><button type="button" class="btn small" id="sl-cancel-pending"'+(state.busy?' disabled':'')+'>Cancel pending change</button>':'')+
+      (state.needs_setup?'<p>The region lock needs the one-time setup permission. In Settings, choose “Run setup again”.</p><button type="button" class="btn small" id="sl-setup">Settings</button>':'')+
       (f.status==='outdated'||f.status==='damaged'||f.status==='missing'?'<button type="button" class="btn small" id="sl-reapply"'+(state.busy||!state.can_lock?' disabled':'')+'>Re-apply lock</button>':'')+
       '<p class="sl-status" role="status">'+esc(message||state.error||state.detail||f.error||'')+'</p>'+
       (state.restart_needed!==false && f.present?'<p>Restart Steam and CS2 to re-measure relays.'+(state.restart_needed===null?' Process restart time could not be verified.':' A process is still running from before the lock.')+'</p>':'')+
@@ -52,6 +56,8 @@ function createServerRegionLock({panel, chip, api, esc, tone, changed}) {
     info.scrollTop = infoScroll;
     if(focus) document.getElementById(focus)?.focus({preventScroll:true});
     info.querySelector('#sl-unlock')?.addEventListener('click',()=>change('unlock'));
+    info.querySelector('#sl-cancel-pending')?.addEventListener('click',cancelPending);
+    info.querySelector('#sl-setup')?.addEventListener('click',()=>{panel.hidePopover();setTab('settings');});
     info.querySelector('#sl-reapply')?.addEventListener('click',()=>prepare(f.code||'dxb'));
     info.querySelector('#sl-log')?.addEventListener('click',enableLog);
     info.querySelector('details').addEventListener('toggle',()=>window.dispatchEvent(new Event('resize')));
@@ -85,8 +91,9 @@ function createServerRegionLock({panel, chip, api, esc, tone, changed}) {
     pending=true; message='';messageError=false;
     try {
       draft=await api('/api/servers/lock/prepare',{code});
+      if(draft.needs_setup) {state.needs_setup=true;message=draft.detail;changed();return;}
       const running=[...new Set(draft.processes.map(p=>p.name==='cs2'?'CS2':'Steam'))];
-      dialog.innerHTML='<h3 id="sl-confirm-title">Play only in '+esc(draft.city)+'?</h3><p>This blocks outbound UDP to '+draft.relay_count+' other Valve relay IPs for all programs, including Steam. The lock stays on after this app closes.</p><ul><li>Queues can take longer.</li><li>If this region is down, you will not find a match until you unlock.</li><li>Restart Steam and CS2 after applying so matchmaking measures the relays again.</li></ul><p>'+esc(running.length?running.join(' and ')+' currently running. Close them before applying to avoid interrupting a live connection.':'Steam and CS2 are not reported running. Restart them after applying.')+'</p><p>'+esc(draft.advice.text)+'</p><small>Valve directory revision '+draft.revision+'. Windows asks for administrator once.</small><div class="sl-confirm-actions"><button type="button" class="btn" id="sl-cancel">Cancel</button><button type="button" class="btn primary" id="sl-apply">Lock to '+esc(draft.city)+'</button></div>';
+      dialog.innerHTML='<h3 id="sl-confirm-title">Play only in '+esc(draft.city)+'?</h3><p>This blocks CS2 traffic to '+draft.relay_count+' other Valve relay IPs. The lock stays on after this app closes.</p><ul><li>Queues can take longer.</li><li>If this region is down, you will not find a match until you unlock.</li><li>Restart Steam and CS2 after applying so matchmaking measures the relays again.</li></ul><p>'+esc(running.includes('CS2')?'CS2 is running. Will apply when CS2 closes.':running.length?'Steam is running. Restart it after applying.':'Steam and CS2 are not reported running. Restart them after applying.')+'</p><p>'+esc(draft.advice.text)+'</p><small>Valve directory revision '+draft.revision+'. Uses the one-time setup permission.</small><div class="sl-confirm-actions"><button type="button" class="btn" id="sl-cancel">Cancel</button><button type="button" class="btn primary" id="sl-apply">Lock to '+esc(draft.city)+'</button></div>';
       panel.hidePopover();dialog.showModal();dialog.querySelector('#sl-cancel').focus();
       dialog.querySelector('#sl-cancel').onclick=()=>dialog.close();
       dialog.querySelector('#sl-apply').onclick=()=>{const id=draft.plan_id;dialog.close();change('apply',id);};
@@ -97,6 +104,13 @@ function createServerRegionLock({panel, chip, api, esc, tone, changed}) {
     if(state.busy||pending) return;
     pending=true;message='';messageError=false;
     try {state=await api('/api/servers/lock/change',{action,plan_id,confirmed:true});}
+    catch(e) {message=e.message;messageError=true;}
+    finally {pending=false;changed();poll();}
+  }
+  async function cancelPending() {
+    if(state.busy||pending) return;
+    pending=true;message='';messageError=false;
+    try {state=await api('/api/servers/lock/cancel',{});}
     catch(e) {message=e.message;messageError=true;}
     finally {pending=false;changed();poll();}
   }

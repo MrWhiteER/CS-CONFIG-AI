@@ -1,5 +1,10 @@
 # Server lock + wrong-server check: brief for Codex (phase 1)
 
+Updated product rule: permissions are requested only during setup. Region locks
+now use the setup-installed elevated helper with CS2-only, protocol Any rules,
+one per blocked POP, and queue changes until CS2 closes. This supersedes the
+original UAC/UDP/all-program requirements below. See [current behavior and Lock API](SERVER_LOCK_TESTING.md).
+
 Edy plays from Dubai. CS2 often puts him on far servers (80+ ms) even though Dubai exists.
 The Play tab already has a server ping drop-up (cs2cfg/serverping.py, the `sp-*` widget in
 cs2cfg/web/index.html, routes in cs2cfg/webui.py; see PING_WIDGET_BRIEF.md). Phase 1 adds two
