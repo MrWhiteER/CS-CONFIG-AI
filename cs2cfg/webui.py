@@ -71,6 +71,7 @@ class State:
         self.demo: Optional[Any] = None      # _DemoJob, while one is downloading
         self.faceit: Optional[Dict[str, Any]] = None  # cached profile + history
         self.sync: Optional[Any] = None      # autosync.Loop, once started
+        self.server_ping: Optional[Any] = None  # on-demand Valve relay survey
 
     def refresh(self, rescan: bool = False) -> None:
         if self.machine is None or rescan:
@@ -2619,6 +2620,32 @@ def _net(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     return netcheck.progress()
 
 
+def _servers_ping(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import serverping
+    if state.server_ping is None:
+        return {"running": False, "updated_at": None, "regions": [],
+                "completed": 0, "total": 0, "max_ping": None,
+                "preferred_code": "dxb", "source": "fallback", "error": ""}
+    result = state.server_ping.snapshot()
+    result.update(max_ping=None, preferred_code="dxb")
+    try:
+        user = state.user_for(_active_account(state))
+        result["max_ping"] = serverping.read_max_ping(
+            user.video_cfg.parent / "cs2_user_convars_0_slot0.vcfg")
+    except steam.SteamError:
+        pass
+    return result
+
+
+def _servers_ping_start(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import serverping
+    from .paths import user_data_dir
+    if state.server_ping is None:
+        state.server_ping = serverping.ServerPing(user_data_dir() / "sdr-relays.json")
+    state.server_ping.start()
+    return _servers_ping(state, body)
+
+
 def _temps_elevate(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     """Raise the one prompt, and start the privileged reader behind it.
 
@@ -3975,6 +4002,53 @@ def _sync_auto(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     return {"ok": True, "auto": bool(body.get("on", True))}
 
 
+def _setup_regions() -> List[Dict[str, Any]]:
+    """Regions for the wizard's optional lock step, once the lock exists.
+
+    Empty -- which keeps the step hidden -- whenever the region lock is not
+    in this build or the helper it needs is not installed yet.
+    """
+    from . import elevated
+
+    try:
+        from . import serverlock  # type: ignore[attr-defined]
+    except ImportError:
+        return []
+    if not elevated.ready():
+        return []
+    try:
+        regions = serverlock.list_regions()
+    except Exception:
+        return []
+    out = []
+    for r in regions or []:
+        code = str((r or {}).get("code") or "")
+        if not code:
+            continue
+        ping = r.get("ping_ms")
+        place = ", ".join(x for x in (str(r.get("city") or ""), str(r.get("country") or "")) if x)
+        out.append({"id": code, "label": place or code.upper(),
+                    "blurb": (f"About {round(ping)} ms from here. " if ping is not None else "")
+                             + "Play here. Block every other region for CS2.",
+                    "ping_ms": ping})
+    out.sort(key=lambda x: (x["ping_ms"] is None, x["ping_ms"] or 0))
+    return out
+
+
+def _setup_region_lock(code: Any) -> Dict[str, Any]:
+    """Apply the wizard's region choice through the region lock, if present."""
+    try:
+        from . import serverlock  # type: ignore[attr-defined]
+    except ImportError:
+        return {}
+    try:
+        if code:
+            serverlock.request_lock(str(code))
+        return {"ok": True, "region": code or None}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+
 def _firstrun(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     """Everything the setup wizard shows, in one call. Reads only."""
     from . import audio, cloud, elevated, firstrun, profiles
@@ -4004,6 +4078,7 @@ def _firstrun(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
         "presets": firstrun.presets(state.machine, state.kb),
         "apps": firstrun.known_apps(libraries, ui),
         "themes": list(firstrun.THEMES),
+        "regions": _setup_regions(),
         "current": {k: ui.get(k) for k in ("intent", "theme", "audio_output",
                                            "audio_input", "cfg_write_ok", "sync_auto")},
     }
@@ -4067,9 +4142,11 @@ def _firstrun_finish(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         except Exception:
             pass                       # saved anyway; the keeper retries
 
+    region = _setup_region_lock(answers.get("region_lock")) if answers.get("region_lock") else {}
+
     # Permission may just have been given: files waiting on it can land now.
     _sync_loop(state).nudge()
-    return {"ok": True, "saved": sorted(changes), "helper": helper,
+    return {"ok": True, "saved": sorted(changes), "helper": helper, "region": region,
             "ui": profiles.ui_for(load_prefs(), account)}
 
 
@@ -4456,6 +4533,7 @@ def make_handler(state: State):
         "/api/focus": _focus,
         "/api/net": _net,
         "/api/net/start": _net_start,
+        "/api/servers/ping/start": _servers_ping_start,
         "/api/audio": _audio,
         "/api/audio/pin": _audio_pin,
         "/api/fix/survey": _fix_survey,
@@ -4836,6 +4914,11 @@ def make_handler(state: State):
                         self._send_json({"ok": True, **_machine_payload(state.machine, state)})
                 except (ProbeError, steam.SteamError) as exc:
                     self._send_json({"ok": False, "error": str(exc)}, 500)
+                return
+
+            if path == "/api/servers/ping":
+                with state.lock:
+                    self._send_json({"ok": True, **_servers_ping(state, {})})
                 return
 
             candidate = (WEB_ROOT / path.lstrip("/")).resolve()

@@ -409,6 +409,12 @@ def _ping_once(host: str) -> "Optional[float]":
     return None
 
 
+# Serialize whole measurements, including fallback probes. start_lock makes
+# reservation atomic with ServerPing.start; a waiting net check has priority.
+probe_lock = threading.Lock()
+start_lock = threading.Lock()
+
+
 class Run:
     """One measurement, readable while it is still going."""
 
@@ -429,10 +435,31 @@ class Run:
         if self.started:
             return
         self.started = time.time()
+        try:
+            threading.Thread(target=self._begin_serialized, daemon=True).start()
+        except Exception:
+            self.done = True
+            raise
+
+    def _begin_serialized(self) -> None:
+        probe_lock.acquire()
+        handed_off = False
+        try:
+            handed_off = bool(self._begin())
+        except Exception as exc:
+            for thread in self._threads:
+                thread.join()
+            self.error = str(exc)
+            self.done = True
+        finally:
+            if not handed_off:
+                probe_lock.release()
+
+    def _begin(self) -> bool:
         if sys.platform != "win32":
             self.error = "this check uses Windows networking tools"
             self.done = True
-            return
+            return False
 
         # Which adapter is in use only decorates the result, so it is fetched
         # alongside the probing rather than before it. Both of these are
@@ -457,7 +484,18 @@ class Run:
             thread.start()
             self._threads.append(thread)
 
-        threading.Thread(target=self._finish, daemon=True).start()
+        threading.Thread(target=self._finish_serialized, daemon=True).start()
+        return True
+
+    def _finish_serialized(self) -> None:
+        try:
+            self._finish()
+        except Exception as exc:
+            with self._lock:
+                self.error = str(exc)
+                self.done = True
+        finally:
+            probe_lock.release()
 
     def _sweep(self, probe: Probe, host: str) -> None:
         if not host:
@@ -530,11 +568,12 @@ _run_now: "Optional[Run]" = None
 def start(samples: int = SAMPLES) -> Dict[str, Any]:
     """Begin a measurement, replacing any that has finished."""
     global _run_now
-    if _run_now is not None and not _run_now.done:
+    with start_lock:
+        if _run_now is not None and not _run_now.done:
+            return _run_now.snapshot()
+        _run_now = Run(samples)
+        _run_now.begin()
         return _run_now.snapshot()
-    _run_now = Run(samples)
-    _run_now.begin()
-    return _run_now.snapshot()
 
 
 def progress() -> Dict[str, Any]:

@@ -56,6 +56,35 @@ class Endpoints(unittest.TestCase):
         self.assertIs(self.prefs["ui"]["sync_auto"], False)
         self.assertFalse(webui._sync_status(self.state, {})["auto"])
 
+    def test_no_region_step_without_the_region_lock(self):
+        import builtins
+        real = builtins.__import__
+
+        def no_lock(name, *a, **k):
+            if name.endswith("serverlock") or (a and a[2] and "serverlock" in a[2]):
+                raise ImportError(name)
+            return real(name, *a, **k)
+
+        with mock.patch("builtins.__import__", side_effect=no_lock):
+            self.assertEqual(webui._setup_regions(), [])
+            self.assertEqual(webui._setup_region_lock("fra"), {})
+
+    def test_regions_become_wizard_choices_sorted_by_ping(self):
+        fake = mock.Mock()
+        fake.list_regions.return_value = [
+            {"code": "fra", "city": "Frankfurt", "country": "Germany", "ping_ms": 80.4},
+            {"code": "dxb", "city": "Dubai", "country": "United Arab Emirates", "ping_ms": 9.6},
+            {"code": "", "city": "x"}]
+        with mock.patch.dict(sys.modules, {"cs2cfg.serverlock": fake}), \
+             mock.patch("cs2cfg.elevated.ready", return_value=True):
+            import cs2cfg
+            with mock.patch.object(cs2cfg, "serverlock", fake, create=True):
+                out = webui._setup_regions()
+                self.assertEqual([r["id"] for r in out], ["dxb", "fra"])
+                self.assertEqual(out[0]["label"], "Dubai, United Arab Emirates")
+                self.assertTrue(webui._setup_region_lock("dxb")["ok"])
+        fake.request_lock.assert_called_once_with("dxb")
+
 
 if __name__ == "__main__":
     unittest.main()
