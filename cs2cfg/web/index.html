@@ -6508,6 +6508,8 @@ const startup = (() => {
 </div>
 <script src="skin-viewer.js"></script>
 <script src="assets/faceit/dashboard.js"></script>
+<link rel="stylesheet" href="assets/home/server-lock.css">
+<script src="assets/home/server-lock.js"></script>
 <script>
 const TOKEN = "__CS2CFG_TOKEN__";
 const $ = (id) => document.getElementById(id);
@@ -14497,6 +14499,7 @@ const serverPingWidget = (() => {
   let data = {regions:[],running:false}, opened = false, busy = false, timer = 0, frame = 0;
   const values = new Map();
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const regionLock = createServerRegionLock({panel,chip,api,esc,tone,changed:()=>render()});
   function glyph(status) {
     const shapes = {
       good:'<path d="M5 8h14M5 15h8M8 5v1m0 5v1m0 6v1"/><path d="m15 18 2 2 4-5"/>',
@@ -14556,14 +14559,22 @@ const serverPingWidget = (() => {
     });
   }
   function render() {
-    const focusCode = document.activeElement?.dataset.code;
+    const focusCode = document.activeElement?.closest('.sp-row')?.dataset.code;
+    const focusLock = document.activeElement?.matches('[data-lock-code]');
     const scrollTop = list.scrollTop;
     const query = search.value.toLocaleLowerCase().trim();
     const regions = [...data.regions].sort((a,b)=>(a.ping_ms??(a.status==='measuring'?values.get(a.code):null)??Infinity)-(b.ping_ms??(b.status==='measuring'?values.get(b.code):null)??Infinity)||a.city.localeCompare(b.city));
     const filtered = regions.filter(r => (r.city+' '+r.country+' '+r.code+' '+(r.codes||[]).join(' ') + (r.country==='United Arab Emirates'?' uae emirates':'')).toLocaleLowerCase().includes(query));
     list.innerHTML = filtered.map((r,i) => '<div class="sp-row sp-tone '+(r.ping_ms==null?'sp-unknown ':'')+(data.max_ping && r.ping_ms>data.max_ping?'sp-over ':'')+(r.status==='measuring'?'sp-measuring':'')+'" role="listitem" tabindex="0" data-code="'+esc(r.code)+'" style="--sp-index:'+Math.min(i,8)+'" title="'+esc((r.partner?'Valve partner relay \u00b7 ':'Valve relay \u00b7 ')+r.city+' ('+r.country+') \u00b7 '+(r.status==='unknown'?'No ICMP reply; availability unknown.':r.status==='measuring'?'Measuring relay…':r.status+' · '+r.loss+'% packet loss · '+r.relays_tried+' relay(s) tried'))+'"><span class="sp-region-icon" aria-hidden="true"><svg class="sp-glyph" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><ellipse cx="12" cy="12" rx="3.5" ry="8"/><path d="M4 12h16M6 7h12M6 17h12"/></svg></span><span><span class="sp-city">'+esc(r.city)+'</span><span class="sp-country">'+esc(r.country)+'</span></span><span><span class="sp-value"><span class="sp-number">—</span> <small>ms</small></span><span class="sp-track"><span class="sp-fill"></span>'+(data.max_ping?'<span class="sp-limit" style="left:'+Math.min(100,data.max_ping/2)+'%" title="Matchmaking limit: '+data.max_ping+' ms"></span>':'')+'</span></span><span class="sp-status" role="img" aria-label="'+esc(r.status)+'"></span></div>').join('') || '<div class="sp-empty">'+(query?'No regions match your search.':data.running?'Discovering Valve relays…':'Refresh to measure server regions.')+'</div>';
+    list.querySelectorAll('.sp-row').forEach(row=>{
+      const region=data.regions.find(r=>r.code===row.dataset.code);
+      row.insertAdjacentHTML('beforeend',regionLock.rowAction(region));
+    });
     list.scrollTop = scrollTop;
-    if(focusCode) [...list.children].find(r=>r.dataset.code===focusCode)?.focus({preventScroll:true});
+    if(focusCode) {
+      const row=[...list.children].find(r=>r.dataset.code===focusCode);
+      (focusLock?row?.querySelector('[data-lock-code]'):row)?.focus({preventScroll:true});
+    }
     paintValues();
     const best = regions.find(r=>r.ping_ms!=null), preferred = regions.find(r=>r.code===(data.preferred_code||'dxb'));
     // The pill answers one question: is my server up, and how is it from here?
@@ -14585,6 +14596,7 @@ const serverPingWidget = (() => {
     refresh.disabled = data.running;
     panel.querySelector('.sp-notice').textContent = data.error || (data.regions.some(r=>r.status==='unknown')?'Unknown means no ICMP reply, not a confirmed outage.':'Ping to Valve’s relay in this city. In-game ping is usually within a few ms.');
     panel.querySelector('.sp-limit-label').textContent = data.max_ping ? '│ Your limit '+data.max_ping+' ms' : 'Relay ping · ICMP';
+    regionLock.decorate(data);
     age(); position();
   }
   function accept(next) {
@@ -14629,9 +14641,9 @@ const serverPingWidget = (() => {
     if(event.key==='Escape') { event.preventDefault(); panel.hidePopover(); chip.focus(); return; }
     if(['ArrowDown','ArrowUp'].includes(event.key)) {
       event.preventDefault(); const rows=[...list.querySelectorAll('.sp-row')];
-      const index=rows.indexOf(document.activeElement), delta=event.key==='ArrowDown'?1:-1;
+      const index=rows.indexOf(document.activeElement.closest('.sp-row')), delta=event.key==='ArrowDown'?1:-1;
       rows[index<0?(delta>0?0:rows.length-1):(index+delta+rows.length)%rows.length]?.focus();
-    } else if(event.key.length===1 && !event.ctrlKey && !event.metaKey && document.activeElement!==search) { search.focus(); }
+    } else if(event.key.length===1 && event.key!==' ' && !event.ctrlKey && !event.metaKey && document.activeElement!==search) { search.focus(); }
   });
   search.addEventListener('input',render); refresh.addEventListener('click',()=>start(true));
   panel.querySelector('.sp-close').addEventListener('click',()=>{ panel.hidePopover(); chip.focus({preventScroll:true}); });

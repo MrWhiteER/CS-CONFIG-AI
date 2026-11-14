@@ -1,0 +1,12 @@
+{
+  "revision": 1794268433,
+  "success": true,
+  "pops": {
+    "dxb": {"desc": "Dubai (United Arab Emirates)", "partners": 1, "tier": 0, "relays": [{"ipv4": "185.25.183.163"}, {"ipv4": "185.25.183.179"}]},
+    "bom": {"desc": "Mumbai (India)", "relays": [{"ipv4": "155.133.226.68"}, {"ipv4": "185.25.183.163"}]},
+    "bom2": {"desc": "Mumbai (India)", "relays": [{"ipv4": "155.133.226.69"}]},
+    "dfjr": {"desc": "Datapacket Fujairah (United Arab Emirates)", "partners": 1, "tier": 1, "relays": [{"ipv4": "155.133.226.70"}]},
+    "hidden": {"relays": [{"ipv4": "155.133.226.71"}]},
+    "hel": {"desc": "Helsinki (Finland)"}
+  }
+}
