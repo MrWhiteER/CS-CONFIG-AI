@@ -448,11 +448,9 @@
   }
   .subpane.came-from-left  { animation: pane-in-right .36s cubic-bezier(.22, .9, .26, 1); }
   .subpane.came-from-right { animation: pane-in-left  .36s cubic-bezier(.22, .9, .26, 1); }
-  .settings-box.resizing { transition: height .36s cubic-bezier(.22, .9, .26, 1); }
 
   @media (prefers-reduced-motion: reduce) {
     .subpane.came-from-left, .subpane.came-from-right { animation: none; }
-    .settings-box.resizing { transition: none; }
   }
 
   /* The followed FACEIT account, and its recent matches. */
@@ -2017,6 +2015,50 @@
 .hidden .verification *,html.verify-paused .verification *,details.verification:not([open]) .verify-row { animation-play-state:paused!important; }
 @media(prefers-reduced-motion:reduce) { .verification * { animation:none!important; transition:none!important; } }
 @media(max-width:700px) { .verification summary { padding:14px; gap:10px; }.verification summary strong { font-size:13px; }.verify-body { padding:4px 14px 14px; }.verify-row { grid-template-columns:21px minmax(0,1fr); }.verify-row > span:last-child { grid-column:2; } }
+/* Section 5: a shared Settings grid and plan-backed preset reveal. */
+.settings-box .subpane { grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:stretch;padding:16px 18px; }
+.settings-box .subpane > :is(.panel,.card) { min-width:0;min-height:220px;padding:20px; }
+.settings-box #machine-card { grid-column:auto;order:0; }
+.settings-box [data-sub="apply"] > .panel:has(#w-video) { order:1; }
+.settings-box #setups-card { order:2; }
+.settings-box #results { display:contents; }
+.settings-box #results > .card { order:3;min-width:0;padding:20px;margin:0; }
+.settings-box #results > .card:has(.chg-list) { max-height:560px;overflow:auto; }
+.settings-box .settings-tools { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px; }
+.settings-box .settings-tools > .fix-tile { margin:0;min-width:0; }
+.settings-box #steam-tools:empty,.settings-box #steam-tools-feedback:has(#steam-tools-status:empty):has(button[hidden]) { display:none; }
+.settings-box #steam-profile { position:relative;margin-top:16px; }
+.settings-box #steam-profile .rail-profile { width:100%;justify-content:flex-start;background:var(--panel-2);color:var(--ink);border:1px solid var(--line);border-radius:8px; }
+.settings-box #steam-profile .nm { display:grid!important;text-align:left; }
+.settings-box #steam-profile .who-menu { position:relative;inset:auto;width:100%;margin-bottom:8px; }
+.settings-box .parts { gap:16px;margin-bottom:20px; }
+.settings-box .part { min-width:0; }
+.settings-box .part-name { font-size:13px;overflow-wrap:anywhere; }
+.settings-box .part-sub { font-size:11px; }
+.settings-box .bias { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;position:relative;isolation:isolate;border:1px solid var(--line);border-radius:10px;padding:4px;flex-wrap:nowrap; }
+.settings-box .bias .bias-thumb { position:absolute;top:4px;bottom:4px;left:4px;width:calc((100% - 8px)/3);background:var(--accent-dim);border:1px solid var(--accent);border-radius:7px;transform:translateX(calc(var(--bias-index)*100%));transition:transform .25s ease;z-index:-1; }
+.settings-box .bias button { min-width:0;padding:12px 4px;border:0;background:transparent;box-shadow:none;flex:initial; }
+.settings-box .bias button[aria-pressed="true"] { background:transparent;border:0; }
+.settings-box .bias button b { font-size:11px;white-space:nowrap; }
+.settings-box .wg-row { margin-top:16px;gap:8px; }
+.preset-veil { position:fixed;inset:0;z-index:50;pointer-events:none;background:color-mix(in srgb,var(--bg) 78%,transparent);animation:preset-fade .18s ease both; }
+.mode-card.preset-active { z-index:51;isolation:isolate;transform:none!important;transition:none!important; }
+.mode-card.preset-active .mode-copy,.mode-card.preset-active .mode-index,.mode-card.preset-active .mode-selected { opacity:0; }
+.preset-changes { position:absolute;inset:0;display:flex;flex-direction:column;padding:16px;background:color-mix(in srgb,var(--panel) 96%,transparent);text-align:left; }
+.preset-heading { font:600 16px var(--display);color:var(--ink);margin-bottom:10px;display:flex;justify-content:space-between;gap:8px; }
+.preset-heading small { font:11px var(--body);color:var(--muted); }
+.preset-rows { display:block;overflow:auto;min-height:0;scrollbar-width:thin; }
+.preset-row { display:grid;grid-template-columns:22px minmax(0,1fr);gap:4px 8px;border-top:1px solid var(--line);padding:8px 0;color:var(--ink);font-size:11px;animation:preset-row .22s ease both; }
+.preset-row .hw-icon { grid-row:span 2; }
+.preset-row .preset-value { color:var(--muted);overflow-wrap:anywhere; }
+.preset-value b { color:var(--accent);font-weight:500; }
+@keyframes preset-row { from { opacity:0;transform:translateY(6px); } to { opacity:1;transform:translateY(0); } }
+@keyframes preset-fade { from { opacity:0; } to { opacity:1; } }
+.hidden .preset-row,.hidden .preset-veil { animation-play-state:paused; }
+@media(max-width:900px) { .settings-box .subpane,.settings-box .settings-tools { grid-template-columns:minmax(0,1fr); }.settings-box #machine-card { grid-column:1/-1; } }
+.hw-paused .bias-thumb,.hidden .bias-thumb { transition:none!important; }
+@media(prefers-reduced-motion:reduce) { .settings-box .bias .bias-thumb { transition:none!important; }.preset-row,.preset-veil { animation:none!important; } }
+
 </style>
 <style>
   /* ------------------------------------------------------------------------
@@ -5882,10 +5924,8 @@ const startup = (() => {
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1z"/><circle cx="12" cy="12" r="3"/></svg></i><span class="tx">Settings</span></button>
     </div>
 
-    <!-- The foot carries the two things that are about this copy of the
-         launcher rather than about the game: what version it is, and whose
-         settings it is showing. Both open upward, because there is no room
-         below them. -->
+    <!-- Version and updates stay in the rail. Account selection lives in
+         Settings > Steam alongside the client controls. -->
     <div class="rail-foot">
       <button class="updc" id="updc" aria-haspopup="dialog" aria-expanded="false"
               aria-controls="updc-pop" title="Update centre">
@@ -5909,14 +5949,7 @@ const startup = (() => {
         </button>
         <div class="ver">__CS2CFG_VERSION__</div>
       </div>
-      <div class="account-label">Steam account</div>
-      <div class="who-menu hidden" id="who-menu"></div>
-      <button class="rail-profile" id="who" aria-haspopup="true" aria-expanded="false"
-              title="Whose settings are shown">
-        <i class="orb" id="who-face"></i>
-        <span class="nm"><b id="who-name">Looking&hellip;</b>
-          <small id="who-how"></small></span>
-      </button>
+
 
     </div>
   </aside>
@@ -6385,6 +6418,7 @@ const startup = (() => {
           <div class="seg-thumb" id="seg-thumb"></div>
           <button class="seg-item" data-sub="apply" role="tab" aria-selected="true">Apply</button>
           <button class="seg-item" data-sub="this-pc" role="tab" aria-selected="false"><span data-hardware-icon="display"></span> This PC</button>
+          <button class="seg-item" data-sub="steam" role="tab" aria-selected="false">Steam</button>
           <button class="seg-item" data-sub="account" role="tab" aria-selected="false">Account</button>
           <button class="seg-item" data-sub="apps" role="tab" aria-selected="false">Apps</button>
           <button class="seg-item" data-sub="look" role="tab" aria-selected="false">Look</button>
@@ -6435,7 +6469,6 @@ const startup = (() => {
         <label class="opt"><input type="checkbox" id="w-video" checked> Picture quality (cs2_video.txt)</label>
         <label class="opt"><input type="checkbox" id="p-video" checked> Set CS2 to borderless windowed before launching</label>
         <label class="opt"><input type="checkbox" id="w-cfg" checked> Generated .vcfg config</label>
-        <label class="opt"><input type="checkbox" id="w-launch" checked> Steam launch options</label>
         <label class="opt"><input type="checkbox" id="w-autoexec"> Add exec line to autoexec.vcfg</label>
         <label class="opt"><input type="checkbox" id="w-scaling" checked> Full-screen scaling (no black bars when stretched)</label>
         <div class="actions">
@@ -6452,7 +6485,28 @@ const startup = (() => {
       <!-- The other programs that run alongside the game. Crosshair X was
            here only because it was the first one written; it is not a setting
            about CS2's configuration and never was. -->
-      <!-- Signing in, and what the plan includes. -->
+      <!-- Local Steam account, client, launch options and repairs. -->
+      <div class="subpane hidden" data-sub="steam">
+        <section class="panel" id="steam-client-card"><h2>Steam client</h2><div id="steam-status"></div>
+          <div id="steam-profile"><div class="account-label">Steam account</div>
+      <div class="who-menu hidden" id="who-menu"></div>
+      <button class="rail-profile" id="who" aria-haspopup="true" aria-expanded="false"
+              title="Whose settings are shown">
+        <i class="orb" id="who-face"></i>
+        <span class="nm"><b id="who-name">Looking&hellip;</b>
+          <small id="who-how"></small></span>
+      </button></div>
+        </section>
+        <section class="panel" id="steam-launch-card"><h2>Steam launch options</h2>
+          <label class="opt"><input type="checkbox" id="w-launch" checked> Apply launch options with next Apply</label>
+          <div id="steam-launch-out"><span class="sub">Preview changes to read launch options.</span></div>
+          <div class="actions"><button class="btn" id="steam-preview">Preview changes</button><button class="btn" id="steam-apply">Review Apply</button></div>
+        </section>
+        <div class="wide" id="steam-tools-feedback"><span id="steam-tools-status" class="sub" role="status"></span><button class="btn small" id="steam-tools-retry" hidden>Retry Steam tools</button></div>
+        <div id="steam-tools" class="settings-tools wide"></div>
+      </div>
+
+      <!-- App sign-in, linking and subscription stay separate from Steam settings. -->
       <div class="subpane hidden" data-sub="account">
         <section class="panel wide" id="account-card">
           <h2>Account</h2>
@@ -7002,10 +7056,7 @@ function renderHardware(d) {
       (m.primary ? ' <span class="sub">primary</span>' : "") +
       (m.confident ? "" : ' <span class="sub">(from EDID)</span>'), null]));
   bits.push(["Power", esc(d.power_plan || "unknown"), null]);
-  if (d.cs2_install) bits.push(["CS2", '<span class="mono">' + esc(d.cs2_install) + "</span>", null]);
-  bits.push(["Steam", d.steam_running
-    ? '<span style="color:var(--warn)">running — close it before applying launch options</span>'
-    : "not running", null]);
+  $('steam-status').innerHTML = '<p class="sub">' + (d.steam_running ? 'Running · close Steam before applying launch options' : 'Steam is closed') + '</p><div class="row"><span class="k">Steam path</span><span class="v mono">' + esc(d.steam_path || 'Not found') + '</span></div><div class="row"><span class="k">CS2 path</span><span class="v mono">' + esc(d.cs2_install || 'Not found') + '</span></div>';
 
   $("hw").innerHTML = bits.map(([k, v, sub]) =>
     '<div class="row"><span class="k">' + (hwIcon(k) || esc(k)) + '</span><span class="v">' + v +
@@ -7451,22 +7502,12 @@ function renderPlan(p) {
       "</span></div></div>").join("") +
     "</div></section>";
 
-  html += '<section class="card"><h2>Steam launch options</h2>' +
-    '<div class="sub">current</div><pre class="opts">' + esc(p.launch_current || "(none set)") + "</pre>" +
-    '<div class="sub">new</div><pre class="opts">' + esc(p.launch_new) + "</pre>" +
-    p.launch_removed.map(r => '<div class="note"><div class="rm">− ' + esc(r.option) +
-      '</div><div class="d">' + esc(r.reason) + "</div></div>").join("") +
-    p.launch_added.map(a => '<div class="note"><div class="ad">+ ' + esc(a.option) +
-      '</div><div class="d">' + esc(a.reason) + "</div></div>").join("") +
-    "</section>";
-
-  const visibleAdvisories = p.advisories.filter(a => !/estimated|headroom|\btier\b|ceiling/i.test(a.title + " " + a.detail));
-  if (visibleAdvisories.length) {
-    html += '<section class="card"><h2>Worth knowing</h2>' +
-      visibleAdvisories.map(a => '<div class="note ' + esc(a.level) + '"><div class="t">' +
-        (a.level === "warn" ? "! " : "i ") + esc(a.title) + '</div><div class="d">' +
-        esc(a.detail) + "</div></div>").join("") + "</section>";
-  }
+  $('steam-launch-out').innerHTML =
+    '<div class="sub">Current</div><pre class="opts">' + esc(p.launch_current || '(none set)') + '</pre>' +
+    '<div class="sub">Next Apply</div><pre class="opts">' + esc(p.launch_new || '(none set)') + '</pre>' +
+    (p.launch_removed || []).map(r => '<div class="note"><div class="rm">− ' + esc(r.option) + '</div><div class="d">' + esc(r.reason) + '</div></div>').join('') +
+    (p.launch_added || []).map(a => '<div class="note"><div class="ad">+ ' + esc(a.option) + '</div><div class="d">' + esc(a.reason) + '</div></div>').join('');
+  presetReveal(p);
 
   $("results").innerHTML = html;
   const toggle = $("show-unchanged");
@@ -8024,6 +8065,64 @@ document.addEventListener('keydown', event => {
 const INTENTS = ["competitive", "balanced", "quality"];
 
 /* Every card uses the same settings preview; estimates stay internal. */
+let presetSession = null;
+function presetClose() {
+  if (presetSession) clearTimeout(presetSession.timer);
+  presetSession = null;
+  document.querySelector('.preset-veil')?.remove();
+  document.querySelectorAll('.preset-active').forEach(card => { card.classList.remove('preset-active');card.querySelector('.preset-changes')?.remove(); });
+}
+function presetBegin(name) {
+  presetClose();
+  if (!homeVisible()) return;
+  const card = document.querySelector('.mode-card[data-intent="' + name + '"]');
+  if (!card) return;
+  presetSession = {name,card,timer:0};
+  const veil = document.createElement('div');veil.className='preset-veil';veil.setAttribute('aria-hidden','true');veil.onclick=presetClose;document.body.append(veil);
+  card.classList.add('preset-active');
+  card.insertAdjacentHTML('beforeend','<span class="preset-changes"><span class="preset-heading">' + esc(name[0].toUpperCase()+name.slice(1)) + '<small>Preview · click to close</small></span><span class="preset-rows" role="status" aria-live="polite">Reading settings…</span></span>');
+  presetPosition();
+}
+// Cut a window through the dimmer. Existing glass panels create stacking
+// contexts, so a z-index on the card alone cannot lift it above a page veil.
+function presetPosition() {
+  if (!presetSession) return;
+  const r=presetSession.card.getBoundingClientRect();
+  const veil=document.querySelector('.preset-veil');
+  if (veil) veil.style.clipPath='polygon(evenodd,0 0,100% 0,100% 100%,0 100%,0 0,' + r.left + 'px ' + r.top + 'px,' + r.right + 'px ' + r.top + 'px,' + r.right + 'px ' + r.bottom + 'px,' + r.left + 'px ' + r.bottom + 'px,' + r.left + 'px ' + r.top + 'px)';
+}
+window.addEventListener('resize',presetPosition);
+document.addEventListener('scroll',presetPosition,true);
+document.addEventListener('click',e => { if (!e.target.closest('#intents')) presetClose(); });
+function presetReveal(plan) {
+  const session = presetSession;
+  if (!session || session.name !== plan.intent) return;
+  const rows = session.card.querySelector('.preset-rows');rows.replaceChildren();
+  const changes = (plan.settings || []).filter(s => s.changed);
+  const glyph = name => /cpu|thread/i.test(name) ? 'cpu' : /texture|memory/i.test(name) ? 'vram' : /display|resolution|sync|refresh/i.test(name) ? 'display' : 'gpu';
+  let at=0;
+  function next() {
+    if (presetSession !== session) return;
+    if (!homeVisible()) { presetClose();return; }
+    const setting=changes[at++];
+    if (setting) {
+      const value = (label,raw) => esc(String(label ?? 'Not set')) + (setting.same_label && raw != null ? ' (' + esc(String(raw)) + ')' : '');
+      rows.insertAdjacentHTML('beforeend','<span class="preset-row">' + hwIcon(glyph(setting.name)) + '<span>' + esc(setting.name) + '</span><span class="preset-value">' + value(setting.before,setting.before_raw) + ' → <b>' + value(setting.after,setting.after_raw) + '</b></span></span>');
+      rows.scrollTop=rows.scrollHeight;
+    }
+    if (at < changes.length && !matchMedia('(prefers-reduced-motion: reduce)').matches) session.timer=setTimeout(next,360);
+    else if (at < changes.length) next();
+    else { if (!changes.length) rows.textContent='Everything already matches.';session.timer=setTimeout(presetClose,2800); }
+  }
+  next();
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') presetClose(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) presetClose(); });
+new MutationObserver(() => { if (!homeVisible()) presetClose(); }).observe(document.querySelector('[data-panel="launcher"]'),{attributes:true,attributeFilter:['class']});
+$('steam-preview').addEventListener('click', () => $('preview').click());
+$('steam-apply').addEventListener('click', () => setSettingsSub('apply'));
+
+
 function paintIntent(name) {
   if (!INTENTS.includes(name)) return;
   const cards = $("intents");
@@ -8047,6 +8146,7 @@ function chooseIntent(name, quiet) {
   rememberPrefs();
   if (!quiet) {
     noteChange("Optimise for → " + name, () => chooseIntent(before, true));
+    presetBegin(name);
     $("preview").click();
   }
 }
@@ -8055,7 +8155,8 @@ function chooseIntent(name, quiet) {
   const cards = $("intents");
   cards.addEventListener("click", e => {
     const card = e.target.closest(".mode-card");
-    if (card) chooseIntent(card.dataset.intent);
+    if (card?.classList.contains('preset-active')) presetClose();
+    else if (card) { if(card.dataset.intent === intent) { presetBegin(intent); $('preview').click(); } else chooseIntent(card.dataset.intent); }
   });
   cards.addEventListener("keydown", e => {
     let at = INTENTS.indexOf(intent);
@@ -8129,12 +8230,15 @@ document.addEventListener('visibilitychange', () => {
 });
 setInterval(() => { if (!document.hidden && !$('verification').hidden) refreshVerification(); }, 15000);
 
+let planRevision = 0;
 async function previewPlan() {
   busy("Building plan…");
   $("preview").disabled = true;
-  try { renderPlan(await api("/api/plan", requestBody())); }
-  catch (e) { status("Plan failed: " + esc(e.message), true); }
-  finally { $("preview").disabled = false; }
+  $("apply").disabled = true;
+  const revision = ++planRevision, body = requestBody();
+  try { const plan = await api("/api/plan", body); if (revision === planRevision && body.intent === intent) renderPlan(plan); }
+  catch (e) { if (revision === planRevision) { presetClose(); status("Plan failed: " + esc(e.message), true); } }
+  finally { if (revision === planRevision) $("preview").disabled = false; }
 }
 $("preview").addEventListener("click", previewPlan);
 
@@ -8522,8 +8626,10 @@ let settingsSub = "apply";
 // server after the page is usable, and a late arrival must not pull the view
 // out from under a click that already happened.
 let settingsSubChosen = false;
+document.addEventListener('cs2cfg:ready', () => { if (settingsSub === 'steam') loadFixes(); });
 
 function setSettingsSub(name, restoring) {
+  if (!document.querySelector('#settings-subtabs [data-sub="' + name + '"]')) name = "apply";
   const was = settingsSub;
   settingsSub = name;
   if (!restoring) settingsSubChosen = true;
@@ -8534,40 +8640,21 @@ function setSettingsSub(name, restoring) {
   moveSegThumb("settings-subtabs");
 
   const panes = [...document.querySelectorAll('[data-panel="settings"] .subpane')];
-  const box = document.querySelector(".settings-box");
-  // Measured before and after the swap so the surround can travel with the
-  // pane instead of snapping to the new content underneath it.
-  const from = box ? box.getBoundingClientRect().height : 0;
   panes.forEach(pane => {
     pane.classList.remove("came-from-left", "came-from-right");
     pane.classList.toggle("hidden", pane.dataset.sub !== name);
   });
   const landed = panes.find(pane => pane.dataset.sub === name);
 
-  if (box && landed && !restoring && was !== name) {
-    const to = box.getBoundingClientRect().height;
-    landed.classList.add("came-from-" + cameFrom);
-    if (Math.abs(to - from) > 1) {
-      box.style.height = from + "px";
-      box.classList.add("resizing");
-      void box.offsetHeight;          // commit the start height before moving
-      box.style.height = to + "px";
-      const done = () => {
-        box.classList.remove("resizing");
-        // Let it size itself again: panes load their contents after this and
-        // a fixed height would clip whatever arrives late.
-        box.style.height = "";
-        box.removeEventListener("transitionend", done);
-      };
-      box.addEventListener("transitionend", done);
-    }
-  }
+  if (landed && !restoring && was !== name) landed.classList.add("came-from-" + cameFrom);
   // Preference restoration only selects the pane. Startup owns its first loads.
   if (prefsReady && startup.finished) {
     if (name === "sound") loadAudio(false);
     if (name === "logs") loadHistory();
     if (name === "config" || name === "editing") ensureScan(false);
     if (name === "apps") loadCompanions();
+    if (name === "steam") { loadFixes(); loadWho(); }
+    if (name === "account") loadCloud();
   }
   rememberPrefs();
 }
@@ -8780,12 +8867,15 @@ function fixPauseMotion() { document.documentElement.classList.toggle("fix-pause
 document.addEventListener("visibilitychange", fixPauseMotion);
 fixPauseMotion();
 $("fix-refresh").addEventListener("click", () => loadFixes(true));
+$('steam-tools-retry').addEventListener('click', () => loadFixes(true));
 
 async function loadFixes(force) {
   const box = $("fix-out");
   if (fixSurveyPending || [...fixStates.values()].some(s => s.phase === "fixing")) return;
   if (fixData && !force) { renderFixes(); return; }
   fixSurveyPending = true;
+  $('steam-tools-status').textContent = 'Reading Steam tools…';
+  $('steam-tools-retry').hidden = true;
   (fixData?.fixes || []).forEach(f => paintFixState(f.id));
   $("fix-refresh").disabled = true;
   $("fix-refresh").textContent = "Checking...";
@@ -8793,7 +8883,10 @@ async function loadFixes(force) {
   try {
     [fixData] = await Promise.all([api("/api/fix/survey", {}), refreshHelperStatus()]);
     renderFixes();
+    $('steam-tools-status').textContent = '';
   } catch (err) {
+    $('steam-tools-status').textContent = 'Steam tools unavailable: ' + String(err && err.message || err);
+    $('steam-tools-retry').hidden = false;
     if (box) { box.querySelector(".fix-survey-error")?.remove(); box.insertAdjacentHTML("afterbegin", '<p class="fix-banner fix-survey-error" role="alert">Could not read the machine: ' + esc(String(err && err.message || err)) + '. Use Check current settings to retry.</p>'); }
   } finally { fixSurveyPending = false; $("fix-refresh").disabled = false; $("fix-refresh").textContent = "Check current settings"; (fixData?.fixes || []).forEach(f => paintFixState(f.id)); }
 }
@@ -8972,15 +9065,18 @@ function renderFixes() {
   html += "</div>";
   // Keep controls across refreshes and returning to this tab.
   const held = {};
+  document.querySelectorAll('#steam-tools input').forEach(el => { held[el.id] = {value:el.value,checked:el.checked}; });
   box.querySelectorAll("select,input").forEach(el => { held[el.id] = {value:el.value,checked:el.checked}; });
   box.innerHTML = html;
   const grid = box.querySelector(".fix-grid");
   const nav = document.createElement("div"); nav.className = "fix-categories"; nav.setAttribute("aria-label", "Tool categories");
-  [["all","All tools"], ...Object.entries(FIX_FAMILY_NAME)].forEach(([key,label]) => {
+  [["all","All tools"], ...Object.entries(FIX_FAMILY_NAME).filter(([key]) => key !== "steam")].forEach(([key,label]) => {
     const button = document.createElement("button"); button.className = "btn"; button.textContent = label; button.setAttribute("aria-pressed", String(fixFilter === key));
     button.onclick = () => { fixFilter = key; nav.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b === button))); grid.querySelectorAll(".fix-tile").forEach(t => { t.hidden = key !== "all" && t.dataset.family !== key; }); }; nav.append(button);
   });
   grid.before(nav);
+  $('steam-tools').replaceChildren(...grid.querySelectorAll('[data-family="steam"]'));
+  $('steam-tools').querySelectorAll('.fix-tile').forEach(t => { t.hidden = false; });
   grid.querySelectorAll(".fix-tile").forEach(t => { t.hidden = fixFilter !== "all" && t.dataset.family !== fixFilter; });
   Object.entries(held).forEach(([id,state]) => { const el = $(id); if (el && el.type === "checkbox") el.checked = state.checked; });
   if (held["fix-all-devices"]?.checked) $("fix-device").innerHTML = listFor(true);
@@ -13354,11 +13450,11 @@ let wgData = null;
 
 const BIAS = [
   ["auto", "Automatic",
-   "Reads the machine and spares whichever part is actually the slower half."],
-  ["gpu", "Lean on the graphics card",
-   "Keeps graphics detail up. For a machine whose card is the stronger half — which is most of them, because CS2 leans on the processor."],
-  ["cpu", "Lean on the processor",
-   "Gives the graphics card less to draw. For a weaker card next to a processor that can carry it."],
+   "Automatically reduces picture detail for the slower part."],
+  ["gpu", "Lean on GPU",
+   "Keeps more graphics detail when the GPU is the stronger part."],
+  ["cpu", "Lean on CPU",
+   "Reduces graphics detail for a weaker GPU. Does not move work between parts."],
 ];
 
 async function loadMachine() {
@@ -13395,37 +13491,15 @@ function renderMachine() {
       '<span class="part ' + (i ? 'gpu' : 'cpu') + '"><span class="part-ic">' + (i ? card : chip) + '</span><span class="part-txt"><span class="part-name" title="' + esc(part.name) + '">' + esc(shortPart(part.name)) + '</span><span class="part-sub">' + esc(part.detail || '') + '</span></span></span>').join('') + '</div>';
   }
 
-  html +=
-    '<p class="sub">Where the detail budget goes when the machine cannot have ' +
-    "everything. These are picture settings, not a scheduler — nothing here " +
-    "moves work between the two parts, it decides which one is asked to draw " +
-    'less.</p><div class="bias">' +
-    BIAS.map(([id, name, why]) =>
-      '<button type="button" data-bias="' + id + '" aria-pressed="' +
-      (now === id) + '"><b>' + esc(name) + "</b><span>" + esc(why) +
-      "</span></button>").join("") +
-    "</div>";
+  html += '<div class="bias" role="group" aria-label="Picture detail balance" style="--bias-index:' + Math.max(0, BIAS.findIndex(b => b[0] === now)) + '"><i class="bias-thumb" aria-hidden="true"></i>' +
+    BIAS.map(([id,name,why]) => '<button type="button" data-bias="' + id + '" title="' + esc(why) + '" aria-pressed="' + (now === id) + '"><b>' + esc(name) + '</b></button>').join('') + '</div>';
 
   if (wgData && wgData.supported) {
     const set = wgData.high_performance && wgData.windowed_optimised;
     html +=
-      '<div class="wg-row"><span class="sub2"><b>Windows graphics settings</b><br>' +
-      "Windows keeps its own per-game settings: which card to render on, and " +
-      "whether a windowed game gets the low-latency presentation path. CS2 is " +
-      "currently <b>" + (set ? "set for performance" : "on Windows&rsquo; defaults") +
-      "</b>." +
-      (wgData.gpu_choice_matters ? "" :
-        " This machine has one graphics adapter, so the card choice changes " +
-        "nothing here; the windowed optimisation still does.") +
-      "</span>" +
-      '<button class="btn small" id="wg-apply"' + (set ? " disabled" : "") + ">" +
-      (set ? "Already set" : "Set for performance") + "</button></div>" +
-      '<label class="opt"><input type="checkbox" id="wg-auto"' +
-      (keep ? " checked" : "") + '><span class="xh-opt">' +
-      "<b>Keep it set on every launch</b>" +
-      '<span class="sub2">Checked before the game starts, and only written when ' +
-      "Windows does not already agree. Other applications&rsquo; settings in the " +
-      "same place are left alone.</span></span></label>";
+      '<div class="wg-row"><span class="sub2" title="Per-game Windows adapter preference and windowed optimisation.">Windows graphics · ' + (set ? 'Performance' : 'Default') + '</span>' +
+      '<button class="btn small" id="wg-apply"' + (set ? ' disabled' : '') + '>' + (set ? 'Already set' : 'Set for performance') + '</button></div>' +
+      '<label class="opt" title="Check these per-game Windows settings before each launch."><input type="checkbox" id="wg-auto"' + (keep ? ' checked' : '') + '> Keep set on launch</label>';
   } else if (wgData && wgData.reason) {
     html += '<p class="wg-row"><span class="sub2">Windows graphics settings are ' +
             "unavailable: " + esc(wgData.reason) + "</span></p>";
@@ -13438,7 +13512,9 @@ document.addEventListener("click", async e => {
   if (pick) {
     const want = pick.dataset.bias;
     if (prefsNow) prefsNow.load_bias = want;
-    renderMachine();
+    const track = pick.closest('.bias');
+    track.style.setProperty('--bias-index', BIAS.findIndex(b => b[0] === want));
+    track.querySelectorAll('[data-bias]').forEach(b => b.setAttribute('aria-pressed', String(b === pick)));
     try { await api("/api/prefs", { load_bias: want }); } catch (err) { /* below */ }
     // The generated config just changed, so the preview is stale.
     $("preview").click();
@@ -16155,6 +16231,7 @@ $("rescan").addEventListener("click", () => scan(true));
       });
       await startup.run("settings-pane", async () => {
         if (settingsSub === "config" || settingsSub === "editing") await ensureScan(false);
+        if (settingsSub === "steam") await loadFixes();
       });
     })(),
   ]);
@@ -16198,7 +16275,7 @@ $("rescan").addEventListener("click", () => scan(true));
     "Picture quality": "picture", "Optimise for": "gauge", "Match demos": "play",
     "Keyboard": "keyboard", "Fix It": "wrench", "Files": "folder",
     "Detected": "layers", "System": "device", "Connection": "gauge",
-    "Steam launch options": "terminal", "Worth knowing": "text", "Settings": "sliders"
+    "Steam launch options": "terminal", "Steam client": "device", "Settings": "sliders"
   };
 
   /* Convar names, by what they govern. First match wins. */

@@ -10,15 +10,19 @@ let code=fs.readFileSync(path.join(root,'cs2cfg/web/assets/hardware/icons.js'),'
 code+=slice("function renderHardware(d) {","/* The machine's scores,");
 code+=`let prefsNow={},audioData=null;`;
 code+=slice('function audioOptions(list, pinned)', 'async function saveAudio');
-code+=slice('let wgData = null;','document.addEventListener("click", async e => {');
+code+=slice('let wgData = null;','/* What the launch did about the crosshair.');
 code+=slice('const CHIPS = { CPU:', '// -- 2. the gradient');
 code+=slice('/* Launcher motion:','function renderPlan(');
-code+=slice('/* Every card uses','async function previewPlan()');
+code+=slice('/* Every card uses','$("preview").addEventListener("click", previewPlan);');
+code+='function busy(){};';
 code+=`let fpsEffect='';function renderFps(){}function markPending(){};`;
 code+=slice('function renderPlan(', '// The last detection,');
 code+=slice('let netTimer = null;', '/* Three scene cards');
 code+=`const prefsReady=false,startup={finished:false};function moveSegThumb(){};`;
 code+=slice('let settingsSub = "apply";', '/* ---------------------------------------------------------------------------\n   Sound devices');
+code+='let cloudData=null;';
+code+=slice('const WAY_ICONS = {', 'async function loadCloud()');
+code+=slice('function cloudWay(', 'function showPasswordForm(');
 code+=slice('function ring(value','function meter(');
 code+=slice('/* Administrator helper status','/* ------');
 code+=slice('// Horizontal thermal strips','// --- live system readout');
@@ -87,6 +91,9 @@ audioData={output:[{id:'out',name:'Headset'}],input:[{id:'in',name:'Microphone'}
 check('sound selects retain their selected devices',$('audio-output').value==='out'&&$('audio-input').value==='in');
 check('sound icon labels remain associated with selects',!!document.querySelector('label[for="audio-output"] [data-hw="headset"]')&&!!document.querySelector('label[for="audio-input"] [data-hw="mic"]'));
 check('Machine controls preserved',$('machine-out').querySelectorAll('[data-bias]').length===3&&!!$('wg-apply')&&!!$('wg-auto'));
+const thumb=$('machine-out').querySelector('.bias-thumb');
+for(const [id,index] of [['gpu',1],['cpu',2],['auto',0]]){const pick=$('machine-out').querySelector('[data-bias="'+id+'"]');pick.click();await Promise.resolve();check('bias '+id+' saves and slides',prefsNow.load_bias===id&&thumb===$('machine-out').querySelector('.bias-thumb')&&thumb.parentElement.style.getPropertyValue('--bias-index')===String(index)&&pick.getAttribute('aria-pressed')==='true');check('bias '+id+' tooltip explains choice',pick.title.length>20);}
+if(matchMedia('(prefers-reduced-motion: reduce)').matches)check('reduced motion disables bias slide',getComputedStyle(thumb).transitionDuration==='0s');
 
 check('Detected moved exclusively into This PC',!!$('hw-card').closest('[data-sub="this-pc"]')&&!document.querySelector('[data-panel="launcher"] #hw-card'));
 check('connection card removed from Play',!document.querySelector('[data-panel="launcher"] #net-card'));
@@ -136,19 +143,44 @@ for(const theme of ${JSON.stringify(themes)}){document.documentElement.dataset.t
 renderPlan({intent:'balanced',tier:'S',headroom:5.7,estimated_fps:342,settings:[{name:'GPU level',after:'High',changed:true,reason:'Tier S headroom'}],launch_current:'',launch_new:'',launch_added:[],launch_removed:[],advisories:[{title:'Estimated 342 fps',detail:'Tier S',level:'warn'}],changed_count:1});
 check('plan keeps settings without estimates',!/(342|headroom|Tier S)/.test($('results').textContent+$('assessment-out').textContent)&&$('results').textContent.includes('GPU level'));
 check('Machine has no estimated FPS',!$('machine-out').textContent.includes('FPS')&&!$('machine-out').querySelector('.part-vs'));
+check('launch controls moved once',['w-launch','steam-launch-out','who','who-menu'].every(id=>document.querySelectorAll('#'+id).length===1&&!!$(id).closest('[data-sub="steam"]')));
+check('app Account stays separate',['account-card','account-out'].every(id=>document.querySelectorAll('#'+id).length===1&&!!$(id).closest('.subpane[data-sub="account"]'))&&!document.querySelector('.subpane[data-sub="steam"] #account-card'));
+check('Steam preview moved from Apply',!$('results').textContent.includes('Steam launch options')&&$('steam-launch-out').textContent.includes('Next Apply'));
+check('Worth knowing render removed',!$('results').textContent.includes('Worth knowing'));
+setSettingsSub('account',true);check('saved Account preference restores Account',settingsSub==='account'&&!$('account-card').closest('.subpane').classList.contains('hidden')&&document.querySelector('#settings-subtabs [data-sub="account"]').getAttribute('aria-selected')==='true');setSettingsSub('apply',true);
+const settingsPanel=document.querySelector('[data-panel="settings"]');panel.classList.add('hidden');settingsPanel.classList.remove('hidden');
+for(const name of ['apply','this-pc','steam','account','apps','look','sound','config','editing','logs']){setSettingsSub(name,true);const pane=settingsPanel.querySelector('.subpane[data-sub="'+name+'"]');check('shared grid '+name,getComputedStyle(pane).gap==='16px'&&getComputedStyle(pane).display==='grid');}
+setSettingsSub('apply',true);const machineRect=$('machine-card').getBoundingClientRect(),writeRect=$('w-video').closest('.panel').getBoundingClientRect();check('Machine and Write aligned',innerWidth<=900||Math.abs(machineRect.width-writeRect.width)<1&&machineRect.top===writeRect.top&&machineRect.height===writeRect.height);
+settingsPanel.classList.add('hidden');panel.classList.remove('hidden');
+const sample={intent:'balanced',settings:[{name:'Texture quality',before:'Low',after:'High',changed:true},{name:'Shadows',before:'Off',after:'On',changed:true},{name:'GPU level',before:'Quality',after:'Quality',before_raw:1,after_raw:3,same_label:true,changed:true}]};
+for(const mode of INTENTS){presetBegin(mode);presetReveal({...sample,intent:mode});check(mode+' uses real preview values',document.querySelector('.preset-row').textContent.includes('Low → High'));check(mode+' dims behind selected card',!!document.querySelector('.preset-veil')&&presetSession.card.dataset.intent===mode);if(!matchMedia('(prefers-reduced-motion: reduce)').matches){check(mode+' reveals sequentially',document.querySelectorAll('.preset-row').length===1);await new Promise(r=>setTimeout(r,780));}check(mode+' displays every changed value',document.querySelectorAll('.preset-row').length===3&&document.querySelector('.preset-rows').textContent.includes('Quality (1) → Quality (3)'));presetClose();}
+presetBegin('quality');presetReveal(sample);check('stale preset response ignored',!document.querySelector('.preset-row'));presetReveal({...sample,intent:'quality',settings:[]});check('unchanged preset honest',document.querySelector('.preset-rows').textContent==='Everything already matches.');document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));check('Escape clears dimming',!presetSession&&!document.querySelector('.preset-veil'));
+presetBegin('balanced');Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));check('background cancels reveal and timer',!presetSession&&!document.querySelector('.preset-veil'));delete document.hidden;
+presetBegin('balanced');panel.classList.add('hidden');await Promise.resolve();check('leaving Play cancels reveal',!presetSession);panel.classList.remove('hidden');
+const oldApi=api;const queue=[];api=(route,body)=>new Promise((resolve,reject)=>queue.push({route,body,resolve,reject}));
+const planFor=name=>({...sample,intent:name,launch_current:'-old',launch_new:'-new',launch_removed:[],launch_added:[],changed_count:3});
+intent='competitive';const first=previewPlan();intent='quality';const second=previewPlan();queue[1].resolve(planFor('quality'));await second;queue[0].resolve(planFor('competitive'));await first;check('late plan cannot overwrite latest selection',planned.intent==='quality'&&$('assessment-out').textContent.includes('quality'));
+check('Steam launch options use latest same plan',$('steam-launch-out').textContent.includes('-new')&&!$('results').textContent.includes('-new'));
+presetBegin('quality');const failed=previewPlan();queue[2].reject(Error('Offline'));await failed;check('plan failure releases dimmer and preview button',!presetSession&&!$('preview').disabled);
+api=oldApi;intent='balanced';paintIntent(intent);renderPlan(planFor('balanced'));
+for(const theme of ${JSON.stringify(themes)}){document.documentElement.dataset.theme=theme;presetBegin('balanced');presetReveal(sample);const row=document.querySelector('.preset-row');check('preset readable in '+theme,getComputedStyle(row).color!==getComputedStyle(document.querySelector('.preset-changes')).backgroundColor);check('dimmer cuts window through selected card in '+theme,document.querySelector('.preset-veil').style.clipPath.includes('evenodd'));presetClose();}delete document.documentElement.dataset.theme;
 renderVerification(receipt);$('verification').open=location.hash.includes('verification');
 if(location.hash.includes('changed')){renderVerification({...receipt,verified:4,items:receipt.items.map((item,i)=>({...item,status:i===0?'changed':i===1?'failed':item.status,detail:i===0?'CS2 changed this value after Apply. Close CS2 and apply again.':i===1?'Config write failed: access denied.':item.detail}))},true);api=async()=>({...receipt,verified:4,items:receipt.items.map((item,i)=>({...item,status:i===0?'changed':i===1?'failed':item.status,detail:i===0?'CS2 changed this value after Apply. Close CS2 and apply again.':i===1?'Config write failed: access denied.':item.detail}))})}
 $('status').remove();document.querySelector('.scroll').scrollTop=0;
 if(location.hash.includes('verification'))$('verification').scrollIntoView({block:'start'});
 if(location.hash.includes('this-pc')){document.querySelector('[data-panel="launcher"]').classList.add('hidden');document.querySelector('[data-panel="settings"]').classList.remove('hidden');setSettingsSub('this-pc',true)}
 if(location.hash.includes('settings-apply')){document.querySelector('[data-panel="launcher"]').classList.add('hidden');document.querySelector('[data-panel="settings"]').classList.remove('hidden');setSettingsSub('apply',true)}
+if(location.hash.includes('settings-steam')){panel.classList.add('hidden');settingsPanel.classList.remove('hidden');setSettingsSub('steam',true);$('who-name').textContent='Edy';$('who-how').textContent='Following Steam';}
+if(location.hash.includes('settings-account')){panel.classList.add('hidden');settingsPanel.classList.remove('hidden');setSettingsSub('account',true);cloudData={configured:true,signed_in:false,google:true};renderCloud();}
+if(location.hash.includes('preset')){presetBegin('balanced');presetReveal(sample);await new Promise(r=>setTimeout(r,780));clearTimeout(presetSession.timer);$('intents').scrollIntoView({block:'center'});}
 if(location.hash.includes('connection'))$('chip-net').click();
 if(location.hash.includes('system')){$('live-card').scrollIntoView({block:'start'});hardwareInspect(400)}
 if(location.hash.includes('sound')){const card=$('audio-card');document.querySelector('.scroll').replaceChildren(card);card.scrollIntoView()}
-if(location.hash.includes('machine')){const card=$('machine-card');document.querySelector('.scroll').replaceChildren(card);card.scrollIntoView()}
+if(location.hash.includes('machine')){const card=$('machine-card'),frame=document.createElement('div');frame.className='settings-box';frame.append(card);document.querySelector('.scroll').replaceChildren(frame);card.scrollIntoView()}
 if(location.hash.includes('family')){const thermal=$('live-temps').cloneNode(true);thermal.style.cssText='display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px;margin:28px;';document.querySelector('.scroll').innerHTML='<section class="panel"><h2>Hardware family</h2><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:32px;padding:28px">'+Object.keys(HW_ART).map(k=>'<div style="display:flex;align-items:center;gap:18px">'+hwIcon(k)+'<span>'+HW_NAMES[k]+'</span></div>').join('')+'</div></section>';const frame=document.createElement('div');frame.dataset.panel='launcher';frame.append(thermal);document.querySelector('.scroll').firstElementChild.append(frame)}
 if(location.hash.includes('paper'))document.documentElement.dataset.theme='paper';
 if(location.hash.includes('solo'))hardwareSelect('gpu');
+if(!settingsPanel.classList.contains('hidden'))document.querySelectorAll('.tabs .tab').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab==='settings')));
 
 }catch(e){checks.push({error:e.stack})}const freeze=document.createElement('style');freeze.textContent='*,*::before,*::after{transition:none!important;animation:none!important}';document.head.append(freeze);document.body.insertAdjacentHTML('beforeend','<pre id="checks" hidden>'+JSON.stringify(checks)+'</pre>')})();`;
 let html=s.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'');html=html.replace('<head>','<head><base href="'+url.pathToFileURL(path.join(root,'cs2cfg/web/')).href+'">');html=html.replace('</body>','<script>'+code+'</script></body>');

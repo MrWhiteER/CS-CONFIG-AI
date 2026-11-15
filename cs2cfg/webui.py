@@ -120,6 +120,7 @@ def _machine_payload(machine: Machine, state: State) -> Dict[str, Any]:
             for d in machine.displays
         ],
         "cs2_install": str(state.cs2_install) if state.cs2_install else None,
+        "steam_path": str(state.steam_root) if state.steam_root else None,
         "steam_running": steam.steam_running(),
         "accounts": [
             {"id": u.account_id, "label": u.label, "has_video": u.video_cfg.exists()}
