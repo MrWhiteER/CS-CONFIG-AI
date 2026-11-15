@@ -5533,6 +5533,9 @@
 
 <link rel="stylesheet" href="assets/devices/workspace.css">
 <link rel="stylesheet" href="assets/fixit/toolbox.css">
+<link rel="stylesheet" href="assets/hardware/icons.css">
+<script src="assets/hardware/icons.js"></script>
+<script src="assets/fixit/icons.js"></script>
 <style>
 /* First run: one decision on a full-window stage. Motion stays on compositor
    properties; even theme previews fade a frozen copy rather than tween colours. */
@@ -5835,13 +5838,13 @@ const startup = (() => {
       <button class="tab" data-tab="cs2" role="tab" aria-selected="false" title="CS2 Settings">
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.3"/><circle cx="10" cy="17" r="2.3"/></svg></i><span class="tx">CS2 Settings</span></button>
       <button class="tab" data-tab="keyboard" role="tab" aria-selected="false" title="Keyboard">
-        <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2.5"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/></svg></i><span class="tx">Keyboard</span></button>
+        <i class="ic"><span data-hardware-icon="keyboard"></span></i><span class="tx">Keyboard</span></button>
       <button class="tab" data-tab="scripts" role="tab" aria-selected="false" title="Scripts">
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7l-5 5 5 5M15 7l5 5-5 5"/></svg></i><span class="tx">Scripts</span></button>
       <button class="tab" data-tab="files" role="tab" aria-selected="false" title="Files">
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 012-2h4l2 2.5h8a2 2 0 012 2V18a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></i><span class="tx">Files</span></button>
       <button class="tab" data-tab="gpu" role="tab" aria-selected="false" title="Graphics">
-        <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="7" width="16" height="11" rx="2"/><rect x="9" y="11" width="6" height="4" rx="1"/><path d="M8 4v3M16 4v3M8 18v2M16 18v2"/></svg></i><span class="tx">Graphics</span></button>
+        <i class="ic"><span data-hardware-icon="gpu"></span></i><span class="tx">Graphics</span></button>
       <button class="tab" data-tab="fix" role="tab" aria-selected="false" title="Fix It">
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a4 4 0 00-5.4 5.4L4 17v3h3l5.3-5.3a4 4 0 005.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg></i><span class="tx">Fix It</span></button>
       <button class="tab" data-tab="settings" role="tab" aria-selected="false" title="Settings">
@@ -5897,9 +5900,9 @@ const startup = (() => {
   <main class="stage">
 
     <div class="topbar">
-      <span class="chip" id="chip-cpu"><i></i>CPU <b>—</b></span>
-      <span class="chip" id="chip-gpu"><i></i>GPU <b>—</b></span>
-      <span class="chip" id="chip-ram"><i></i>RAM <b>—</b></span>
+      <span class="chip" id="chip-cpu"><span data-hardware-icon="cpu"></span> <b>—</b></span>
+      <span class="chip" id="chip-gpu"><span data-hardware-icon="gpu"></span> <b>—</b></span>
+      <span class="chip" id="chip-ram"><span data-hardware-icon="ram"></span> <b>—</b></span>
       <span class="spacer"></span>
       <div class="modebadge" id="mode-badge"></div>
       <div class="scorebar" id="scorebar"></div>
@@ -6739,7 +6742,7 @@ function renderDisplays(d) {
     const options = rates.map(r => '<option value="' + Number(r) + '"' + (r === s.refresh ? ' selected' : '') + '>' + esc(hz(r)) + '</option>').join('');
     const reported = s.width > 0 && s.height > 0;
     return '<article class="gfx-monitor" id="disp-' + esc(s.device) + '">' +
-      '<header><b>Display ' + (i+1) + '</b>' + (s.primary ? '<span class="flag">Primary</span>' : '') +
+      '<header><b>' + hwIcon('display', 'Display ' + (i+1)) + ' ' + (i+1) + '</b>' + (s.primary ? '<span class="flag">Primary</span>' : '') +
       '<span class="sub">' + (s.at_best ? 'Highest offered at this resolution' : s.best ? esc(hz(s.best)) + ' available' : 'Available rates not reported') + '</span></header>' +
       '<div class="gfx-monitor-body"><div class="gfx-hardware">' + gfxScene() + '<div class="gfx-stand"></div></div>' +
       '<div class="gfx-readout"><strong>' + (s.refresh > 0 ? esc(s.refresh) + '<small> Hz</small>' : '—') + '</strong><b>' +
@@ -6794,6 +6797,8 @@ function renderScaling(d) {
     '<p class="gfx-note">These rows show the driver’s current scaling policy, not CS2’s live resolution. Fix saves full-screen scaling permanently. The launcher also fixes scaling for stretched play and restores it on exit.</p></section>';
 }
 function gfxIcon(kind) {
+  const hardware = {screen:'display',power:'power',chip:'gpu'}[kind];
+  if (hardware) return hwIcon(hardware);
   const paths = {screen:'M3 4H21V16H3ZM9 20H15M12 16V20',frames:'M3 5H15V15H3ZM8 2H20V12M7 19H20',image:'M3 3H21V21H3ZM3 17L9 11L13 15L17 10L21 14M7 7H8',power:'M12 2V11M6 5A9 9 0 1 0 18 5',chip:'M6 6H18V18H6ZM9 1V6M15 1V6M9 18V23M15 18V23M1 9H6M1 15H6M18 9H23M18 15H23',info:'M12 10V17M12 6V7M12 2A10 10 0 1 0 12 22A10 10 0 1 0 12 2'};
   return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="' + (paths[kind] || paths.info) + '"/></svg>';
 }
@@ -6968,7 +6973,7 @@ function renderHardware(d) {
     : "not running", null]);
 
   $("hw").innerHTML = bits.map(([k, v, sub]) =>
-    '<div class="row"><span class="k">' + esc(k) + '</span><span class="v">' + v +
+    '<div class="row"><span class="k">' + (hwIcon(k) || esc(k)) + '</span><span class="v">' + v +
     (sub ? '<br><span class="sub">' + esc(sub) + "</span>" : "") + "</span></div>").join("");
 
 }
@@ -7133,6 +7138,7 @@ function homePatchReadouts(host, markup) {
   else [...host.children].forEach((el, i) => {
     const fresh = template.content.children[i];
     el.title = fresh.title;
+    el.style.setProperty("--hw-speed", fresh.style.getPropertyValue("--hw-speed"));
     const oldSub = el.querySelector('.sub2'), nextSub = fresh.querySelector('.sub2');
     if (oldSub && nextSub) oldSub.textContent = nextSub.textContent;
     else if (nextSub) el.append(nextSub.cloneNode(true));
@@ -7180,10 +7186,10 @@ const hardwareGraph = {
   mode: 'usage', selected: null, data: {}, temperatures: {}, at: null,
   cursor: null, offset: 0, fromOffset: 0, raf: 0, started: 0, duration: 2000,
   usage: [
-    ['cpu', 'CPU', 'var(--accent)', 'M5 5h14v14H5z M9 9h6v6H9z'],
-    ['gpu', 'GPU', 'var(--hardware-gpu)', 'M3 6h18v12H3z M7 10h4v4H7z M15 10h2v4h-2z'],
-    ['ram', 'RAM', 'var(--hardware-ram)', 'M3 7h18v9H3z M6 10h3v3H6z M12 10h3v3h-3z M6 16v4 M11 16v4 M16 16v4'],
-    ['vram', 'VRAM', 'var(--hardware-vram)', 'M12 3l9 5-9 5-9-5z M3 12l9 5 9-5 M3 16l9 5 9-5']
+    ['cpu', 'CPU', 'var(--accent)'],
+    ['gpu', 'GPU', 'var(--hardware-gpu)'],
+    ['ram', 'RAM', 'var(--hardware-ram)'],
+    ['vram', 'VRAM', 'var(--hardware-vram)']
   ], thermal: []
 };
 function hardwareSeries() { return hardwareGraph.mode === 'usage' ? hardwareGraph.usage : hardwareGraph.thermal; }
@@ -7193,9 +7199,9 @@ function hardwareLegend() {
   const g = hardwareGraph, host = $('hardware-legend');
   const signature = hardwareSeries().map(s => s[0]).join('|');
   // Keep focused legend buttons mounted across the two-second polling updates.
-  if (host.dataset.signature !== signature) host.innerHTML = hardwareSeries().map(([key, name, tone, glyph]) => {
+  if (host.dataset.signature !== signature) host.innerHTML = hardwareSeries().map(([key, name, tone]) => {
     const value = hardwareValues(key).at(-1), known = Number.isFinite(value);
-    return '<button type="button" class="hardware-chip" data-hardware="' + key + '" style="--series:' + tone + '" aria-pressed="' + (g.selected === key) + '" title="' + esc(name + ': click to isolate; click again for all') + '"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="' + glyph + '"/></svg><span>' + esc(name) + '</span><b>' + (known ? Math.round(value) + hardwareUnit() : '—') + '</b></button>';
+    return '<button type="button" class="hardware-chip" data-hardware="' + key + '" style="--series:' + tone + '" aria-pressed="' + (g.selected === key) + '" title="' + esc(name + ': click to isolate; click again for all') + '">' + hwIcon(g.mode === 'temperature' ? key.slice(5) : key, name) + '<b>' + (known ? Math.round(value) + hardwareUnit() : '—') + '</b></button>';
   }).join('');
   host.dataset.signature = signature;
   for (const [key] of hardwareSeries()) {
@@ -7274,7 +7280,7 @@ function hardwareUpdate(d) {
   if (!parts.some(p => p.part === 'gpu')) parts.push({part:'gpu', label:'GPU', celsius:d.gpu?.temperature, known:Number.isFinite(d.gpu?.temperature)});
   for (const p of parts) {
     const key = 'temp-' + p.part;
-    if (!g.thermal.some(s => s[0] === key)) g.thermal.push([key, p.part === 'system' ? 'System' : p.part.toUpperCase(), p.part === 'gpu' ? 'var(--good)' : p.part === 'system' ? 'var(--warn)' : 'var(--accent)', 'M10 4a2 2 0 014 0v10a4 4 0 11-4 0z']);
+    if (!g.thermal.some(s => s[0] === key)) g.thermal.push([key, p.part === 'system' ? 'System' : p.part.toUpperCase(), p.part === 'gpu' ? 'var(--good)' : p.part === 'system' ? 'var(--warn)' : 'var(--accent)']);
   }
   for (const [key] of g.thermal) {
     const p = parts.find(p => key === 'temp-' + p.part);
@@ -7343,7 +7349,7 @@ function scoreRing(value, cap, label, detail, tone) {
       ' transform="rotate(-90 16 16)"/>' +
     "</svg>" +
     '<span class="score-text"><b>' + Math.round(value) + "</b>" +
-    "<i>" + esc(label) + "</i></span></span>";
+    "<i>" + (hwIcon(label) || esc(label)) + "</i></span></span>";
 }
 
 function renderScores(p, headroomPct, hue) {
@@ -7388,12 +7394,12 @@ function renderPlan(p) {
     '<div class="stat"><b>' + esc(p.tier) + '</b><span>tier</span></div>' +
     '<div class="stat"><b style="color:' + hue + '">~' + p.estimated_fps + '</b><span>est. fps</span></div>' +
     '<div class="stat"><b>' + p.headroom + '×</b><span>of ' + p.target_fps + ' Hz</span></div>' +
-    '<div class="stat"><b>' + esc(p.bottleneck) + '</b><span>limited by</span></div>' +
+    '<div class="stat"><b>' + (hwIcon(p.bottleneck) || esc(p.bottleneck)) + '</b><span>limited by</span></div>' +
     "</div>" +
-    '<div class="row" style="margin-top:8px"><span class="k">CPU</span><span class="v">score ' +
+    '<div class="row" style="margin-top:8px"><span class="k">' + hwIcon('cpu') + '</span><span class="v">score ' +
       p.cpu_score + (p.cpu_exact ? "" : ' <span class="sub">(' + esc(p.cpu_note) + ")</span>") +
       ' · ceiling ~' + p.cpu_ceiling + ' fps</span></div>' +
-    '<div class="row"><span class="k">GPU</span><span class="v">score ' +
+    '<div class="row"><span class="k">' + hwIcon('gpu') + '</span><span class="v">score ' +
       p.gpu_score + (p.gpu_exact ? "" : ' <span class="sub">(' + esc(p.gpu_note) + ")</span>") +
       ' · ceiling ~' + p.gpu_ceiling + ' fps</span></div>' +
     "</div>";
@@ -8319,7 +8325,7 @@ function ring(value, caption, sub, unit) {
   const r = 34, c = 2 * Math.PI * r;
   const colour = !known ? "var(--line)"
     : pct >= 90 ? "var(--bad)" : pct >= 70 ? "var(--warn)" : "var(--accent)";
-  return '<div class="gauge"><svg width="92" height="92" viewBox="0 0 92 92">' +
+  return '<div class="gauge" title="' + esc(caption) + '" style="--hw-speed:' + (5 - pct * .025).toFixed(2) + 's"><svg width="92" height="92" viewBox="0 0 92 92">' +
     '<circle class="ring-bg" cx="46" cy="46" r="' + r + '" fill="none" stroke-width="7"/>' +
     '<circle class="ring-fg" cx="46" cy="46" r="' + r + '" fill="none" stroke-width="7"' +
     ' stroke="' + colour + '" stroke-linecap="round"' +
@@ -8330,7 +8336,7 @@ function ring(value, caption, sub, unit) {
     (known ? Math.round(pct) : "—") + "</text>" +
     (known && unit !== false
       ? '<text class="unit" x="46" y="61" text-anchor="middle">%</text>' : "") +
-    "</svg><span class=\"cap\">" + esc(caption) + "</span>" +
+    "</svg><span class=\"cap\">" + (hwIcon(caption) || esc(caption)) + "</span>" +
     (sub ? '<span class="sub2">' + esc(sub) + "</span>" : "") + "</div>";
 }
 
@@ -8544,10 +8550,10 @@ function renderAudio() {
   }
 
   box.innerHTML = head +
-    '<div class="row"><span class="k">Output</span><span class="v">' +
+    '<div class="row"><label class="k" for="audio-output">' + hwIcon('headset', 'Sound output') + '</label><span class="v">' +
       '<select id="audio-output">' + audioOptions(d.output, d.pinned_output) + "</select>" +
     "</span></div>" +
-    '<div class="row"><span class="k">Input</span><span class="v">' +
+    '<div class="row"><label class="k" for="audio-input">' + hwIcon('mic', 'Microphone input') + '</label><span class="v">' +
       '<select id="audio-input">' + audioOptions(d.input, d.pinned_input) + "</select>" +
     "</span></div>" +
     '<label class="opt"><input type="checkbox" id="audio-enforce"' +
@@ -8708,24 +8714,7 @@ async function loadFixes(force) {
    family colour so the four groups are separable before a word is read, and
    the colour is never the only signal -- every tile still says what it is.
 */
-const FIX_ART = {
-  "net.restart": "<path d=\"M5 3v4m5-4v4M3 7h9v4l-3 3v4H6v-4l-3-3M15 6a7 7 0 0 1 5 12m-4 1h5v-5M8 22h8\"/>",
-  "net.flush": "<path d=\"M3 4h11M3 8h8M3 12h6M3 16h4m14-13-8 11m-2-2 5 3-3 6-7-5zM8 17l3 2m-1-4 3 2\"/>",
-  "gpu.restart": "<path d=\"M2 6h15v13H2zM5 19v2m4-2v2m4-2v2M17 14h4v4h-4\"/><circle cx=\"9\" cy=\"12\" r=\"3\"/><path d=\"M16 3a5 5 0 0 1 6 7m0-4v4h-4\"/>",
-  "device.restart": "<path d=\"M4 8a5 5 0 0 1 10 0v9a5 5 0 0 1-10 0zM9 5v6m8-8a6 6 0 0 1 5 8m0-4v4h-4m0 4a6 6 0 0 1-1 6\"/>",
-  "sound.apps": "<path d=\"M9 5 5 9H2v6h3l4 4zM14 4v16M20 4v16M12 9h4m2 6h4\"/>",
-  "sound.restart": "<path d=\"M9 5 5 9H2v6h3l4 4zM12 12h2l2-5 3 10 2-5h2\"/>",
-  "display.restore": "<rect x=\"2.5\" y=\"4\" width=\"19\" height=\"13\" rx=\"2.2\"/><path d=\"M9 20.5h6M12 17v3.5\"/><path d=\"M10.1 9.9L6.7 6.6M13.9 9.9L17.3 6.6M10.1 11.6L6.7 14.9M13.9 11.6L17.3 14.9\"/><path d=\"M6.7 6.6h2.7M6.7 6.6v2.7M17.3 6.6h-2.7M17.3 6.6v2.7M6.7 14.9h2.7M6.7 14.9v-2.7M17.3 14.9h-2.7M17.3 14.9v-2.7\"/>",
-  "steam.restart": "<path d=\"M5 16a5 5 0 0 1-1-10 7 7 0 0 1 13-1 5 5 0 0 1 4 7M9 14a6 6 0 1 0 10 6m1-5v5h-5\"/>",
-  "shader.clear": "<path d=\"m2 6 8-4 8 4-8 4zM2 10l8 4 4-2M2 14l8 4m12-9-7 7m-2-2 5 3-3 5-6-4zM11 19l3 2\"/>",
-  "steam.zombie": "<rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"1.5\"/><path d=\"M3 9h18M9 13l6 6M15 13l-6 6\"/>",
-  "steam.verify": "<path d=\"M4 2h10l6 6v14H4zM14 2v6h6M8 15l3 3 6-7\"/>",
-  "mic.privacy": "<rect x=\"4\" y=\"2\" width=\"6\" height=\"12\" rx=\"3\"/><path d=\"M1 10a6 6 0 0 0 12 0M7 16v5M3 21h8m7-13 5 2v5c0 3-3 5-5 6-2-1-5-3-5-6v-5zM16 14l2 2 3-4\"/>",
-  "startup.apps": "<path d=\"M2 5h20v17H2zM2 10h20m10 9v-6m-3 3 3-3 3 3M5 7h1m3 0h1\"/>",
-  "defender.exclude": "<path d=\"m12 2 9 4v6c0 5-5 8-9 10-4-2-9-5-9-10V6zM7 12h10\"/>",
-  "fullscreen.exclusive": "<path d=\"M3 8V3h5m8 0h5v5M3 16v5h5m8 0h5v-5M7 7h10v10H7zM10 10l4 4m0-4-4 4\"/>",
-  "power.performance": "<path d=\"M15 2 6 13h6l-3 9 10-12h-6zM3 5h4M1 9h3m14 10h4m-2-4h3\"/>"
-};
+/* Repair artwork is in assets/fixit/icons.js. */
 
 const FIX_FAMILY_NAME = {
   network: "Connection",
@@ -9029,7 +9018,8 @@ document.addEventListener("click", e => {
 
 // Horizontal thermal strips preserve the sensor's own floor and hot limit.
 function thermoGauge(part) {
-  return '<div class="temp-gauge" data-label="' + esc(part.label) + '"><div class="heat-heading"><span class="cap">' + esc(part.label) + '</span><b class="t-read">—</b></div><div class="heat-track"><span class="t-fill"></span></div></div>';
+  const kind = hwKey(part.part);
+  return '<div class="temp-gauge" data-label="' + esc(part.label) + '" title="' + esc(part.label + ' temperature') + '"><div class="thermal-ring">' + hwIcon(HW_ART[kind] ? kind : 'temperature', part.label) + '<b class="t-read">&#8212;</b><span class="thermal-badge">' + hwIcon('temperature') + '</span></div><div class="heat-heading"><span class="cap">' + (HW_ART[hwKey(part.label)] ? '' : esc(part.label)) + '</span><span class="t-reason"></span><div class="heat-track"><span class="t-fill"></span></div></div></div>';
 }
 function paintTempGauge(el, part) {
   const known = !!part.known;
@@ -9041,7 +9031,9 @@ function paintTempGauge(el, part) {
   homeTween(fill, "heat", level, v => { fill.style.transform = "scaleX(" + v + ")"; });
   const read = el.querySelector(".t-read");
   if (known) homeNumber(read, part.celsius, "\u00b0C");
-  else { homeCancel(read); read.textContent = part.unavailable || "—"; }
+  else { homeCancel(read); read.textContent = "\u2014"; }
+  el.querySelector(".t-reason").textContent = known ? "" : (part.unavailable || "No reading");
+  el.setAttribute("aria-label", part.label + " temperature: " + (known ? Math.round(part.celsius) + "\u00b0C, " + part.state : part.unavailable || "unavailable"));
 }
 
 function renderTemps(data) {
@@ -11229,7 +11221,7 @@ const KB_ICONS = {
 };
 
 function kbIcon(name) {
-  const art = KB_ICONS[name] || KB_ICONS.dot;
+  const art = (name === "board" ? HW_ART.keyboard : HW_ART[hwKey(name)]) || KB_ICONS[name] || KB_ICONS.dot;
   return '<svg class="kb-ico-art" viewBox="0 0 24 24" aria-hidden="true">' +
     art + "</svg>";
 }
@@ -12781,7 +12773,7 @@ const SETUP_KEYS = { sync:"sync", permission:"cfg_write", sound:"sound", preset:
 const setupReduced = window.matchMedia("(prefers-reduced-motion: reduce)");
 let setupSession = null, setupOpening = null;
 const setupDelay = ms => new Promise(resolve => setTimeout(resolve, ms));
-function setupIcon(name) { return '<svg viewBox="0 0 24 24" aria-hidden="true">' + (name === 'microphone' ? '<rect x="8" y="3" width="8" height="12" rx="4"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8"/>' : '<use href="#i-' + name + '"></use>') + '</svg>'; }
+function setupIcon(name) { const hardware = hwIcon(name); if (hardware) return hardware; return '<svg viewBox="0 0 24 24" aria-hidden="true">' + (name === 'microphone' ? '<rect x="8" y="3" width="8" height="12" rx="4"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8"/>' : '<use href="#i-' + name + '"></use>') + '</svg>'; }
 function setupCheck() { return '<svg viewBox="0 0 24 24" aria-hidden="true"><g><path d="m5 12 4 4 10-10"/></g></svg>'; }
 function setupTick() { return '<span class="setup-tick" aria-hidden="true">' + setupCheck() + '</span>'; }
 // Server reasons sometimes include an OS error containing a path. The cfg path
@@ -12893,7 +12885,7 @@ function renderSetupHardware(s) {
   if (!setupAlive(s) || setupCurrentStep(s) !== 'preset' || !$('setup-hardware')) return;
   const scan = lastScan;
   $('setup-hardware').innerHTML = scan && (scan.cpu || scan.gpu)
-    ? [['CPU',scan.cpu && scan.cpu.name,'device'],['GPU',scan.gpu && scan.gpu.name,'gpu']].filter(x => x[1]).map(([kind,name,icon]) => '<span>' + setupIcon(icon) + esc(kind + ' · ' + name) + '</span>').join('')
+    ? [['CPU',scan.cpu && scan.cpu.name,'device'],['GPU',scan.gpu && scan.gpu.name,'gpu']].filter(x => x[1]).map(([kind,name,icon]) => '<span>' + hwIcon(kind) + esc(name) + '</span>').join('')
     : '<span>' + setupIcon('device') + (s.hardwareFailed ? 'Hardware details unavailable' : 'Reading your CPU and GPU…') + '</span>';
 }
 function setupCountFPS(s) {
@@ -13330,19 +13322,13 @@ function renderMachine() {
       : cpu.ceiling < gpu.ceiling ? "the processor runs out first"
       : gpu.ceiling < cpu.ceiling ? "the graphics card runs out first"
       : "evenly matched";
-    const chip =
-      '<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/>' +
-      '<rect x="9.5" y="9.5" width="5" height="5" rx="1"/>' +
-      '<path d="M9 6V3M15 6V3M9 21v-3M15 21v-3M6 9H3M6 15H3M21 9h-3M21 15h-3"/></svg>';
-    const card =
-      '<svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2"/>' +
-      '<circle cx="9" cy="12" r="3.2"/><path d="M15 9.5h4M15 12h4M15 14.5h4"/>' +
-      '<path d="M6 18v2.5M18 18v2.5"/></svg>';
+    const chip = hwIcon('cpu');
+    const card = hwIcon('gpu');
 
     html +=
       '<div class="parts">' +
         '<span class="part cpu"><span class="part-ic">' + chip + "</span>" +
-          '<span class="part-txt"><span class="part-kind">PROCESSOR</span>' +
+          '<span class="part-txt">' +
           '<span class="part-name" title="' + esc(cpu.name) + '">' +
             esc(shortPart(cpu.name)) + "</span>" +
           '<span class="part-sub">' + esc(cpu.detail || "") + "</span>" +
@@ -13354,7 +13340,7 @@ function renderMachine() {
           "<small>" + esc(limit) + "</small></span>" +
 
         '<span class="part gpu"><span class="part-ic">' + card + "</span>" +
-          '<span class="part-txt"><span class="part-kind">GRAPHICS CARD</span>' +
+          '<span class="part-txt">' +
           '<span class="part-name" title="' + esc(gpu.name) + '">' +
             esc(shortPart(gpu.name)) + "</span>" +
           '<span class="part-sub">' + esc(gpu.detail || "") + "</span>" +
@@ -16253,7 +16239,7 @@ $("rescan").addEventListener("click", () => scan(true));
       const cap = g.querySelector(".cap");
       const val = g.querySelector("text.val");
       if (!cap || !val) return;
-      seen[cap.textContent.trim().toUpperCase()] = val.textContent.trim();
+      seen[(cap.querySelector("[data-hw]")?.dataset.hw || cap.textContent.trim()).toUpperCase()] = val.textContent.trim();
     });
     for (const [name, id] of Object.entries(CHIPS)) {
       const chip = document.getElementById(id);

@@ -23,8 +23,10 @@
 [data-panel="fix"] .fix-tile[hidden] { display:none; }
 [data-panel="fix"] .fix-title h3 { font:650 16px/1.3 var(--sans,system-ui); text-transform:none; letter-spacing:-.015em; margin:4px 0 0; }
 [data-panel="fix"] .fix-fam { font-size:9px; letter-spacing:.12em; }
-[data-panel="fix"] .fix-ic { width:56px; height:56px; border-radius:10px; background:color-mix(in srgb,var(--fam) 8%,var(--panel)); }
-[data-panel="fix"] .fix-ic svg { width:34px; height:34px; stroke-width:1.4; }
+[data-panel="fix"] .fix-ic { width:56px; height:56px; border-radius:50%; border:1.5px solid transparent; background:linear-gradient(var(--panel),var(--panel)) padding-box,linear-gradient(140deg,var(--fam),var(--accent)) border-box; }
+[data-panel="fix"] .fix-ic svg { width:32px; height:32px; stroke-width:1.5; overflow:visible; }
+[data-panel="fix"] .fix-tile[data-state="fixing"] .fix-ic svg { animation:fix-icon-pulse 2s ease-in-out infinite; }
+@keyframes fix-icon-pulse { 50% { transform:translateY(-1px); opacity:.55; } }
 [data-panel="fix"] .fix-blurb { font-size:12px; margin-top:17px; line-height:1.6; }
 .fix-chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
 .fix-chips:empty { display:none; }

@@ -9,7 +9,7 @@ const themes=vm.runInNewContext(slice('const THEMES = [','function applyTheme(')
 const catalogue=fs.readFileSync(path.join(root,'cs2cfg/quickfix.py'),'utf8').split('CATALOGUE: List[Fix] = [')[1].split('\n]\n')[0];
 const fixes=[...catalogue.matchAll(/Fix\("([^"]+)", "([^"]+)", "([^"]+)"([\s\S]*?)(?=\n    Fix\(|$)/g)].map(m=>({id:m[1],family:m[2],title:m[3],blurb:'Backend explanation for '+m[3],needs_admin:m[4].includes('needs_admin=True'),disruptive:m[4].includes('disruptive=True'),allowed_in_game:m[4].includes('allowed_in_game=True'),danger:m[4].includes('danger=')?'Full backend caution for '+m[3]:''}));
 assert.equal(fixes.length,16);
-let code=`
+let code=fs.readFileSync(path.join(root,'cs2cfg/web/assets/hardware/icons.js'),'utf8')+'\n'+fs.readFileSync(path.join(root,'cs2cfg/web/assets/fixit/icons.js'),'utf8')+'\n'+`
 const $=id=>document.getElementById(id),esc=x=>String(x??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
 const checks=[],calls=[],messages=[];const check=(name,ok)=>{checks.push({name,ok:!!ok});if(!ok)throw Error(name)};
 const settle=()=>new Promise(r=>setTimeout(r,35));function status(message,error){messages.push({message,error})}

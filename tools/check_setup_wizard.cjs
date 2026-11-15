@@ -20,7 +20,7 @@ console.log(`node --check: all ${scripts} inline script bodies passed`);
 const slice = (a,b) => { const start = source.indexOf(a), end = source.indexOf(b,start); assert(start >= 0 && end > start, a); return source.slice(start,end); };
 assert(source.indexOf('await checkFirstRun();') < source.indexOf('await startup.run("scan"'), 'setup gates startup');
 const preview = process.env.SETUP_STEP || '', theme = process.env.SETUP_THEME || 'violet';
-const code = `
+const code = fs.readFileSync(path.join(root,'cs2cfg/web/assets/hardware/icons.js'),'utf8')+'\n'+fs.readFileSync(path.join(root,'cs2cfg/web/assets/fixit/icons.js'),'utf8')+'\n'+`
 window.addEventListener('error',event=>{const pre=document.createElement('pre');pre.id='setup-checks';pre.textContent=JSON.stringify({error:event.message+' at '+event.lineno,checks:[]});document.body.append(pre)});
 const $ = id => document.getElementById(id);
 ${slice('function esc(s) {','async function api(')}
