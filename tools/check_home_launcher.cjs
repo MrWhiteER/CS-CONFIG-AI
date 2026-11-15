@@ -6,7 +6,7 @@ const s=fs.readFileSync('cs2cfg/web/index.html','utf8');
 for(const x of s.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g))new (require('vm').Script)(x[1]);
 const themes=require('vm').runInNewContext(s.slice(s.indexOf('const THEMES = [')+'const THEMES = '.length,s.indexOf('function applyTheme(')).trim().replace(/;$/, '')).map(t=>t[0]);
 const slice=(a,b)=>s.slice(s.indexOf(a),s.indexOf(b,s.indexOf(a)));
-let code=fs.readFileSync(path.join(root,'cs2cfg/web/assets/hardware/icons.js'),'utf8')+'\n'+fs.readFileSync(path.join(root,'cs2cfg/web/assets/fixit/icons.js'),'utf8')+'\n'+`const $=id=>document.getElementById(id); const esc=x=>String(x??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');let intent='balanced',planned={},prefs=0,previews=0;const INTENTS=['competitive','balanced','quality'];function paintModeBadge(){} function rememberPrefs(){prefs++} function noteChange(){} function requestBody(){return {intent,target_fps:240}};async function api(url,b){return {intent:b.intent,estimated_fps:{competitive:410,balanced:340,quality:230}[b.intent]}};const tempAlarm={};function status(){};`;
+let code=fs.readFileSync(path.join(root,'cs2cfg/web/assets/hardware/icons.js'),'utf8')+'\n'+fs.readFileSync(path.join(root,'cs2cfg/web/assets/fixit/icons.js'),'utf8')+'\n'+`const $=id=>document.getElementById(id); const esc=x=>String(x??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');let intent='balanced',planned={},prefs=0,previews=0;const INTENTS=['competitive','balanced','quality'];function paintModeBadge(){} function rememberPrefs(){prefs++} function noteChange(){} function requestBody(){return {intent,target_fps:240}};let netApi;async function api(url,b){if(url.startsWith("/api/net"))return netApi(url,b);return {intent:b.intent,estimated_fps:{competitive:410,balanced:340,quality:230}[b.intent]}};const tempAlarm={};function status(){};`;
 code+=slice("function renderHardware(d) {","/* The machine's scores,");
 code+=`let prefsNow={},audioData=null;`;
 code+=slice('function audioOptions(list, pinned)', 'async function saveAudio');
@@ -14,6 +14,9 @@ code+=slice('let wgData = null;','document.addEventListener("click", async e => 
 code+=slice('const CHIPS = { CPU:', '// -- 2. the gradient');
 code+=slice('/* Launcher motion:','function renderPlan(');
 code+=slice('/* Every card uses','async function previewPlan()');
+code+=slice('let netTimer = null;', '/* Three scene cards');
+code+=`const prefsReady=false,startup={finished:false};function moveSegThumb(){};`;
+code+=slice('let settingsSub = "apply";', '/* ---------------------------------------------------------------------------\n   Sound devices');
 code+=slice('function ring(value','function meter(');
 code+=slice('/* Administrator helper status','/* ------');
 code+=slice('// Horizontal thermal strips','// --- live system readout');
@@ -84,7 +87,30 @@ check('sound selects retain their selected devices',$('audio-output').value==='o
 check('sound icon labels remain associated with selects',!!document.querySelector('label[for="audio-output"] [data-hw="headset"]')&&!!document.querySelector('label[for="audio-input"] [data-hw="mic"]'));
 check('Machine controls preserved',$('machine-out').querySelectorAll('[data-bias]').length===3&&!!$('wg-apply')&&!!$('wg-auto'));
 
+check('Detected moved exclusively into This PC',!!$('hw-card').closest('[data-sub="this-pc"]')&&!document.querySelector('[data-panel="launcher"] #hw-card'));
+check('connection card removed from Play',!document.querySelector('[data-panel="launcher"] #net-card'));
+setSettingsSub('this-pc',true);check('This PC navigation reveals hardware',!$('hw-card').closest('.subpane').classList.contains('hidden')&&document.querySelector('[data-sub="this-pc"][role="tab"]').getAttribute('aria-selected')==='true');setSettingsSub('apply',true);
+const probe={label:'The internet',host:'1.1.1.1',sent:20,received:20,reachable:true,average:18,jitter:2,loss:0,times:[17,18,19],misses:[]};
+const measured={done:true,running:false,adapter:{name:'Ethernet',speed:'1 Gbps',wireless:false},internet:probe,gateway:{...probe,label:'Your router',host:'192.168.1.1',average:1},findings:[{severity:'good',title:'Steady connection',detail:'No packets lost.'}]};
+let calls=[];netApi=async route=>{calls.push(route);return route.endsWith('/start')?{...measured,done:false,running:true}:measured};
+const job=runNetCheck();check('duplicate tests share one job',job===runNetCheck());check('re-test disabled while measuring',$('net-run').disabled);await job;
+check('startup job waits for polling result',calls.join(',')==='/api/net/start,/api/net'&&netData.done&&netJob===null);
+check('speed and ping chip uses actual result',$('net-summary').textContent==='1 Gbps · 18 ms');
+check('details retain diagnostics',['Your router','The internet','jitter','% loss','Steady connection','Link speed'].every(t=>$('net-out').textContent.includes(t)));
+$('chip-net').click();check('chip opens details',$('chip-net').getAttribute('aria-expanded')==='true'&&!$('net-card').hidden);
+const popup=$('net-card').getBoundingClientRect();check('details fit viewport',popup.left>=0&&popup.right<=innerWidth&&popup.bottom<=innerHeight);
+check('details are painted above content',popup.width>300&&popup.height>100&&!!document.elementFromPoint(popup.left+30,popup.top+30)?.closest('#net-card'));
+document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));check('Escape closes and restores focus',$('net-card').hidden&&document.activeElement===$('chip-net'));
+$('chip-net').click();$('live-card').click();check('outside click closes details',$('net-card').hidden);
+netApi=async()=>{throw new Error('<offline>')};await runNetCheck();check('failed start settles and permits retry',!$('net-run').disabled&&netJob===null&&$('net-summary').textContent==='Unavailable'&&$('net-out').textContent==='<offline>'&&!$('net-out').querySelector('offline'));
+netApi=async route=>{if(route.endsWith('/start'))return {...measured,running:true,done:false};throw new Error('Poll failed')};await runNetCheck();check('failed polling settles and permits retry',netJob===null&&!$('net-run').disabled&&$('net-out').textContent==='Poll failed');
+netApi=()=>new Promise(()=>{});await runNetCheck();check('hung request times out and releases startup',netJob===null&&!$('net-run').disabled&&$('net-out').textContent.includes('timed out'));
+renderNet({done:true,internet:{reachable:false},adapter:null});check('offline readings are unknown not zero',$('net-summary').textContent==='— · — ms');
+netApi=async()=>measured;await runNetCheck();check('re-test recovers after failure',$('net-summary').textContent==='1 Gbps · 18 ms'&&!$('net-run').disabled);
+for(const theme of ${JSON.stringify(themes)}){document.documentElement.dataset.theme=theme;$('chip-net').click();check('connection works in theme '+theme,getComputedStyle($('net-card')).display!=='none'&&getComputedStyle($('chip-net')).color!=='transparent');closeNetDetails()}delete document.documentElement.dataset.theme;
 $('status').remove();document.querySelector('.scroll').scrollTop=0;
+if(location.hash.includes('this-pc')){document.querySelector('[data-panel="launcher"]').classList.add('hidden');document.querySelector('[data-panel="settings"]').classList.remove('hidden');setSettingsSub('this-pc',true)}
+if(location.hash.includes('connection'))$('chip-net').click();
 if(location.hash.includes('system')){$('live-card').scrollIntoView({block:'start'});hardwareInspect(400)}
 if(location.hash.includes('sound')){const card=$('audio-card');document.querySelector('.scroll').replaceChildren(card);card.scrollIntoView()}
 if(location.hash.includes('machine')){const card=$('machine-card');document.querySelector('.scroll').replaceChildren(card);card.scrollIntoView()}
@@ -95,7 +121,7 @@ if(location.hash.includes('solo'))hardwareSelect('gpu');
 }catch(e){checks.push({error:e.stack})}const freeze=document.createElement('style');freeze.textContent='*,*::before,*::after{transition:none!important;animation:none!important}';document.head.append(freeze);document.body.insertAdjacentHTML('beforeend','<pre id="checks" hidden>'+JSON.stringify(checks)+'</pre>')})();`;
 let html=s.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'');html=html.replace('<head>','<head><base href="'+url.pathToFileURL(path.join(root,'cs2cfg/web/')).href+'">');html=html.replace('</body>','<script>'+code+'</script></body>');
 fs.writeFileSync(path.join(work,'preview.html'),html);
-const chrome=process.env.CHROME_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe';const args=['--headless','--no-sandbox','--disable-gpu','--allow-file-access-from-files','--user-data-dir='+path.join(work,'chrome'),'--window-size='+(process.env.HOME_VIEWPORT||'1440,1100'),'--virtual-time-budget=4000',url.pathToFileURL(path.join(work,'preview.html')).href+(process.env.HOME_HASH||'')];
+const chrome=process.env.CHROME_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe';const args=['--headless','--no-sandbox','--disable-gpu','--allow-file-access-from-files','--user-data-dir='+path.join(work,'chrome'),'--window-size='+(process.env.HOME_VIEWPORT||'1440,1100'),'--virtual-time-budget=30000',url.pathToFileURL(path.join(work,'preview.html')).href+(process.env.HOME_HASH||'')];
 if(process.env.HOME_REDUCED)args.unshift('--force-prefers-reduced-motion');
-const out=cp.execFileSync(chrome,[...args,'--dump-dom'],{maxBuffer:4e6,stdio:['ignore','pipe','ignore']}).toString();fs.writeFileSync(path.join(work,'dom.html'),out);const result=[...out.matchAll(/<pre id="checks"[^>]*>(.*?)<\/pre>/gs)].at(-1);console.log(result?result[1]:'NO TEST RESULTS');assert(result&& !result[1].includes('false')&&!result[1].includes('"error"'));
-cp.execFileSync(chrome,[...args,'--screenshot='+(process.env.HOME_SCREENSHOT||path.join(work,'preview.png'))],{stdio:'ignore'});
+const out=cp.execFileSync(chrome,[...args,'--dump-dom','--screenshot='+(process.env.HOME_SCREENSHOT||path.join(work,'preview.png'))],{maxBuffer:4e6,stdio:['ignore','pipe','ignore']}).toString();fs.writeFileSync(path.join(work,'dom.html'),out);const result=[...out.matchAll(/<pre id="checks"[^>]*>(.*?)<\/pre>/gs)].at(-1);console.log(result?result[1]:'NO TEST RESULTS');assert(result&& !result[1].includes('false')&&!result[1].includes('"error"'));
+console.log('Browser checks: '+JSON.parse(result[1]).length+' passed');

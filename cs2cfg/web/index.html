@@ -1984,6 +1984,19 @@
 @keyframes sp-pulse { 50% { transform:scale(1.7); opacity:.35; } }
 @media(prefers-reduced-motion:reduce) { .sp-panel,.sp-panel *,.sp-chip * { animation:none !important; } }
 @media(max-width:700px) { [data-panel="launcher"] .home-hero { padding-bottom:100px; }.sp-chip { right:16px; bottom:16px; font-size:11px; max-width:calc(100% - 32px); } }
+/* Section 3: the shared connection chip owns its anchored diagnostic panel. */
+.net-control { position:relative; }
+#chip-net { cursor:pointer; font:inherit; font-size:10.5px; }
+#chip-net:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.net-popover { position:fixed; top:64px; left:clamp(16px, 30vw, 500px); width:min(680px, calc(100vw - 32px)); max-height:calc(100dvh - 90px); overflow:auto; z-index:100; padding:20px; border:1px solid var(--line); border-radius:12px; background:var(--panel-2); backdrop-filter:blur(24px); color:var(--ink); box-shadow:0 16px 48px rgba(0,0,0,.3); }
+.net-popover[hidden] { display:none; }
+.net-popover-head { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.net-popover-head h2 { margin:0; }
+.net-popover > p { margin:12px 0 18px; }
+.net-popover .netgrid { grid-template-columns:1fr; }
+.net-popover .netbar-fill { width:100%; transform-origin:left; transition:none; }
+[data-panel="launcher"] > .grid2 { grid-template-columns:1fr; }
+#settings-subtabs [data-hardware-icon] { display:inline-flex; vertical-align:middle; }
 </style>
 <style>
   /* ------------------------------------------------------------------------
@@ -5705,7 +5718,7 @@ const startup = (() => {
   let nextTip = 0, finished = false, tipTimer;
   const names = ["scan", "prefs", "plan", "machine", "setups", "crosshair",
     "companions", "audio", "history", "suggestions", "starter", "source",
-    "settings-pane", "profile", "launch", "monitor", "updates", "cloud"];
+    "settings-pane", "profile", "launch", "monitor", "updates", "cloud", "connection"];
   let settled = 0;
   const tasks = new Map(names.map(name => {
     let resolve;
@@ -5903,6 +5916,14 @@ const startup = (() => {
       <span class="chip" id="chip-cpu"><span data-hardware-icon="cpu"></span> <b>—</b></span>
       <span class="chip" id="chip-gpu"><span data-hardware-icon="gpu"></span> <b>—</b></span>
       <span class="chip" id="chip-ram"><span data-hardware-icon="ram"></span> <b>—</b></span>
+      <div class="net-control">
+        <button type="button" class="chip" id="chip-net" aria-expanded="false" aria-controls="net-card" title="Connection details"><span data-hardware-icon="network"></span> <b id="net-summary">Checking&hellip;</b></button>
+        <section id="net-card" class="net-popover" role="region" aria-label="Connection details" hidden>
+          <div class="net-popover-head"><h2>Connection</h2><button type="button" class="btn small" id="net-run" title="Re-test connection">↻ Re-test</button></div>
+          <p class="sub">Link speed is your adapter’s connection rate, not download throughput. Ping, jitter and loss are measured to your router and the internet.</p>
+          <div id="net-out" aria-live="polite"></div>
+        </section>
+      </div>
       <span class="spacer"></span>
       <div class="modebadge" id="mode-badge"></div>
       <div class="scorebar" id="scorebar"></div>
@@ -6020,29 +6041,9 @@ const startup = (() => {
           <div class="sub2" id="temps-note"></div>
         </section>
 
-        <section class="panel" id="hw-card">
-          <h2>Detected</h2>
-          <div id="hw"><span class="sub">&hellip;</span></div>
-          <!-- The verdict belongs under the hardware it is a verdict on,
-               rather than in a card of its own further down the page. -->
-          <div id="assessment-out"></div>
-        </section>
       </div>
 
-      <section class="panel" id="net-card">
-        <h2>Connection</h2>
-        <p class="sub" style="margin:0 0 9px">
-          CS2 timestamps the exact moment you click, so a packet that never arrives is a
-          shot the server never saw &mdash; however clearly it landed on your screen. That is
-          what &ldquo;no reg&rdquo; usually is. This measures loss and jitter to your own router and
-          out to the internet separately, so you can tell which side the trouble is on.
-          It takes five seconds and changes nothing.
-        </p>
-        <div class="actions">
-          <button class="btn primary" id="net-run">Measure my connection</button>
-        </div>
-        <div id="net-out"></div>
-      </section>
+
 
 
 
@@ -6360,6 +6361,7 @@ const startup = (() => {
         <div class="segbar" id="settings-subtabs" role="tablist">
           <div class="seg-thumb" id="seg-thumb"></div>
           <button class="seg-item" data-sub="apply" role="tab" aria-selected="true">Apply</button>
+          <button class="seg-item" data-sub="this-pc" role="tab" aria-selected="false"><span data-hardware-icon="display"></span> This PC</button>
           <button class="seg-item" data-sub="account" role="tab" aria-selected="false">Account</button>
           <button class="seg-item" data-sub="apps" role="tab" aria-selected="false">Apps</button>
           <button class="seg-item" data-sub="look" role="tab" aria-selected="false">Look</button>
@@ -6368,6 +6370,16 @@ const startup = (() => {
           <button class="seg-item" data-sub="editing" role="tab" aria-selected="false">Editing</button>
           <button class="seg-item" data-sub="logs" role="tab" aria-selected="false">Logs</button>
         </div>
+      </div>
+
+      <div class="subpane hidden" data-sub="this-pc">
+        <section class="panel" id="hw-card">
+          <h2><span data-hardware-icon="display"></span> This PC</h2>
+          <div id="hw"><span class="sub">&hellip;</span></div>
+          <!-- The verdict belongs under the hardware it is a verdict on,
+               rather than in a card of its own further down the page. -->
+          <div id="assessment-out"></div>
+        </section>
       </div>
 
       <div class="subpane" data-sub="apply">
@@ -7803,6 +7815,7 @@ $("confirm-veil").addEventListener("keydown", e => {
    lost, and the dial shows the last reply rather than the average.
    --------------------------------------------------------------------------- */
 let netTimer = null;
+let netJob = null;
 let netData = null;
 
 // Where the dial tops out. A competitive player on a bad route is at 90; past
@@ -7902,9 +7915,16 @@ function netSide(probe, sent, total) {
 }
 
 function renderNet(d) {
+  const speed = d?.adapter?.speed || '—';
+  const ping = d?.internet?.reachable && Number.isFinite(d.internet.average) ? Math.round(d.internet.average) + ' ms' : '— ms';
+  const summary = d?.error ? 'Unavailable' : d?.running ? 'Checking…' : d?.idle || !d ? 'Not tested' : speed + ' · ' + ping;
+  $('net-summary').textContent = summary;
+  $('chip-net').title = 'Connection · Link speed: ' + speed + ' · Internet ping: ' + ping;
+  $('chip-net').classList.toggle('warn', !!d?.error || (!d?.running && !d?.internet?.reachable));
+  $('chip-net').style.setProperty('--chip-load', d?.running ? '.35' : '1');
   const box = $("net-out");
   if (!box) return;
-  if (!d || d.idle) { box.innerHTML = ""; return; }
+  if (!d || d.idle) { box.textContent = "No measurement yet. Use Re-test to check your connection."; return; }
   if (d.error) {
     box.innerHTML = '<span class="sub warn">' + esc(d.error) + "</span>";
     return;
@@ -7916,7 +7936,7 @@ function renderNet(d) {
 
   let html = "";
   if (d.running) {
-    html += '<div class="netbar"><div class="netbar-fill" style="width:' + pct + '%"></div></div>' +
+    html += '<div class="netbar"><div class="netbar-fill" style="transform:scaleX(' + pct / 100 + ')"></div></div>' +
       '<div class="sub" style="margin:6px 0 12px">Measuring&hellip; ' + pct + "%" +
       "  <span class=\"sub2\">about " + Math.max(0, Math.round(((total - sent) / 2) * 1)) +
       "s left</span></div>";
@@ -7924,7 +7944,7 @@ function renderNet(d) {
 
   if (d.adapter) {
     html += '<div class="sub" style="margin:0 0 12px">' + esc(d.adapter.name) + " " +
-      '<span class="sub2">' + esc(d.adapter.speed) + "</span>" +
+      '<span class="sub2">Link speed: ' + esc(d.adapter.speed) + "</span>" +
       (d.adapter.wireless
         ? '<span class="flag warn">Wi-Fi</span>'
         : '<span class="flag">wired</span>') + "</div>";
@@ -7943,43 +7963,63 @@ function renderNet(d) {
   box.innerHTML = html;
 }
 
-async function pollNet() {
-  try {
-    netData = await api("/api/net", {});
-    renderNet(netData);
-    if (netData.done || !netData.running) {
-      clearInterval(netTimer);
-      netTimer = null;
-      const button = $("net-run");
-      if (button) { button.disabled = false; button.textContent = "Measure again"; }
+// One bounded job covers start + serialized polling. Startup waits for this promise.
+function runNetCheck() {
+  if (netJob) return netJob;
+  netJob = (async () => {
+    const button = $('net-run');
+    button.disabled = true;
+    button.textContent = 'Checking…';
+    const deadline = Date.now() + 12000;
+    const request = (route) => new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('Connection test timed out. Try again.')), Math.max(1, deadline - Date.now()));
+      Promise.resolve().then(() => api(route, {})).then(resolve, reject).finally(() => clearTimeout(timer));
+    });
+    try {
+      netData = await request('/api/net/start');
+      renderNet(netData);
+      while (netData.running && !netData.done && !netData.error) {
+        await new Promise(resolve => { netTimer = setTimeout(resolve, 500); });
+        if (Date.now() >= deadline) throw new Error('Connection test timed out. Try again.');
+        netData = await request('/api/net');
+        renderNet(netData);
+      }
+    } catch (error) {
+      netData = { error: error.message || 'Connection test unavailable. Try again.' };
+      renderNet(netData);
+    } finally {
+      clearTimeout(netTimer); netTimer = null;
+      button.disabled = false;
+      button.textContent = '↻ Re-test';
     }
-  } catch (err) {
-    clearInterval(netTimer);
-    netTimer = null;
-    const button = $("net-run");
-    if (button) { button.disabled = false; button.textContent = "Measure my connection"; }
-  }
+  })().finally(() => { netJob = null; });
+  return netJob;
 }
-
-async function runNetCheck() {
-  const button = $("net-run");
-  button.disabled = true;
-  button.textContent = "Measuring…";
-  try {
-    netData = await api("/api/net/start", {});
-    renderNet(netData);
-    if (netTimer) clearInterval(netTimer);
-    // Twice a second: the replies land about once a second each, and a poll
-    // that is slower than the thing it is watching draws a stuttering line.
-    netTimer = setInterval(pollNet, 500);
-  } catch (err) {
-    button.disabled = false;
-    button.textContent = "Measure my connection";
-    status("Could not start the measurement: " + (err && err.message || err), true);
-  }
+$('net-run').addEventListener('click', runNetCheck);
+function closeNetDetails(restoreFocus = false) {
+  $('net-card').hidden = true;
+  $('chip-net').setAttribute('aria-expanded', 'false');
+  if (restoreFocus) $('chip-net').focus();
 }
-
-if ($("net-run")) $("net-run").addEventListener("click", runNetCheck);
+$('chip-net').addEventListener('click', () => {
+  const open = $('net-card').hidden;
+  $('net-card').hidden = !open;
+  if (open) positionNetDetails();
+  $('chip-net').setAttribute('aria-expanded', String(open));
+});
+function positionNetDetails() {
+  if ($('net-card').hidden) return;
+  const rect = $('chip-net').getBoundingClientRect();
+  $('net-card').style.left = Math.max(16, Math.min(rect.left, innerWidth - $('net-card').offsetWidth - 16)) + 'px';
+  $('net-card').style.top = rect.bottom + 12 + 'px';
+}
+document.addEventListener('click', event => {
+  if (!event.target.closest('.net-control')) closeNetDetails();
+});
+window.addEventListener('resize', positionNetDetails);
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && !$('net-card').hidden) { closeNetDetails(true); event.stopPropagation(); }
+});
 
 /* Three scene cards share the existing preference and plan-preview flow. */
 const INTENTS = ["competitive", "balanced", "quality"];
@@ -16061,6 +16101,7 @@ $("rescan").addEventListener("click", () => scan(true));
 // refresh rather than pretending nothing is happening.
 (async () => {
   await checkFirstRun();
+  const connectionReady = startup.run("connection", runNetCheck);
   startSyncWatch();
   setStretchMode(stretchMode);
   // prefs also calls State.refresh(). Starting it alongside scan can run the
@@ -16077,6 +16118,7 @@ $("rescan").addEventListener("click", () => scan(true));
   // GET monitor/status and independent local loaders need not wait for the
   // starter config. Every promise includes its loader's final render.
   await Promise.allSettled([
+    connectionReady,
     startup.run("plan", previewPlan),
     startup.run("machine", loadMachine),
     startup.run("setups", loadSetups),
