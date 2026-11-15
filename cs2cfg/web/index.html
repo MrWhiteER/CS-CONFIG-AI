@@ -5378,7 +5378,37 @@
 [data-panel="launcher"] #history-stats .stat::before { float:right; font-size:17px; color:var(--muted); }
 [data-panel="launcher"] #hw .row { padding:6px 0; border-bottom:1px solid var(--line); }[data-panel="launcher"] #hw .k { font-size:10px; }[data-panel="launcher"] #hw .v { font-size:11px; overflow-wrap:anywhere; }
 [data-panel="launcher"] .assess { margin-top:22px; padding-top:16px; border-top:1px solid var(--line); }[data-panel="launcher"] .assess .stats { grid-template-columns:repeat(2,minmax(0,1fr)); display:grid; }
-[data-panel="launcher"] .spark { height:78px; overflow:hidden; background:repeating-linear-gradient(0deg,var(--line) 0 1px,transparent 1px 25%); }.chart-tip { filter:drop-shadow(0 0 4px currentColor); }
+.hardware-graph { --hardware-gpu:var(--good); --hardware-ram:var(--warn); --hardware-vram:var(--ink); margin-top:18px; min-width:0; }
+:root[data-theme="acid"] .hardware-graph { --hardware-gpu:var(--cat-config); }
+:root[data-theme="paper"] .hardware-graph,:root[data-theme="ember"] .hardware-graph { --hardware-ram:var(--cat-editing); }
+:root[data-theme="carbon"] .hardware-graph { --hardware-vram:var(--cat-editing); }
+.hardware-toolbar,.hardware-toolbar>div { display:flex; align-items:center; gap:8px; justify-content:space-between; }
+.hardware-toolbar button[aria-pressed="true"] { border-color:var(--accent); color:var(--accent); }
+.hardware-legend { display:flex; flex-wrap:wrap; gap:7px; margin:12px 0 18px; }
+.hardware-chip { display:flex; flex:1 1 95px; align-items:center; gap:7px; padding:8px; border:1px solid var(--line); border-radius:7px; background:transparent; color:var(--ink); cursor:pointer; font:inherit; font-size:11px; transition:opacity .2s; }
+.hardware-chip svg { width:19px; height:19px; flex:none; fill:none; stroke:var(--series); stroke-width:1.6; stroke-linejoin:round; }
+.hardware-chip b { margin-left:auto; font-variant-numeric:tabular-nums; }
+.hardware-chip[aria-pressed="true"] { border-color:var(--series); }
+.hardware-chip:focus-visible,.hardware-plot:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.hardware-plot { position:relative; padding-left:37px; }
+#hardware-chart { display:block; width:100%; height:180px; overflow:hidden; touch-action:pan-y; }
+.hardware-grid path { stroke:var(--line); stroke-width:1; fill:none; }
+.hardware-axis { position:absolute; top:-6px; bottom:-6px; left:0; color:var(--muted); font:10px/90px var(--mono,monospace); line-height:90px; transform:translateY(-39px); pointer-events:none; }
+.hardware-area { pointer-events:none; }
+.hardware-line { fill:none; stroke-width:2; vector-effect:non-scaling-stroke; pointer-events:none; }
+.hardware-hit { fill:none; stroke:transparent; stroke-width:14; vector-effect:non-scaling-stroke; cursor:pointer; pointer-events:stroke; }
+#hardware-scroll>g { transition:opacity .2s; }
+.hardware-muted { opacity:.12; }
+.hardware-chip.hardware-muted { opacity:.5; }
+.hardware-muted .hardware-hit { pointer-events:none; }
+.hardware-crosshair { stroke:var(--muted); stroke-width:1; stroke-dasharray:3 3; fill:none; pointer-events:none; }
+.hardware-tooltip { position:absolute; z-index:2; top:12px; min-width:125px; padding:10px 12px; background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:7px; box-shadow:0 5px 18px #0003; pointer-events:none; font-size:11px; }
+.hardware-tooltip>b { display:block; margin-bottom:7px; }
+.hardware-tooltip span { display:flex; align-items:center; gap:7px; margin-top:4px; }
+.hardware-tooltip i { width:6px; height:6px; border-radius:50%; }
+.hardware-tooltip strong { margin-left:auto; font-variant-numeric:tabular-nums; }
+.hardware-times { display:flex; justify-content:space-between; gap:8px; margin:9px 0 0 37px; font-size:10px; }
+@media(prefers-reduced-motion:reduce) { .hardware-chip,#hardware-scroll>g { transition:none; } }
 [data-panel="launcher"] #net-card { margin-top:20px; border-left:3px solid var(--accent); }[data-panel="launcher"] #net-card > p { max-width:900px; line-height:1.7; }
 .topbar .chip i { box-shadow:0 0 calc(2px + var(--chip-load,0)*8px) var(--accent); }
 .topbar .chip { position:relative; overflow:hidden; }.topbar .chip::after { content:''; position:absolute; inset:auto 0 0; height:2px; background:var(--accent); transform:scaleX(var(--chip-load,0)); transform-origin:left; }
@@ -5967,15 +5997,18 @@ const startup = (() => {
           <div class="gauges" id="live-gauges"></div>
           <div class="temps" id="live-temps"></div>
           <div class="stats" id="history-stats"></div>
-          <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:12px">
-            <div style="flex:1 1 200px;min-width:170px">
-              <div class="sub" style="margin-bottom:2px">CPU load</div>
-              <svg class="spark" id="spark-cpu" viewBox="0 0 240 46" preserveAspectRatio="none"></svg>
+          <div class="hardware-graph" id="hardware-graph">
+            <div class="hardware-toolbar"><span class="sub">Hardware activity</span><div>
+              <button type="button" class="btn small" id="hardware-all" aria-pressed="true">All</button>
+              <button type="button" class="btn small" id="hardware-temperature" aria-pressed="false" title="Switch between usage and temperature history">°C</button>
+            </div></div>
+            <div class="hardware-legend" id="hardware-legend" role="group" aria-label="Isolate a hardware series"></div>
+            <div class="hardware-plot" id="hardware-plot" tabindex="0" role="group" aria-describedby="hardware-tooltip" aria-label="Hardware history. Arrow keys inspect samples; Escape clears the cursor. Use the legend to isolate a series.">
+              <span class="hardware-axis" id="hardware-axis">100%<br>50%<br>0%</span>
+              <svg id="hardware-chart" viewBox="0 0 600 180" preserveAspectRatio="none" aria-hidden="true"></svg>
+              <div class="hardware-tooltip" id="hardware-tooltip" role="tooltip" hidden></div>
             </div>
-            <div style="flex:1 1 200px;min-width:170px">
-              <div class="sub" style="margin-bottom:2px">GPU load</div>
-              <svg class="spark" id="spark-gpu" viewBox="0 0 240 46" preserveAspectRatio="none"></svg>
-            </div>
+            <div class="hardware-times sub"><span>~2 min ago</span><span id="hardware-state">Waiting for samples</span><span>Now</span></div>
           </div>
           <div class="sub" id="live-note" style="margin-top:8px">&nbsp;</div>
           <!-- Last in the card on purpose. It is an offer, not a reading, and
@@ -7141,36 +7174,161 @@ function homeSmoothPath(points) {
   }
   return path;
 }
-function homeChart(id, series, colour) {
-  const el = $(id); if (!el) return;
-  const samples = (series || []).slice(-40);
-  if (samples.filter(v => Number.isFinite(v)).length < 2) {
-    homeCancel(el); el.innerHTML = '<text x="6" y="26" fill="var(--muted)" font-size="11">no samples yet</text>'; return;
+/* Combined hardware history. Geometry changes only on a sample; each frame only
+   translates the persistent series group. Null sensors split paths, never read 0. */
+const hardwareGraph = {
+  mode: 'usage', selected: null, data: {}, temperatures: {}, at: null,
+  cursor: null, offset: 0, fromOffset: 0, raf: 0, started: 0, duration: 2000,
+  usage: [
+    ['cpu', 'CPU', 'var(--accent)', 'M5 5h14v14H5z M9 9h6v6H9z'],
+    ['gpu', 'GPU', 'var(--hardware-gpu)', 'M3 6h18v12H3z M7 10h4v4H7z M15 10h2v4h-2z'],
+    ['ram', 'RAM', 'var(--hardware-ram)', 'M3 7h18v9H3z M6 10h3v3H6z M12 10h3v3h-3z M6 16v4 M11 16v4 M16 16v4'],
+    ['vram', 'VRAM', 'var(--hardware-vram)', 'M12 3l9 5-9 5-9-5z M3 12l9 5 9-5 M3 16l9 5 9-5']
+  ], thermal: []
+};
+function hardwareSeries() { return hardwareGraph.mode === 'usage' ? hardwareGraph.usage : hardwareGraph.thermal; }
+function hardwareValues(key) { return (hardwareGraph.mode === 'usage' ? hardwareGraph.data : hardwareGraph.temperatures)[key] || []; }
+function hardwareUnit() { return hardwareGraph.mode === 'usage' ? '%' : '°C'; }
+function hardwareLegend() {
+  const g = hardwareGraph, host = $('hardware-legend');
+  const signature = hardwareSeries().map(s => s[0]).join('|');
+  // Keep focused legend buttons mounted across the two-second polling updates.
+  if (host.dataset.signature !== signature) host.innerHTML = hardwareSeries().map(([key, name, tone, glyph]) => {
+    const value = hardwareValues(key).at(-1), known = Number.isFinite(value);
+    return '<button type="button" class="hardware-chip" data-hardware="' + key + '" style="--series:' + tone + '" aria-pressed="' + (g.selected === key) + '" title="' + esc(name + ': click to isolate; click again for all') + '"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="' + glyph + '"/></svg><span>' + esc(name) + '</span><b>' + (known ? Math.round(value) + hardwareUnit() : '—') + '</b></button>';
+  }).join('');
+  host.dataset.signature = signature;
+  for (const [key] of hardwareSeries()) {
+    const value = hardwareValues(key).at(-1);
+    host.querySelector('[data-hardware="' + key + '"] b').textContent = Number.isFinite(value) ? Math.round(value) + hardwareUnit() : '—';
   }
-  const points = samples.map(v => Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : null);
-  const previous = el.homeSamples || points;
-  el.homeSamples = points;
-  const gid = 'home-gradient-' + id;
-  if (!el.querySelector('.chart-line')) el.innerHTML = '<defs><linearGradient id="' + gid + '" x2="0" y2="1"><stop stop-color="' + colour + '" stop-opacity=".4"/><stop offset="1" stop-color="' + colour + '" stop-opacity="0"/></linearGradient></defs><path class="chart-area" fill="url(#' + gid + ')"/><path class="chart-line" fill="none" stroke="' + colour + '" stroke-width="1.8"/><circle class="chart-tip" r="2.6" fill="' + colour + '"/>';
-  el.setAttribute('role', 'img'); el.setAttribute('aria-label', id.replace('spark-', '').toUpperCase() + ' load history; latest ' + (points.at(-1) ?? 'unavailable') + '%');
-  el.dataset.homescroll = 0;
-  homeTween(el, 'scroll', 1, progress => {
-    const count = points.length, step = 240 / (count - 1), segments = []; let segment = [];
-    // Slide the old window left while the newest measured point enters from right.
-    const values = [...previous.slice(-count), points.at(-1)];
-    for (let i = 0; i < values.length; i++) {
-      const v = values[i];
-      if (v === null) { if (segment.length) segments.push(segment); segment = []; continue; }
-      segment.push([(i - progress) * step, 43 - v * .4]);
-    }
-    if (segment.length) segments.push(segment);
-    el.querySelector('.chart-line').setAttribute('d', segments.map(homeSmoothPath).join(' '));
-    el.querySelector('.chart-area').setAttribute('d', segments.map(p => homeSmoothPath(p) + ' L' + p.at(-1)[0] + ' 46 L' + p[0][0] + ' 46 Z').join(' '));
-    const latest = values.at(-2), next = values.at(-1), tip = el.querySelector('.chart-tip');
-    tip.style.opacity = latest === null || next === null ? 0 : 1;
-    tip.setAttribute('cx', 240); tip.setAttribute('cy', 43 - ((latest ?? 0) + ((next ?? 0) - (latest ?? 0)) * progress) * .4);
-  }, 1900);
+  $('hardware-all').setAttribute('aria-pressed', String(!g.selected));
 }
+function hardwareSelect(key) {
+  hardwareGraph.selected = hardwareGraph.selected === key ? null : key;
+  hardwarePaintSelection();
+}
+function hardwarePaintSelection() {
+  const key = hardwareGraph.selected;
+  document.querySelectorAll('[data-hardware]').forEach(el => {
+    el.classList.toggle('hardware-muted', !!key && el.dataset.hardware !== key);
+    if (el.tagName === 'BUTTON') el.setAttribute('aria-pressed', String(el.dataset.hardware === key));
+  });
+  $('hardware-all').setAttribute('aria-pressed', String(!key));
+}
+function hardwareDraw() {
+  const g = hardwareGraph, max = g.mode === 'usage' ? 100 : 120, step = 600 / 59;
+  let svg = '<defs>' + hardwareSeries().map(([key,,tone]) => '<linearGradient id="hardware-fill-' + key + '" x1="0" y1="0" x2="0" y2="1"><stop stop-color="' + tone + '" stop-opacity=".26"/><stop offset="1" stop-color="' + tone + '" stop-opacity=".01"/></linearGradient>').join('') + '</defs><g class="hardware-grid">';
+  for (let y = 0; y <= 180; y += 45) svg += '<path d="M0 ' + y + 'H600"/>';
+  svg += '</g><g id="hardware-scroll">';
+  let known = 0;
+  for (const [key,,tone] of hardwareSeries()) {
+    const values = hardwareValues(key).slice(-61), segments = []; let part = [];
+    values.forEach((value, i) => {
+      if (!Number.isFinite(value)) { if (part.length) segments.push(part); part = []; return; }
+      known++;
+      part.push([(60 - values.length + i) * step, 180 - Math.max(0, Math.min(max, value)) / max * 180]);
+    });
+    if (part.length) segments.push(part);
+    const line = segments.map(homeSmoothPath).join(' ');
+    const area = segments.map(p => homeSmoothPath(p) + ' L' + p.at(-1)[0] + ' 180 L' + p[0][0] + ' 180 Z').join(' ');
+    svg += '<g data-hardware="' + key + '" style="--series:' + tone + '"><path class="hardware-area" fill="url(#hardware-fill-' + key + ')" d="' + area + '"/><path class="hardware-line" stroke="' + tone + '" d="' + line + '"/>' + segments.filter(p => p.length === 1).map(p => '<circle cx="' + p[0][0] + '" cy="' + p[0][1] + '" r="3" fill="' + tone + '"/>').join('') + '<path class="hardware-hit" data-hardware-line="' + key + '" d="' + line + '"/></g>';
+  }
+  svg += '</g><path id="hardware-crosshair" class="hardware-crosshair" visibility="hidden"/>';
+  $('hardware-chart').innerHTML = svg;
+  $('hardware-state').textContent = known ? (g.mode === 'usage' ? 'Usage · %' : 'Temperature · °C') : 'No readings available';
+  $('hardware-axis').innerHTML = max + hardwareUnit() + '<br>' + max / 2 + hardwareUnit() + '<br>0' + hardwareUnit();
+  hardwareLegend(); hardwarePaintSelection(); hardwareTranslate();
+}
+function hardwareTranslate() {
+  const el = $('hardware-scroll');
+  if (el) el.style.transform = 'translateX(' + hardwareGraph.offset + 'px)';
+  if (hardwareGraph.cursor !== null) hardwareInspect(hardwareGraph.cursor);
+}
+function hardwareFrame(now) {
+  const g = hardwareGraph; g.raf = 0;
+  if (!homeVisible() || homeMotion.reduced.matches) return;
+  g.offset = g.fromOffset * (1 - Math.min(1, (now - g.started) / g.duration));
+  hardwareTranslate();
+  if (g.offset > 0) g.raf = requestAnimationFrame(hardwareFrame);
+}
+function hardwarePause() {
+  const g = hardwareGraph;
+  cancelAnimationFrame(g.raf); g.raf = 0;
+  // Resume at the measured window instead of replaying time spent hidden.
+  g.offset = 0; hardwareTranslate();
+}
+function hardwareUpdate(d) {
+  const g = hardwareGraph;
+  if (d.at != null && g.at === d.at) return;
+  const animate = g.at !== null && Number(d.at) > g.at && Number(d.at) - g.at < 4 && homeVisible() && !homeMotion.reduced.matches;
+  const previous = g.data;
+  g.data = {};
+  for (const [key] of g.usage) {
+    g.data[key] = (d.history?.[key] || []).slice(-60);
+    // Retain the point leaving the left edge until its translation finishes.
+    if (animate && g.data[key].length === 60 && previous[key]?.length >= 60) g.data[key].unshift(previous[key].at(-60));
+  }
+  // Temperatures have no server history: begin collecting at this page's first poll.
+  const parts = (d.temps?.parts || []).filter(p => ['cpu', 'gpu', 'system'].includes(p.part));
+  if (!parts.some(p => p.part === 'gpu')) parts.push({part:'gpu', label:'GPU', celsius:d.gpu?.temperature, known:Number.isFinite(d.gpu?.temperature)});
+  for (const p of parts) {
+    const key = 'temp-' + p.part;
+    if (!g.thermal.some(s => s[0] === key)) g.thermal.push([key, p.part === 'system' ? 'System' : p.part.toUpperCase(), p.part === 'gpu' ? 'var(--good)' : p.part === 'system' ? 'var(--warn)' : 'var(--accent)', 'M10 4a2 2 0 014 0v10a4 4 0 11-4 0z']);
+  }
+  for (const [key] of g.thermal) {
+    const p = parts.find(p => key === 'temp-' + p.part);
+    const values = g.temperatures[key] ||= [];
+    if (g.at !== null && Number(d.at) - g.at >= 4) values.push(null);
+    values.push(p?.known && Number.isFinite(p.celsius) ? p.celsius : null);
+    g.temperatures[key] = values.slice(-60);
+  }
+  cancelAnimationFrame(g.raf); g.raf = 0; g.at = Number(d.at) || Date.now() / 1000;
+  g.offset = animate ? g.offset + 600 / 59 : 0;
+  g.fromOffset = g.offset;
+  hardwareDraw();
+  if (animate) { g.started = performance.now(); g.raf = requestAnimationFrame(hardwareFrame); }
+}
+function hardwareInspect(x) {
+  const g = hardwareGraph; g.cursor = Math.max(0, Math.min(600, x));
+  const age = Math.max(0, Math.min(59, Math.round((600 - g.cursor + g.offset) / (600 / 59))));
+  const cross = $('hardware-crosshair');
+  cross?.setAttribute('d', 'M' + g.cursor + ' 0V180'); cross?.setAttribute('visibility', 'visible');
+  const tip = $('hardware-tooltip'); tip.hidden = false;
+  tip.style.left = Math.min(68, g.cursor / 6) + '%';
+  const signature = [g.at, g.mode, age, hardwareSeries().length].join('|');
+  if (tip.dataset.sample === signature) return;
+  tip.dataset.sample = signature;
+  tip.innerHTML = '<b>' + (age ? '~' + age * 2 + 's ago' : 'Latest sample') + '</b>' + hardwareSeries().map(([key,name,tone]) => {
+    const values = hardwareValues(key), value = values[values.length - 1 - age];
+    return '<span><i style="background:' + tone + '"></i>' + esc(name) + '<strong>' + (Number.isFinite(value) ? Math.round(value) + hardwareUnit() : '—') + '</strong></span>';
+  }).join('');
+}
+function hardwareClearCursor() {
+  hardwareGraph.cursor = null; $('hardware-tooltip').hidden = true;
+  $('hardware-crosshair')?.setAttribute('visibility', 'hidden');
+}
+$('hardware-legend').addEventListener('click', e => { const chip = e.target.closest('[data-hardware]'); if (chip) hardwareSelect(chip.dataset.hardware); });
+$('hardware-chart').addEventListener('click', e => { const line = e.target.closest('[data-hardware-line]'); if (line) hardwareSelect(line.dataset.hardwareLine); });
+$('hardware-all').addEventListener('click', () => { hardwareGraph.selected = null; hardwarePaintSelection(); });
+$('hardware-temperature').addEventListener('click', () => {
+  const g = hardwareGraph; g.mode = g.mode === 'usage' ? 'temperature' : 'usage'; g.selected = null;
+  $('hardware-temperature').setAttribute('aria-pressed', String(g.mode === 'temperature'));
+  hardwareDraw();
+});
+$('hardware-plot').addEventListener('pointermove', e => { const r = $('hardware-chart').getBoundingClientRect(); hardwareInspect((e.clientX - r.left) / r.width * 600); });
+$('hardware-plot').addEventListener('pointerleave', hardwareClearCursor);
+$('hardware-plot').addEventListener('blur', hardwareClearCursor);
+$('hardware-plot').addEventListener('keydown', e => {
+  if (e.key === 'Escape') hardwareClearCursor();
+  else if (['ArrowLeft','ArrowRight','Home','End'].includes(e.key)) {
+    e.preventDefault(); hardwareInspect(e.key === 'Home' ? 0 : e.key === 'End' ? 600 : (hardwareGraph.cursor ?? 600) + (e.key === 'ArrowLeft' ? -1 : 1) * 600 / 59);
+  }
+});
+document.addEventListener('visibilitychange', hardwarePause);
+homeMotion.reduced.addEventListener('change', hardwarePause);
+new MutationObserver(hardwarePause).observe(document.querySelector('[data-panel="launcher"]'), {attributes:true, attributeFilter:['class']});
+hardwareDraw();
 
 function scoreRing(value, cap, label, detail, tone) {
   const share = Math.max(0, Math.min(1, value / cap));
@@ -8183,10 +8341,6 @@ function meter(label, value, max, text, tone) {
     '<div class="track"><div class="fill" style="width:' + pct.toFixed(1) + '%"></div></div></div>';
 }
 
-function sparkline(id, series, colour) {
-  homeChart(id, series, colour);
-}
-
 /* Sensor availability, elevation and alarm handling are shared by thermal strips. */
 const tempAlarm = {};
 
@@ -8959,8 +9113,7 @@ async function pollLive() {
              ? Math.round(gpu.vram_used_mb / 1024 * 10) / 10 + " / " +
                Math.round(gpu.vram_total_mb / 1024) + " GB" : null));
 
-    sparkline("spark-cpu", (d.history || {}).cpu, "var(--accent)");
-    sparkline("spark-gpu", (d.history || {}).gpu, "var(--good)");
+    hardwareUpdate(d);
     renderTemps(d.temps);
 
     const note = [];
