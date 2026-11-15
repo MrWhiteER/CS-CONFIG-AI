@@ -1,7 +1,7 @@
 /* App pages share existing companion/FACEIT/Crosshair endpoints. No remote art. */
 let appTilesData = null, appFaceitData = {}, appMatchData = {}, appSelected = '', appLoading = null;
 const APP_NAMES = {faceit:'FACEIT',discord:'Discord',teamspeak:'TeamSpeak',crosshairx:'Crosshair X'};
-function appLogo(kind) { return kind === 'faceit' ? 'assets/faceit/faceit-mark.svg' : 'assets/apps/'+kind+'-logo.svg'; }
+function appLogo(kind) { return kind === 'faceit' ? 'assets/faceit/faceit-mark.svg' : kind === 'crosshairx' ? 'assets/apps/crosshairx-logo.png' : 'assets/apps/'+kind+'-logo.svg'; }
 function appState(d) { return !d ? 'Checking…' : d.error ? 'Status unavailable' : d.running ? 'Running' : d.installed ? 'Ready to launch' : 'Not found · choose app'; }
 function paintAppTiles() {
   const states = {faceit:appFaceitData['faceit-client'],discord:appTilesData?.apps?.discord,teamspeak:appTilesData?.apps?.teamspeak,crosshairx:typeof xhairData==='undefined'?null:xhairData};

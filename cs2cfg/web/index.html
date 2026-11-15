@@ -6516,7 +6516,7 @@ const startup = (() => {
           <button type="button" class="app-tile" data-app-tile="faceit" aria-label="FACEIT settings"><img src="assets/faceit/faceit-mark.svg" alt=""><b>FACEIT</b><span class="app-addon">+ Anti-cheat</span><small data-app-status="faceit">Checking…</small><span class="app-arrow" aria-hidden="true">↗</span></button>
           <button type="button" class="app-tile" data-app-tile="discord" aria-label="Discord settings"><img src="assets/apps/discord-logo.svg" alt=""><b>Discord</b><small data-app-status="discord">Checking…</small><span class="app-arrow" aria-hidden="true">↗</span></button>
           <button type="button" class="app-tile" data-app-tile="teamspeak" aria-label="TeamSpeak settings"><img src="assets/apps/teamspeak-logo.svg" alt=""><b>TeamSpeak</b><small data-app-status="teamspeak">Checking…</small><span class="app-arrow" aria-hidden="true">↗</span></button>
-          <button type="button" class="app-tile" data-app-tile="crosshairx" aria-label="Crosshair X settings"><img src="assets/apps/crosshairx-logo.svg" alt=""><b>Crosshair X</b><small data-app-status="crosshairx">Checking…</small><span class="app-arrow" aria-hidden="true">↗</span></button>
+          <button type="button" class="app-tile" data-app-tile="crosshairx" aria-label="Crosshair X settings"><img src="assets/apps/crosshairx-logo.png" alt=""><b>Crosshair X</b><small data-app-status="crosshairx">Checking…</small><span class="app-arrow" aria-hidden="true">↗</span></button>
         </div>
       </section>
       <section id="app-detail" hidden>
@@ -12154,7 +12154,7 @@ function renderCrosshairX() {
   const hide = !!(prefsNow && prefsNow.hide_crosshair);
   const withGame = !!(prefsNow && prefsNow.crosshairx_launch);
 
-  const mark = '<span class="xh-mark"><img src="assets/apps/crosshairx-logo.svg" width="60" height="48" alt=""></span>';
+  const mark = '<span class="xh-mark"><img src="assets/apps/crosshairx-logo.png" width="60" height="48" alt=""></span>';
 
   box.innerHTML =
     '<div class="xh-head">' + mark +
