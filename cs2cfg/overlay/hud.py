@@ -80,12 +80,13 @@ def display_lines(sample: dict, fields=FIELDS, hotkey="Ctrl+Alt+O") -> tuple[str
 class Hud:
     def __init__(self, exclude_from_capture: bool = False, *, corner="top_left",
                  fields=FIELDS, hotkey="Ctrl+Alt+O", panel_hotkey="Ctrl+Alt+P",
-                 on_panel=None) -> None:
+                 on_panel=None, register_hotkeys=True) -> None:
         self.exclude = exclude_from_capture
         self.corner, self.fields, self.hotkey = corner, tuple(fields), hotkey
         self._chord = parse_hotkey(hotkey)
         self._panel_chord = parse_hotkey(panel_hotkey)
         self.on_panel = on_panel
+        self.register_hotkeys = register_hotkeys
         self.visible = False
         self._requested = True
         self._manual = False
@@ -125,6 +126,16 @@ class Hud:
             self._thread.join(timeout=5)
         if self._thread.is_alive():
             raise RuntimeError("HUD did not stop")
+
+    def toggle_requested(self) -> None:
+        with self._lock:
+            self._requested = not (self._requested if self._manual else self._auto_visible)
+            self._manual = True
+
+    def pin_requested(self) -> bool:
+        """Share the native HUD shortcut choice with the hardware widget."""
+        with self._lock:
+            return self._requested if self._manual else True
 
     def set_allowed(self, allowed: bool) -> None:
         """Presentation/focus gate, independent of the player's hotkey choice."""
@@ -279,8 +290,7 @@ class Hud:
                 message = w.MSG()
                 while user.PeekMessageW(ctypes.byref(message), None, 0, 0, 1):
                     if message.message == 0x0312 and message.wParam == 1:  # WM_HOTKEY
-                        self._requested = not self.visible
-                        self._manual = True
+                        self.toggle_requested()
                     elif message.message == 0x0312 and message.wParam == 2 and self.on_panel:
                         try:
                             self.on_panel()
@@ -290,7 +300,8 @@ class Hud:
                         user.TranslateMessage(ctypes.byref(message))
                         user.DispatchMessageW(ctypes.byref(message))
                 with self._lock:
-                    desired = self._chord, self._panel_chord if self.on_panel else None
+                    desired = ((self._chord, self._panel_chord if self.on_panel else None)
+                               if self.register_hotkeys else (None, None))
                     if shortcuts.desired != desired:
                         shortcuts.configure(*desired)
                         self.warning = shortcuts.warning

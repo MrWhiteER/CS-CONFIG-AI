@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+from .layout import IDS, validate
+
 FIELDS = ("fps", "one_percent_low", "frame_time_ms", "cpu_percent", "gpu_percent", "gpu_temp_c")
 CORNERS = ("top_left", "top_right", "bottom_left", "bottom_right")
 DEFAULTS = {
+    "overlay_layout": {},
+    "overlay_tools": list(IDS),
     "overlay_enabled": False,
     "overlay_auto_hide": True,
     "overlay_always_visible": False,
@@ -38,13 +42,24 @@ def hotkey(value: str) -> tuple[int, int]:
 
 def read(ui: dict | None = None, *, strict: bool = False) -> dict:
     ui = ui or {}
-    out = {**DEFAULTS, "overlay_fields": list(FIELDS)}
+    import copy
+    out = copy.deepcopy(DEFAULTS)
     for key in DEFAULTS:
         if key not in ui:
             continue
         value = ui[key]
         valid = True
-        if isinstance(DEFAULTS[key], bool):
+        if key == "overlay_layout":
+            try:
+                value = validate(value)
+            except ValueError:
+                valid = False
+        elif key == "overlay_tools":
+            valid = (isinstance(value, list) and all(isinstance(v, str) and v in IDS for v in value)
+                     and len(set(value)) == len(value) and "settings" in value)
+            if valid:
+                value = list(value)
+        elif isinstance(DEFAULTS[key], bool):
             valid = isinstance(value, bool)
         elif key == "overlay_corner":
             valid = value in CORNERS

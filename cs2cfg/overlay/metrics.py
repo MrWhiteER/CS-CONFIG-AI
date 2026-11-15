@@ -175,6 +175,28 @@ class Nvml:
             self.api = None
 
 
+def system_memory() -> dict:
+    """Read-only system RAM totals, without opening any process."""
+    class MemoryStatus(ctypes.Structure):
+        _fields_ = [("length", wintypes.DWORD), ("load", wintypes.DWORD)] + [
+            (key, ctypes.c_ulonglong) for key in (
+                "total", "available", "page_total", "page_available",
+                "virtual_total", "virtual_available", "extended")]
+    result = {"ram_used_mb": None, "ram_total_mb": None}
+    try:
+        api = ctypes.WinDLL("kernel32", use_last_error=True)
+        api.GlobalMemoryStatusEx.argtypes = [ctypes.POINTER(MemoryStatus)]
+        api.GlobalMemoryStatusEx.restype = wintypes.BOOL
+        status = MemoryStatus()
+        status.length = ctypes.sizeof(status)
+        if api.GlobalMemoryStatusEx(ctypes.byref(status)):
+            result.update(ram_total_mb=status.total / 1024 ** 2,
+                          ram_used_mb=(status.total - status.available) / 1024 ** 2)
+    except (AttributeError, OSError):
+        pass
+    return result
+
+
 class Metrics:
     def __init__(self) -> None:
         self.cpu = Monitor()

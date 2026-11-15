@@ -751,6 +751,16 @@ def _history(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     return {"ok": True, "sessions": sessions, "summary": telemetry.summarise(sessions)}
 
 
+def _overlay_tools(state, body):
+    from .overlay.tools import listing
+    return listing(state)
+
+
+def _overlay_tool(state, body):
+    from .overlay.tools import dispatch
+    return dispatch(state, body)
+
+
 def _overlay(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     return {"ok": True, **state.overlay.snapshot(int(body.get("seconds") or 600))}
 
@@ -760,6 +770,9 @@ def _overlay_panel(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     if panel is None:
         return {"ok": False, "error": "Panel requires the desktop app"}
     action = str(body.get("action") or "poll")
+    if action == "region-close":
+        panel.regions.close()
+        return {"ok": True}
     if action == "close":
         panel.hide()
         return {"ok": True}
@@ -4723,6 +4736,8 @@ def make_handler(state: State):
         "/api/update/settings": _update_settings,
         "/api/quit": _quit,
         "/api/history": _history,
+        "/api/overlay/tools": _overlay_tools,
+        "/api/overlay/tool": _overlay_tool,
         "/api/overlay": _overlay,
         "/api/overlay/panel": _overlay_panel,
         "/api/overlay/settings": _overlay_settings,
@@ -4781,6 +4796,13 @@ def make_handler(state: State):
                 return
 
             path = self.path.split("?", 1)[0]
+            if path == "/api/overlay/tools":
+                if self.headers.get("X-CS2CFG-Token") != state.token:
+                    self._send_json({"error": "bad or missing token"}, 403)
+                    return
+                with state.lock:
+                    self._send_json({"ok": True, **_overlay_tools(state, {})})
+                return
             if path in ("/", "/index.html"):
                 self._send_file(WEB_ROOT / "index.html")
                 return

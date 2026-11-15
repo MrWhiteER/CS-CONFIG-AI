@@ -51,56 +51,87 @@ frame-stats access into the app's existing cards. Live readings appear only
 while enabled with CS2 running. Open Settings again or use **Refresh status**
 to reread them; no Settings refresh timer runs.
 
-## Session panel
+## Overlay shell
 
-Opening activates the panel so you can use the cursor. Close with **Escape**,
-the panel's close button, its window X, or its shortcut again. Closing stops all
-panel JavaScript timers, aborts pending view requests, hides the window and
-returns focus to CS2 while this app is foreground. If you switched to another
-app, it leaves focus there. Game exit hides the panel without changing focus;
-disabling the overlay also hides it. The window is created only on first open
-and reused. Refreshes run once per second while visible (including graph draws,
-well below the 10 Hz cap); there is no panel Python polling worker.
+Ctrl+Alt+P opens one reusable, frameless WebView on CS2's monitor, with a dim
+backdrop, clock and bottom dock. Escape, the backdrop, Return to game, or the
+same shortcut closes it with a 120 ms fade. Focus returns only while one of
+this app's windows owns foreground focus. Overlay remains off by default.
 
-- **Profiles:** choose a saved setup for the app's next Apply, or switch a saved
-  keyboard/mouse layout using the existing file-writing API. After switching a
-  layout, press the shown Apply Saved Settings key in game. If no key is bound,
-  follow **Open Keyboard tab** to bind it. No input is sent to CS2.
-- **Performance:** current FPS; session average, 1% low and worst frame; a
-  frame-time graph of one-second summaries for 2, 5 or 10 minutes; CPU/GPU load
-  and GPU temperature. Missing readings stay blank. The setup/sign-out hint and
-  persistent sign-out dismissal appear here while resource stats keep working.
-- **Stutters and freezes:** newest first, local time, duration, and frame spike
-  or not responding. The list is bounded by the existing service's 200 events.
-- **Server region lock:** currently **Coming soon**, since the optional
-  `cs2cfg.serverlock` module is absent on this branch. When merged, the adapter
-  offers a region picker and Lock/Unlock, displays setup, pending, restart and
-  error messages, and checks asynchronous completion at most once per second
-  while busy and the panel is open. It only delegates to that module's four
-  public functions. Opening the panel is the first possible status query.
+The dock launches Performance, Hardware, Stutters and freezes, Profiles,
+Server lock and Settings. Drag a window title to move it, or its lower-right
+corner to resize it. Focus either handle and use arrow keys (Shift for larger
+steps) for keyboard positioning. Close windows independently. Settings enables,
+disables and reorders dock entries; Settings itself stays available. Geometry,
+open and pin state are machine-wide, shared between accounts. Positions are
+clamped when the monitor size changes.
 
-### Screenshot preview (no CS2 required)
+Only Performance and Hardware offer a pin. Their pinned forms use the existing
+native GDI HUD renderer, never additional WebViews. They are click-through,
+never activated, capture-excluded when configured, and redraw only on changes
+at at most 2 Hz. Pins obey presentation, focus and GSI gates; auto hide applies
+even with a manual visibility override. The HUD shortcut controls both pins.
+Existing users retain their combined HUD until the shell first saves a layout.
+Closing a tool window does not remove its pin.
 
-Start the existing local server from the repository:
+Each visible live tool refreshes at its own registry rate (currently 1 Hz;
+maximum 10 Hz). Profiles and Settings load once on opening. Server lock only
+continues refreshing while its adapter reports an operation in progress.
+Closing a tool cancels its request and timer. Hiding the shell aborts requests
+and stops all JavaScript timers, including the clock. Capture and native pins
+retain their existing lifecycle.
+
+Profiles delegates to the existing setup and layout APIs. Selecting a setup
+affects the next Apply. After applying a keyboard/mouse layout, press the
+shown Apply Saved Settings key in game. No game input is sent. Missing frame
+permissions preserve the setup/sign-out notices, dismissal and resource stats.
+Server lock keeps its guarded adapter and **Coming soon** state until the
+optional `cs2cfg.serverlock` module is available.
+
+### Adding a tool
+
+Add a module under `cs2cfg/overlay/tools/` defining `TOOL = Tool(...)`, then add
+it to the explicit imports/list in that package's `__init__.py`. No directory
+scanning or arbitrary imports are used. Register a web renderer in
+`window.overlayRenderers[id]` from a file under `assets/overlay/tools/` and
+include that script in `overlay-panel.html`. Renderers receive
+`(root, data, call(action, args))`; they must not create timers or fetch data.
+The shell schedules data requests and cancels them on hide. Only tools with a
+native GDI representation may advertise `pinnable=True`; extend layout
+validation and the native pin presenter when adding one.
+
+`GET /api/overlay/tools` lists metadata, machine layout and the selected theme.
+`POST /api/overlay/tool` accepts `{id, action, args}` (default action: data).
+Both require the existing X-CS2CFG-Token header. Unknown tools/actions and
+invalid arguments return 400. Hidden or disabled overlays never invoke tool
+sources. Layout writes use the authenticated overlay settings API.
+
+### Offline screenshot preview
+
+Run from the worktree root, with Chrome or Edge installed:
 
 ```powershell
-python -m cs2cfg web --port 8765
+node tools/overlay_preview.cjs
 ```
 
-Open **http://127.0.0.1:8765/overlay-panel.html?preview=1** in a browser. This
-developer preview uses local sample data through the same renderer; it does not
-enable the overlay, start capture, query the region module or modify profiles.
-The 2/5/10 minute controls work; actions are disabled. It has no refresh timers.
-Use a viewport around 1000 × 800 for a screenshot, or resize to inspect layout.
-With the desktop server you can use the same path on its assigned local port.
+Scratch HTML, browser profiles and temporary folders are created under
+`tmp/overlay-shell/` in this worktree and removed after rendering. No app server,
+capture, helper, Steam lookup, GSI installation or region query is started.
+It writes `shell-tools.png`, `dock.png`, `pinned-widget.png` and `settings.png`
+to `docs/overlay/preview/shell/`. The pinned screenshot is an HTML facsimile of
+the native HUD's display lines; live GDI, capture and focus behavior needs
+Windows and CS2 for verification. Set CHROME_PATH to select another Chromium
+binary. Screenshots are review artifacts, not release assets.
 
-For Settings screenshots, open **http://127.0.0.1:8765/?overlayPreview=off**.
-Use `overlayPreview=live` for running-game sample values, or
-`overlayPreview=waiting` for the sign-out hint. These modes select Settings >
-Overlay, use the production renderer, disable overlay actions, and never enable
-the service or save overlay settings. Other app startup features still run;
-for an entirely isolated screenshot server, set `CS2CFG_DATA`, `APPDATA` and
-`LOCALAPPDATA` to disposable directories before starting it.
+For an interactive inert preview, serve the repository web folder and open
+`overlay-panel.html?preview=1`. Add `&theme=paper` (or any app theme ID) to
+inspect another theme. Actions are disabled and no timers or requests run.
+Theme tokens are exported verbatim from the app's root/theme rules. After
+changing app tokens, run:
+
+```powershell
+node tools/overlay_preview.cjs --sync-themes
+```
 
 ## Capture and lifecycle
 

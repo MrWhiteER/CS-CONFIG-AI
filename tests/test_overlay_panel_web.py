@@ -71,6 +71,15 @@ class PanelScript(unittest.TestCase):
     def test_preview_has_sample_data_without_requests_or_timers(self):
         self.check_script("preview")
 
+    def test_escape_or_close_stops_all_shell_work(self):
+        self.check_script("close")
+
+    def test_layout_pin_and_closed_tool_survive_reopen(self):
+        self.check_script("layout")
+
+    def test_settings_disable_tool_and_update_dock(self):
+        self.check_script("settings")
+
     def test_busy_region_poll_stops_when_idle_and_on_hide(self):
         self.check_script("busy")
 

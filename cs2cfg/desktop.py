@@ -336,8 +336,9 @@ def _launch_webview(url: str, icon: Optional[Path], on_closed: Callable[[], None
                 window.show()
 
             panel = Panel(service, lambda: webview.create_window(
-                "CS2 Auto Config — Session panel", url + "overlay-panel.html",
-                width=1000, height=800, min_size=(760, 560), on_top=True,
+                "CS2 Auto Config — Overlay", url + "overlay-panel.html",
+                width=1280, height=800, min_size=(480, 400), on_top=True,
+                frameless=True, transparent=True, easy_drag=False,
                 focus=True, background_color="#0c0812", confirm_close=False),
                 keyboard=lambda: open_tab("keyboard"),
                 setup=lambda: open_tab("settings"))

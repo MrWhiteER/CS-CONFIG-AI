@@ -23,12 +23,15 @@ class Event:
 
 class PanelLifecycle(unittest.TestCase):
     def setUp(self):
+        placement = mock.patch.object(panel, "monitor_bounds", return_value=None)
+        placement.start()
+        self.addCleanup(placement.stop)
         self.service = OverlayService()
         self.window = mock.Mock()
         self.window.events = types.SimpleNamespace(loaded=Event(), closing=Event())
         self.factory = mock.Mock(return_value=self.window)
         self.focus = mock.Mock()
-        self.panel = panel.Panel(self.service, self.factory, focus=self.focus, keyboard=mock.Mock(), setup=mock.Mock())
+        self.panel = panel.Panel(self.service, self.factory, focus=self.focus, keyboard=mock.Mock(), setup=mock.Mock(), fade_seconds=0)
         self.module = mock.Mock()
         self.module.list_regions.return_value = []
         self.module.lock_status.return_value = {"busy": True}
@@ -66,6 +69,32 @@ class PanelLifecycle(unittest.TestCase):
         self.panel.toggle()
         self.factory.assert_called_once()
         self.window.show.assert_called_once()
+
+    def test_shell_fills_game_monitor_on_first_open_and_reopen(self):
+        self.enable_game()
+        with mock.patch.object(panel, "monitor_bounds", return_value=(-1920, 0, 1920, 1080)):
+            self.panel.toggle()
+            self.window.move.assert_called_with(-1920, 0)
+            self.window.resize.assert_called_with(1920, 1080)
+            self.panel.hide()
+            self.panel.toggle()
+        self.assertEqual(self.window.move.call_count, 2)
+        self.assertEqual(self.window.resize.call_count, 2)
+
+    def test_hotkey_close_fades_native_window_and_reopen_cancels_hide(self):
+        self.enable_game()
+        self.panel.toggle()
+        self.panel.loaded()
+        self.panel._fade_seconds = .12
+        with mock.patch.object(panel.threading, "Timer") as timer:
+            self.panel.hide()
+            self.window.evaluate_js.assert_called_with("window.overlayPanelActive(false)")
+            timer.assert_called_once_with(.12, self.panel._hide_native)
+            self.window.hide.assert_not_called()
+            self.panel.toggle()
+            timer.return_value.cancel.assert_called_once()
+            self.panel._hide_native()
+            self.window.hide.assert_not_called()
 
     def test_closing_suspends_before_focus_and_hide(self):
         self.enable_game()
@@ -162,6 +191,14 @@ class PanelLifecycle(unittest.TestCase):
         self.panel.toggle()
         webui._overlay_panel(self.state, {"action":"close"})
         self.focus.assert_called_once_with(123)
+
+    def test_closed_region_tool_stops_adapter_without_hiding_shell(self):
+        self.enable_game()
+        self.panel.toggle()
+        self.panel.data("open")
+        webui._overlay_panel(self.state, {"action": "region-close"})
+        self.assertTrue(self.panel.visible)
+        self.assertFalse(self.panel.regions.visible)
 
     def test_api_gates_region_calls_and_validates_actions(self):
         self.enable_game()

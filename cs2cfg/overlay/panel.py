@@ -27,8 +27,28 @@ def return_to_game(hwnd):
         user.SetForegroundWindow(hwnd)
 
 
+def monitor_bounds(hwnd):
+    """Read the game's monitor bounds, including negative monitor origins."""
+    try:
+        user = ctypes.WinDLL("user32", use_last_error=True)
+        user.MonitorFromWindow.argtypes = [w.HWND, w.DWORD]
+        user.MonitorFromWindow.restype = w.HANDLE
+        class Info(ctypes.Structure):
+            _fields_ = [("size", w.DWORD), ("monitor", w.RECT),
+                        ("work", w.RECT), ("flags", w.DWORD)]
+        user.GetMonitorInfoW.argtypes = [w.HANDLE, ctypes.POINTER(Info)]
+        info = Info()
+        info.size = ctypes.sizeof(info)
+        if user.GetMonitorInfoW(user.MonitorFromWindow(hwnd, 2), ctypes.byref(info)):
+            r = info.monitor
+            return r.left, r.top, r.right - r.left, r.bottom - r.top
+    except (AttributeError, OSError):
+        pass
+    return None
+
+
 class Panel:
-    def __init__(self, service, factory, *, focus=return_to_game, keyboard=None, setup=None):
+    def __init__(self, service, factory, *, focus=return_to_game, keyboard=None, setup=None, fade_seconds=.12):
         self.service, self.factory = service, factory
         self.focus, self.keyboard = focus, keyboard
         self.setup = setup
@@ -39,6 +59,8 @@ class Panel:
         self._loaded = False
         self._destroying = False
         self._close_timer = None
+        self._fade_timer = None
+        self._fade_seconds = fade_seconds
         self.error = ""
 
     def toggle(self):
@@ -47,7 +69,11 @@ class Panel:
                 self.hide()
             elif self.service.panel_allowed():
                 self.error = ""
+                if self._fade_timer:
+                    self._fade_timer.cancel()
+                    self._fade_timer = None
                 self.visible = True
+                self.service.suspend_pins()
                 if self.window is None:
                     try:
                         self.window = self.factory()
@@ -55,11 +81,20 @@ class Panel:
                         self.visible = False
                         self.error = f"Panel: {exc}"
                         return
+                    self._place()
                     self.window.events.loaded += self.loaded
                     self.window.events.closing += self.closing
                 else:
+                    self._place()
                     self.window.show()  # pywebview shows and activates its window.
                     self._script(True)
+
+    def _place(self):
+        bounds = monitor_bounds(self.service.game_hwnd())
+        if bounds:
+            x, y, width, height = bounds
+            self.window.move(x, y)
+            self.window.resize(width, height)
 
     def loaded(self):
         with self._lock:
@@ -86,11 +121,27 @@ class Panel:
             self.regions.close()
             for operation in (lambda: self._script(False),
                               lambda: self.focus(self.service.game_hwnd()) if restore else None,
-                              lambda: self.window.hide() if self.window else None):
+                              self._fade_hide):
                 try:
                     operation()
                 except Exception as exc:
                     self.error = f"Panel: {exc}"
+
+    def _fade_hide(self):
+        if not self.window:
+            return
+        if self._fade_seconds:
+            self._fade_timer = threading.Timer(self._fade_seconds, self._hide_native)
+            self._fade_timer.daemon = True
+            self._fade_timer.start()
+        else:
+            self.window.hide()
+
+    def _hide_native(self):
+        with self._lock:
+            self._fade_timer = None
+            if not self.visible and self.window and not self._destroying:
+                self.window.hide()
 
     def closing(self):
         if self._destroying:
@@ -111,6 +162,9 @@ class Panel:
     def destroy(self):
         self.hide(restore=False)
         self._destroying = True
+        if self._fade_timer:
+            self._fade_timer.cancel()
+            self._fade_timer = None
         if self.window:
             self.window.destroy()
 

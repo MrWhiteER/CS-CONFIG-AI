@@ -1,248 +1,143 @@
-/* One completion-driven refresh per second. Hiding cancels every pending task. */
+/* Single WebView scheduler. Hidden shell = zero timers, requests or rendering. */
 (() => {
-  'use strict';
-  const $ = id => document.getElementById(id);
-  const preview = new URLSearchParams(location.search).get('preview') === '1';
-  let active = false, requested = false, generation = 0, seconds = 120;
-  let performanceTimer = null, regionTimer = null, controller = null, latest = null;
-  let graphTimer = null, lastGraphAt = -Infinity;
-  let regionBusy = false;
-  const number = (n, unit = '') => Number.isFinite(n) ? n.toFixed(1) + unit : '—';
-  const text = (id, value) => { $(id).textContent = value; };
-
-  async function api(path, body = {}, signal = controller?.signal) {
-    if (preview) throw new Error('Preview changes are disabled');
-    const response = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json',
-      'X-CS2CFG-Token':window.overlayToken}, body:JSON.stringify(body), signal});
-    const result = await response.json();
-    if (!response.ok || result.ok === false) throw new Error(result.error || 'Request failed');
+ 'use strict';
+ const $=id=>document.getElementById(id),{icon,escape:e}=window.overlayUI;
+ const params=new URLSearchParams(location.search),preview=params.get('preview')==='1';
+ let closing=false,requested=false,active=false,generation=0,controller=null,clockTimer=null,z=1,manifest=null,settings={},layout={},saveChain=Promise.resolve();
+ const windows=new Map(),timers=new Map(),requests=new Map();
+ function report(error){if(active&&error?.name!=='AbortError')$('error').textContent=error.message||String(error);}
+ async function api(path,body,signal=controller?.signal){
+  if(preview)throw new Error('Preview changes are disabled');
+  const response=await fetch(path,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json','X-CS2CFG-Token':window.overlayToken},...(body===undefined?{}:{body:JSON.stringify(body)}),signal});
+  const data=await response.json();if(!response.ok||data.ok===false)throw new Error(data.error||'Request failed');return data;
+ }
+ function entry(id){return layout[id]||={open:['performance','hardware'].includes(id),pinned:false};}
+ function visible(id){return active&&settings.overlay_tools.includes(id)&&entry(id).open;}
+ function cancelTool(id){clearTimeout(timers.get(id));timers.delete(id);requests.get(id)?.abort();requests.delete(id);}
+ async function refresh(tool,epoch){
+  if(!visible(tool.id)||epoch!==generation||preview)return;
+  const request=new AbortController();requests.set(tool.id,request);
+  const abort=()=>request.abort();controller.signal.addEventListener('abort',abort,{once:true});
+  try{
+   const data=await api('/api/overlay/tool',{id:tool.id,action:'data',args:{}},request.signal);
+   if(visible(tool.id)&&epoch===generation&&!request.signal.aborted)render(tool,data);
+  }catch(error){report(error);}finally{controller?.signal.removeEventListener('abort',abort);if(requests.get(tool.id)===request)requests.delete(tool.id);}
+  if(visible(tool.id)&&epoch===generation&&tool.refresh_hz>0&&!request.signal.aborted){
+   // Server lock's adapter polls at <=1 Hz, and only while busy.
+   if(tool.id!=='serverlock'||windows.get(tool.id)?.data?.poll)
+    timers.set(tool.id,setTimeout(()=>{timers.delete(tool.id);refresh(tool,epoch);},Math.max(100,1000/tool.refresh_hz)));
+  }
+ }
+ function render(tool,data){
+  const view=windows.get(tool.id);if(!view||!visible(tool.id))return;view.data=data;
+  const call=async(action,args)=>{
+   if(preview||!visible(tool.id))throw new Error('Changes unavailable');
+   const epoch=generation;
+   try{const result=await api('/api/overlay/tool',{id:tool.id,action,args});
+    if(!visible(tool.id)||epoch!==generation)throw new DOMException('Tool hidden','AbortError');
+    if(tool.id==='serverlock'){cancelTool(tool.id);if(result.poll)timers.set(tool.id,setTimeout(()=>refresh(tool,generation),1000));}
     return result;
-  }
-
-  function report(error) {
-    if (active && error.name !== 'AbortError') text('error', error.message || String(error));
-  }
-
-  function graph(history, ready) {
-    if (!active) return;
-    clearTimeout(graphTimer); graphTimer = null;
-    const wait = 100 - (performance.now() - lastGraphAt);
-    if (wait > 0) {
-      graphTimer = setTimeout(() => graph(history, ready), Math.ceil(wait));
-      return;
-    }
-    lastGraphAt = performance.now();
-    const svg = $('graph'), ns = 'http://www.w3.org/2000/svg';
-    svg.replaceChildren();
-    const node = (tag, attrs, label) => {
-      const el = document.createElementNS(ns, tag);
-      for (const [key, value] of Object.entries(attrs)) el.setAttribute(key, value);
-      if (label != null) el.textContent = label;
-      svg.appendChild(el); return el;
-    };
-    const now = preview ? previewData.now : Date.now() / 1000;
-    const samples = ready ? history.filter(s => s.at >= now - seconds && Number.isFinite(s.frame_time_ms)) : [];
-    const max = Math.max(10, ...samples.map(s => s.frame_time_ms)) * 1.1;
-    for (let i = 0; i <= 4; i++) {
-      const y = 8 + i * 40;
-      node('line', {x1:38, x2:618, y1:y, y2:y, class:'grid'});
-      node('text', {x:0, y:y + 4}, (max * (1 - i / 4)).toFixed(0));
-    }
-    if (!samples.length) node('text', {x:75, y:90}, ready ? 'Waiting for frame data' : 'Frame stats unavailable');
-    // Break the path at missing intervals instead of inventing frame data.
-    let previous = null;
-    const path = samples.map(s => {
-      const x = 38 + Math.max(0, Math.min(1, (s.at - now + seconds) / seconds)) * 580;
-      const y = 168 - s.frame_time_ms / max * 160;
-      const move = previous === null || s.at - previous > 2;
-      previous = s.at;
-      return `${move ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`;
-    }).join(' ');
-    node('path', {d:path, class:'trace'});
-    text('range-label', `${seconds / 60} minutes ago`);
-  }
-
-  function render(data) {
-    latest = data;
-    const current = data.current || {}, summary = data.summary || {}, ready = data.frame_capture_ready;
-    text('shortcut', data.settings.overlay_panel_hotkey);
-    text('capture-state', preview ? 'Sample session' : data.game_running ? 'Current session' : 'Waiting for CS2');
-    text('fps', ready ? number(current.fps) : '—');
-    text('average', ready ? number(summary.avg_fps) : '—');
-    text('low', ready ? number(summary.one_percent_low) : '—');
-    text('worst', ready ? number(summary.worst_frame_ms, ' ms') : '—');
-    text('cpu', number(current.cpu_percent, '%'));
-    text('gpu', number(current.gpu_percent, '%'));
-    text('temp', number(current.gpu_temp_c, ' °C'));
-    $('frame-hint').hidden = !data.frame_capture_hint;
-    $('frame-hint').querySelector('span').textContent = data.frame_capture_hint || '';
-    $('dismiss').hidden = !data.frame_capture_hint_dismissible;
-    text('notice', [data.notice, data.error, data.hud_warning, data.panel_warning].filter(Boolean).join(' · '));
-    graph(data.history || [], ready);
-    const rows = (data.events || []).slice().sort((a,b) => b.at - a.at);
-    $('events').replaceChildren();
-    if (!rows.length) {
-      const row = $('events').insertRow(), cell = row.insertCell();
-      cell.colSpan = 3; cell.textContent = 'No events this session';
-    }
-    for (const event of rows) {
-      const row = $('events').insertRow();
-      const values = [new Date(event.at * 1000).toLocaleTimeString(), number(event.duration_ms, ' ms'),
-        event.type === 'not_responding' ? 'Not responding' : 'Frame spike'];
-      for (const value of values) row.insertCell().textContent = value;
-    }
-  }
-
-  function options(id, entries, value, label, selected) {
-    const select = $(id);
-    select.replaceChildren();
-    for (const item of entries) {
-      const option = document.createElement('option');
-      option.value = value(item); option.textContent = label(item);
-      option.selected = selected(item); select.appendChild(option);
-    }
-    if (!entries.length) {
-      const option = document.createElement('option'); option.textContent = 'None saved'; select.appendChild(option);
-    }
-    select.disabled = preview || !entries.length;
-  }
-
-  async function profiles(epoch) {
-    const results = await Promise.allSettled([api('/api/setups'), api('/api/cfg/layouts/profiles')]);
-    if (!active || epoch !== generation) return;
-    const [setup, layout] = results;
-    if (setup.status === 'fulfilled') {
-      const d = setup.value;
-      options('setups', d.setups || [], s => s.name, s => s.name, s => s.name === d.live);
-      $('use-setup').disabled = $('setups').disabled;
-    } else report(setup.reason);
-    if (layout.status === 'fulfilled') {
-      options('layouts', layout.value.profiles || [], p => p.file, p => p.label, p => p.active);
-      $('use-layout').disabled = $('layouts').disabled;
-    } else text('profile-note', layout.reason.message);
-  }
-
-  async function refreshPerformance(epoch) {
-    try {
-      const data = await api('/api/overlay', {seconds:600});
-      if (active && epoch === generation) render(data);
-    } catch (error) { report(error); }
-    if (active && epoch === generation) performanceTimer = setTimeout(() => refreshPerformance(epoch), 1000);
-  }
-
-  function region(data, epoch) {
-    if (!active || epoch !== generation) return;
-    clearTimeout(regionTimer); regionTimer = null;
-    text('region-text', data.text);
-    $('region-controls').hidden = !data.available;
-    if (!data.available) return;
-    regionBusy = Boolean(data.status.busy);
-    const selected = $('regions').value || data.status?.firewall?.code;
-    options('regions', data.regions || [], r => r.code,
-      r => `${r.city}, ${r.country} · ${number(r.ping_ms, ' ms')} · loss ${number(r.loss)} · ${r.status || ''}`,
-      r => r.code === selected);
-    $('lock-region').disabled = preview || data.status.busy || $('regions').disabled;
-    $('unlock-region').disabled = preview || data.status.busy;
-    if (data.poll) regionTimer = setTimeout(async () => {
-      try { region(await api('/api/overlay/panel'), epoch); } catch (error) { report(error); }
-    }, 1000);
-  }
-
-  function stop() {
-    active = false; generation++;
-    clearTimeout(performanceTimer); clearTimeout(regionTimer);
-    clearTimeout(graphTimer); graphTimer = null;
-    performanceTimer = regionTimer = null;
-    controller?.abort(); controller = null;
-  }
-
-  async function start() {
-    if (active || document.hidden) return;
-    active = true;
-    const epoch = ++generation;
-    controller = new AbortController();
-    if (preview) { renderPreview(); return; }
-    refreshPerformance(epoch);
-    profiles(epoch).catch(report);
-    try { region(await api('/api/overlay/panel', {action:'open'}), epoch); } catch (error) { report(error); }
-  }
-
-  window.overlayPanelActive = value => { requested = value; if (value) start(); else stop(); };
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) stop(); else if (requested) start();
-  });
-  window.addEventListener('pagehide', stop);
-
-  document.querySelectorAll('[data-range]').forEach(button => button.addEventListener('click', () => {
-    seconds = Number(button.dataset.range);
-    document.querySelectorAll('[data-range]').forEach(b => b.setAttribute('aria-pressed', String(b === button)));
-    if (latest) graph(latest.history || [], latest.frame_capture_ready);
-  }));
-
-  async function action(button, fn) {
-    if (!active || preview) return;
-    button.disabled = true; text('error', '');
-    const epoch = generation;
-    try { await fn(epoch); } catch (error) { report(error); }
-    finally {
-      if (active && epoch === generation) {
-        if (button.id.endsWith('-region')) {
-          $('lock-region').disabled = regionBusy || $('regions').disabled;
-          $('unlock-region').disabled = regionBusy;
-        } else button.disabled = false;
-      }
-    }
-  }
-  $('use-setup').onclick = () => action($('use-setup'), async epoch => {
-    await api('/api/setups/act', {do:'use', name:$('setups').value});
-    if (active && epoch === generation) text('profile-note', 'Setup selected for the app’s next Apply.');
-  });
-  $('use-layout').onclick = () => action($('use-layout'), async epoch => {
-    const data = await api('/api/cfg/layouts/apply', {file:$('layouts').value});
-    if (active && epoch === generation) text('profile-note', data.apply_keys?.length ?
-      `Press ${data.apply_keys.join(' / ')} in game to load it` : 'No Apply Saved Settings key is bound. Set one in the Keyboard tab.');
-  });
-  $('dismiss').onclick = () => action($('dismiss'), async epoch => {
-    const data = await api('/api/overlay/settings', {overlay_sign_out_hint_dismissed:true});
-    if (active && epoch === generation) render(data);
-  });
-  for (const [id, operation] of [['lock-region','lock'], ['unlock-region','unlock']]) {
-    $(id).onclick = () => action($(id), async epoch => {
-      const data = await api('/api/overlay/panel', {action:operation, code:$('regions').value});
-      region(data, epoch);
-    });
-  }
-  $('close').onclick = () => {
-    if (preview) { window.overlayPanelActive(false); return; }
-    stop(); requested = false;
-    api('/api/overlay/panel', {action:'close'}, null).catch(() => {});
+   }catch(error){report(error);throw error;}
   };
-  document.addEventListener('keydown', event => { if (event.key === 'Escape') $('close').click(); });
-  document.querySelectorAll('a').forEach(link => link.addEventListener('click', event => {
-    if (preview) { event.preventDefault(); return; }
-    event.preventDefault();
-    const operation = link.id === 'keyboard' ? 'keyboard' : 'setup';
-    api('/api/overlay/panel', {action:operation}).catch(report);
-  }));
-
-  const previewData = (() => {
-    if (!preview) return null;
-    const now = Date.now() / 1000;
-    return {now, settings:{overlay_panel_hotkey:'Ctrl+Alt+P'}, game_running:true, frame_capture_ready:true,
-      frame_capture_hint:'', current:{fps:287, cpu_percent:32, gpu_percent:56, gpu_temp_c:66},
-      summary:{avg_fps:281, one_percent_low:182, worst_frame_ms:24.1},
-      history:Array.from({length:600}, (_,i) => ({at:now - 599 + i,
-        frame_time_ms:i % 97 === 0 ? 20.5 : 3.55 + Math.sin(i * 2.7) * .7 + Math.cos(i * .9) * .4})),
-      events:[{at:now-18,duration_ms:24.1,type:'frame_spike'},
-        {at:now-73,duration_ms:212.4,type:'not_responding'},
-        {at:now-116,duration_ms:18.9,type:'frame_spike'}]};
-  })();
-  function renderPreview() {
-    $('preview').hidden = false;
-    render(previewData);
-    options('setups', [{name:'Balanced'}], s => s.name, s => s.name, () => true);
-    options('layouts', [{file:'competitive',label:'Competitive'}], p => p.file, p => p.label, () => true);
-    text('profile-note', 'Press F8 in game to load it');
+  window.overlayRenderers[tool.id](view.body,data,call);
+  if(preview)for(const control of view.body.querySelectorAll('input,select,button:not([data-range])'))control.disabled=true;
+ }
+ function bounds(){return $('workspace').getBoundingClientRect();}
+ function place(tool){
+  const view=windows.get(tool.id),row=entry(tool.id),area=bounds();
+  const width=Math.min(Math.max(240,row.width||tool.default_size[0]),Math.max(240,area.width));
+  const height=Math.min(Math.max(180,row.height||tool.default_size[1]),Math.max(180,area.height));
+  const x=Math.max(0,Math.min(row.x??(tool.id==='hardware'?560:24+manifest.tools.indexOf(tool)*36),Math.max(0,area.width-width)));
+  const y=Math.max(0,Math.min(row.y??(tool.id==='hardware'?12:12+manifest.tools.indexOf(tool)*24),Math.max(0,area.height-height)));
+  Object.assign(row,{x,y,width,height});Object.assign(view.element.style,{left:x+'px',top:y+'px',width:width+'px',height:height+'px'});
+ }
+ function persist(){
+  if(preview||!active)return Promise.resolve();
+  const value=JSON.parse(JSON.stringify(layout)),signal=controller.signal;
+  // Serialize writes to prevent an old drag from overwriting a later close/pin.
+  saveChain=saveChain.catch(()=>{}).then(()=>signal.aborted?null:api('/api/overlay/settings',{overlay_layout:value},signal)).catch(report);
+  return saveChain;
+ }
+ function dock(){
+  $('dock').replaceChildren();
+  for(const id of settings.overlay_tools){
+   const tool=manifest.tools.find(t=>t.id===id);if(!tool)continue;
+   const button=document.createElement('button');button.type='button';button.dataset.launch=id;
+   button.innerHTML=icon(tool.icon)+'<span>'+e(tool.title)+'</span>';button.setAttribute('aria-pressed',String(!!entry(id).open));
+   button.onclick=()=>toggleTool(tool,!entry(id).open);$('dock').appendChild(button);
   }
-  if (preview) window.overlayPanelActive(true);
+  const room=document.createElement('span');room.className='dock-space';room.textContent='+';room.title='Room for future tools';room.setAttribute('aria-hidden','true');$('dock').appendChild(room);
+ }
+ function toggleTool(tool,open){
+  entry(tool.id).open=open;const view=windows.get(tool.id);view.element.hidden=!open;
+  cancelTool(tool.id);
+  if(!open&&tool.id==='serverlock'&&!preview)api('/api/overlay/panel',{action:'region-close'}).catch(report);
+  if(open){view.element.style.zIndex=++z;place(tool);if(preview)render(tool,window.overlayPreview.data[tool.id]);else refresh(tool,generation);}
+  dock();persist();
+ }
+ function createWindow(tool){
+  const element=document.createElement('section');element.className='tool-window';element.dataset.tool=tool.id;element.setAttribute('role','region');element.setAttribute('aria-label',tool.title);
+  element.innerHTML='<header class="window-head">'+icon(tool.icon)+'<h2>'+e(tool.title)+'</h2>'+(tool.pinnable?'<button data-pin aria-label="Pin '+e(tool.title)+'" title="Keep visible over game">'+icon('pin')+'</button>':'')+'<button data-close aria-label="Close '+e(tool.title)+'">'+icon('close')+'</button></header><div class="tool-body"></div><button class="resize" aria-label="Resize '+e(tool.title)+'" title="Drag to resize; arrow keys also resize"></button>';
+  const view={element,body:element.querySelector('.tool-body'),data:null};windows.set(tool.id,view);$('workspace').appendChild(element);
+  element.onpointerdown=()=>element.style.zIndex=++z;
+  element.querySelector('[data-close]').onclick=()=>toggleTool(tool,false);
+  const pin=element.querySelector('[data-pin]');if(pin){pin.setAttribute('aria-pressed',String(!!entry(tool.id).pinned));pin.onclick=()=>{entry(tool.id).pinned=!entry(tool.id).pinned;pin.setAttribute('aria-pressed',String(entry(tool.id).pinned));persist();};}
+  const head=element.querySelector('.window-head'),resize=element.querySelector('.resize');
+  const drag=(handle,resizing)=>handle.onpointerdown=event=>{
+   if(event.button!==0||event.target.closest('button')!==null&&!resizing)return;
+   event.preventDefault();handle.setPointerCapture(event.pointerId);const start={...entry(tool.id)},sx=event.clientX,sy=event.clientY;
+   handle.onpointermove=ev=>{const row=entry(tool.id);if(resizing){row.width=start.width+ev.clientX-sx;row.height=start.height+ev.clientY-sy;}else{row.x=start.x+ev.clientX-sx;row.y=start.y+ev.clientY-sy;}place(tool);};
+   handle.onpointerup=handle.onpointercancel=()=>{handle.onpointermove=null;handle.onpointerup=null;handle.onpointercancel=null;persist();};
+  };
+  drag(head,false);drag(resize,true);head.tabIndex=0;head.setAttribute('aria-label','Move '+tool.title+' with arrow keys');
+  for(const [handle,resizing] of [[head,false],[resize,true]])handle.onkeydown=ev=>{if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(ev.key))return;ev.preventDefault();const row=entry(tool.id),delta=ev.shiftKey?40:10;if(ev.key==='ArrowLeft'||ev.key==='ArrowRight')row[resizing?'width':'x']+=(ev.key==='ArrowLeft'?-delta:delta);else row[resizing?'height':'y']+=(ev.key==='ArrowUp'?-delta:delta);place(tool);persist();};
+  element.hidden=!entry(tool.id).open||!settings.overlay_tools.includes(tool.id);place(tool);
+ }
+ function applySettings(value){
+  settings={...settings,...value};
+  // Local geometry may have changed since the settings tool was opened.
+  settings.overlay_layout=layout;
+  for(const tool of manifest.tools){const view=windows.get(tool.id);view.element.hidden=!settings.overlay_tools.includes(tool.id)||!entry(tool.id).open;if(view.element.hidden)cancelTool(tool.id);else if(!requests.has(tool.id)&&!timers.has(tool.id))refresh(tool,generation);}
+  dock();
+ }
+ function clock(){if(!active)return;$('clock').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});if(!preview)clockTimer=setTimeout(clock,1000);}
+ async function start(){
+  if(active)return;closing=false;active=true;const epoch=++generation;controller=new AbortController();document.body.classList.add('active');
+  try{
+   manifest=preview?structuredClone(window.overlayPreview.manifest):await api('/api/overlay/tools');
+   if(!active||epoch!==generation)return;
+   document.documentElement.dataset.theme=params.get('theme')||manifest.theme;
+   settings=manifest.settings;settings.overlay_tools||=manifest.tools.map(t=>t.id);layout=structuredClone(settings.overlay_layout||{});
+   // Pinned forms share the native HUD's two supported tools, never a WebView.
+   if(!Object.keys(layout).length){entry('performance').pinned=true;entry('hardware').pinned=true;}
+   windows.clear();$('workspace').replaceChildren();for(const tool of manifest.tools)createWindow(tool);
+   dock();clock();$('shortcut').textContent=settings.overlay_panel_hotkey+' to return to game';
+   if(preview){document.body.classList.add('preview');$('preview').hidden=false;for(const tool of manifest.tools)if(visible(tool.id))render(tool,window.overlayPreview.data[tool.id]);}
+   else for(const tool of manifest.tools)if(visible(tool.id))refresh(tool,epoch);
+  }catch(error){report(error);}
+ }
+ function stop(){
+  active=false;generation++;controller?.abort();clearTimeout(clockTimer);clockTimer=null;
+  for(const tool of manifest?.tools||[])cancelTool(tool.id);
+  for(const view of windows.values())for(const handle of view.element.querySelectorAll('.window-head,.resize')){handle.onpointermove=null;handle.onpointerup=null;handle.onpointercancel=null;}
+  document.body.classList.remove('active');
+ }
+ async function close(){
+  if(!active||closing)return;closing=true;
+  await persist();if(!active)return;requested=false;
+  if(preview){stop();return;}
+  stop();
+  // Native controller hides after the 120 ms CSS fade. No JS timer remains.
+  api('/api/overlay/panel',{action:'close'},null).catch(()=>{});
+ }
+ window.overlayPanelActive=value=>{requested=!!value;if(value&&!document.hidden)start();else stop();};
+ window.overlayShell={get tools(){return manifest?.tools||[];},applySettings,close,showTool:id=>{const tool=manifest.tools.find(t=>t.id===id);if(tool)toggleTool(tool,true);},get layout(){return layout;}};
+ $('close').onclick=close;$('backdrop').onclick=close;
+ document.addEventListener('keydown',event=>{if(event.key==='Escape')close();});
+ document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();else if(requested)start();});
+ document.addEventListener('click',event=>{const link=event.target.closest('a');if(!link)return;event.preventDefault();if(preview)return;const action=link.href.includes('keyboard')?'keyboard':'setup';persist().then(()=>{stop();requested=false;api('/api/overlay/panel',{action},null).catch(()=>{});});});
+ window.addEventListener('resize',()=>{if(active)for(const tool of manifest?.tools||[])place(tool);});
+ window.addEventListener('unhandledrejection',event=>{report(event.reason);event.preventDefault();});
+ window.addEventListener('pagehide',stop);
+ if(preview)window.overlayPanelActive(true);
 })();

@@ -36,6 +36,17 @@ def hud_position(rect: tuple, corner: str) -> tuple[int, int]:
             max(top + 20, bottom - HEIGHT - 20) if corner.startswith("bottom") else top + 20)
 
 
+def pinned_position(rect, row, corner="top_left", offset=0):
+    """Keep native widgets reachable when the game's monitor changes."""
+    from .hud import WIDTH, HEIGHT
+    left, top, right, bottom = rect
+    x, y = hud_position(rect, corner)
+    y += -offset if corner.startswith("bottom") else offset
+    x = left + row['x'] if 'x' in row else x
+    y = top + row['y'] if 'y' in row else y
+    return (max(left, min(x, right - WIDTH)), max(top, min(y, bottom - HEIGHT)))
+
+
 class OverlayService:
     def __init__(self) -> None:
         self._lock = threading.RLock()
@@ -50,6 +61,8 @@ class OverlayService:
         self._capture = self._hud = self._gpu = self._cpu = self._recorder = None
         self._hwnd = None
         self.panel = None
+        self._hardware_widget = None
+        self._hardware_widget_failed = False
         self._modes = {}
         self._status = "disabled"
         self._notice = self._error = ""
@@ -337,7 +350,8 @@ class OverlayService:
         if self.panel:
             self.panel.hide(restore=False)
         # Independent cleanup: a failed native resource cannot strand capture.
-        for resource, method in ((self._hud, "stop"), (self._capture, "stop"), (self._gpu, "close")):
+        for resource, method in ((self._hud, "stop"), (self._hardware_widget, "stop"),
+                                 (self._capture, "stop"), (self._gpu, "close")):
             if resource:
                 try:
                     getattr(resource, method)()
@@ -352,15 +366,66 @@ class OverlayService:
         with self._lock:
             self._capture = self._hud = self._gpu = self._cpu = self._recorder = None
             self._aggregator = None
+            self._hardware_widget = None
+            self._hardware_widget_failed = False
             self._hwnd = None
 
     def _configure_hud(self, wanted):
-        self._hud.configure(fields=wanted["overlay_fields"], hotkey=wanted["overlay_hotkey"],
+        self._hud.configure(fields=self._pinned_fields(wanted), hotkey=wanted["overlay_hotkey"],
                             panel_hotkey=wanted["overlay_panel_hotkey"],
                             exclude_from_capture=wanted["overlay_hide_from_capture"],
                             auto_visible=self._game_state.visible(
                                 auto_hide=wanted["overlay_auto_hide"],
                                 always_visible=wanted["overlay_always_visible"]))
+
+    def suspend_pins(self):
+        for widget in (self._hud, self._hardware_widget):
+            if widget:
+                widget.set_allowed(False)
+
+    def _pinned_fields(self, wanted):
+        # An empty layout migrates the existing HUD without losing its fields.
+        if not wanted['overlay_layout']:
+            return wanted['overlay_fields']
+        return [f for f in wanted['overlay_fields'] if f in settings.FIELDS[:3]]
+
+    def _update_pins(self, sample, found, allowed):
+        layout = self._settings['overlay_layout']
+        if not layout:
+            return
+        manual_visible = self._hud.pin_requested()
+        native_visible = (allowed and manual_visible and not (self.panel and self.panel.visible)
+                          and self._game_state.visible(
+                              auto_hide=self._settings['overlay_auto_hide'],
+                              always_visible=self._settings['overlay_always_visible']))
+        performance = layout.get('performance', {})
+        self._hud.set_allowed(native_visible and performance.get('pinned', False)
+                              and 'performance' in self._settings['overlay_tools'])
+        if performance.get('pinned'):
+            self._hud.update(sample, pinned_position(
+                found.rect, performance, self._settings['overlay_corner']))
+        hardware = layout.get('hardware', {})
+        pinned = hardware.get('pinned', False) and 'hardware' in self._settings['overlay_tools']
+        if pinned and self._hardware_widget is None and not self._hardware_widget_failed:
+            from .hud import Hud
+            self._hardware_widget = Hud(register_hotkeys=False)
+            self._hardware_widget.set_allowed(False)
+            try:
+                self._hardware_widget.start()
+            except (OSError, RuntimeError) as exc:
+                self._error = f"Hardware widget: {exc}"
+                self._hardware_widget.stop()
+                self._hardware_widget = None
+                self._hardware_widget_failed = True
+        if self._hardware_widget:
+            self._hardware_widget.configure(
+                fields=[f for f in self._settings['overlay_fields'] if f in settings.FIELDS[3:]],
+                hotkey=self._settings['overlay_hotkey'],
+                exclude_from_capture=self._settings['overlay_hide_from_capture'],
+                auto_visible=True)
+            self._hardware_widget.set_allowed(native_visible and pinned)
+            self._hardware_widget.update(sample, pinned_position(
+                found.rect, hardware, self._settings['overlay_corner'], offset=140))
 
     def panel_allowed(self):
         return bool(self._settings["overlay_enabled"] and self._hwnd)
@@ -370,6 +435,7 @@ class OverlayService:
 
     def _run(self) -> None:
         from .. import window
+        from .metrics import system_memory
 
         next_tick = time.monotonic()
         try:
@@ -387,7 +453,7 @@ class OverlayService:
                     next_tick = time.monotonic() + 1
                 if self._stop.wait(max(0, next_tick - time.monotonic())):
                     break
-                metrics = {"cpu_percent": self._cpu.cpu_percent(), **self._gpu.sample()}
+                metrics = {"cpu_percent": self._cpu.cpu_percent(), **self._gpu.sample(), **system_memory()}
                 with self._lock:
                     sample = self._aggregator.snapshot()
                     state = (self._capture.status(True, bool(sample["frame_count"])) if self._capture
@@ -415,9 +481,15 @@ class OverlayService:
                     self._notice = ("HUD needs Fullscreen Windowed. Switch to borderless in Play."
                                     if not borderless or (self._modes and not hud_allowed(True, self._modes))
                                     else "")
-                self._hud.set_allowed(allowed and window.foreground_hwnd() == found.hwnd)
+                focused = allowed and window.foreground_hwnd() == found.hwnd
                 self._configure_hud(self._settings)
-                self._hud.update(sample, hud_position(found.rect, self._settings["overlay_corner"]))
+                if self._settings['overlay_layout']:
+                    self._update_pins(sample, found, focused)
+                else:
+                    if self._hardware_widget:
+                        self._hardware_widget.set_allowed(False)
+                    self._hud.set_allowed(focused)
+                    self._hud.update(sample, hud_position(found.rect, self._settings["overlay_corner"]))
                 next_tick += 1
                 if next_tick < time.monotonic():
                     next_tick = time.monotonic() + 1
