@@ -448,6 +448,12 @@ def _watch_for_matches(url: str) -> None:
     def close() -> None:
         with lock:
             win, held["window"] = held["window"], None
+        try:
+            from . import dimmer
+
+            dimmer.hide()
+        except Exception:
+            pass
         if win is not None:
             try:
                 win.destroy()
@@ -466,6 +472,14 @@ def _watch_for_matches(url: str) -> None:
             screen_w, screen_h = 1920, 1080
         x = max(0, (screen_w - width) // 2)
         y = max(0, int(screen_h * 0.28))
+        # Every screen goes dark first; the alert then sits above the dim,
+        # the one bright thing on any monitor.
+        try:
+            from . import dimmer
+
+            dimmer.show()
+        except Exception:
+            pass
         try:
             win = webview.create_window(
                 ALERT_TITLE, url.rstrip("/") + "/alert.html",
@@ -480,6 +494,21 @@ def _watch_for_matches(url: str) -> None:
         def raise_it() -> None:
             try:
                 focus_existing_window(ALERT_TITLE, same_process=True)
+            except Exception:
+                pass
+            # Above the dimming windows, which are topmost too.
+            try:
+                u32 = ctypes.WinDLL("user32", use_last_error=True)
+                u32.FindWindowW.restype = wintypes.HWND
+                u32.FindWindowW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR]
+                u32.SetWindowPos.argtypes = [wintypes.HWND, wintypes.HWND,
+                                             ctypes.c_int, ctypes.c_int,
+                                             ctypes.c_int, ctypes.c_int,
+                                             wintypes.UINT]
+                hwnd = u32.FindWindowW(None, ALERT_TITLE)
+                if hwnd:
+                    u32.SetWindowPos(hwnd, wintypes.HWND(-1), 0, 0, 0, 0,
+                                     0x0001 | 0x0002 | 0x0040)  # NOSIZE|NOMOVE|SHOWWINDOW
             except Exception:
                 pass
         try:
