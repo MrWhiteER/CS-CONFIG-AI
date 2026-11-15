@@ -51,6 +51,7 @@ def _run(body, steam_up, cs2_up):
          mock.patch.object(webui.steam, "write_launch_options", return_value="set") as wrote_launch, \
          mock.patch.object(webui.backup, "BackupSession", return_value=_Session()), \
          mock.patch.object(webui.backup, "prune"), \
+         mock.patch.object(webui, "_record_verification", return_value={}), \
          mock.patch.object(webui, "_scaling_step", return_value={"ok": True, "what": "scaling",
                                                                 "detail": ""}):
         out = webui._apply(state, body)

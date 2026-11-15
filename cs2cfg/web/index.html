@@ -974,7 +974,7 @@
   /* The two parts the choice is about, drawn rather than described.
      "Lean on the graphics card" means something different once you can see
      which card it is and how far ahead of the processor it actually is. */
-  .parts { display: grid; grid-template-columns: 1fr auto 1fr; gap: 14px;
+  .parts { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px;
            align-items: center; margin: 12px 0 14px; }
   .part { display: flex; gap: 12px; align-items: center; min-width: 0; }
   .part.gpu { flex-direction: row-reverse; text-align: right; }
@@ -1997,6 +1997,26 @@
 .net-popover .netbar-fill { width:100%; transform-origin:left; transition:none; }
 [data-panel="launcher"] > .grid2 { grid-template-columns:1fr; }
 #settings-subtabs [data-hardware-icon] { display:inline-flex; vertical-align:middle; }
+
+/* Apply receipt: compact persistent status, expandable read-only checklist. */
+.verification { margin:0 0 20px; border:1px solid var(--line); border-radius:12px; background:var(--panel); --verify-tone:var(--warn); }
+.verification[data-state="verified"] { --verify-tone:var(--good); }
+.verification[data-state="failed"] { --verify-tone:var(--bad); }
+.verification summary { list-style:none; display:flex; align-items:center; gap:16px; padding:16px 20px; cursor:pointer; }
+.verification summary::-webkit-details-marker { display:none; }
+.verification summary:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.verification summary strong { display:block; font-size:15px; }.verification summary small { display:block; margin-top:4px; color:var(--muted); font:11px var(--mono); }
+.verify-shield { width:34px; height:34px; flex:none; color:var(--verify-tone); }.verify-chevron { margin-left:auto; color:var(--accent); transition:transform .2s; }.verification[open] .verify-chevron { transform:rotate(180deg); }
+.verify-body { padding:4px 20px 16px; border-top:1px solid var(--line); }.verify-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }.verify-head h2 { margin:16px 0; }
+.verification-list { list-style:none; padding:0; margin:12px 0 0; max-height:340px; overflow:auto; }
+.verify-row { display:grid; grid-template-columns:24px minmax(0,1fr) auto; gap:10px; padding:10px 0; border-top:1px solid var(--line); align-items:center; }
+.verify-row svg { width:21px; height:21px; color:var(--warn); }.verify-row[data-state="verified"] svg { color:var(--good); }.verify-row[data-state="failed"] svg { color:var(--bad); }.verify-row small { display:block; color:var(--muted); font-size:11px; margin-top:4px; }.verify-row b { font-size:12px; font-weight:500; }.verify-row > span:last-child { font:10px var(--mono); color:var(--muted); }
+.verify-row[data-state="verified"] small { display:none; }
+.verification.reveal .verify-row { animation:verify-arrive .25s both; animation-delay:calc(var(--i) * 35ms); }.verification.reveal .verify-tick { animation:verify-arrive .35s both; }
+@keyframes verify-arrive { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
+.hidden .verification *,html.verify-paused .verification *,details.verification:not([open]) .verify-row { animation-play-state:paused!important; }
+@media(prefers-reduced-motion:reduce) { .verification * { animation:none!important; transition:none!important; } }
+@media(max-width:700px) { .verification summary { padding:14px; gap:10px; }.verification summary strong { font-size:13px; }.verify-body { padding:4px 14px 14px; }.verify-row { grid-template-columns:21px minmax(0,1fr); }.verify-row > span:last-child { grid-column:2; } }
 </style>
 <style>
   /* ------------------------------------------------------------------------
@@ -5367,8 +5387,6 @@
 .mode-card[aria-pressed="true"] { transform:translateY(-5px); }.mode-card[aria-pressed="true"]::after { border-color:var(--accent); box-shadow:inset 0 -32px 35px -30px var(--accent); }
 .mode-card:hover { transform:translateY(-5px); }.mode-card:focus-visible { outline:0; }.mode-card:focus-visible::after { border:3px solid var(--accent); }
 .mode-index { position:absolute; left:18px; top:16px; font:600 10px var(--mono); color:#fff; letter-spacing:.1em; }
-.mode-fps { position:absolute; top:12px; right:20px; display:flex; flex-direction:column; align-items:flex-end; color:#fff; }
-.mode-fps b { font:700 27px var(--mono); text-shadow:0 2px 12px #000; }.mode-fps small { font:8px var(--mono); letter-spacing:.12em; }
 .mode-copy { position:absolute; left:20px; bottom:20px; right:22px; display:flex; flex-direction:column; color:#fff; gap:5px; }
 .mode-copy strong { font-size:21px; font-weight:700; letter-spacing:-.025em; }.mode-copy > span { font-size:11px; color:#ddd; }
 .mode-selected { position:absolute; bottom:23px; right:18px; color:var(--accent); opacity:0; }.mode-card[aria-pressed="true"] .mode-selected { opacity:1; }
@@ -5433,7 +5451,7 @@
 @keyframes home-sweep { 0%,65% { transform:translateX(-55%); } 100% { transform:translateX(55%); } }
 .home-paused .mode-card::before, .home-paused :is(.hero-art img,.monitor-light,.desk-light,.mode-card img) { animation-play-state:paused; }
 @media(max-width:1150px) { [data-panel="launcher"] .home-hero { padding:26px; min-height:365px; }.home-hero .hero-copy { width:58%; }.home-hero .fix-row { display:flex; flex-direction:column; align-items:flex-start; }.mode-card { height:180px; padding:15px; }.mode-copy strong { font-size:18px; }[data-panel="launcher"] .grid2 { grid-template-columns:1fr; } }
-@media(max-width:700px) { .home-hero .hero-copy { width:100%; }.home-hero::after { background:color-mix(in srgb,var(--panel) 84%,transparent); }.mode-cards { gap:8px; }.mode-card { height:190px; }.mode-copy { left:12px; bottom:15px; }.mode-copy strong { font-size:15px; }.mode-copy > span { font-size:10px; }.mode-fps { top:40px; right:12px; }.mode-index { left:12px; font-size:8px; }[data-panel="launcher"] :is(#live-card,#hw-card,#net-card) { padding:16px; } }
+@media(max-width:700px) { .home-hero .hero-copy { width:100%; }.home-hero::after { background:color-mix(in srgb,var(--panel) 84%,transparent); }.mode-cards { gap:8px; }.mode-card { height:190px; }.mode-copy { left:12px; bottom:15px; }.mode-copy strong { font-size:15px; }.mode-copy > span { font-size:10px; }.mode-index { left:12px; font-size:8px; }[data-panel="launcher"] :is(#live-card,#hw-card,#net-card) { padding:16px; } }
 @media(prefers-reduced-motion:reduce) { .mode-card::before, :is(.hero-art img,.monitor-light,.desk-light,.mode-card img) { animation:none; }.mode-card { transition:none; }.mode-card:hover,.mode-card[aria-pressed="true"] { transform:none; } }
 
 </style>
@@ -5989,13 +6007,18 @@ const startup = (() => {
         </div>
       </div>
 
+
+      <details id="verification" class="verification" hidden>
+        <summary><svg class="verify-shield" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M16 3 27 7v9c0 6-5 10-11 13C10 26 5 22 5 16V7Z"/><path class="verify-tick" d="m10 16 4 4 8-9"/></svg><span><strong id="verification-title" role="status">Apply settings to verify</strong><small id="verification-time"></small></span><span class="verify-chevron" aria-hidden="true">&#8964;</span></summary>
+        <div class="verify-body"><div class="verify-head"><h2>Applied and verified</h2><button class="btn small" id="verify-again" type="button">Read again</button></div><p class="sub" id="verification-context"></p><ul id="verification-list" class="verification-list"></ul></div>
+      </details>
       <section class="panel">
         <h2>Optimise for</h2>
         <div class="mode-cards" id="intents" role="group" aria-label="Optimise for">
-          <button class="mode-card" data-intent="competitive" type="button" aria-pressed="false" title="Choose Competitive"><img src="assets/home/mode-competitive.webp" alt="Competitive rendering of a Mediterranean training courtyard"><span class="mode-shade"></span><span class="mode-index">01 / FPS</span><span class="mode-fps"><b data-mode-fps="competitive">—</b><small>EST. FPS</small></span><span class="mode-copy"><strong>Competitive</strong><span>Maximum frames. Clear sightlines.</span></span><span class="mode-selected" aria-hidden="true">&#10003;</span></button>
-          <button class="mode-card" data-intent="balanced" type="button" aria-pressed="true" title="Choose Balanced"><img src="assets/home/mode-balanced.webp" alt="Balanced rendering of a Mediterranean training courtyard"><span class="mode-shade"></span><span class="mode-index">02 / BALANCE</span><span class="mode-fps"><b data-mode-fps="balanced">—</b><small>EST. FPS</small></span><span class="mode-copy"><strong>Balanced</strong><span>Clarity meets atmosphere.</span></span><span class="mode-selected" aria-hidden="true">&#10003;</span></button>
-          <button class="mode-card" data-intent="quality" type="button" aria-pressed="false" title="Choose Quality"><img src="assets/home/mode-quality.webp" alt="Quality rendering of a Mediterranean training courtyard"><span class="mode-shade"></span><span class="mode-index">03 / DETAIL</span><span class="mode-fps"><b data-mode-fps="quality">—</b><small>EST. FPS</small></span><span class="mode-copy"><strong>Quality</strong><span>Every detail. Every shadow.</span></span><span class="mode-selected" aria-hidden="true">&#10003;</span></button>
-        </div><p class="mode-note sub">FPS estimates use your hardware and current settings; actual performance varies.</p>
+          <button class="mode-card" data-intent="competitive" type="button" aria-pressed="false" title="Choose Competitive"><img src="assets/home/mode-competitive.webp" alt="Competitive rendering of a Mediterranean training courtyard"><span class="mode-shade"></span><span class="mode-index">01 / FOCUS</span><span class="mode-copy"><strong>Competitive</strong><span>Less detail. Clear sightlines.</span></span><span class="mode-selected" aria-hidden="true">&#10003;</span></button>
+          <button class="mode-card" data-intent="balanced" type="button" aria-pressed="true" title="Choose Balanced"><img src="assets/home/mode-balanced.webp" alt="Balanced rendering of a Mediterranean training courtyard"><span class="mode-shade"></span><span class="mode-index">02 / BALANCE</span><span class="mode-copy"><strong>Balanced</strong><span>Clarity meets atmosphere.</span></span><span class="mode-selected" aria-hidden="true">&#10003;</span></button>
+          <button class="mode-card" data-intent="quality" type="button" aria-pressed="false" title="Choose Quality"><img src="assets/home/mode-quality.webp" alt="Quality rendering of a Mediterranean training courtyard"><span class="mode-shade"></span><span class="mode-index">03 / DETAIL</span><span class="mode-copy"><strong>Quality</strong><span>Every detail. Every shadow.</span></span><span class="mode-selected" aria-hidden="true">&#10003;</span></button>
+        </div>
 
       </section>
 
@@ -6178,7 +6201,7 @@ const startup = (() => {
         </div>
         <div class="fps-copy">
           <h3>Target frame rate</h3>
-          <p id="fps-say">Left blank, everything is chosen to clear your refresh rate.</p>
+          <p id="fps-say">Use your refresh rate as the settings target.</p>
         </div>
         <div class="fps-set">
           <input type="number" id="target" min="30" max="1000" placeholder="auto"
@@ -7364,18 +7387,9 @@ function scoreRing(value, cap, label, detail, tone) {
     "<i>" + (hwIcon(label) || esc(label)) + "</i></span></span>";
 }
 
-function renderScores(p, headroomPct, hue) {
+function renderScores() {
   const box = $("scorebar");
-  if (!box || !p) return;
-  homePatchReadouts(box,
-    scoreRing(headroomPct, 100, "Headroom",
-              p.headroom + "× of " + p.target_fps + " Hz", hue) +
-    scoreRing(p.cpu_score, 105, "CPU",
-              "score " + p.cpu_score + ", ceiling ~" + p.cpu_ceiling + " fps",
-              "var(--warn)") +
-    scoreRing(p.gpu_score, 135, "GPU",
-              "score " + p.gpu_score + ", ceiling ~" + p.gpu_ceiling + " fps",
-              "var(--accent)"));
+  if (box) box.replaceChildren();
 }
 
 function renderPlan(p) {
@@ -7385,37 +7399,13 @@ function renderPlan(p) {
 
   // What the target actually cost, said where the target is typed.
   const level = (p.settings || []).find(x => /gpu level|overall quality/i.test(x.name || ""));
-  fpsEffect = "Tier " + esc(p.tier) + " · " + p.headroom + "× headroom" +
-    (level && level.after ? " · picture " + esc(String(level.after)) : "");
+  fpsEffect = level && level.after ? "Picture " + esc(String(level.after)) : "";
   renderFps();
-  setBandFigures(p);
 
-  const hue = p.headroom >= 1.15 ? "var(--good)" : p.headroom >= 0.85 ? "var(--warn)" : "var(--bad)";
+
   const changed = p.settings.filter(s => s.changed);
-
-  const headroomPct = Math.min(100, (p.headroom / 2) * 100);
-  // The three scores go to the title bar. They are a verdict on the machine
-  // rather than something that changes while you read, so they belong where
-  // the other standing figures are -- and the assessment card stops opening
-  // with a row of rings repeating the numbers printed underneath them.
-  renderScores(p, headroomPct, hue);
-
-  let assessment = '<div class="assess">' +
-    '<div class="subcat">Assessment</div>' +
-    '<div class="stats">' +
-    '<div class="stat"><b>' + esc(p.tier) + '</b><span>tier</span></div>' +
-    '<div class="stat"><b style="color:' + hue + '">~' + p.estimated_fps + '</b><span>est. fps</span></div>' +
-    '<div class="stat"><b>' + p.headroom + '×</b><span>of ' + p.target_fps + ' Hz</span></div>' +
-    '<div class="stat"><b>' + (hwIcon(p.bottleneck) || esc(p.bottleneck)) + '</b><span>limited by</span></div>' +
-    "</div>" +
-    '<div class="row" style="margin-top:8px"><span class="k">' + hwIcon('cpu') + '</span><span class="v">score ' +
-      p.cpu_score + (p.cpu_exact ? "" : ' <span class="sub">(' + esc(p.cpu_note) + ")</span>") +
-      ' · ceiling ~' + p.cpu_ceiling + ' fps</span></div>' +
-    '<div class="row"><span class="k">' + hwIcon('gpu') + '</span><span class="v">score ' +
-      p.gpu_score + (p.gpu_exact ? "" : ' <span class="sub">(' + esc(p.gpu_note) + ")</span>") +
-      ' · ceiling ~' + p.gpu_ceiling + ' fps</span></div>' +
-    "</div>";
-  $("assessment-out").innerHTML = assessment;
+  renderScores();
+  $("assessment-out").innerHTML = '<div class="assess"><div class="subcat">Selected settings</div><span class="sub">' + esc(p.intent) + ' \u00b7 ' + p.settings.length + ' picture settings reviewed</span></div>';
 
   // A change you cannot see is a change you cannot check. Anything moving gets
   // a full row with the reason attached; the rest collapses out of the way.
@@ -7439,7 +7429,7 @@ function renderPlan(p) {
         : '<span class="chg-chip new">new</span>' +
           '<span class="chg-arrow">→</span>' + chip(s.after, null, "to")) +
       "</div>" +
-      (s.reason ? '<div class="chg-why">' + esc(s.reason) + "</div>" : "") +
+      (s.reason ? '<div class="chg-why">' + esc(/headroom|\btier\b|estimated|ceiling/i.test(s.reason) ? 'Selected for this picture profile.' : s.reason) + "</div>" : "") +
       "</div>";
   }).join("");
 
@@ -7470,9 +7460,10 @@ function renderPlan(p) {
       '</div><div class="d">' + esc(a.reason) + "</div></div>").join("") +
     "</section>";
 
-  if (p.advisories.length) {
+  const visibleAdvisories = p.advisories.filter(a => !/estimated|headroom|\btier\b|ceiling/i.test(a.title + " " + a.detail));
+  if (visibleAdvisories.length) {
     html += '<section class="card"><h2>Worth knowing</h2>' +
-      p.advisories.map(a => '<div class="note ' + esc(a.level) + '"><div class="t">' +
+      visibleAdvisories.map(a => '<div class="note ' + esc(a.level) + '"><div class="t">' +
         (a.level === "warn" ? "! " : "i ") + esc(a.title) + '</div><div class="d">' +
         esc(a.detail) + "</div></div>").join("") + "</section>";
   }
@@ -7500,6 +7491,8 @@ async function scan(rescan) {
   try {
     lastScan = await api("/api/scan" + (rescan ? "?rescan=1" : ""));
     renderHardware(lastScan);
+    verificationStarted = true;
+    refreshVerification();
     renderFps();
     status("Ready.");
   } catch (e) { status("Scan failed: " + esc(e.message), true); }
@@ -7539,6 +7532,12 @@ let confirmOpen = false;
 let changeSeq = 0;
 
 function noteChange(label, revert) {
+  verificationDirty = true;
+  if (!$('verification').hidden) {
+    $('verification').dataset.state = 'changed';
+    $('verification-title').textContent = 'Settings changed \u00b7 apply to verify';
+    renderApplyVerification();
+  }
   // The same control moved twice is still one thing to answer for, and the
   // older revert is the one that goes all the way back.
   const already = pendingChanges.find(c => c.label.split("→")[0] === label.split("→")[0]);
@@ -7894,13 +7893,13 @@ function netSide(probe, sent, total) {
   if (!probe) return "";
   const tone = netTone(probe);
   const times = probe.times || [];
-  const last = times.length ? times[times.length - 1] : 0;
+  const average = probe.average;
   return '<div class="netside ' + tone + '">' +
     '<div class="netside-head">' + esc(probe.label) +
       (probe.host ? ' <span class="sub mono">' + esc(probe.host) + "</span>" : "") +
     "</div>" +
     '<div class="netside-body">' +
-      netDial(last, times.length > 0, tone) +
+      netDial(average, times.length > 0 && Number.isFinite(average), tone) +
       '<div class="netside-right">' +
         netLine(probe) +
         '<div class="netstats">' +
@@ -7944,7 +7943,7 @@ function renderNet(d) {
 
   if (d.adapter) {
     html += '<div class="sub" style="margin:0 0 12px">' + esc(d.adapter.name) + " " +
-      '<span class="sub2">Link speed: ' + esc(d.adapter.speed) + "</span>" +
+      '<span class="sub2">Link speed: ' + esc(d.adapter.speed) + "</span> " +
       (d.adapter.wireless
         ? '<span class="flag warn">Wi-Fi</span>'
         : '<span class="flag">wired</span>') + "</div>";
@@ -8024,28 +8023,7 @@ document.addEventListener('keydown', event => {
 /* Three scene cards share the existing preference and plan-preview flow. */
 const INTENTS = ["competitive", "balanced", "quality"];
 
-/* Every card uses the backend's existing plan estimate, with a request snapshot
-   so a late response cannot overwrite estimates for newer settings. */
-let modeEstimateRevision = 0;
-let modeEstimateKey = "";
-function setBandFigures(plan) {
-  const body = requestBody();
-  const key = JSON.stringify({...body, intent: null});
-  const selected = document.querySelector('[data-mode-fps="' + plan.intent + '"]');
-  if (selected) homeNumber(selected, plan.estimated_fps);
-  if (key === modeEstimateKey) return;
-  const revision = ++modeEstimateRevision;
-  modeEstimateKey = key;
-  document.querySelectorAll('[data-mode-fps]').forEach(el => { el.textContent = "—"; });
-  INTENTS.forEach(async name => {
-    try {
-      const p = name === plan.intent ? plan : await api("/api/plan", {...body, intent: name});
-      if (revision !== modeEstimateRevision) return;
-      const el = document.querySelector('[data-mode-fps="' + name + '"]');
-      if (el) homeNumber(el, p.estimated_fps);
-    } catch (_) { if (revision === modeEstimateRevision) modeEstimateKey = ""; }
-  });
-}
+/* Every card uses the same settings preview; estimates stay internal. */
 function paintIntent(name) {
   if (!INTENTS.includes(name)) return;
   const cards = $("intents");
@@ -8092,6 +8070,65 @@ function chooseIntent(name, quiet) {
   paintIntent(intent);
 })();
 
+
+/* Read-only Apply verification; only server receipts supply the counts. */
+let verificationBusy = false, verificationRevision = 0, verificationDirty = false, verificationStarted = false;
+function renderVerification(result, animate = false) {
+  verificationStarted = true;
+  const box = $('verification');
+  box.classList.remove('reveal');
+  if (!result || !result.total) { box.hidden = true; return; }
+  box.hidden = false;
+  const selection = result.selection;
+  const chosen = selection ? requestBody() : {};
+  const selectionChanged = selection && Object.keys(selection).some(k => String(selection[k] ?? '') !== String(chosen[k] ?? ''));
+  const accountChanged = typeof currentAccount === 'function' && currentAccount() && String(currentAccount()) !== String(result.account);
+  const needsApply = verificationDirty || selectionChanged || accountChanged;
+  const complete = result.verified === result.total && !needsApply;
+  box.querySelector('.verify-tick').setAttribute('d', complete ? 'm10 16 4 4 8-9' : 'M16 10v8m0 3v1');
+  box.dataset.state = complete ? 'verified' : result.items.some(x => x.status === 'failed') ? 'failed' : 'changed';
+  $('verification-title').textContent = (complete ? 'Your PC is set: ' : needsApply ? 'Settings changed \u00b7 ' : 'Review settings: ') + result.verified + '/' + result.total + ' verified';
+  $('verification-time').textContent = 'Checked ' + new Date(result.checked_at * 1000).toLocaleString();
+  $('verification-context').textContent = (result.intent || 'Applied') + ' \u00b7 Account ' + (result.account || 'unknown') + ' \u00b7 Applied ' + new Date(result.applied_at * 1000).toLocaleString() + (result.storage_warning ? ' \u00b7 ' + result.storage_warning : '');
+  const labels = {verified:'Matches',changed:'Changed',failed:'Failed',not_checked:'Not checked'};
+  $('verification-list').innerHTML = result.items.map((item, i) => '<li class="verify-row" data-state="' + esc(item.status) + '" style="--i:' + i + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="' + (item.status === 'verified' ? 'm7 12 3 3 7-7' : item.status === 'failed' ? 'm8 8 8 8m0-8-8 8' : 'M12 6v7m0 3v2') + '"/></svg><span><b>' + esc(item.label) + '</b><small>' + esc(item.detail) + '</small></span><span>' + labels[item.status] + '</span></li>').join('');
+  if (animate) { box.open = true; void box.offsetWidth; box.classList.add('reveal'); }
+  renderApplyVerification();
+}
+function renderApplyVerification() {
+  const report = $('apply-verification'), box = $('verification');
+  if (!report || box.hidden) return;
+  report.dataset.state = box.dataset.state;
+  report.innerHTML = '<div class="verify-body"><div class="verify-head"><h2>Applied and verified</h2></div><p class="verify-summary" role="status">' + esc($('verification-title').textContent) + '</p><p class="sub">' + esc($('verification-time').textContent) + '</p><ul class="verification-list">' + $('verification-list').innerHTML + '</ul></div>';
+}
+async function refreshVerification() {
+  if (!verificationStarted || verificationBusy || document.hidden) return;
+  const revision = verificationRevision;
+  verificationBusy = true;
+  $('verify-again').disabled = true;
+  let timeout;
+  try {
+    const result = await Promise.race([
+      api('/api/verification'),
+      new Promise((_, reject) => { timeout = setTimeout(() => reject(new Error('Read-back timed out')), 8000); }),
+    ]);
+    if (revision === verificationRevision) renderVerification(result);
+  } catch (_) {
+    if (revision === verificationRevision && !$('verification').hidden) {
+      $('verification').dataset.state = 'changed';
+      $('verification-title').textContent = 'Not checked \u00b7 read-back unavailable';
+      $('verification-time').textContent = 'Last check could not be refreshed. Use Read again.';
+      renderApplyVerification();
+    }
+  } finally { clearTimeout(timeout); verificationBusy = false; $('verify-again').disabled = false; }
+}
+$('verify-again').addEventListener('click', refreshVerification);
+document.addEventListener('visibilitychange', () => {
+  document.documentElement.classList.toggle('verify-paused', document.hidden);
+  if (!document.hidden) refreshVerification();
+});
+setInterval(() => { if (!document.hidden && !$('verification').hidden) refreshVerification(); }, 15000);
+
 async function previewPlan() {
   busy("Building plan…");
   $("preview").disabled = true;
@@ -8103,12 +8140,21 @@ $("preview").addEventListener("click", previewPlan);
 
 $("apply").addEventListener("click", async () => {
   if (!planned) return;
-  if (!confirm("Apply the tier " + planned.tier + " / " + planned.intent +
+  if (!confirm("Apply the " + planned.intent +
                " profile?\n\nEverything changed is backed up first.")) return;
+  verificationRevision++;
+  verificationDirty = true;
+  if (!$('verification').hidden) {
+    $('verification-title').textContent = 'Applying and reading back…';
+    $('verification').dataset.state = 'changed';
+  }
   busy("Writing…");
   $("apply").disabled = true;
   try {
     const r = await api("/api/apply", requestBody());
+    verificationDirty = false;
+    verificationRevision++;
+    renderVerification(r.verification, true);
     settleChanges();          // written to disk; nothing left to answer for
     $("results").insertAdjacentHTML("afterbegin",
       '<section class="card"><h2>Written</h2>' +
@@ -8124,13 +8170,18 @@ $("apply").addEventListener("click", async () => {
           "</div></div>";
       }).join("") +
       (r.backup ? '<p class="sub">Backup ' + esc(r.backup) + " — use Undo last to revert.</p>" : "") +
-      "</section>");
+      '</section>');
+    $('apply-verification')?.remove();
+    $('results').insertAdjacentHTML('afterbegin', '<section id="apply-verification" class="verification reveal"></section>');
+    renderApplyVerification();
     // Never just "Applied." when part of it was not: that is how somebody
     // ends up believing a setting was written when it was stood down.
     const stood = r.skipped || [];
     if (stood.length) {
       status("Applied — but " + stood.map(x => esc(x.what)).join(" and ") +
              " could not be written yet. " + esc(stood[0].detail), true);
+    } else if (r.steps.some(s => !s.ok)) {
+      status('Applied with errors. Review the read-back checklist.', true);
     } else {
       status("Applied.");
     }
@@ -9766,8 +9817,8 @@ function renderFps() {
 
   if (say) {
     say.innerHTML = (now
-      ? "Everything is chosen to hold " + esc(now) + " fps."
-      : "Left blank, everything is chosen to clear your refresh rate.") +
+      ? "Settings target: " + esc(now) + " fps."
+      : "Use your refresh rate as the settings target.") +
       (fpsEffect ? ' <b class="fps-effect">' + fpsEffect + "</b>" : "");
   }
   if (!box) return;
@@ -12901,13 +12952,10 @@ function setupStepHTML(s) {
     ((d.sound || {}).error ? '<p class="setup-note warn">Sound devices could not be read. You can continue and choose them in Settings.</p>' : '<p class="setup-note">Windows defaults are selected for a new setup. Your saved choices are kept when you run setup again.</p>') + '</div></div>';
   if (step === "preset") return heading("TUNED FOR THIS PC", "Find your advantage.", "More frames, more detail, or a little of both. Choose how you want CS2 to feel.") +
     '<div class="setup-hardware" id="setup-hardware"></div><div class="setup-presets">' + (d.presets || []).map(p => {
-      const fps = p.fps !== null && p.fps !== undefined && Number.isFinite(Number(p.fps)) && Number(p.fps) >= 0;
-      const limit = /gpu/i.test(p.bottleneck || '') ? 'GPU' : /cpu/i.test(p.bottleneck || '') ? 'CPU' : '';
       return '<button type="button" class="setup-choice setup-preset" data-setup-preset="' + esc(p.id) + '" aria-pressed="' + (draft.preset === p.id) + '">' + setupTick() +
         '<svg viewBox="0 0 22 22" aria-hidden="true">' + (MODE_ART[p.id] || '') + '</svg><b>' + esc(p.id === 'quality' ? 'Visual' : p.label) + '</b>' +
-        (fps ? '<span class="setup-fps" aria-label="About ' + Number(p.fps) + ' FPS">~<span data-setup-fps="' + Number(p.fps) + '" aria-hidden="true">' + (setupReduced.matches ? Number(p.fps) : 0) + '</span><small aria-hidden="true">FPS</small></span>' : '<span class="setup-fps unavailable">Estimate unavailable</span>') +
-        '<p>' + esc(p.blurb) + '</p>' + (limit ? '<span class="setup-limit">Limited by ' + limit + '</span>' : '') + '</button>';
-    }).join('') + '</div><p class="setup-note">Estimated frames per second. Actual performance varies by map and what’s running.</p>';
+        '<p>' + esc({competitive:'Less detail. Clear sightlines.',balanced:'Clarity meets atmosphere.',quality:'Every detail. Every shadow.'}[p.id] || '') + '</p></button>';
+    }).join('') + '</div>';
   if (step === "region") return heading("OPTIONAL / YOUR SERVERS", "Lock to one server region.", "Choose one region to play in. Every other region is blocked for CS2 only. Change it any time in the overlay or the app.") +
     '<div class="setup-regions">' + [{id:null,label:'Keep all regions open',blurb:'No server region lock.'},...setupRegions(d)].map((r,i) =>
       '<button type="button" class="setup-choice setup-region setup-scan" style="--scan-index:' + i + '" data-setup-region="' + esc(r.id || '') + '" aria-pressed="' + (draft.region === r.id) + '">' + setupIcon(r.id ? 'globe' : 'shield') + setupTick() + '<b>' + esc(r.label || r.name) + '</b><p>' + esc(r.blurb || 'Play here. Block every other region for CS2.') + '</p></button>').join('') + '</div><p class="setup-note">Optional. Skip to leave your current region choice as it is.</p>';
@@ -12927,22 +12975,6 @@ function renderSetupHardware(s) {
   $('setup-hardware').innerHTML = scan && (scan.cpu || scan.gpu)
     ? [['CPU',scan.cpu && scan.cpu.name,'device'],['GPU',scan.gpu && scan.gpu.name,'gpu']].filter(x => x[1]).map(([kind,name,icon]) => '<span>' + hwIcon(kind) + esc(name) + '</span>').join('')
     : '<span>' + setupIcon('device') + (s.hardwareFailed ? 'Hardware details unavailable' : 'Reading your CPU and GPU…') + '</span>';
-}
-function setupCountFPS(s) {
-  cancelAnimationFrame(s.fpsFrame); clearTimeout(s.fpsEnd);
-  const numbers = [...$('setup-content').querySelectorAll('[data-setup-fps]')];
-  if (setupReduced.matches) { numbers.forEach(n => { n.textContent = n.dataset.setupFps; }); return; }
-  const start = performance.now();
-  const tick = now => {
-    if (!setupAlive(s) || setupCurrentStep(s) !== 'preset') return;
-    if (document.hidden) { numbers.forEach(n => { n.textContent = n.dataset.setupFps; }); return; }
-    const t = Math.min(1,(now-start)/720), ease = 1-Math.pow(1-t,3);
-    numbers.forEach(n => { n.textContent = Math.round(Number(n.dataset.setupFps)*ease); });
-    if (t < 1) s.fpsFrame = requestAnimationFrame(tick);
-  };
-  s.fpsFrame = requestAnimationFrame(tick);
-  // Settle even when the host throttles animation frames during a resize.
-  s.fpsEnd = setTimeout(() => { if (setupAlive(s) && setupCurrentStep(s) === 'preset') { cancelAnimationFrame(s.fpsFrame); numbers.forEach(n => { n.textContent = n.dataset.setupFps; }); } },760);
 }
 function renderSetup(s, focus = true) {
   if (!setupAlive(s)) return;
@@ -12966,7 +12998,7 @@ function renderSetup(s, focus = true) {
     if ((s.data.cloud || {}).signed_in && !(s.data.cloud || {}).needs_steam && !s.synced && !s.syncBusy && !s.syncError) setupSync(s);
   }
   if (step === 'preset') {
-    renderSetupHardware(s); setupCountFPS(s);
+    renderSetupHardware(s);
     if (!lastScan && !s.hardwareJob) s.hardwareJob = api('/api/scan').then(scan => { lastScan = scan; renderSetupHardware(s); }).catch(() => { s.hardwareFailed = true; renderSetupHardware(s); });
   }
   content.querySelectorAll('[data-setup-app-icon]').forEach(img => {
@@ -13356,37 +13388,11 @@ function renderMachine() {
   const parts = wgData && wgData.parts;
   if (parts && parts.cpu && parts.gpu) {
     const cpu = parts.cpu, gpu = parts.gpu;
-    const total = (cpu.ceiling || 0) + (gpu.ceiling || 0);
-    const share = total ? Math.round((cpu.ceiling / total) * 100) : 50;
-    const limit = !cpu.ceiling || !gpu.ceiling ? ""
-      : cpu.ceiling < gpu.ceiling ? "the processor runs out first"
-      : gpu.ceiling < cpu.ceiling ? "the graphics card runs out first"
-      : "evenly matched";
     const chip = hwIcon('cpu');
     const card = hwIcon('gpu');
 
-    html +=
-      '<div class="parts">' +
-        '<span class="part cpu"><span class="part-ic">' + chip + "</span>" +
-          '<span class="part-txt">' +
-          '<span class="part-name" title="' + esc(cpu.name) + '">' +
-            esc(shortPart(cpu.name)) + "</span>" +
-          '<span class="part-sub">' + esc(cpu.detail || "") + "</span>" +
-          '<span class="part-fps">' + (cpu.ceiling || "—") +
-            " <span>FPS</span></span></span></span>" +
-
-        '<span class="part-vs"><b>LIMIT</b>' +
-          '<span class="part-bar"><i style="width:' + share + '%"></i></span>' +
-          "<small>" + esc(limit) + "</small></span>" +
-
-        '<span class="part gpu"><span class="part-ic">' + card + "</span>" +
-          '<span class="part-txt">' +
-          '<span class="part-name" title="' + esc(gpu.name) + '">' +
-            esc(shortPart(gpu.name)) + "</span>" +
-          '<span class="part-sub">' + esc(gpu.detail || "") + "</span>" +
-          '<span class="part-fps">' + (gpu.ceiling || "—") +
-            " <span>FPS</span></span></span></span>" +
-      "</div>";
+    html += '<div class="parts">' + [cpu,gpu].map((part,i) =>
+      '<span class="part ' + (i ? 'gpu' : 'cpu') + '"><span class="part-ic">' + (i ? card : chip) + '</span><span class="part-txt"><span class="part-name" title="' + esc(part.name) + '">' + esc(shortPart(part.name)) + '</span><span class="part-sub">' + esc(part.detail || '') + '</span></span></span>').join('') + '</div>';
   }
 
   html +=

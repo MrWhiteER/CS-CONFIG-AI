@@ -122,7 +122,7 @@ async function suite() {
   check('Windows sound defaults preselected',$('setup-audio-output').value==='out-headset'&&$('setup-audio-input').value==='in-mic');
   await move(true);await sleep(800);
   check('hardware chips reuse scan data',$('setup-hardware').textContent.includes('RTX 4070')&&$('setup-hardware').textContent.includes('i7-13700K'));
-  check('FPS counters reach backend estimates',[...document.querySelectorAll('[data-setup-fps]')].every(n=>n.textContent===n.dataset.setupFps));
+  check('preset cards do not display estimates',!document.querySelector('[data-setup-fps]'));
   check('Visual maps to quality id',document.querySelector('[data-setup-preset="quality"] b').textContent==='Visual');
   tap('[data-setup-preset="competitive"]');await move();
   check('companion defaults match this PC',[...document.querySelectorAll('[data-setup-app]:checked')].map(n=>n.dataset.setupApp).join(',')==='discord,faceit-client');
@@ -199,7 +199,7 @@ async function suite() {
   reset();response.cfg={path:'',writable:false,reason:'CS2 was not found on this PC'};response.apps=[];response.sound={error:'No audio stack'};response.presets[2].fps=null;
   await openSetupWizard({step:'permission'});check('unwritable folder explains reason and permits continuing',$('setup-content').textContent.includes('CS2 was not found')&&!$('setup-next').disabled);
   await move(true);check('missing audio remains usable',$('setup-content').textContent.includes('could not be read')&&$('setup-audio-output').value==='');
-  await move(true);check('missing FPS never shows invented zero',document.querySelector('[data-setup-preset="quality"]').textContent.includes('Estimate unavailable'));
+  await move(true);check('preset choice remains available without an estimate',!!document.querySelector('[data-setup-preset="quality"]'));
   await move(true);check('empty companion list has recovery copy',$('setup-content').textContent.includes('No companion apps found on this PC'));
   await close();
   reset();await openSetupWizard({step:'preset'});tap('[data-setup-preset="quality"]');failures['/api/firstrun/finish']='Save failed';await close();
@@ -240,7 +240,7 @@ async function suite() {
   }
   await openSetupWizard({step:'theme'});applyTheme('violet');
   const reduced=setupReduced.matches;
-  if (reduced) { await openSetupWizard({step:'preset'});check('reduced motion skips FPS countups',[...document.querySelectorAll('[data-setup-fps]')].every(n=>n.textContent===n.dataset.setupFps));check('reduced motion removes particles',getComputedStyle(document.querySelector('.setup-particles')).display==='none'); }
+  if (reduced) { await openSetupWizard({step:'preset'});check('reduced motion has no FPS countups',!document.querySelector('[data-setup-fps]'));check('reduced motion removes particles',getComputedStyle(document.querySelector('.setup-particles')).display==='none'); }
   await close();
   let created=false, made=0;async function checkStarter(){return {ok:true,complete:false,present:[],autoexec:false}}async function makeStarter(){made++;return {ok:true}}
   async function starterAfterSetup(){${source.match(/await startup.run\("starter", async \(\) => \{([\s\S]*?)\n      \}\);/)[1]}}

@@ -14,6 +14,8 @@ code+=slice('let wgData = null;','document.addEventListener("click", async e => 
 code+=slice('const CHIPS = { CPU:', '// -- 2. the gradient');
 code+=slice('/* Launcher motion:','function renderPlan(');
 code+=slice('/* Every card uses','async function previewPlan()');
+code+=`let fpsEffect='';function renderFps(){}function markPending(){};`;
+code+=slice('function renderPlan(', '// The last detection,');
 code+=slice('let netTimer = null;', '/* Three scene cards');
 code+=`const prefsReady=false,startup={finished:false};function moveSegThumb(){};`;
 code+=slice('let settingsSub = "apply";', '/* ---------------------------------------------------------------------------\n   Sound devices');
@@ -48,11 +50,10 @@ $('hardware-temperature').click();check('temperature toggle uses Celsius scale',
 $('hardware-temperature').click();hardwareClearCursor();
 const cpu=history.cpu;history.cpu=[10,null,40];hardwareUpdate({at:104,history,gpu:{}});check('missing samples split geometry',$('hardware-chart').querySelector('[data-hardware="cpu"] .hardware-line').getAttribute('d').split('M').length===3);history.cpu=cpu;
 hardwareUpdate({at:106,history,gpu:{temperature:57}});hardwarePause();homeMotion.reduced=userMotion;
-setBandFigures({intent:'competitive',estimated_fps:410});await new Promise(r=>setTimeout(r,30));check('all mode estimates use backend result',Array.from(document.querySelectorAll('[data-mode-fps]')).every(el=>homeMotion.jobs.has(el)||Number(el.textContent)>0));
+check('mode cards have no performance promises',!document.querySelector('[data-mode-fps]')&&!$('intents').textContent.includes('EST. FPS'));
 $('history-stats').innerHTML='<div class="stat"><b>16</b><span>sessions</span></div><div class="stat"><b>5.5</b><span>hours played</span></div><div class="stat"><b>7.41s</b><span>alt-tab back</span></div>';
 renderHardware({cpu:{name:'Intel Core i9-12900K',cores:16,threads:24},gpu:{name:'NVIDIA GeForce RTX 3090 Ti',vram_gb:24,driver:'621.01'},ram_gb:32,ram_speed:6000,displays:[{width:2560,height:1440,refresh:240,primary:true,confident:true}],power_plan:'Balanced'});
-$('assessment-out').innerHTML='<div class="assess"><div class="subcat">Assessment</div><div class="stats"><div class="stat"><b>A</b><span>tier</span></div><div class="stat"><b>~410</b><span>est. fps</span></div><div class="stat"><b>1.7—</b><span>of 240 Hz</span></div><div class="stat"><b>CPU</b><span>limited by</span></div></div></div>';
-$('assessment-out').innerHTML=$('assessment-out').innerHTML.replace('<b>CPU</b>','<b>'+hwIcon('cpu')+'</b>');
+$('assessment-out').innerHTML='<div class="assess">Selected settings ? Competitive</div>';
 homeFrame(performance.now()+2200);check('gauge reaches its target',node.querySelector('.val').textContent==='80');check('smooth combined area chart',$('hardware-chart').querySelector('.hardware-line').getAttribute('d').includes(' C'));
 const errors=[...document.images].filter(i=>i.getAttribute('src')&&(!i.complete||!i.naturalWidth));check('all home image assets load',errors.length===0);
 check('no horizontal overflow',document.documentElement.scrollWidth<=innerWidth);
@@ -96,6 +97,8 @@ let calls=[];netApi=async route=>{calls.push(route);return route.endsWith('/star
 const job=runNetCheck();check('duplicate tests share one job',job===runNetCheck());check('re-test disabled while measuring',$('net-run').disabled);await job;
 check('startup job waits for polling result',calls.join(',')==='/api/net/start,/api/net'&&netData.done&&netJob===null);
 check('speed and ping chip uses actual result',$('net-summary').textContent==='1 Gbps · 18 ms');
+check('adapter has whitespace before wired',$('net-out').textContent.includes('1 Gbps wired'));
+check('router dial uses same average as stats',$('net-out').querySelector('.pingdial-num').textContent==='1');
 check('details retain diagnostics',['Your router','The internet','jitter','% loss','Steady connection','Link speed'].every(t=>$('net-out').textContent.includes(t)));
 $('chip-net').click();check('chip opens details',$('chip-net').getAttribute('aria-expanded')==='true'&&!$('net-card').hidden);
 const popup=$('net-card').getBoundingClientRect();check('details fit viewport',popup.left>=0&&popup.right<=innerWidth&&popup.bottom<=innerHeight);
@@ -108,8 +111,37 @@ netApi=()=>new Promise(()=>{});await runNetCheck();check('hung request times out
 renderNet({done:true,internet:{reachable:false},adapter:null});check('offline readings are unknown not zero',$('net-summary').textContent==='— · — ms');
 netApi=async()=>measured;await runNetCheck();check('re-test recovers after failure',$('net-summary').textContent==='1 Gbps · 18 ms'&&!$('net-run').disabled);
 for(const theme of ${JSON.stringify(themes)}){document.documentElement.dataset.theme=theme;$('chip-net').click();check('connection works in theme '+theme,getComputedStyle($('net-card')).display!=='none'&&getComputedStyle($('chip-net')).color!=='transparent');closeNetDetails()}delete document.documentElement.dataset.theme;
+const receipt={total:6,verified:6,checked_at:1794739320,applied_at:1794739300,account:'42',intent:'balanced',items:['CS2 video settings','Config files','Autoexec link','Steam launch options','Launch options reference','Display scaling'].map(label=>({label,status:'verified',detail:'Matches the applied value'})).concat(['NVIDIA profile','Windows power','Windows graphics'].map(label=>({label,status:'not_checked',detail:'Not checked - not written by this Apply.',counted:false})))};
+await refreshVerification();check('read-back waits for gated startup',!verificationStarted&&!verificationBusy);
+renderVerification({total:0,items:[]});check('no receipt never claims success',$('verification').hidden);
+renderVerification(receipt,true);check('badge uses verified count and time',$('verification-title').textContent==='Your PC is set: 6/6 verified'&&$('verification-time').textContent.startsWith('Checked'));
+$('results').insertAdjacentHTML('afterbegin','<section id="apply-verification" class="verification reveal"></section>');renderApplyVerification();
+check('Apply results show the same read-back checklist',$('apply-verification').querySelectorAll('.verify-row').length===9&&$('apply-verification').textContent.includes('6/6 verified'));
+check('apply reveals accessible checklist',$('verification').open&&$('verification-list').children.length===9&&$('verification-title').getAttribute('role')==='status');
+check('unwritten items visibly remain not checked',$('verification').querySelectorAll('.verify-row[data-state="not_checked"]').length===3);
+renderVerification({...receipt,verified:4,items:receipt.items.map((item,i)=>({...item,status:i===0?'changed':i===1?'failed':item.status,detail:i===0?'CS2 changed this value after Apply. Close CS2 and apply again.':i===1?'Config write failed: access denied.':item.detail}))});
+check('partial result cannot claim PC set',$('verification').dataset.state==='failed'&&$('verification-title').textContent==='Review settings: 4/6 verified');
+check('partial result updates Apply checklist too',$('apply-verification').dataset.state==='failed'&&$('apply-verification').textContent.includes('4/6 verified'));
+verificationDirty=true;renderVerification(receipt);check('pending edits invalidate badge',$('verification-title').textContent.startsWith('Settings changed'));verificationDirty=false;
+renderVerification({...receipt,selection:{intent:'quality'}});check('saved selection changes invalidate receipt after reload',$('verification-title').textContent.startsWith('Settings changed'));
+renderVerification(receipt);
+api=async()=>{throw Error('offline')};await refreshVerification();check('read failure invalidates green badge',$('verification-title').textContent.startsWith('Not checked')&&$('verification').dataset.state==='changed');
+api=()=>new Promise(()=>{});await refreshVerification();check('hung read-back settles and enables retry',!verificationBusy&&!$('verify-again').disabled&&$('verification-title').textContent.startsWith('Not checked'));
+api=async()=>receipt;await refreshVerification();check('read again restores actual result',$('verification-title').textContent==='Your PC is set: 6/6 verified'&&!$('verify-again').disabled);
+renderVerification({...receipt,items:[{label:'<unsafe>',detail:'<img src=x>',status:'failed'}]});check('read-back escapes file and error text',!$('verification-list').querySelector('img')&&$('verification-list').textContent.includes('<unsafe>'));
+renderVerification(receipt,true);
+if(matchMedia('(prefers-reduced-motion: reduce)').matches)check('reduced motion disables checklist reveal',getComputedStyle(document.querySelector('.verify-row')).animationName==='none');
+Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));check('background pauses read-back animation',document.documentElement.classList.contains('verify-paused'));delete document.hidden;document.dispatchEvent(new Event('visibilitychange'));await Promise.resolve();await Promise.resolve();
+for(const theme of ${JSON.stringify(themes)}){document.documentElement.dataset.theme=theme;check('verification readable in '+theme,getComputedStyle($('verification-title')).color!==getComputedStyle($('verification')).backgroundColor);}delete document.documentElement.dataset.theme;
+renderPlan({intent:'balanced',tier:'S',headroom:5.7,estimated_fps:342,settings:[{name:'GPU level',after:'High',changed:true,reason:'Tier S headroom'}],launch_current:'',launch_new:'',launch_added:[],launch_removed:[],advisories:[{title:'Estimated 342 fps',detail:'Tier S',level:'warn'}],changed_count:1});
+check('plan keeps settings without estimates',!/(342|headroom|Tier S)/.test($('results').textContent+$('assessment-out').textContent)&&$('results').textContent.includes('GPU level'));
+check('Machine has no estimated FPS',!$('machine-out').textContent.includes('FPS')&&!$('machine-out').querySelector('.part-vs'));
+renderVerification(receipt);$('verification').open=location.hash.includes('verification');
+if(location.hash.includes('changed')){renderVerification({...receipt,verified:4,items:receipt.items.map((item,i)=>({...item,status:i===0?'changed':i===1?'failed':item.status,detail:i===0?'CS2 changed this value after Apply. Close CS2 and apply again.':i===1?'Config write failed: access denied.':item.detail}))},true);api=async()=>({...receipt,verified:4,items:receipt.items.map((item,i)=>({...item,status:i===0?'changed':i===1?'failed':item.status,detail:i===0?'CS2 changed this value after Apply. Close CS2 and apply again.':i===1?'Config write failed: access denied.':item.detail}))})}
 $('status').remove();document.querySelector('.scroll').scrollTop=0;
+if(location.hash.includes('verification'))$('verification').scrollIntoView({block:'start'});
 if(location.hash.includes('this-pc')){document.querySelector('[data-panel="launcher"]').classList.add('hidden');document.querySelector('[data-panel="settings"]').classList.remove('hidden');setSettingsSub('this-pc',true)}
+if(location.hash.includes('settings-apply')){document.querySelector('[data-panel="launcher"]').classList.add('hidden');document.querySelector('[data-panel="settings"]').classList.remove('hidden');setSettingsSub('apply',true)}
 if(location.hash.includes('connection'))$('chip-net').click();
 if(location.hash.includes('system')){$('live-card').scrollIntoView({block:'start'});hardwareInspect(400)}
 if(location.hash.includes('sound')){const card=$('audio-card');document.querySelector('.scroll').replaceChildren(card);card.scrollIntoView()}

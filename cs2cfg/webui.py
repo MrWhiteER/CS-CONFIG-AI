@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from urllib.parse import parse_qs
 
-from . import __version__, backup, cfglang, emit, profiles, steam, window
+from . import __version__, backup, cfglang, emit, profiles, steam, window, verification
 from .hardware import Machine, ProbeError, detect
 from .kb import KnowledgeBase
 from .profile import build_profile, plan_launch_options
@@ -55,6 +55,9 @@ class State:
     """
 
     def __init__(self, cfg_folder: str, cfg_name: str) -> None:
+        from .paths import user_data_dir
+        self.verification_path = user_data_dir() / "applied-verification.json"
+        self.verification_receipt = verification.load(self.verification_path)
         self.token = secrets.token_urlsafe(24)
         self.kb = KnowledgeBase()
         self.cfg_folder = cfg_folder
@@ -229,17 +232,82 @@ def _scaling_step() -> Dict[str, Any]:
     except Exception as exc:                # never fail an apply over this
         return {"ok": False, "what": what, "detail": str(exc)}
 
+    expected = {"display_id": result.get("display_id"),
+                "expected": result.get("scaling", scaling.PREFERRED)}
     if result.get("already"):
         return {"ok": True, "what": what,
+                "verification": expected,
                 "detail": "already full-screen; a stretched mode fills the panel"}
     if not result.get("ok"):
         return {"ok": False, "what": what,
                 "detail": result.get("error", "could not be read")}
     if not result.get("changed"):
-        return {"ok": True, "what": what, "detail": result.get("note", "unchanged")}
+        return {"ok": True, "what": what, "verification": expected,
+                "detail": result.get("note", "unchanged")}
     return {"ok": True, "what": what,
+            "verification": expected,
             "detail": f"{result.get('was', 'letterboxed')} -> full-screen, "
                       f"so a stretched resolution has no black bars down the sides"}
+
+
+def _record_verification(state, user, profile, launch, body, steps, generated=None):
+    """Record intended values, never infer success from the write response."""
+    checks = []
+    by_name = {s["what"]: s for s in steps}
+    generated = generated or {}
+
+    def add(label, what, **spec):
+        step = by_name.get(what)
+        if step and step.get("skipped"):
+            spec = {"kind": "unavailable", "detail": "Not written: " + step["detail"]}
+        elif step and not step["ok"]:
+            spec["failed"] = step["detail"]
+        checks.append({"label": label, **spec})
+
+    if body.get("write_video", True):
+        for key, value in sorted(profile.video.items()):
+            add("CS2 · " + state.kb.ui_name(key), "cs2_video.txt", kind="video",
+                user=str(user.path), key=key, expected=str(value))
+    if body.get("write_cfg", True) and state.cs2_install:
+        root = steam.cfg_dir(state.cs2_install) / state.cfg_folder
+        add(state.cfg_name, state.cfg_name, kind="text", path=str(root / state.cfg_name),
+            expected=generated[state.cfg_name])
+        add("Launch options reference", "launch_options_generated.txt", kind="text",
+            path=str(root / "launch_options_generated.txt"),
+            expected=generated["launch_options_generated.txt"])
+        if body.get("link_autoexec"):
+            add("Autoexec link", "autoexec.vcfg", kind="exec", path=str(root / "autoexec.vcfg"),
+                expected=f"{state.cfg_folder}/{state.cfg_name}")
+    elif body.get("write_cfg", True):
+        checks.append({"label": "Config files", "kind": "unavailable",
+                       "detail": "Not written: CS2 install was not found."})
+    if body.get("write_launch", True):
+        add("Steam launch options", "Steam launch options", kind="launch",
+            user=str(user.path), expected=launch.line)
+    if body.get("fix_scaling", True):
+        add("Display scaling", "Display scaling", kind="scaling",
+            **by_name.get("Display scaling", {}).get("verification", {}))
+    for label in ("NVIDIA profile", "Windows power", "Windows graphics"):
+        checks.append({"label": label, "kind": "unavailable", "counted": False,
+                       "detail": "Not checked — not written by this Apply."})
+    receipt = {"checks": checks, "account": user.account_id,
+               "intent": profile.intent, "applied_at": time.time(),
+               "selection": {"intent": profile.intent,
+                             "target_fps": body.get("target_fps") or None,
+                             "load_bias": body.get("load_bias") or "auto",
+                             "hide_crosshair": bool(body.get("hide_crosshair"))}}
+    state.verification_receipt = receipt
+    result = verification.check(receipt)
+    try:
+        verification.save(state.verification_path, receipt)
+    except OSError:
+        receipt["storage_warning"] = "Receipt could not be saved; available for this session only."
+        result["storage_warning"] = receipt["storage_warning"]
+    return result
+
+
+def _verification(state):
+    return verification.check(state.verification_receipt)
 
 
 def _apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -247,6 +315,7 @@ def _apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     user = state.user_for(body.get("account"))
     kb = state.kb
     steps = []
+    generated = {}
 
     target = body.get("target_fps")
     profile = build_profile(
@@ -308,33 +377,39 @@ def _apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
             diff = steam.write_video_cfg(user, profile.video, session)
             steps.append({"ok": True, "what": "cs2_video.txt",
                           "detail": f"{len(diff)} setting(s) changed"})
-        except steam.SteamError as exc:
+        except (steam.SteamError, OSError) as exc:
             steps.append({"ok": False, "what": "cs2_video.txt", "detail": str(exc)})
 
     if body.get("write_cfg", True) and state.cs2_install:
         root = steam.cfg_dir(state.cs2_install)
         target_path = root / state.cfg_folder / state.cfg_name
-        emit.write_text_file(target_path, emit.render_cfg(profile, kb, state.cfg_name), session)
-        steps.append({"ok": True, "what": state.cfg_name, "detail": str(target_path)})
-
         notes = root / state.cfg_folder / "launch_options_generated.txt"
-        emit.write_text_file(
-            notes, emit.render_launch_notes(profile, launch.line, launch.removed, launch.added), session
-        )
-        steps.append({"ok": True, "what": "launch_options_generated.txt", "detail": str(notes)})
+        for path, content in (
+            (target_path, emit.render_cfg(profile, kb, state.cfg_name)),
+            (notes, emit.render_launch_notes(profile, launch.line, launch.removed, launch.added)),
+        ):
+            generated[path.name] = content
+            try:
+                emit.write_text_file(path, content, session)
+                steps.append({"ok": True, "what": path.name, "detail": str(path)})
+            except OSError as exc:
+                steps.append({"ok": False, "what": path.name, "detail": str(exc)})
 
         if body.get("link_autoexec"):
-            result = emit.ensure_exec_line(
-                root / state.cfg_folder / "autoexec.vcfg",
-                f"{state.cfg_folder}/{state.cfg_name}", session
-            )
-            steps.append({"ok": True, "what": "autoexec.vcfg", "detail": result})
+            try:
+                result = emit.ensure_exec_line(
+                    root / state.cfg_folder / "autoexec.vcfg",
+                    f"{state.cfg_folder}/{state.cfg_name}", session
+                )
+                steps.append({"ok": True, "what": "autoexec.vcfg", "detail": result})
+            except OSError as exc:
+                steps.append({"ok": False, "what": "autoexec.vcfg", "detail": str(exc)})
 
     if write_launch:
         try:
             action = steam.write_launch_options(user, launch.line, session)
             steps.append({"ok": True, "what": "Steam launch options", "detail": action})
-        except steam.SteamError as exc:
+        except (steam.SteamError, OSError) as exc:
             steps.append({"ok": False, "what": "Steam launch options", "detail": str(exc)})
 
     if body.get("fix_scaling", True):
@@ -346,7 +421,8 @@ def _apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         steps.append({"ok": False, "skipped": True, **stood_down})
 
     backup.prune()
-    return {"ok": True, "steps": steps, "skipped": skipped,
+    verified = _record_verification(state, user, profile, launch, body, steps, generated)
+    return {"ok": True, "steps": steps, "skipped": skipped, "verification": verified,
             "backup": None if session.empty else session.stamp}
 
 
@@ -4993,6 +5069,11 @@ def make_handler(state: State):
                         self._send_json({"ok": True, **_machine_payload(state.machine, state)})
                 except (ProbeError, steam.SteamError) as exc:
                     self._send_json({"ok": False, "error": str(exc)}, 500)
+                return
+
+            if path == "/api/verification":
+                with state.lock:
+                    self._send_json(_verification(state))
                 return
 
             if path == "/api/servers/ping":
