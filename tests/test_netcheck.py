@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import sys
 import unittest
+import threading
+import itertools
 from pathlib import Path
 from unittest import mock
 
@@ -250,6 +252,176 @@ class WatchingItHappen(unittest.TestCase):
         self.assertTrue(found["ok"])
         self.assertFalse(found["running"])
         self.assertTrue(found.get("idle"))
+
+
+
+class DownloadMeasurement(unittest.TestCase):
+    """All HTTP and clocks are mocked; these tests never contact the internet."""
+
+    def measure(self, response=None, failure=None):
+        connection = mock.MagicMock()
+        reply = connection.getresponse.return_value
+        reply.status = 200
+        reply.getheader.return_value = "identity"
+        reply.read1.side_effect = lambda count: b"x" * count
+        if response:
+            response(reply)
+        if failure:
+            connection.connect.side_effect = failure
+        with mock.patch.object(netcheck.http.client, "HTTPSConnection", return_value=connection), \
+             mock.patch.object(netcheck, "DOWNLOAD_BYTES", 128_000), \
+             mock.patch.object(netcheck.time, "monotonic", side_effect=itertools.chain([0], itertools.repeat(.5))):
+            result = netcheck.download_speed()
+        return result, connection, reply
+
+    def test_measured_mbps_and_hard_byte_limit(self):
+        result, connection, reply = self.measure()
+        self.assertEqual(result["bytes"], 128_000)
+        self.assertEqual(result["seconds"], .5)
+        self.assertEqual(result["mbps"], 2.05)
+        self.assertEqual([c.args[0] for c in reply.read1.call_args_list], [65536, 62464])
+        reply.close.assert_called_once()
+        self.assertTrue(connection.close.called)
+
+    def test_request_has_no_identity_or_account_headers(self):
+        _, connection, _ = self.measure()
+        self.assertEqual(connection.request.call_args.args, ("GET", "/__down?bytes=128000"))
+        self.assertEqual(connection.request.call_args.kwargs["headers"], {
+            "User-Agent": "Mozilla/5.0", "Accept-Encoding": "identity",
+            "Cache-Control": "no-cache", "Connection": "close"})
+
+    def test_offline_is_unknown(self):
+        result, connection, _ = self.measure(failure=OSError("offline"))
+        self.assertIsNone(result["mbps"])
+        self.assertTrue(result["error"])
+        connection.request.assert_not_called()
+
+    def test_transport_timeout_without_bytes_is_unknown(self):
+        result, _, _ = self.measure(failure=TimeoutError("timed out"))
+        self.assertIsNone(result["mbps"])
+        self.assertEqual(result["bytes"], 0)
+
+    def test_worker_start_failure_is_unknown(self):
+        with mock.patch.object(netcheck.http.client, "HTTPSConnection"), \
+             mock.patch.object(netcheck.threading.Thread, "start", side_effect=RuntimeError("no thread")):
+            self.assertIsNone(netcheck.download_speed()["mbps"])
+
+    def test_redirect_and_http_failures_are_not_download_results(self):
+        for status in [302, 403, 429, 500]:
+            with self.subTest(status=status):
+                result, _, reply = self.measure(lambda r: setattr(r, "status", status))
+                self.assertIsNone(result["mbps"])
+                reply.read1.assert_not_called()
+
+    def test_compressed_response_is_unknown(self):
+        result, _, reply = self.measure(lambda r: setattr(r.getheader, "return_value", "gzip"))
+        self.assertIsNone(result["mbps"])
+        reply.read1.assert_not_called()
+
+    def test_empty_or_truncated_response_is_unknown(self):
+        for chunks in [[b""], [b"short", b""]]:
+            with self.subTest(chunks=chunks):
+                result, _, _ = self.measure(lambda r: setattr(r.read1, "side_effect", chunks))
+                self.assertIsNone(result["mbps"])
+
+    def test_read_failure_is_unknown_and_closed(self):
+        result, connection, reply = self.measure(lambda r: setattr(r.read1, "side_effect", OSError("lost")))
+        self.assertIsNone(result["mbps"])
+        reply.close.assert_called_once()
+        self.assertTrue(connection.close.called)
+
+    def test_dns_stall_returns_and_never_sends_a_late_request(self):
+        release, exited = threading.Event(), threading.Event()
+        connection = mock.MagicMock()
+        def connect():
+            release.wait(2)
+            exited.set()
+        connection.connect.side_effect = connect
+        with mock.patch.object(netcheck.http.client, "HTTPSConnection", return_value=connection), \
+             mock.patch.object(netcheck, "DOWNLOAD_SECONDS", .03):
+            try:
+                result = netcheck.download_speed()
+                self.assertIsNone(result["mbps"])
+                self.assertFalse(release.is_set())
+            finally:
+                release.set()
+                self.assertTrue(exited.wait(1))
+        connection.request.assert_not_called()
+
+    def test_deadline_returns_partial_sample_and_stops_stream(self):
+        release, entered, closed = threading.Event(), threading.Event(), threading.Event()
+        connection = mock.MagicMock()
+        reply = connection.getresponse.return_value
+        reply.status = 200
+        reply.getheader.return_value = "identity"
+        reply.close.side_effect = closed.set
+        calls = []
+        def read(count):
+            calls.append(count)
+            if len(calls) == 1:
+                return b"x" * count
+            entered.set()
+            release.wait(2)
+            return b""
+        reply.read1.side_effect = read
+        with mock.patch.object(netcheck.http.client, "HTTPSConnection", return_value=connection), \
+             mock.patch.object(netcheck, "DOWNLOAD_SECONDS", .1):
+            try:
+                result = netcheck.download_speed()
+                self.assertTrue(entered.is_set())
+                self.assertEqual(result["bytes"], 65536)
+                self.assertEqual(result["mbps"], 5.24)
+                connection.sock.shutdown.assert_called_once()
+            finally:
+                release.set()
+                self.assertTrue(closed.wait(1))
+
+    def test_snapshot_does_not_expose_mutable_result(self):
+        run = netcheck.Run()
+        self.assertIsNone(run.snapshot()["download"])
+        run.download = {"mbps": 125, "error": ""}
+        snapshot = run.snapshot()
+        snapshot["download"]["mbps"] = 1
+        self.assertEqual(run.download["mbps"], 125)
+
+    def test_download_runs_in_job_before_latency_probes(self):
+        run = netcheck.Run(samples=4)
+        events = []
+        class InlineThread:
+            def __init__(self, target, args=(), **kwargs):
+                self.target, self.args = target, args
+            def start(self):
+                self.target(*self.args)
+            def join(self):
+                pass
+        def download():
+            events.append("download")
+            return {"mbps": None, "error": "offline"}
+        with mock.patch.object(sys, "platform", "win32"), \
+             mock.patch.object(netcheck.threading, "Thread", InlineThread), \
+             mock.patch.object(netcheck, "download_speed", side_effect=download), \
+             mock.patch.object(netcheck, "adapter", return_value=None), \
+             mock.patch.object(netcheck, "gateway_address", return_value=""), \
+             mock.patch.object(run, "_sweep", side_effect=lambda *a: events.append("ping")), \
+             mock.patch.object(run, "_finish_serialized"):
+            self.assertTrue(run._begin())
+        self.assertEqual(events, ["download", "ping"])
+        self.assertIsNone(run.snapshot()["download"]["mbps"])
+
+    def test_start_is_nonblocking_deduplicated_and_retest_creates_new_run(self):
+        with mock.patch.object(netcheck, "_run_now", None), \
+             mock.patch.object(netcheck.Run, "begin") as begin:
+            netcheck.start()
+            first = netcheck._run_now
+            netcheck.start()
+            self.assertIs(netcheck._run_now, first)
+            begin.assert_called_once()
+            first.download = {"mbps": 123}
+            first.done = True
+            netcheck.start()
+            self.assertIsNot(netcheck._run_now, first)
+            self.assertIsNone(netcheck.progress()["download"])
+            self.assertEqual(begin.call_count, 2)
 
 
 if __name__ == "__main__":

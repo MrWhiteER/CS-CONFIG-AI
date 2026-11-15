@@ -99,14 +99,14 @@ check('Detected moved exclusively into This PC',!!$('hw-card').closest('[data-su
 check('connection card removed from Play',!document.querySelector('[data-panel="launcher"] #net-card'));
 setSettingsSub('this-pc',true);check('This PC navigation reveals hardware',!$('hw-card').closest('.subpane').classList.contains('hidden')&&document.querySelector('[data-sub="this-pc"][role="tab"]').getAttribute('aria-selected')==='true');setSettingsSub('apply',true);
 const probe={label:'The internet',host:'1.1.1.1',sent:20,received:20,reachable:true,average:18,jitter:2,loss:0,times:[17,18,19],misses:[]};
-const measured={done:true,running:false,adapter:{name:'Ethernet',speed:'1 Gbps',wireless:false},internet:probe,gateway:{...probe,label:'Your router',host:'192.168.1.1',average:1},findings:[{severity:'good',title:'Steady connection',detail:'No packets lost.'}]};
+const measured={done:true,running:false,adapter:{name:'Ethernet',speed:'1 Gbps',wireless:false},download:{mbps:245.3,bytes:25000000,seconds:.815,error:''},internet:probe,gateway:{...probe,label:'Your router',host:'192.168.1.1',average:1},findings:[{severity:'good',title:'Steady connection',detail:'No packets lost.'}]};
 let calls=[];netApi=async route=>{calls.push(route);return route.endsWith('/start')?{...measured,done:false,running:true}:measured};
 const job=runNetCheck();check('duplicate tests share one job',job===runNetCheck());check('re-test disabled while measuring',$('net-run').disabled);await job;
 check('startup job waits for polling result',calls.join(',')==='/api/net/start,/api/net'&&netData.done&&netJob===null);
-check('speed and ping chip uses actual result',$('net-summary').textContent==='1 Gbps · 18 ms');
+check('speed and ping chip uses actual download result',$('net-summary').textContent==='245.3 Mbps · 18 ms'&&$('chip-net').title.includes('Download: 245.3 Mbps'));
 check('adapter has whitespace before wired',$('net-out').textContent.includes('1 Gbps wired'));
 check('router dial uses same average as stats',$('net-out').querySelector('.pingdial-num').textContent==='1');
-check('details retain diagnostics',['Your router','The internet','jitter','% loss','Steady connection','Link speed'].every(t=>$('net-out').textContent.includes(t)));
+check('details retain diagnostics',['Your router','The internet','jitter','% loss','Steady connection','Link speed','Download: 245.3 Mbps','25 MB'].every(t=>$('net-out').textContent.includes(t)));
 $('chip-net').click();check('chip opens details',$('chip-net').getAttribute('aria-expanded')==='true'&&!$('net-card').hidden);
 const popup=$('net-card').getBoundingClientRect();check('details fit viewport',popup.left>=0&&popup.right<=innerWidth&&popup.bottom<=innerHeight);
 check('details are painted above content',popup.width>300&&popup.height>100&&!!document.elementFromPoint(popup.left+30,popup.top+30)?.closest('#net-card'));
@@ -116,7 +116,10 @@ netApi=async()=>{throw new Error('<offline>')};await runNetCheck();check('failed
 netApi=async route=>{if(route.endsWith('/start'))return {...measured,running:true,done:false};throw new Error('Poll failed')};await runNetCheck();check('failed polling settles and permits retry',netJob===null&&!$('net-run').disabled&&$('net-out').textContent==='Poll failed');
 netApi=()=>new Promise(()=>{});await runNetCheck();check('hung request times out and releases startup',netJob===null&&!$('net-run').disabled&&$('net-out').textContent.includes('timed out'));
 renderNet({done:true,internet:{reachable:false},adapter:null});check('offline readings are unknown not zero',$('net-summary').textContent==='— · — ms');
-netApi=async()=>measured;await runNetCheck();check('re-test recovers after failure',$('net-summary').textContent==='1 Gbps · 18 ms'&&!$('net-run').disabled);
+renderNet({...measured,download:{mbps:null,error:'offline'}});check('download failure preserves ping without substituting link speed',$('net-summary').textContent==='— · 18 ms'&&$('net-out').textContent.includes('Download unavailable')&&$('net-out').textContent.includes('1 Gbps'));
+renderNet({...measured,download:{mbps:0.24,error:''}});check('slow download retains precision',$('net-summary').textContent==='0.24 Mbps · 18 ms');
+renderNet({...measured,download:{mbps:Infinity,error:''}});check('invalid download is unknown',$('net-summary').textContent==='— · 18 ms');
+netApi=async()=>measured;await runNetCheck();check('re-test recovers after failure',$('net-summary').textContent==='245.3 Mbps · 18 ms'&&!$('net-run').disabled);
 for(const theme of ${JSON.stringify(themes)}){document.documentElement.dataset.theme=theme;$('chip-net').click();check('connection works in theme '+theme,getComputedStyle($('net-card')).display!=='none'&&getComputedStyle($('chip-net')).color!=='transparent');closeNetDetails()}delete document.documentElement.dataset.theme;
 const receipt={total:6,verified:6,checked_at:1794739320,applied_at:1794739300,account:'42',intent:'balanced',items:['CS2 video settings','Config files','Autoexec link','Steam launch options','Launch options reference','Display scaling'].map(label=>({label,status:'verified',detail:'Matches the applied value'})).concat(['NVIDIA profile','Windows power','Windows graphics'].map(label=>({label,status:'not_checked',detail:'Not checked - not written by this Apply.',counted:false})))};
 await refreshVerification();check('read-back waits for gated startup',!verificationStarted&&!verificationBusy);
@@ -173,6 +176,7 @@ if(location.hash.includes('settings-apply')){document.querySelector('[data-panel
 if(location.hash.includes('settings-steam')){panel.classList.add('hidden');settingsPanel.classList.remove('hidden');setSettingsSub('steam',true);$('who-name').textContent='Edy';$('who-how').textContent='Following Steam';}
 if(location.hash.includes('settings-account')){panel.classList.add('hidden');settingsPanel.classList.remove('hidden');setSettingsSub('account',true);cloudData={configured:true,signed_in:false,google:true};renderCloud();}
 if(location.hash.includes('preset')){presetBegin('balanced');presetReveal(sample);await new Promise(r=>setTimeout(r,780));clearTimeout(presetSession.timer);$('intents').scrollIntoView({block:'center'});}
+if(location.hash.includes('connection-offline'))renderNet({...measured,download:{mbps:null,error:'offline'}});
 if(location.hash.includes('connection'))$('chip-net').click();
 if(location.hash.includes('system')){$('live-card').scrollIntoView({block:'start'});hardwareInspect(400)}
 if(location.hash.includes('sound')){const card=$('audio-card');document.querySelector('.scroll').replaceChildren(card);card.scrollIntoView()}

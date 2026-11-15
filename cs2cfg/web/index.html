@@ -5971,7 +5971,7 @@ const startup = (() => {
         <button type="button" class="chip" id="chip-net" aria-expanded="false" aria-controls="net-card" title="Connection details"><span data-hardware-icon="network"></span> <b id="net-summary">Checking&hellip;</b></button>
         <section id="net-card" class="net-popover" role="region" aria-label="Connection details" hidden>
           <div class="net-popover-head"><h2>Connection</h2><button type="button" class="btn small" id="net-run" title="Re-test connection">↻ Re-test</button></div>
-          <p class="sub">Link speed is your adapter’s connection rate, not download throughput. Ping, jitter and loss are measured to your router and the internet.</p>
+          <p class="sub">Real download sample, then router and internet ping.</p>
           <div id="net-out" aria-live="polite"></div>
         </section>
       </div>
@@ -7955,12 +7955,13 @@ function netSide(probe, sent, total) {
 }
 
 function renderNet(d) {
-  const speed = d?.adapter?.speed || '—';
+  const measured = d?.download?.mbps;
+  const speed = Number.isFinite(measured) && measured > 0 ? (measured < 1 ? measured.toFixed(2) : measured.toFixed(1).replace(/\.0$/, '')) + ' Mbps' : '—';
   const ping = d?.internet?.reachable && Number.isFinite(d.internet.average) ? Math.round(d.internet.average) + ' ms' : '— ms';
   const summary = d?.error ? 'Unavailable' : d?.running ? 'Checking…' : d?.idle || !d ? 'Not tested' : speed + ' · ' + ping;
   $('net-summary').textContent = summary;
-  $('chip-net').title = 'Connection · Link speed: ' + speed + ' · Internet ping: ' + ping;
-  $('chip-net').classList.toggle('warn', !!d?.error || (!d?.running && !d?.internet?.reachable));
+  $('chip-net').title = 'Connection · Download: ' + speed + ' · Internet ping: ' + ping;
+  $('chip-net').classList.toggle('warn', !!d?.error || (!d?.running && (!d?.internet?.reachable || !Number.isFinite(measured) || measured <= 0)));
   $('chip-net').style.setProperty('--chip-load', d?.running ? '.35' : '1');
   const box = $("net-out");
   if (!box) return;
@@ -7978,9 +7979,13 @@ function renderNet(d) {
   if (d.running) {
     html += '<div class="netbar"><div class="netbar-fill" style="transform:scaleX(' + pct / 100 + ')"></div></div>' +
       '<div class="sub" style="margin:6px 0 12px">Measuring&hellip; ' + pct + "%" +
-      "  <span class=\"sub2\">about " + Math.max(0, Math.round(((total - sent) / 2) * 1)) +
-      "s left</span></div>";
+      "</div>";
   }
+
+  html += '<div class="sub" style="margin:0 0 6px"><b>Download: ' + speed + '</b></div>' +
+    '<div class="sub2" style="margin:0 0 12px">' +
+    (d.running && !d.download ? 'Sampling download, then ping…' : d.download?.error || !Number.isFinite(measured) ? 'Download unavailable. Use Re-test to try again.' : 'Short sample · Cloudflare · up to 4 s / 25 MB') +
+    '</div>';
 
   if (d.adapter) {
     html += '<div class="sub" style="margin:0 0 12px">' + esc(d.adapter.name) + " " +
