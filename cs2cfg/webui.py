@@ -515,6 +515,13 @@ def _play(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
 
     ui = profiles.ui_for(load_prefs(), _active_account(state))
     companions_before = [c for c in companions.listed(ui) if c["with_game"]]
+    from . import apps
+    ts_server = ui.get("teamspeak_server", {})
+    if isinstance(ts_server, dict) and ts_server.get("enabled"):
+        try:
+            companions_before.append({"name": "TeamSpeak server", "url": apps.join_url(ts_server)})
+        except ValueError:
+            pass  # Invalid old preferences must never prevent CS2 starting.
 
     state.launch = LaunchSession(user, width, height, refresh, stretch_mode,
                                  patch_video=bool(body.get("patch_video", True)),
@@ -3932,6 +3939,47 @@ def _companions_act(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     return {"ok": True, "companions": companions.survey(fresh)}
 
 
+def _apps(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import apps, profiles
+    from .cli import load_prefs
+    ui = profiles.ui_for(load_prefs(), _active_account(state))
+    return {"ok": True, "apps": apps.survey(ui),
+            "teamspeak": ui.get("teamspeak_server", {})}
+
+
+def _apps_set(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import apps, profiles
+    from .cli import load_prefs, save_prefs
+    account = _active_account(state)
+    prefs = load_prefs()
+    ui = profiles.ui_for(prefs, account)
+    try:
+        if "server" in body:
+            changes = {"teamspeak_server": apps.server(body["server"])}
+        else:
+            changes = apps.configure(ui, str(body.get("app") or ""), body)
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
+    profiles.remember(prefs, account, changes)
+    save_prefs(prefs)
+    return _apps(state, {})
+
+
+def _apps_launch(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import apps, profiles
+    from .cli import load_prefs
+    ui = profiles.ui_for(load_prefs(), _active_account(state))
+    kind = str(body.get("app") or "")
+    if kind == "gamebar":
+        return apps.open_url("ms-gamebar:")
+    if kind == "teamspeak-join":
+        try:
+            return apps.open_url(apps.join_url(ui.get("teamspeak_server", {})))
+        except ValueError as exc:
+            return {"ok": False, "error": str(exc)}
+    return apps.launch(ui, kind)
+
+
 def _faceit_apps(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     """The FACEIT client and FACEIT AC: installed, running, start with game."""
     from . import faceit_apps, profiles
@@ -3999,9 +4047,15 @@ def _match_settings(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     prefs = load_prefs()
     if "enabled" in body:
         prefs["match_alert"] = bool(body.get("enabled"))
-        save_prefs(prefs)
         matchwatch.set_enabled(prefs["match_alert"])
-    return {"ok": True, "enabled": bool(prefs.get("match_alert", True))}
+    for key in ("sound", "on_top"):
+        if key in body:
+            prefs["match_alert_" + key] = bool(body[key])
+    if any(key in body for key in ("enabled", "sound", "on_top")):
+        save_prefs(prefs)
+    return {"ok": True, "enabled": bool(prefs.get("match_alert", True)),
+            "sound": bool(prefs.get("match_alert_sound", True)),
+            "on_top": bool(prefs.get("match_alert_on_top", True))}
 
 
 def _companions_start(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -4711,6 +4765,9 @@ def make_handler(state: State):
         "/api/match/dismiss": _match_dismiss,
         "/api/match/settings": _match_settings,
         "/api/faceit/apps": _faceit_apps,
+        "/api/apps": _apps,
+        "/api/apps/set": _apps_set,
+        "/api/apps/launch": _apps_launch,
         "/api/faceit/apps/set": _faceit_apps_set,
         "/api/faceit/apps/launch": _faceit_apps_launch,
         "/api/demos/get": _demo_get,

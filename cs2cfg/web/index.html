@@ -6,6 +6,7 @@
 <title>cs2-autoconfig</title>
 <link rel="stylesheet" href="assets/faceit/dashboard.css">
 <link rel="stylesheet" href="assets/faceit/scoreboard.css">
+<link rel="stylesheet" href="assets/apps/apps.css">
 <!-- The same mark the application, the window and the notification area
      icon use, inline so the page carries it without a second request. -->
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3.52' fill='%23130c1f'/><path fill='%23a78bfa' d='M12 3H6L3 6V10L6 13H12V11H7L5 9V7L7 5H12Z'/><path fill='%23ececec' d='M10 5H12V7H14V9H12V11H10V9H8V7H10Z'/></svg>">
@@ -680,13 +681,7 @@
     .demo-get input:focus { box-shadow: none; }
   }
 
-  /* Crosshair X, as its own thing rather than another row of checkboxes.
-
-     The mark is drawn here rather than lifted from the application: a
-     crosshair is the obvious shape for it and nobody owns a circle with four
-     ticks, but their actual logo is theirs. A ring, a gap at each quarter,
-     a centre dot -- and it is cyan, which in this window already means "this
-     is telling you something" rather than a state of the game. */
+  /* Crosshair X integration. The asset slot is documented in assets/apps/. */
   .xh-head {
     display: flex; align-items: center; gap: 14px; margin-bottom: 4px;
   }
@@ -6515,8 +6510,21 @@ const startup = (() => {
       </div>
 
       <div class="subpane hidden" data-sub="apps">
-      <section class="panel hidden" id="xhair-card">
-        <div id="xhair-out"></div>
+      <section id="apps-overview" class="apps-overview">
+        <div class="apps-heading"><h2>Apps</h2><p>Ready when you play.</p></div>
+        <div class="app-tiles">
+          <button type="button" class="app-tile" data-app-tile="faceit" aria-label="FACEIT settings"><img src="assets/faceit/faceit-mark.svg" alt=""><b>FACEIT</b><span class="app-addon">+ Anti-cheat</span><small data-app-status="faceit">Checking…</small><span class="app-arrow" aria-hidden="true">↗</span></button>
+          <button type="button" class="app-tile" data-app-tile="discord" aria-label="Discord settings"><img src="assets/apps/discord-logo.svg" alt=""><b>Discord</b><small data-app-status="discord">Checking…</small><span class="app-arrow" aria-hidden="true">↗</span></button>
+          <button type="button" class="app-tile" data-app-tile="teamspeak" aria-label="TeamSpeak settings"><img src="assets/apps/teamspeak-logo.svg" alt=""><b>TeamSpeak</b><small data-app-status="teamspeak">Checking…</small><span class="app-arrow" aria-hidden="true">↗</span></button>
+          <button type="button" class="app-tile" data-app-tile="crosshairx" aria-label="Crosshair X settings"><img src="assets/apps/crosshairx-logo.svg" alt=""><b>Crosshair X</b><small data-app-status="crosshairx">Checking…</small><span class="app-arrow" aria-hidden="true">↗</span></button>
+        </div>
+      </section>
+      <section id="app-detail" hidden>
+        <button class="btn small ghost" id="app-back">← Back to Apps</button>
+        <div class="app-detail-head"><img id="app-detail-logo" alt=""><div><h2 id="app-detail-title" tabindex="-1"></h2><p id="app-detail-caption"></p></div></div>
+        <div class="app-controls" id="app-controls"></div>
+        <section class="panel hidden" id="xhair-card"><div id="xhair-out"></div></section>
+        <p class="app-feedback" id="app-feedback" role="status" aria-live="polite"></p>
       </section>
 
       <!-- Everything else that runs alongside the game. Crosshair X above is
@@ -6524,12 +6532,9 @@ const startup = (() => {
            here gets the general case -- find it, say whether it is up, start
            it -- and nothing this application cannot honestly offer. -->
       <section class="panel wide" id="companions-card">
-        <h2>Companions</h2>
+        <h2>Your companions</h2>
         <p class="sub" style="margin:0 0 9px">
-          Other programs you run with CS2 &mdash; a clip recorder, an overlay, whatever
-          it is. Add one and it gets a Start button here and the choice to come up on
-          its own when the game does. Nothing in its own settings is touched; this only
-          finds it, watches whether it is running, and starts it.
+          Add other programs to start with CS2.
         </p>
         <div id="companions-out"></div>
       </section>
@@ -6732,6 +6737,7 @@ const startup = (() => {
 </div>
 <script src="skin-viewer.js"></script>
 <script src="assets/faceit/dashboard.js"></script>
+<script src="assets/apps/apps.js"></script>
 <script>
 const TOKEN = "__CS2CFG_TOKEN__";
 const $ = (id) => document.getElementById(id);
@@ -8657,7 +8663,7 @@ function setSettingsSub(name, restoring) {
     if (name === "sound") loadAudio(false);
     if (name === "logs") loadHistory();
     if (name === "config" || name === "editing") ensureScan(false);
-    if (name === "apps") loadCompanions();
+    if (name === "apps") { loadCompanions(); loadAppTiles(); }
     if (name === "steam") { loadFixes(); loadWho(); }
     if (name === "account") loadCloud();
   }
@@ -12138,25 +12144,17 @@ function renderCrosshairX() {
   if (!card || !box) return;
   const d = xhairData;
   // Nothing to offer if it is not there.
-  card.classList.toggle("hidden", !(d && d.installed));
-  if (!d || !d.installed) return;
+  card.classList.toggle("hidden", appSelected !== 'crosshairx');
+  if (!d || !d.installed) {
+    box.innerHTML = '<p class="sub">' + (d?.error ? esc(d.error) : 'Crosshair X was not found in your Steam libraries.') + '</p><a class="btn small" href="https://store.steampowered.com/app/1366800/" target="_blank" rel="noopener">View on Steam</a>';
+    paintAppTiles();
+    return;
+  }
 
   const hide = !!(prefsNow && prefsNow.hide_crosshair);
   const withGame = !!(prefsNow && prefsNow.crosshairx_launch);
 
-  // Drawn, not borrowed: a ring with a gap at each quarter and a dot in the
-  // middle. The shape a crosshair application would obviously use, without
-  // reproducing the one that belongs to them.
-  const mark =
-    '<span class="xh-mark"><svg viewBox="0 0 26 26" aria-hidden="true">' +
-      // r 8.2 -> circumference 51.52, so a quarter is 12.88. A dash of 8.6
-      // leaves a 4.28 gap, and the offset puts half a gap at the path start,
-      // which lands all four gaps on the four ticks rather than near them.
-      '<circle cx="13" cy="13" r="8.2" stroke-dasharray="8.6 4.2805"' +
-      ' stroke-dashoffset="10.74"/>' +
-      '<path d="M13 1.1V7M13 19v5.9M1.1 13H7M19 13h5.9"/>' +
-      '<circle cx="13" cy="13" r="1.5" fill="currentColor" stroke="none"/>' +
-    "</svg></span>";
+  const mark = '<span class="xh-mark"><img src="assets/apps/crosshairx-logo.svg" width="60" height="48" alt=""></span>';
 
   box.innerHTML =
     '<div class="xh-head">' + mark +
@@ -12188,7 +12186,9 @@ function renderCrosshairX() {
       "This application does not know your event&rsquo;s rules and makes no claim " +
       "about them." +
     "</p>";
+  box.insertAdjacentHTML('beforeend','<div class="actions"><button class="btn small" data-app-launch="gamebar">Wake overlay ↗</button><span class="sub">Opens Game Bar. Enable your Crosshair X widget there.</span></div>');
   paintCrosshairLive();
+  paintAppTiles();
 }
 
 /* The two parts of the card that are only true for this second.
@@ -12228,11 +12228,12 @@ function startCrosshairWatch() {
   if (xhairTimer) return;
   xhairTimer = setInterval(async () => {
     const card = $("xhair-card");
-    if (document.hidden || activeTab !== "settings" || !card) return;
+    if (document.hidden || activeTab !== "settings" || settingsSub !== "apps" || !card) return;
     let fresh;
     try { fresh = await api("/api/crosshairx", {}); } catch (err) { return; }
     const was = xhairData || {};
     xhairData = fresh;
+    paintAppTiles();
     // Appearing or disappearing changes the whole card; running or not is two
     // words and a button, and the light touch is the safe one.
     if (!!was.installed !== !!fresh.installed) renderCrosshairX();
@@ -12285,7 +12286,7 @@ function companionTile(c) {
 function renderCompanions() {
   const box = $("companions-out");
   if (!box) return;
-  const rows = companionsData.map(companionTile).join("");
+  const rows = companionsData.filter(c => !["faceit-client", "faceit-ac", "discord", "teamspeak"].includes(c.integration) && !["discord", "discordptb", "discordcanary", "teamspeak"].includes(c.id)).map(companionTile).join("");
   box.innerHTML =
     (rows || '<p class="sub">Nothing added yet.</p>') +
     '<div class="actions" style="margin-top:10px">' +
@@ -12371,7 +12372,7 @@ function startCompanionsWatch() {
   if (companionsTimer) return;
   companionsTimer = setInterval(() => {
     if (document.hidden || activeTab !== "settings" || settingsSub !== "apps") return;
-    loadCompanions();
+    loadCompanions(); loadAppTiles();
   }, 5000);
 }
 
@@ -16210,7 +16211,7 @@ $("rescan").addEventListener("click", () => scan(true));
     startup.run("machine", loadMachine),
     startup.run("setups", loadSetups),
     startup.run("crosshair", loadCrosshairX),
-    startup.run("companions", async () => { await loadCompanions(); startCompanionsWatch(); }),
+    startup.run("companions", async () => { await loadCompanions(); await loadAppTiles(); startCompanionsWatch(); }),
     startup.run("audio", () => loadAudio(false)),
     startup.run("history", loadHistory),
     startup.run("profile", loadWho),

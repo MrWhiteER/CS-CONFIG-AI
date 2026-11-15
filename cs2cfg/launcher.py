@@ -466,16 +466,28 @@ def _bring_up_companions(
                       f"{result.get('error', 'unknown error')}", "warn")
 
     for entry in (companions_before or []):
+        if entry.get("url"):
+            from . import apps
+            result = apps.open_url(entry["url"])
+            report(result.get("detail") or result.get("error", "Could not open app URL"),
+                   "dim" if result.get("ok") else "warn")
+            continue
         exe_name = Path(entry.get("exe") or "").name
         if not exe_name:
             continue
-        if companions_mod.running(exe_name):
+        kind = entry.get("integration")
+        if kind in ("discord", "teamspeak"):
+            from . import apps
+            is_running = lambda k=kind: apps.running(k)
+        else:
+            is_running = lambda n=exe_name: companions_mod.running(n)
+        if is_running():
             report(f"  {entry['name']} is already running", "dim")
             continue
         result = companions_mod.start(entry)
         if result.get("ok") and not result.get("already"):
             report(f"  starting {entry['name']}...", "")
-            pending.append((entry["name"], lambda n=exe_name: companions_mod.running(n)))
+            pending.append((entry["name"], is_running))
             if entry.get("integration") == "faceit-ac":
                 # FACEIT refuses a game that started before its anti-cheat,
                 # and the anti-cheat waits on a UAC prompt a person answers.
