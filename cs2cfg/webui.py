@@ -4125,7 +4125,7 @@ def _sync_auto(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     return {"ok": True, "auto": bool(body.get("on", True))}
 
 
-def _setup_regions() -> List[Dict[str, Any]]:
+def _setup_regions(state: Optional[State] = None) -> List[Dict[str, Any]]:
     """Regions for the wizard's optional lock step, once the lock exists.
 
     Empty -- which keeps the step hidden -- whenever the region lock is not
@@ -4139,15 +4139,26 @@ def _setup_regions() -> List[Dict[str, Any]]:
         return []
     if not elevated.ready():
         return []
+    if state is not None:
+        # A first run has no Valve directory cached yet: start the same ping
+        # sweep the Play tab uses, so the list fills in and the lock can apply.
+        try:
+            _servers_ping_start(state, {})
+            _server_lock_service(state)
+        except Exception:
+            pass
     try:
         regions = serverlock.list_regions()
     except Exception:
-        return []
+        regions = []
+    if not regions:
+        from . import serverping
+        regions = [r | {"ping_ms": None} for r in serverping.parse_regions(serverping.FALLBACK)]
     out = []
     for r in regions or []:
         code = str((r or {}).get("code") or "")
-        if not code:
-            continue
+        if not code or r.get("partner"):
+            continue  # partner relays carry routes, not CS2 game servers
         ping = r.get("ping_ms")
         place = ", ".join(x for x in (str(r.get("city") or ""), str(r.get("country") or "")) if x)
         out.append({"id": code, "label": place or code.upper(),
@@ -4158,7 +4169,7 @@ def _setup_regions() -> List[Dict[str, Any]]:
     return out
 
 
-def _setup_region_lock(code: Any) -> Dict[str, Any]:
+def _setup_region_lock(code: Any, state: Optional[State] = None) -> Dict[str, Any]:
     """Apply the wizard's region choice through the region lock, if present."""
     try:
         from . import serverlock  # type: ignore[attr-defined]
@@ -4166,6 +4177,12 @@ def _setup_region_lock(code: Any) -> Dict[str, Any]:
         return {}
     try:
         if code:
+            # The lock needs Valve's full directory; on a first run the sweep
+            # started by the wizard may still be fetching it. Wait briefly.
+            survey = getattr(state, "server_ping", None) if state is not None else None
+            deadline = time.monotonic() + 20
+            while survey is not None and survey.directory_snapshot() is None and time.monotonic() < deadline:
+                time.sleep(0.5)
             serverlock.request_lock(str(code))
         return {"ok": True, "region": code or None}
     except Exception as exc:
@@ -4201,7 +4218,7 @@ def _firstrun(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
         "presets": firstrun.presets(state.machine, state.kb),
         "apps": firstrun.known_apps(libraries, ui),
         "themes": list(firstrun.THEMES),
-        "regions": _setup_regions(),
+        "regions": _setup_regions(state),
         "current": {k: ui.get(k) for k in ("intent", "theme", "audio_output",
                                            "audio_input", "cfg_write_ok", "sync_auto")},
     }
@@ -4265,7 +4282,7 @@ def _firstrun_finish(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         except Exception:
             pass                       # saved anyway; the keeper retries
 
-    region = _setup_region_lock(answers.get("region_lock")) if answers.get("region_lock") else {}
+    region = _setup_region_lock(answers.get("region_lock"), state) if answers.get("region_lock") else {}
 
     # Permission may just have been given: files waiting on it can land now.
     _sync_loop(state).nudge()

@@ -22,6 +22,7 @@ function createServerRegionLock({panel, chip, api, esc, tone, changed}) {
     return 'Region lock off · suggested: Dubai';
   }
   function rowAction(r) {
+    if(r.partner) return '';  // a partner relay has no CS2 game servers to lock to
     const selected = state.firewall.code === r.code && state.firewall.present;
     return '<button type="button" class="sl-row-lock'+(selected?' sl-selected':'')+'" data-lock-code="'+esc(r.code)+'" aria-label="Play only here: '+esc(r.city)+'" title="'+(!state.can_lock&&state.lock_blocked?esc(state.lock_blocked):(selected?'Re-apply lock to ':'Play only here: ')+esc(r.city)+(r.code==='dxb'?' (suggested)':''))+'"'+(state.busy||state.checking||!state.can_lock?' disabled':'')+'>'+lockIcon+'</button>';
   }

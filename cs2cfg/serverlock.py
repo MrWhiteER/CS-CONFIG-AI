@@ -63,6 +63,8 @@ def build_plan(config, selected):
     chosen = next((r for r in rows if r["code"] == selected), None)
     if chosen is None:
         raise ValueError("That region is not in the saved Valve directory. Refresh server ping.")
+    if chosen.get("partner"):
+        raise ValueError(f"{chosen['city']} is a partner relay with no CS2 game servers; locking to it would find no matches.")
     allowed, pops = set(), {}
     for code, pop in config["pops"].items():
         if not isinstance(code, str) or not isinstance(pop, dict) or not isinstance(pop.get("relays", []), list):
@@ -361,7 +363,7 @@ class ServerLock:
             lock_blocked = "CS2 was not found on this PC, so there is nothing to lock."
         if not lock_blocked:
             try:
-                build_plan(config, regions[0]["code"] if regions else "dxb")
+                build_plan(config, next((r["code"] for r in regions if not r.get("partner")), "dxb"))
             except ValueError:
                 lock_blocked = "Refresh the server list first."
         if not lock_blocked and not ready:

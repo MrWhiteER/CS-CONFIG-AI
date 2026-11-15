@@ -199,7 +199,7 @@ class Firewall(Isolated):
         self.assertFalse(self.parse(raw)["active"])
 
     def test_inference_without_intent_requires_unique_kept_region_and_complete_rules(self):
-        for code in ("dxb", "bom", "dfjr"):
+        for code in ("dxb", "bom"):
             result = sl.parse_state(observed(code), CONFIG, program=PROGRAM)
             self.assertEqual(result["status"], "locked")
             self.assertEqual(result["code"], code)
@@ -548,8 +548,8 @@ class Operations(Isolated):
         service.begin("unlock")
         self.assertEqual(service.snapshot()["pending"]["action"], "unlock")
         self.assertEqual(service.snapshot()["firewall"]["code"], "dxb")
-        service.begin("apply", code="dfjr")
-        self.assertEqual(service.snapshot()["pending"]["code"], "dfjr")
+        service.begin("apply", code="bom")
+        self.assertEqual(service.snapshot()["pending"]["code"], "bom")
         self.assertIsNone(service.cancel()["pending"])
         self.assertEqual(self.service().intent["code"], "dxb")
         self.raw["processes"] = []
@@ -787,3 +787,12 @@ class Api(Isolated):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PartnerRelays(unittest.TestCase):
+    def test_a_partner_relay_cannot_be_the_locked_region(self):
+        config = json.loads(json.dumps(CONFIG))
+        config["pops"]["dfjr"] = {"desc": "Datapacket Fujairah (UAE)", "partners": 1, "tier": 1,
+                                  "relays": [{"ipv4": "89.222.117.194"}]}
+        with self.assertRaises(ValueError):
+            sl.build_plan(config, "dfjr")
