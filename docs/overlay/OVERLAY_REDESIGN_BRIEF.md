@@ -60,8 +60,9 @@ tool later means adding one file on each side and nothing else.
 3. **Stutters and freezes**: the event list.
 4. **Profiles**: setups and keyboard/mouse layout profiles, with the
    "press <apply key> in game" hint.
-5. **Server lock**: the region lock (adapter `overlay/regionlock.py`; the real
-   `cs2cfg.serverlock` is now on main, so use it; keep the guarded import).
+5. **Server lock**: the region lock (adapter `overlay/regionlock.py` over
+   `cs2cfg.serverlock`, which is still on branch codex/server-lock; keep the
+   guarded import and the "Coming soon" state until it merges).
 6. **Settings**: overlay settings in the shell itself (hotkeys, HUD fields,
    auto hide, hide from capture, which tools are in the dock).
 
