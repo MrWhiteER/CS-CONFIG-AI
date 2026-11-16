@@ -30,7 +30,7 @@ function openAppPage(kind) {
   if(!APP_NAMES[kind])return;
   appSelected=kind;
   $('apps-overview').hidden=true;$('companions-card').classList.add('hidden');$('app-detail').hidden=false;
-  $('app-detail-title').textContent=APP_NAMES[kind];$('app-detail-logo').src=appLogo(kind);
+  $('app-detail-title').textContent=APP_NAMES[kind];$('app-detail-logo').src=appLogo(kind);$('app-detail-brand').dataset.appLogo=kind;
   $('app-detail-caption').textContent=kind==='faceit'?'Client, anti-cheat & match alerts':kind==='crosshairx'?'Your overlay, ready for the game':'Ready when you play.';
   const box=$('app-controls');let content='';
   if(kind==='faceit') {

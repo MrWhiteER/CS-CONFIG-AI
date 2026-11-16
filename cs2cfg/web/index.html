@@ -6515,13 +6515,13 @@ const startup = (() => {
         <div class="app-tiles">
           <button type="button" class="app-tile" data-app-tile="faceit" aria-label="FACEIT settings"><img src="assets/faceit/faceit-mark.svg" alt=""><b>FACEIT</b><span class="app-addon">+ Anti-cheat</span><small data-app-status="faceit">Checking…</small><span class="app-arrow" aria-hidden="true">↗</span></button>
           <button type="button" class="app-tile" data-app-tile="discord" aria-label="Discord settings"><img src="assets/apps/discord-logo.svg" alt=""><b>Discord</b><small data-app-status="discord">Checking…</small><span class="app-arrow" aria-hidden="true">↗</span></button>
-          <button type="button" class="app-tile" data-app-tile="teamspeak" aria-label="TeamSpeak settings"><img src="assets/apps/teamspeak-logo.svg" alt=""><b>TeamSpeak</b><small data-app-status="teamspeak">Checking…</small><span class="app-arrow" aria-hidden="true">↗</span></button>
-          <button type="button" class="app-tile" data-app-tile="crosshairx" aria-label="Crosshair X settings"><img src="assets/apps/crosshairx-logo.png" alt=""><b>Crosshair X</b><small data-app-status="crosshairx">Checking…</small><span class="app-arrow" aria-hidden="true">↗</span></button>
+          <button type="button" class="app-tile" data-app-tile="teamspeak" aria-label="TeamSpeak settings"><span class="app-brand" data-app-logo="teamspeak"><img class="app-logo-on-dark" src="assets/apps/teamspeak-logo.svg" alt=""><img class="app-logo-on-light" src="assets/apps/teamspeak-logo-dark.svg" alt=""></span><b>TeamSpeak</b><small data-app-status="teamspeak">Checking…</small><span class="app-arrow" aria-hidden="true">↗</span></button>
+          <button type="button" class="app-tile" data-app-tile="crosshairx" aria-label="Crosshair X settings"><span class="app-brand" data-app-logo="crosshairx"><img src="assets/apps/crosshairx-logo.png" alt=""></span><b>Crosshair X</b><small data-app-status="crosshairx">Checking…</small><span class="app-arrow" aria-hidden="true">↗</span></button>
         </div>
       </section>
       <section id="app-detail" hidden>
         <button class="btn small ghost" id="app-back">← Back to Apps</button>
-        <div class="app-detail-head"><img id="app-detail-logo" alt=""><div><h2 id="app-detail-title" tabindex="-1"></h2><p id="app-detail-caption"></p></div></div>
+        <div class="app-detail-head"><span class="app-brand" id="app-detail-brand"><img id="app-detail-logo" class="app-logo-on-dark" alt=""><img class="app-logo-on-light" src="assets/apps/teamspeak-logo-dark.svg" alt=""></span><div><h2 id="app-detail-title" tabindex="-1"></h2><p id="app-detail-caption"></p></div></div>
         <div class="app-controls" id="app-controls"></div>
         <section class="panel hidden" id="xhair-card"><div id="xhair-out"></div></section>
         <p class="app-feedback" id="app-feedback" role="status" aria-live="polite"></p>

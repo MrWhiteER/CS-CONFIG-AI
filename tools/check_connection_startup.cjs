@@ -2,7 +2,7 @@
 const fs = require('fs'), path = require('path'), os = require('os');
 const cp = require('child_process'), {pathToFileURL} = require('url'), assert = require('assert');
 const root = path.resolve(__dirname, '..');
-const source = fs.readFileSync(path.join(root, 'cs2cfg/web/index.html'), 'utf8');
+const source = fs.readFileSync(path.join(root, 'cs2cfg/web/index.html'), 'utf8').replace(/\r\n/g,'\n');
 const coordinator = source.slice(source.indexOf('const startup = (() => {'), source.indexOf('</script>', source.indexOf('const startup = (() => {')));
 const names = JSON.parse(coordinator.match(/const names = (\[[\s\S]*?\]);/)[1]);
 assert(names.includes('connection'));

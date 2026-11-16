@@ -1,4 +1,13 @@
 .subpane[data-sub="apps"]{--border:var(--line);--text:var(--ink)}
+/* Official artwork switches with the theme; the white-only logo gets clear space. */
+:root{--app-logo-on-dark:block;--app-logo-on-light:none;--app-logo-plate-display:contents;--app-logo-plate:transparent;--app-logo-gap:20px}
+:root[data-theme="daylight"],:root[data-theme="paper"]{--app-logo-on-dark:none;--app-logo-on-light:block;--app-logo-plate-display:flex;--app-logo-plate:var(--ink);--app-logo-gap:0px}
+.app-brand{display:contents}.app-logo-on-light{display:none}
+.app-brand[data-app-logo="teamspeak"]>.app-logo-on-dark{display:var(--app-logo-on-dark)}
+.app-brand[data-app-logo="teamspeak"]>.app-logo-on-light{display:var(--app-logo-on-light)}
+.app-brand[data-app-logo="crosshairx"]{display:var(--app-logo-plate-display);align-items:center;justify-content:center;padding:8px 12px;margin:-8px -12px;background:var(--app-logo-plate);border-radius:8px}
+.app-tile .app-brand[data-app-logo="crosshairx"]{margin-bottom:12px}
+.app-tile .app-brand[data-app-logo="crosshairx"]>img{margin-bottom:var(--app-logo-gap)}
 .tab-panel[data-panel="settings"]:has(.subpane[data-sub="apps"]:not(.hidden)) > .hero p{display:none}
 #app-detail-title:focus{outline:none}
 .apps-overview{grid-column:1/-1;min-width:0}.apps-heading{margin:0 0 22px}.apps-heading h2{font-size:25px;margin:0 0 6px}.apps-heading p{margin:0;color:var(--muted)}

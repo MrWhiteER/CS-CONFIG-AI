@@ -2,7 +2,7 @@ const fs=require('fs'),cp=require('child_process'),assert=require('assert');
 const path=require('path'),url=require('url');
 const root=path.resolve(__dirname,'..');process.chdir(root);
 const work=path.join(require('os').tmpdir(),'cs-config-home-'+require('crypto').createHash('sha1').update(root).digest('hex').slice(0,8));fs.mkdirSync(work,{recursive:true});
-const s=fs.readFileSync('cs2cfg/web/index.html','utf8');
+const s=fs.readFileSync('cs2cfg/web/index.html','utf8').replace(/\r\n/g,'\n');
 for(const x of s.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g))new (require('vm').Script)(x[1]);
 const themes=require('vm').runInNewContext(s.slice(s.indexOf('const THEMES = [')+'const THEMES = '.length,s.indexOf('function applyTheme(')).trim().replace(/;$/, '')).map(t=>t[0]);
 const slice=(a,b)=>s.slice(s.indexOf(a),s.indexOf(b,s.indexOf(a)));
