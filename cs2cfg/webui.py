@@ -288,9 +288,7 @@ def _record_verification(state, user, profile, launch, body, steps, generated=No
     if body.get("fix_scaling", True):
         add("Display scaling", "Display scaling", kind="scaling",
             **by_name.get("Display scaling", {}).get("verification", {}))
-    for label in ("NVIDIA profile", "Windows power", "Windows graphics"):
-        checks.append({"label": label, "kind": "unavailable", "counted": False,
-                       "detail": "Not checked — not written by this Apply."})
+    checks.extend(verification.system_checks(state.cs2_install, state.verification_path.parent))
     receipt = {"checks": checks, "account": user.account_id,
                "intent": profile.intent, "applied_at": time.time(),
                "selection": {"intent": profile.intent,
@@ -308,7 +306,8 @@ def _record_verification(state, user, profile, launch, body, steps, generated=No
 
 
 def _verification(state):
-    return verification.check(state.verification_receipt)
+    return verification.check(verification.with_system_checks(
+        state.verification_receipt, state.cs2_install, state.verification_path.parent))
 
 
 def _apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:

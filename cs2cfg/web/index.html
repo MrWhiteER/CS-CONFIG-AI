@@ -2001,10 +2001,12 @@
 .verification summary strong { display:block; font-size:15px; }.verification summary small { display:block; margin-top:4px; color:var(--muted); font:11px var(--mono); }
 .verify-shield { width:34px; height:34px; flex:none; color:var(--verify-tone); }.verify-chevron { margin-left:auto; color:var(--accent); transition:transform .2s; }.verification[open] .verify-chevron { transform:rotate(180deg); }
 .verify-body { padding:4px 20px 16px; border-top:1px solid var(--line); }.verify-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }.verify-head h2 { margin:16px 0; }
-.verification-list { list-style:none; padding:0; margin:12px 0 0; max-height:340px; overflow:auto; }
+.verification-list { list-style:none; padding:0 0 6px; margin:12px 0 0; max-height:560px; overflow:auto; }
 .verify-row { display:grid; grid-template-columns:24px minmax(0,1fr) auto; gap:10px; padding:10px 0; border-top:1px solid var(--line); align-items:center; }
 .verify-row svg { width:21px; height:21px; color:var(--warn); }.verify-row[data-state="verified"] svg { color:var(--good); }.verify-row[data-state="failed"] svg { color:var(--bad); }.verify-row small { display:block; color:var(--muted); font-size:11px; margin-top:4px; }.verify-row b { font-size:12px; font-weight:500; }.verify-row > span:last-child { font:10px var(--mono); color:var(--muted); }
 .verify-row[data-state="verified"] small { display:none; }
+.verify-row[data-state="not_applicable"] svg { color:var(--muted); }
+.verify-action { display:block; margin-top:6px; font-size:11px; }
 .verification.reveal .verify-row { animation:verify-arrive .25s both; animation-delay:calc(var(--i) * 35ms); }.verification.reveal .verify-tick { animation:verify-arrive .35s both; }
 @keyframes verify-arrive { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
 .hidden .verification *,html.verify-paused .verification *,details.verification:not([open]) .verify-row { animation-play-state:paused!important; }
@@ -8202,8 +8204,9 @@ function renderVerification(result, animate = false) {
   $('verification-title').textContent = (complete ? 'Your PC is set: ' : needsApply ? 'Settings changed \u00b7 ' : 'Review settings: ') + result.verified + '/' + result.total + ' verified';
   $('verification-time').textContent = 'Checked ' + new Date(result.checked_at * 1000).toLocaleString();
   $('verification-context').textContent = (result.intent || 'Applied') + ' \u00b7 Account ' + (result.account || 'unknown') + ' \u00b7 Applied ' + new Date(result.applied_at * 1000).toLocaleString() + (result.storage_warning ? ' \u00b7 ' + result.storage_warning : '');
-  const labels = {verified:'Matches',changed:'Changed',failed:'Failed',not_checked:'Not checked'};
-  $('verification-list').innerHTML = result.items.map((item, i) => '<li class="verify-row" data-state="' + esc(item.status) + '" style="--i:' + i + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="' + (item.status === 'verified' ? 'm7 12 3 3 7-7' : item.status === 'failed' ? 'm8 8 8 8m0-8-8 8' : 'M12 6v7m0 3v2') + '"/></svg><span><b>' + esc(item.label) + '</b><small>' + esc(item.detail) + '</small></span><span>' + labels[item.status] + '</span></li>').join('');
+  const labels = {verified:'Matches',changed:'Changed',failed:'Failed',not_checked:'Not checked',not_set:'Not set',not_applicable:'Not applicable'};
+  const actions = {nvidia:'Review NVIDIA settings',power:'Open power control',wingraphics:'Open Windows graphics'};
+  $('verification-list').innerHTML = result.items.map((item, i) => '<li class="verify-row" data-state="' + esc(item.status) + '" data-counted="' + (item.counted !== false) + '" style="--i:' + i + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="' + (item.status === 'verified' ? 'm7 12 3 3 7-7' : item.status === 'failed' ? 'm8 8 8 8m0-8-8 8' : item.status === 'not_applicable' ? 'M8 12h8' : 'M12 6v7m0 3v2') + '"/></svg><span><b>' + esc(item.label) + '</b><small>' + esc(item.detail) + '</small>' + (Object.hasOwn(actions, item.action) && ['not_set','not_checked'].includes(item.status) ? '<button class="btn small verify-action" data-verify-action="' + esc(item.action) + '">' + actions[item.action] + '</button>' : '') + '</span><span>' + (labels[item.status] || labels.not_checked) + '</span></li>').join('');
   if (animate) { box.open = true; void box.offsetWidth; box.classList.add('reveal'); }
   renderApplyVerification();
 }
@@ -8213,6 +8216,17 @@ function renderApplyVerification() {
   report.dataset.state = box.dataset.state;
   report.innerHTML = '<div class="verify-body"><div class="verify-head"><h2>Applied and verified</h2></div><p class="verify-summary" role="status">' + esc($('verification-title').textContent) + '</p><p class="sub">' + esc($('verification-time').textContent) + '</p><ul class="verification-list">' + $('verification-list').innerHTML + '</ul></div>';
 }
+function openVerificationControl(action) {
+  let target;
+  if (action === 'nvidia') { setTab('gpu'); target = $('gpu-out'); }
+  else if (action === 'power') { setTab('fix'); target = document.querySelector('[data-fix="power.performance"]'); }
+  else if (action === 'wingraphics') { setSettingsSub('apply', true); setTab('settings'); target = $('wg-apply') || $('machine-card'); }
+  if (target) { target.scrollIntoView({block:'center'}); if (target.matches('button')) target.focus(); }
+}
+document.addEventListener('click', e => {
+  const button = e.target.closest('[data-verify-action]');
+  if (button) openVerificationControl(button.dataset.verifyAction);
+});
 async function refreshVerification() {
   if (!verificationStarted || verificationBusy || document.hidden) return;
   const revision = verificationRevision;

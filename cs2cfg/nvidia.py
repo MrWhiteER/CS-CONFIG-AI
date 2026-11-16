@@ -5,10 +5,8 @@ NVAPI is the documented way in. This module opens a session, reads, and closes
 it. There is deliberately no write path: ``NvAPI_DRS_SaveSettings`` is not in
 the function table below, so nothing here can modify the database even by
 mistake. Writing would need elevation and would land in a system-wide store
-shared by every game on the machine, and the driver does not publish what its
-setting values mean -- the ids and names come from the driver, but the value
-encodings would have to be guessed, which is not a good enough footing for
-writing into it.
+shared by every game on the machine. Most values are displayed without decoding;
+the verification targets below use only NVIDIA's published DWORD enums.
 
 Everything degrades quietly: on a machine with no NVIDIA driver, ``probe()``
 reports that and the caller shows the display section on its own.
@@ -35,15 +33,21 @@ _FN = {
     "DRS_DestroySession": 0xDAD9CFF8,
     "DRS_LoadSettings": 0x375DBD6B,
     "DRS_GetBaseProfile": 0xDA8466A0,
+    "DRS_GetCurrentGlobalProfile": 0x617BFF9F,
     "DRS_GetNumProfiles": 0x1DAE4FBC,
     "DRS_GetProfileInfo": 0x61CD6FD6,
     "DRS_FindApplicationByName": 0xEEE566B2,
     "DRS_EnumSettings": 0xAE3039DA,
+    "DRS_GetSetting": 0x73BF8338,
     "DRS_EnumAvailableSettingIds": 0xF020614A,
     "DRS_GetSettingNameFromId": 0xD61CBE6E,
 }
 
 _DWORD, _BINARY, _STRING = 0, 1, 2
+_SETTING_NOT_FOUND = -160
+_PROFILE_NOT_FOUND = -163
+_EXECUTABLE_NOT_FOUND = -166
+_INHERITED = (_SETTING_NOT_FOUND, _PROFILE_NOT_FOUND, _EXECUTABLE_NOT_FOUND)
 
 
 class _BinarySetting(ctypes.Structure):
@@ -120,6 +124,27 @@ class NvApiError(RuntimeError):
     pass
 
 
+class NoNvidiaDriver(NvApiError):
+    pass
+
+
+# NVIDIA/nvapi: NvApiDriverSettings.h and nvapi_interface.h. These are
+# recommendations, not a claim that Apply writes the driver database.
+# Leave image quality and Reflex to CS2; don't force driver VSync on.
+VERIFICATION_TARGETS = {
+    0x1057EB71: ("Power management: Prefer maximum performance", (0x00000001,)),
+    0x00A879CF: ("Vertical sync: application-controlled or Off", (0x60925292, 0x08416747)),
+}
+
+# Last resort when neither application nor global/base profiles store a value.
+# Published in https://github.com/NVIDIA/nvapi/blob/main/NvApiDriverSettings.h
+# These are driver defaults, independent of the recommendations above.
+_DRIVER_DEFAULTS = {
+    0x1057EB71: 0x00000005,  # PREFERRED_PSTATE_DEFAULT = OPTIMAL_POWER
+    0x00A879CF: 0x60925292,  # VSYNCMODE_DEFAULT = PASSIVE (application-controlled)
+}
+
+
 @dataclass
 class Setting:
     id: int
@@ -186,7 +211,11 @@ class _Session:
         try:
             self._dll = ctypes.WinDLL("nvapi64.dll")
         except OSError as exc:
-            raise NvApiError("no NVIDIA driver on this machine") from exc
+            if getattr(exc, "winerror", None) == 5:
+                raise PermissionError("NVIDIA driver access denied") from exc
+            if isinstance(exc, FileNotFoundError) or getattr(exc, "winerror", None) in {2, 126}:
+                raise NoNvidiaDriver("no NVIDIA driver on this machine") from exc
+            raise NvApiError(f"no NVIDIA driver could be loaded: {exc}") from exc
         self._dll.nvapi_QueryInterface.restype = ctypes.c_void_p
         self._dll.nvapi_QueryInterface.argtypes = [ctypes.c_uint32]
         self._fns: Dict[str, object] = {}
@@ -211,6 +240,8 @@ class _Session:
         return buf.value.decode(errors="replace") or str(code)
 
     def _check(self, code: int, what: str) -> None:
+        if code == -6:  # NVAPI_NVIDIA_DEVICE_NOT_FOUND
+            raise NoNvidiaDriver("no NVIDIA GPU/driver on this machine")
         if code != 0:
             raise NvApiError(f"{what}: {self._explain(code)}")
 
@@ -353,7 +384,7 @@ class _Session:
         entries.sort(key=lambda s: s.name.lower())
         return Catalogue(entries)
 
-    def app_profile(self, executable: str) -> Optional[ProfileView]:
+    def _app_handle(self, executable: str):
         app = _Application()
         app.version = _stamp(_Application, 4)
         handle = ctypes.c_void_p()
@@ -363,9 +394,80 @@ class _Session:
                         ctypes.POINTER(_Application))(
             self._session, _wide(executable), ctypes.byref(handle),
             ctypes.byref(app))
-        if code != 0:
+        if code in (_EXECUTABLE_NOT_FOUND, _PROFILE_NOT_FOUND):
+            return None
+        self._check(code, "finding the application profile")
+        return handle
+
+    def app_profile(self, executable: str) -> Optional[ProfileView]:
+        handle = self._app_handle(executable)
+        if handle is None:
             return None
         return self._read_profile(handle, executable)
+
+    def _global_handle(self, function: str):
+        handle = ctypes.c_void_p()
+        code = self._fn(function, ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p))(
+            self._session, ctypes.byref(handle))
+        if code in (_PROFILE_NOT_FOUND, _EXECUTABLE_NOT_FOUND):
+            return None
+        self._check(code, "opening the global profile")
+        return handle
+
+    def _read_dword(self, handle, setting_id: int) -> Optional[int]:
+        entry = _Setting()
+        entry.version = _stamp(_Setting, 1)
+        code = self._fn("DRS_GetSetting", ctypes.c_void_p, ctypes.c_void_p,
+                        ctypes.c_uint32, ctypes.POINTER(_Setting))(
+            self._session, handle, setting_id, ctypes.byref(entry))
+        if code in _INHERITED:
+            return None
+        self._check(code, "reading the effective application setting")
+        if entry.settingType != _DWORD:
+            raise NvApiError("expected a DWORD application setting")
+        return entry.current.u32
+
+    def effective_settings(self, executable: str, ids) -> dict:
+        """Resolve app -> current global -> base -> documented driver default.
+
+        GetSetting can return SETTING_NOT_FOUND for an inherited value. Only
+        absence permits fallback; denied access and other read errors propagate.
+        """
+        app_handle = self._app_handle(executable)
+        global_handles = {}
+        values = {}
+        for setting_id in ids:
+            value = self._read_dword(app_handle, setting_id) if app_handle is not None else None
+            if value is None:
+                for function in ("DRS_GetCurrentGlobalProfile", "DRS_GetBaseProfile"):
+                    if function not in global_handles:
+                        global_handles[function] = self._global_handle(function)
+                    handle = global_handles[function]
+                    if handle is not None:
+                        value = self._read_dword(handle, setting_id)
+                        if value is not None:
+                            break
+            if value is None:
+                value = _DRIVER_DEFAULTS.get(setting_id)
+                if value is None:
+                    raise NvApiError(f"no documented default for setting 0x{setting_id:08X}")
+            values[setting_id] = value
+        return values
+
+
+def read_recommended() -> dict:
+    """Small unelevated read for the receipt; no catalogue scan or write calls."""
+    try:
+        with _Session() as session:
+            values = session.effective_settings("cs2.exe", VERIFICATION_TARGETS)
+        missing = [label for setting_id, (label, allowed) in VERIFICATION_TARGETS.items()
+                   if values[setting_id] not in allowed]
+        return {"available": True, "matches": not missing,
+                "detail": "; ".join(missing)}
+    except NoNvidiaDriver as exc:
+        return {"available": False, "not_applicable": True, "reason": str(exc)}
+    except (NvApiError, OSError) as exc:
+        return {"available": False, "reason": str(exc)}
 
 
 def probe(executables: tuple = ("cs2.exe",)) -> Probe:
