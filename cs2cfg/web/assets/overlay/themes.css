@@ -1,0 +1,307 @@
+/* App theme tokens exported by tools/overlay_preview.cjs --sync-themes. */
+:root {
+    /* The only thing this used to carry that the :root further down does
+       not: every colour here used to duplicate one defined there, disagreed
+       with it in no visible way, and was never the one actually painting the
+       app. Kept to exactly this one declaration, since nothing else in the
+       file sets it for the dark themes -- lose it and native chrome (the
+       scrollbar, a checkbox before this app draws its own) renders light. */
+    color-scheme: dark;
+  }
+:root {
+    /* What "lighten this surface" means in this theme.
+       Used as rgba(var(--lift), .06) wherever a panel is raised off its
+       background. On a dark theme that is white; on a light one it has to be
+       black, or the effect is invisible. Sixty-odd places depend on it, which
+       is why it is one variable rather than sixty edits. */
+    --lift: 255, 255, 255;
+
+    /* The rail's own surface. A variable rather than a literal because it was
+       the one panel in the window with a colour of its own, and on a light
+       theme that meant dark text on a dark bar -- the navigation, invisible. */
+    --rail-bg: rgba(13, 8, 22, .86);
+
+    /* Shape, not just colour. A theme that can only change hue cannot show
+       you a different kind of interface, and the difference between this
+       application and a tool like FACEIT's is mostly shape: measured on
+       theirs, 34 of 41 boxes carry no border at all, 19 are square-cornered,
+       and nothing is blurred. A box there is a 5% lighter fill and nothing
+       else. These three let a theme say that. */
+    --r: 14px;
+    --panel-blur: blur(26px) saturate(1.05);
+    --panel-edge: .6;          /* the lit top edge; 0 removes it entirely */
+    /* How much of the room the chosen profile lights up. The colour itself is
+       semantic and stays -- it says which profile you are on -- but a flat
+       theme wants the signal without the light show, so the strength is a
+       theme's to decide. */
+    --glow: .75;
+
+    --ink:        #ece8f7;
+    /* Secondary text keeps enough opacity to read over raised glass surfaces. */
+    --muted:      rgba(236, 232, 247, .68);
+    /* Hairlines are a dim violet rather than a neutral white. That single
+       change does most of the work: a grey rule reads as a box drawn around
+       something, a violet one reads as the surface being lit. */
+    --line:       rgba(167, 139, 250, .19);
+    --line-soft:  rgba(167, 139, 250, .10);
+
+    --bg:         #07050d;
+    --bg-2:       rgba(10, 6, 20, .34);
+    --panel:      rgba(19, 12, 31, .82);
+    --panel-2:    rgba(26, 17, 42, .88);
+    --chip:       rgba(34, 22, 53, .86);
+
+    --accent:      #8b5cf6;              /* selection, focus, "you are here" */
+    --accent-deep: #6d28d9;
+    --accent-dim:  rgba(139, 92, 246, .16);
+    /* The chrome's own violet, named apart from --accent so the profile and
+       category colours stay free to mean what they mean. */
+    --violet:      #8b5cf6;
+    --violet-soft: #a78bfa;
+    --hot:         #e4002b;              /* the one loud colour: play, live  */
+    --good:        #35d07f;
+    --warn:        #ffb43a;
+    --bad:         #ff5468;
+
+    --ink-dim: rgba(236, 232, 247, .76);
+    --faint:   rgba(236, 232, 247, .46);
+    --glass-3: rgba(28, 18, 44, .86);
+    --sunk:    rgba(0, 0, 0, .30);
+
+    /* The stage gradient, overridden per section below. */
+    --g1: #4a1f8c; --g2: #7b2ea8; --g3: #2a1560;
+
+    /* One colour per profile, named once. The dial, the labels and the light
+       across the whole window all read from here, so they can never drift
+       apart into three slightly different greens. */
+    /* Reserved for text that explains rather than names. Cyan is the one
+       bright hue the window does not already use for a state, so it reads as
+       "this is telling you something" instead of as good/warn/bad. */
+    --neon-cyan:        #22e6ff;
+    /* The band's upper half: the frames you keep. Named apart from --neon-cyan
+       so the band can be retuned without moving every explanation in the app. */
+    --neon-frames:      var(--neon-cyan);
+
+    --neon-competitive: #ff9d2e;
+    --neon-balanced:    #17e3a1;
+    --neon-quality:     #a56bff;
+
+    /* Shared category identities; light themes override these for contrast. */
+    --cat-apply:   var(--neon-balanced);
+    --cat-sound:   var(--neon-competitive);
+    --cat-config:  #4d94ff;
+    --cat-editing: #ff5cb8;
+    --cat-account: var(--neon-balanced);
+    --cat-apps:    var(--neon-quality);
+    --cat-look:    var(--neon-cyan);
+    --cat-logs:    #8ea2c0;
+  }
+:root[data-theme="ember"] {
+    --ink: #f8efe3; --muted: rgba(248, 239, 227, .68);
+    --line: rgba(245, 165, 36, .20); --line-soft: rgba(245, 165, 36, .11);
+    --bg: #0a0704; --bg-2: rgba(16, 10, 5, .34);
+    --panel: rgba(30, 19, 9, .62); --panel-2: rgba(42, 27, 13, .72);
+    --chip: rgba(54, 35, 16, .74);
+    --accent: #f5a524; --accent-deep: #b4740f; --accent-dim: rgba(245, 165, 36, .16);
+    --violet: #f5a524; --violet-soft: #ffc46b;
+    --ink-dim: rgba(248, 239, 227, .76); --faint: rgba(248, 239, 227, .46);
+    --glass-3: rgba(38, 25, 12, .74);
+    --neon-cyan: #ffd48a;
+    --rail-bg: var(--panel);
+  }
+:root[data-theme="carbon"] {
+    --ink: #eaeef4; --muted: rgba(234, 238, 244, .68);
+    --line: rgba(196, 211, 229, .16); --line-soft: rgba(196, 211, 229, .09);
+    --bg: #060709; --bg-2: rgba(12, 14, 17, .34);
+    --panel: rgba(19, 22, 27, .66); --panel-2: rgba(28, 32, 39, .74);
+    --chip: rgba(38, 43, 51, .74);
+    --accent: #c3d0de; --accent-deep: #8d9cad; --accent-dim: rgba(195, 208, 222, .14);
+    --violet: #c3d0de; --violet-soft: #dbe4ee;
+    --ink-dim: rgba(234, 238, 244, .76); --faint: rgba(234, 238, 244, .46);
+    --glass-3: rgba(24, 27, 33, .76);
+    --neon-cyan: #9fb4cc;
+    --rail-bg: var(--panel);
+  }
+:root[data-theme="acid"] {
+    --ink: #e2f7e7; --muted: rgba(226, 247, 231, .68);
+    --line: rgba(57, 255, 136, .18); --line-soft: rgba(57, 255, 136, .09);
+    --bg: #040706; --bg-2: rgba(6, 14, 10, .34);
+    --panel: rgba(9, 22, 14, .64); --panel-2: rgba(13, 32, 20, .72);
+    --chip: rgba(18, 44, 28, .74);
+    --accent: #39ff88; --accent-deep: #15a34a; --accent-dim: rgba(57, 255, 136, .14);
+    --violet: #39ff88; --violet-soft: #8dffbb;
+    --ink-dim: rgba(226, 247, 231, .76); --faint: rgba(226, 247, 231, .46);
+    --glass-3: rgba(11, 26, 17, .76);
+    --neon-cyan: #7dffc0;
+    --rail-bg: var(--panel);
+  }
+:root[data-theme="crimson"] {
+    --ink: #f7e9ea; --muted: rgba(247, 233, 234, .52);
+    --line: rgba(227, 24, 55, .19); --line-soft: rgba(227, 24, 55, .10);
+    --bg: #080405; --bg-2: rgba(16, 6, 8, .34);
+    --panel: rgba(28, 10, 13, .62); --panel-2: rgba(40, 14, 18, .72);
+    --chip: rgba(52, 18, 23, .74);
+    --accent: #e31837; --accent-deep: #9e0f26; --accent-dim: rgba(227, 24, 55, .15);
+    --violet: #e31837; --violet-soft: #ff6b7f;
+    --ink-dim: rgba(247, 233, 234, .62); --faint: rgba(247, 233, 234, .21);
+    --glass-3: rgba(34, 12, 15, .76);
+    --neon-cyan: #ff9aa8;
+  }
+:root[data-theme="frost"] {
+    --ink: #e6f4fb; --muted: rgba(230, 244, 251, .52);
+    --line: rgba(0, 184, 252, .19); --line-soft: rgba(0, 184, 252, .10);
+    --bg: #04080d; --bg-2: rgba(6, 12, 20, .34);
+    --panel: rgba(10, 20, 32, .62); --panel-2: rgba(14, 28, 44, .72);
+    --chip: rgba(18, 36, 56, .74);
+    --accent: #00b8fc; --accent-deep: #0080b3; --accent-dim: rgba(0, 184, 252, .15);
+    --violet: #00b8fc; --violet-soft: #6fd8ff;
+    --ink-dim: rgba(230, 244, 251, .62); --faint: rgba(230, 244, 251, .21);
+    --glass-3: rgba(12, 24, 38, .76);
+    --neon-cyan: #7fe3ff;
+  }
+:root[data-theme="neon"] {
+    --ink: #f3e8f7; --muted: rgba(243, 232, 247, .52);
+    --line: rgba(236, 72, 153, .19); --line-soft: rgba(236, 72, 153, .10);
+    --bg: #0b0614; --bg-2: rgba(14, 6, 24, .34);
+    --panel: rgba(24, 10, 38, .62); --panel-2: rgba(34, 14, 52, .72);
+    --chip: rgba(44, 18, 64, .74);
+    --accent: #ec4899; --accent-deep: #a21c66; --accent-dim: rgba(236, 72, 153, .15);
+    --violet: #ec4899; --violet-soft: #f9a8d4;
+    --ink-dim: rgba(243, 232, 247, .62); --faint: rgba(243, 232, 247, .21);
+    --glass-3: rgba(28, 12, 44, .76);
+    --neon-cyan: #a78bfa;
+  }
+:root[data-theme="daylight"] {
+    color-scheme: light;
+    --lift: 0, 0, 0;
+    --ink: #14161b; --muted: rgba(20, 22, 27, .68);
+    --line: rgba(20, 22, 27, .14); --line-soft: rgba(20, 22, 27, .08);
+    --bg: #eef0f4; --bg-2: rgba(255, 255, 255, .5);
+    --panel: rgba(255, 255, 255, .78); --panel-2: rgba(255, 255, 255, .92);
+    --chip: rgba(20, 22, 27, .07);
+    --accent: #6d28d9; --accent-deep: #4c1d95; --accent-dim: rgba(109, 40, 217, .12);
+    --violet: #6d28d9; --violet-soft: #8b5cf6;
+    --ink-dim: rgba(20, 22, 27, .76); --faint: rgba(20, 22, 27, .46);
+    --glass-3: rgba(255, 255, 255, .86);
+    --sunk: rgba(0, 0, 0, .10);
+    --rail-bg: rgba(255, 255, 255, .82);
+    --good: #0f8a4d; --warn: #a66200; --bad: #c62337;
+    --neon-cyan: #0b7c92;
+    --neon-competitive: #965000; --neon-balanced: #087443; --neon-quality: #7539be;
+    --cat-config: #245bb5; --cat-editing: #ae246e; --cat-logs: #53647d;
+  }
+:root[data-theme="pro"] {
+    --r: 4px;
+    --panel-blur: none;
+    --panel-edge: 0;
+    --ink: #f1f1f1; --muted: rgba(241, 241, 241, .68);
+    --line: rgba(241, 241, 241, .09); --line-soft: rgba(241, 241, 241, .05);
+    --bg: #121212; --bg-2: rgba(241, 241, 241, .02);
+    --panel: rgba(241, 241, 241, .05); --panel-2: rgba(241, 241, 241, .08);
+    --chip: rgba(241, 241, 241, .09);
+    --rail-bg: #0a0a0a;
+    --accent: #ff5500; --accent-deep: #cc4400; --accent-dim: rgba(255, 85, 0, .14);
+    --violet: #ff5500; --violet-soft: #ff8f5c;
+    --ink-dim: rgba(241, 241, 241, .76); --faint: rgba(241, 241, 241, .46);
+    --glass-3: #1d1d1d;
+    --sunk: rgba(0, 0, 0, .35);
+    --neon-cyan: #ffa26b;
+    --glow: 0;
+  }
+:root[data-theme="paper"] {
+    color-scheme: light;
+    --lift: 0, 0, 0;
+    --ink: #1c1a17; --muted: rgba(28, 26, 23, .68);
+    --line: rgba(28, 26, 23, .15); --line-soft: rgba(28, 26, 23, .08);
+    --bg: #f4f1ea; --bg-2: rgba(255, 253, 248, .55);
+    --panel: rgba(255, 253, 248, .8); --panel-2: rgba(255, 254, 251, .93);
+    --chip: rgba(28, 26, 23, .07);
+    --accent: #9a5b00; --accent-deep: #6f4100; --accent-dim: rgba(154, 91, 0, .12);
+    --violet: #9a5b00; --violet-soft: #c87f14;
+    --ink-dim: rgba(28, 26, 23, .76); --faint: rgba(28, 26, 23, .46);
+    --glass-3: rgba(255, 253, 248, .88);
+    --sunk: rgba(0, 0, 0, .09);
+    --rail-bg: rgba(255, 253, 248, .85);
+    --good: #2f7a33; --warn: #9a5b00; --bad: #b3261e;
+    --neon-cyan: #39607a;
+
+    --neon-competitive: #925000; --neon-balanced: #326d37; --neon-quality: #74429b;
+    --cat-apply: var(--neon-balanced); --cat-sound: var(--neon-competitive);
+    --cat-config: #315e9f; --cat-editing: #a32c65;
+    --cat-account: var(--neon-balanced); --cat-apps: var(--neon-quality);
+    --cat-look: var(--neon-cyan); --cat-logs: #625d52;
+  }
+:root {
+    /* The display face. Bahnschrift is on every Windows 10 and 11; the DIN
+       lineage is why it reads as signage rather than as a document. The
+       fallbacks walk down to a condensed grotesque and then to whatever the
+       system has, so a machine without it degrades rather than breaks. */
+    --display: "Bahnschrift SemiCondensed", "Bahnschrift", "Franklin Gothic Medium",
+               "Segoe UI Variable Display", "Segoe UI", sans-serif;
+    --body: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    --mono: "Cascadia Mono", Consolas, ui-monospace, monospace;
+    /* Shared across every palette, including Daylight and Paper. */
+    --body-size: 13.5px;
+    --body-leading: 1.55;
+    --heading-weight: 600;
+    --heading-tracking: .08em;
+    --heading-stretch: condensed;
+    --heading-case: uppercase;
+    --figure-style: tabular-nums;
+
+    /* The notch. One number, because every cut surface in the window has to
+       agree -- a panel notched 14px beside a button notched 6px reads as two
+       applications. */
+    --cut: 10px;
+    --cut-sm: 6px;
+    --r: 3px;                  /* what is left of the old radius */
+
+    /* Technical hairlines, brighter than the old ones. The previous --line
+       sat at .19 alpha, which on a blurred panel came out as nothing at all;
+       a HUD is mostly line work, so the line has to be visible. */
+    --hud-line: rgba(var(--lift), .14);
+    --hud-line-2: rgba(var(--lift), .07);
+    --hud-bracket: var(--accent);
+
+    /* Density. Dashboard scale: the old layout spent 24px where 12 would
+       have read better, and the result was panels you had to scroll past
+       rather than take in. */
+    --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px;
+    --s5: 24px; --s6: 32px; --s7: 48px;
+  }
+:root {
+    --nav-radius: 7px;
+    --nav-badge-ink: var(--ink);
+    --nav-badge-fill: var(--accent-dim);
+    --nav-hover: rgba(var(--lift), .055);
+    --nav-selected: color-mix(in srgb, var(--accent) 14%, var(--rail-bg));
+    --nav-glow: color-mix(in srgb, var(--accent) calc(var(--glow) * 50%), transparent);
+    --nav-avatar: color-mix(in srgb, var(--accent) 22%, var(--panel-2));
+    --nav-ease: cubic-bezier(.2, .8, .2, 1);
+    --nav-row: 34px;
+    --nav-step: 38px;
+  }
+:root[data-theme="pro"] { --nav-radius: 0px; }
+:root {
+    --component-radius: max(12px, var(--r));
+    --control-radius: 8px;
+    --chip-radius: 6px;
+    --on-accent: #10091c;
+    --component-shadow: 0 8px 24px -14px var(--sunk);
+    --floating-shadow: 0 24px 64px -18px var(--sunk);
+    --component-glow: color-mix(in srgb, var(--accent) calc(var(--glow) * 26%), transparent);
+    --component-hover: color-mix(in srgb, var(--accent) 7%, var(--panel-2));
+    --component-focus: color-mix(in srgb, var(--accent) 24%, transparent);
+    --component-veil: color-mix(in srgb, var(--bg) 76%, transparent);
+    --component-motion: 200ms ease-out;
+    --skeleton-base: var(--chip);
+    --skeleton-light: color-mix(in srgb, var(--accent) 14%, var(--panel-2));
+  }
+:root[data-theme="paper"] { --on-accent: #ffffff; }
+:root[data-theme="pro"] {
+    --component-radius: var(--r);
+    --control-radius: var(--r);
+    --chip-radius: var(--r);
+    --component-shadow: none;
+    --floating-shadow: none;
+  }

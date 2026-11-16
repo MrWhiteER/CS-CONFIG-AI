@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CS2 Auto Config · Overlay</title>
+<link rel="stylesheet" href="assets/overlay/themes.css"><link rel="stylesheet" href="assets/overlay/panel.css">
+</head><body>
+<div id="backdrop" aria-label="Return to game"></div>
+<header class="shell-header"><div class="brand"><span class="brand-mark">C2</span><div>CS2 AUTO CONFIG<small>Your in-game workspace</small></div></div><div class="session"><span>COUNTER-STRIKE 2</span><time id="clock">—</time></div><button id="close">Return to game <kbd>Esc</kbd></button></header>
+<p id="preview" hidden>DESIGN PREVIEW · Sample session · Changes are disabled</p>
+<p id="error" role="status"></p>
+<main id="workspace" aria-label="Overlay tool windows"></main>
+<footer><p>Choose a tool. Make it yours.<span>Drag to move · Resize from the corner · Pin telemetry to your game</span></p><nav id="dock" aria-label="Overlay tools"></nav><small id="shortcut">Ctrl+Alt+P to return to game</small></footer>
+<script>window.overlayToken = '__CS2CFG_TOKEN__'; window.overlayRenderers = {};</script>
+<script src="assets/overlay/tools/common.js"></script>
+<script src="assets/overlay/tools/performance.js"></script><script src="assets/overlay/tools/hardware.js"></script>
+<script src="assets/overlay/tools/events.js"></script><script src="assets/overlay/tools/profiles.js"></script>
+<script src="assets/overlay/tools/serverlock.js"></script><script src="assets/overlay/tools/settings.js"></script>
+<script src="assets/overlay/preview.js"></script><script src="assets/overlay/panel.js"></script>
+</body></html>

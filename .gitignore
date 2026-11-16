@@ -47,3 +47,6 @@ desktop.ini
 # belongs in a public repository either.
 .wrangler/
 tools/matchfound_probe.log
+
+# Official PresentMon console binary is supplied locally, never committed.
+/tools/presentmon/
