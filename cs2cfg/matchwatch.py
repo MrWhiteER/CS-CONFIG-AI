@@ -365,7 +365,7 @@ def accept() -> Dict[str, object]:
     # Our own window goes first: it sits on top, in the middle of the screen,
     # which is right where the game's Accept button is.
     dismiss()
-    time.sleep(0.3)
+    time.sleep(0.6)          # and the screen dim has faded, or the colours are off
     raised = _raise(target)
     clicked = False
     if raised:

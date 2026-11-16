@@ -19,6 +19,7 @@ import gzip
 import json
 import mimetypes
 import os
+import re
 import secrets
 import sys
 import threading
@@ -72,6 +73,7 @@ class State:
         self.faceit: Optional[Dict[str, Any]] = None  # cached profile + history
         self.sync: Optional[Any] = None      # autosync.Loop, once started
         self.server_ping: Optional[Any] = None  # on-demand Valve relay survey
+        self.server_lock: Optional[Any] = None  # firewall + read-only console observer
         from .overlay.service import OverlayService
 
         self.overlay = OverlayService()  # Inert until enabled in preferences.
@@ -2700,6 +2702,55 @@ def _servers_ping_start(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     return _servers_ping(state, body)
 
 
+def _server_lock_service(state: State):
+    from . import serverlock, serverping
+    from .paths import user_data_dir
+    if getattr(state, "server_lock", None) is None:
+        root = user_data_dir()
+        cached = serverping.ServerPing(root / "sdr-relays.json")
+
+        def context():
+            return serverlock.discover_context(state)
+
+        def directory():
+            survey = state.server_ping or cached
+            return survey.directory_snapshot()
+
+        def survey():
+            return state.server_ping.snapshot() if state.server_ping else {}
+
+        state.server_lock = serverlock.shared(context, directory, survey)
+    return state.server_lock
+
+
+def _servers_lock(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    return _server_lock_service(state).snapshot()
+
+
+def _servers_lock_prepare(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    return _server_lock_service(state).prepare(str(body.get("code", "")))
+
+
+def _servers_lock_change(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    if body.get("confirmed") is not True:
+        raise ValueError("Review the region lock warning first.")
+    return _server_lock_service(state).begin(body.get("action"), body.get("plan_id"))
+
+
+def _servers_lock_cancel(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    return _server_lock_service(state).cancel()
+
+
+def _servers_log_enable(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Use the existing safe, backed-up launch-options writer; Steam must be closed."""
+    user = state.user_for(_active_account(state))
+    options = steam.read_launch_options(user)
+    if not re.search(r"(?:^|\s)-condebug(?=\s|$)", options, re.I):
+        session = backup.BackupSession(note="enable read-only CS2 server detection (-condebug)")
+        steam.write_launch_options(user, (options.rstrip() + " -condebug").strip(), session)
+    return {"detail": "Console logging enabled for this account. Start Steam and CS2, then join a match."}
+
+
 def _temps_elevate(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     """Raise the one prompt, and start the privileged reader behind it.
 
@@ -4128,7 +4179,7 @@ def _sync_auto(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     return {"ok": True, "auto": bool(body.get("on", True))}
 
 
-def _setup_regions() -> List[Dict[str, Any]]:
+def _setup_regions(state: Optional[State] = None) -> List[Dict[str, Any]]:
     """Regions for the wizard's optional lock step, once the lock exists.
 
     Empty -- which keeps the step hidden -- whenever the region lock is not
@@ -4142,15 +4193,26 @@ def _setup_regions() -> List[Dict[str, Any]]:
         return []
     if not elevated.ready():
         return []
+    if state is not None:
+        # A first run has no Valve directory cached yet: start the same ping
+        # sweep the Play tab uses, so the list fills in and the lock can apply.
+        try:
+            _servers_ping_start(state, {})
+            _server_lock_service(state)
+        except Exception:
+            pass
     try:
         regions = serverlock.list_regions()
     except Exception:
-        return []
+        regions = []
+    if not regions:
+        from . import serverping
+        regions = [r | {"ping_ms": None} for r in serverping.parse_regions(serverping.FALLBACK)]
     out = []
     for r in regions or []:
         code = str((r or {}).get("code") or "")
-        if not code:
-            continue
+        if not code or r.get("partner"):
+            continue  # partner relays carry routes, not CS2 game servers
         ping = r.get("ping_ms")
         place = ", ".join(x for x in (str(r.get("city") or ""), str(r.get("country") or "")) if x)
         out.append({"id": code, "label": place or code.upper(),
@@ -4161,7 +4223,7 @@ def _setup_regions() -> List[Dict[str, Any]]:
     return out
 
 
-def _setup_region_lock(code: Any) -> Dict[str, Any]:
+def _setup_region_lock(code: Any, state: Optional[State] = None) -> Dict[str, Any]:
     """Apply the wizard's region choice through the region lock, if present."""
     try:
         from . import serverlock  # type: ignore[attr-defined]
@@ -4169,6 +4231,12 @@ def _setup_region_lock(code: Any) -> Dict[str, Any]:
         return {}
     try:
         if code:
+            # The lock needs Valve's full directory; on a first run the sweep
+            # started by the wizard may still be fetching it. Wait briefly.
+            survey = getattr(state, "server_ping", None) if state is not None else None
+            deadline = time.monotonic() + 20
+            while survey is not None and survey.directory_snapshot() is None and time.monotonic() < deadline:
+                time.sleep(0.5)
             serverlock.request_lock(str(code))
         return {"ok": True, "region": code or None}
     except Exception as exc:
@@ -4204,7 +4272,7 @@ def _firstrun(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
         "presets": firstrun.presets(state.machine, state.kb),
         "apps": firstrun.known_apps(libraries, ui),
         "themes": list(firstrun.THEMES),
-        "regions": _setup_regions(),
+        "regions": _setup_regions(state),
         "current": {k: ui.get(k) for k in ("intent", "theme", "audio_output",
                                            "audio_input", "cfg_write_ok", "sync_auto")},
     }
@@ -4268,7 +4336,7 @@ def _firstrun_finish(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         except Exception:
             pass                       # saved anyway; the keeper retries
 
-    region = _setup_region_lock(answers.get("region_lock")) if answers.get("region_lock") else {}
+    region = _setup_region_lock(answers.get("region_lock"), state) if answers.get("region_lock") else {}
 
     # Permission may just have been given: files waiting on it can land now.
     _sync_loop(state).nudge()
@@ -4678,6 +4746,10 @@ def make_handler(state: State):
         "/api/net": _net,
         "/api/net/start": _net_start,
         "/api/servers/ping/start": _servers_ping_start,
+        "/api/servers/lock/prepare": _servers_lock_prepare,
+        "/api/servers/lock/change": _servers_lock_change,
+        "/api/servers/lock/cancel": _servers_lock_cancel,
+        "/api/servers/log/enable": _servers_log_enable,
         "/api/audio": _audio,
         "/api/audio/pin": _audio_pin,
         "/api/fix/survey": _fix_survey,
@@ -5084,6 +5156,11 @@ def make_handler(state: State):
                     self._send_json({"ok": True, **_servers_ping(state, {})})
                 return
 
+            if path == "/api/servers/lock":
+                with state.lock:
+                    self._send_json({"ok": True, **_servers_lock(state, {})})
+                return
+
             candidate = (WEB_ROOT / path.lstrip("/")).resolve()
             if WEB_ROOT.resolve() in candidate.parents:
                 self._send_file(candidate)
@@ -5163,6 +5240,9 @@ def make_handler(state: State):
 def serve(port: int = 8765, cfg_folder: str = "mrwhiteer",
           cfg_name: str = "autoperf.vcfg") -> Tuple[ThreadingHTTPServer, State]:
     state = State(cfg_folder, cfg_name)
+    # Read real firewall state at startup, even if the Play tab is never opened.
+    # This worker reads local state and drains explicitly queued changes after CS2 closes.
+    _server_lock_service(state)
 
     # Pick the sound pin up now rather than when somebody first opens the page.
     # The whole promise is that the devices stay put; a keeper that only starts
