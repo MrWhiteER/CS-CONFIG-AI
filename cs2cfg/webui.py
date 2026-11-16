@@ -74,6 +74,10 @@ class State:
         self.sync: Optional[Any] = None      # autosync.Loop, once started
         self.server_ping: Optional[Any] = None  # on-demand Valve relay survey
         self.server_lock: Optional[Any] = None  # firewall + read-only console observer
+        from .overlay.service import OverlayService
+
+        self.overlay = OverlayService()  # Inert until enabled in preferences.
+        self.overlay.pinned_context = lambda: _overlay_pinned_context(self)
 
     def refresh(self, rescan: bool = False) -> None:
         if self.machine is None or rescan:
@@ -748,6 +752,54 @@ def _history(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
 
     sessions = telemetry.load_sessions(int(body.get("limit") or 25))
     return {"ok": True, "sessions": sessions, "summary": telemetry.summarise(sessions)}
+
+
+def _overlay_tools(state, body):
+    from .overlay.tools import listing
+    return listing(state)
+
+
+def _overlay_tool(state, body):
+    from .overlay.tools import dispatch
+    return dispatch(state, body)
+
+
+def _overlay(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    return {"ok": True, **state.overlay.snapshot(int(body.get("seconds") or 600))}
+
+
+def _overlay_panel(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    panel = state.overlay.panel
+    if panel is None:
+        return {"ok": False, "error": "Panel requires the desktop app"}
+    action = str(body.get("action") or "poll")
+    if action == "region-close":
+        panel.regions.close()
+        return {"ok": True}
+    if action == "close":
+        panel.hide()
+        return {"ok": True}
+    if action in ("keyboard", "setup"):
+        navigate = getattr(panel, action)
+        if panel.visible and navigate:
+            panel.hide(restore=False)
+            navigate()
+        return {"ok": True}
+    return {"ok": True, **panel.data(action, body.get("code"))}
+
+
+def _overlay_settings(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    from .cli import load_prefs, save_prefs
+    from .overlay import settings
+
+    prefs = load_prefs()
+    current = settings.read(prefs.get("ui"))
+    wanted = settings.read({**current, **{k: body[k] for k in settings.DEFAULTS if k in body}},
+                           strict=True)
+    profiles.remember(prefs, None, wanted)
+    save_prefs(prefs)
+    state.overlay.configure(wanted)
+    return _overlay(state, {})
 
 
 def _cfg_scan(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -1524,7 +1576,9 @@ def _cfg_layouts_apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
 
     if not applied:
         empty = not cfgscan._profile_own_binds(result, profile_file)
+        apply_info = cfgscan.existing_apply_script(result)
         return {"ok": True, "changed": False, "empty": empty, "file": profile_file,
+                "apply_keys": sorted((apply_info or {}).get("bound_to") or []),
                 "label": label, "applied": [], "skipped": [keys.label(k) for k in skipped]}
 
     # The first time any of these keys is ever overridden, remember what it
@@ -4377,6 +4431,21 @@ def _cloud_logout(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     return cloud.sign_out()
 
 
+def _overlay_pinned_context(state):
+    """Read saved profile names without rescanning configs or invoking web APIs."""
+    from . import profiles, setups, layouts
+    from .cli import load_prefs
+    prefs = load_prefs()
+    account = prefs.get('ui', {}).get('pinned_account')
+    if not account and state.steam_root:
+        from . import whoami
+        account, _ = whoami.current(state.steam_root, [u.account_id for u in state.users])
+    ui = profiles.ui_for(prefs, account)
+    current = layouts.load_current(state.cfg_scan.root) if state.cfg_scan else None
+    return {'theme': ui.get('theme', 'violet'),
+            'profiles': {'setup': setups.listing(ui).get('live'), 'layout': current}}
+
+
 def _setups(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     """Every named setup this account has, and which one it is following."""
     from . import profiles, setups
@@ -4587,7 +4656,10 @@ def _quit(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     import os
 
     def bye() -> None:
-        os._exit(0)
+        try:
+            _state.overlay.stop()
+        finally:
+            os._exit(0)
 
     threading.Timer(0.6, bye).start()
     return {"ok": True, "closing": True}
@@ -4752,6 +4824,11 @@ def make_handler(state: State):
         "/api/update/settings": _update_settings,
         "/api/quit": _quit,
         "/api/history": _history,
+        "/api/overlay/tools": _overlay_tools,
+        "/api/overlay/tool": _overlay_tool,
+        "/api/overlay": _overlay,
+        "/api/overlay/panel": _overlay_panel,
+        "/api/overlay/settings": _overlay_settings,
     }
 
     class Handler(BaseHTTPRequestHandler):
@@ -4807,6 +4884,13 @@ def make_handler(state: State):
                 return
 
             path = self.path.split("?", 1)[0]
+            if path == "/api/overlay/tools":
+                if self.headers.get("X-CS2CFG-Token") != state.token:
+                    self._send_json({"error": "bad or missing token"}, 403)
+                    return
+                with state.lock:
+                    self._send_json({"ok": True, **_overlay_tools(state, {})})
+                return
             if path in ("/", "/index.html"):
                 self._send_file(WEB_ROOT / "index.html")
                 return
@@ -5084,6 +5168,32 @@ def make_handler(state: State):
             self._send_json({"error": "not found"}, 404)
 
         def do_POST(self) -> None:
+            if self.path.split("?", 1)[0] == "/api/overlay/gsi":
+                from .overlay.gsi import MAX_BODY
+
+                # Valve uses its cfg secret rather than the browser API token.
+                # Reject before reading, then close so excess bytes cannot be reused.
+                self.close_connection = True
+                if not self._host_ok() or self.client_address[0] != "127.0.0.1":
+                    self._send_json({"error": "host not allowed"}, 403)
+                    return
+                try:
+                    length = int(self.headers.get("Content-Length", "0"))
+                    if self.headers.get("Transfer-Encoding") or not 0 < length <= MAX_BODY:
+                        self._send_json({"error": "invalid body size"}, 413)
+                        return
+                    self.connection.settimeout(2)
+                    raw = self.rfile.read(length)
+                    if len(raw) != length:
+                        raise ValueError("Incomplete GSI body")
+                    state.overlay.receive_gsi(raw)
+                except PermissionError:
+                    self._send_json({"error": "invalid GSI token"}, 403)
+                except (ValueError, OSError):
+                    self._send_json({"error": "invalid GSI body"}, 400)
+                else:
+                    self._send_json({"ok": True})
+                return
             # Drain the body first, before any check that might reject the
             # request. On a keep-alive connection an unread body stays in the
             # socket and gets parsed as the start of the next request, which
@@ -5162,6 +5272,26 @@ def serve(port: int = 8765, cfg_folder: str = "mrwhiteer",
     except Exception:
         pass
 
-    server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(state))
+    class AppServer(ThreadingHTTPServer):
+        def server_close(self) -> None:
+            try:
+                state.overlay.stop()
+            finally:
+                super().server_close()
+
+    server = AppServer(("127.0.0.1", port), make_handler(state))
     server.daemon_threads = True
+    from .cli import load_prefs
+    from .overlay.settings import read as overlay_settings
+
+    def overlay_install():
+        if state.cs2_install is None:
+            try:
+                state.cs2_install = steam.find_cs2_install(state.steam_root or steam.find_steam_root())
+            except steam.SteamError:
+                return None
+        return state.cs2_install
+
+    state.overlay.bind_gsi(overlay_install, server.server_address[1])
+    state.overlay.configure(overlay_settings(load_prefs().get("ui")))
     return server, state
