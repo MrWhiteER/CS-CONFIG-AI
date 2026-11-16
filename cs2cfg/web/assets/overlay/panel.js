@@ -11,7 +11,7 @@
   const response=await fetch(path,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json','X-CS2CFG-Token':window.overlayToken},...(body===undefined?{}:{body:JSON.stringify(body)}),signal});
   const data=await response.json();if(!response.ok||data.ok===false)throw new Error(data.error||'Request failed');return data;
  }
- function entry(id){return layout[id]||={open:['performance','hardware'].includes(id),pinned:false};}
+ function entry(id){const row=layout[id]||={open:['performance','hardware'].includes(id),pinned:false};row.opacity??=60;return row;}
  function visible(id){return active&&settings.overlay_tools.includes(id)&&entry(id).open;}
  function cancelTool(id){clearTimeout(timers.get(id));timers.delete(id);requests.get(id)?.abort();requests.delete(id);}
  async function refresh(tool,epoch){
@@ -42,6 +42,11 @@
   window.overlayRenderers[tool.id](view.body,data,call);
   if(preview)for(const control of view.body.querySelectorAll('input,select,button:not([data-range])'))control.disabled=true;
  }
+ function setOpacity(id,value){
+  const row=entry(id);row.opacity=Math.max(0,Math.min(100,Math.round(Number(value))));
+  const view=windows.get(id);if(view){view.element.style.setProperty('--surface-opacity',row.opacity+'%');view.element.dataset.clear=String(row.opacity===0);const input=view.element.querySelector('[data-opacity]');if(input){input.value=row.opacity;input.nextElementSibling.textContent=row.opacity+'%';}}
+ }
+ function dim(){document.body.classList[settings.overlay_dim_game===false?'add':'remove']('no-dim');}
  function bounds(){return $('workspace').getBoundingClientRect();}
  function place(tool){
   const view=windows.get(tool.id),row=entry(tool.id),area=bounds();
@@ -49,7 +54,7 @@
   const height=Math.min(Math.max(180,row.height||tool.default_size[1]),Math.max(180,area.height));
   const x=Math.max(0,Math.min(row.x??(tool.id==='hardware'?560:24+manifest.tools.indexOf(tool)*36),Math.max(0,area.width-width)));
   const y=Math.max(0,Math.min(row.y??(tool.id==='hardware'?12:12+manifest.tools.indexOf(tool)*24),Math.max(0,area.height-height)));
-  Object.assign(row,{x,y,width,height});Object.assign(view.element.style,{left:x+'px',top:y+'px',width:width+'px',height:height+'px'});
+  Object.assign(row,{x,y,width,height});if(row.pinned)Object.assign(row,{pinned_x:x+area.left,pinned_y:y+area.top});Object.assign(view.element.style,{left:x+'px',top:y+'px',width:width+'px',height:height+'px'});
  }
  function persist(){
   if(preview||!active)return Promise.resolve();
@@ -77,27 +82,29 @@
  }
  function createWindow(tool){
   const element=document.createElement('section');element.className='tool-window';element.dataset.tool=tool.id;element.setAttribute('role','region');element.setAttribute('aria-label',tool.title);
-  element.innerHTML='<header class="window-head">'+icon(tool.icon)+'<h2>'+e(tool.title)+'</h2>'+(tool.pinnable?'<button data-pin aria-label="Pin '+e(tool.title)+'" title="Keep visible over game">'+icon('pin')+'</button>':'')+'<button data-close aria-label="Close '+e(tool.title)+'">'+icon('close')+'</button></header><div class="tool-body"></div><button class="resize" aria-label="Resize '+e(tool.title)+'" title="Drag to resize; arrow keys also resize"></button>';
+  element.innerHTML='<header class="window-head">'+icon(tool.icon)+'<h2>'+e(tool.title)+'</h2>'+(tool.pinnable?'<button data-pin aria-label="Pin '+e(tool.title)+'" title="Keep visible over game">'+icon('pin')+'</button>':'')+'<label class="opacity-control" title="Background opacity"><input data-opacity type="range" min="0" max="100" aria-label="'+e(tool.title)+' background opacity"><output></output></label><button data-close aria-label="Close '+e(tool.title)+'">'+icon('close')+'</button></header><div class="tool-body"></div><button class="resize" aria-label="Resize '+e(tool.title)+'" title="Drag to resize; arrow keys also resize"></button>';
   const view={element,body:element.querySelector('.tool-body'),data:null};windows.set(tool.id,view);$('workspace').appendChild(element);
+  const opacity=element.querySelector('[data-opacity]');opacity.oninput=()=>setOpacity(tool.id,opacity.value);opacity.onchange=()=>persist();setOpacity(tool.id,entry(tool.id).opacity);
   element.onpointerdown=()=>element.style.zIndex=++z;
   element.querySelector('[data-close]').onclick=()=>toggleTool(tool,false);
-  const pin=element.querySelector('[data-pin]');if(pin){pin.setAttribute('aria-pressed',String(!!entry(tool.id).pinned));pin.onclick=()=>{entry(tool.id).pinned=!entry(tool.id).pinned;pin.setAttribute('aria-pressed',String(entry(tool.id).pinned));persist();};}
+  const pin=element.querySelector('[data-pin]');if(pin){pin.setAttribute('aria-pressed',String(!!entry(tool.id).pinned));pin.onclick=()=>{entry(tool.id).pinned=!entry(tool.id).pinned;pin.setAttribute('aria-pressed',String(entry(tool.id).pinned));place(tool);persist();};}
   const head=element.querySelector('.window-head'),resize=element.querySelector('.resize');
   const drag=(handle,resizing)=>handle.onpointerdown=event=>{
-   if(event.button!==0||event.target.closest('button')!==null&&!resizing)return;
+   if(event.button!==0||event.target.closest('button,input,label')!==null&&!resizing)return;
    event.preventDefault();handle.setPointerCapture(event.pointerId);const start={...entry(tool.id)},sx=event.clientX,sy=event.clientY;
    handle.onpointermove=ev=>{const row=entry(tool.id);if(resizing){row.width=start.width+ev.clientX-sx;row.height=start.height+ev.clientY-sy;}else{row.x=start.x+ev.clientX-sx;row.y=start.y+ev.clientY-sy;}place(tool);};
    handle.onpointerup=handle.onpointercancel=()=>{handle.onpointermove=null;handle.onpointerup=null;handle.onpointercancel=null;persist();};
   };
   drag(head,false);drag(resize,true);head.tabIndex=0;head.setAttribute('aria-label','Move '+tool.title+' with arrow keys');
-  for(const [handle,resizing] of [[head,false],[resize,true]])handle.onkeydown=ev=>{if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(ev.key))return;ev.preventDefault();const row=entry(tool.id),delta=ev.shiftKey?40:10;if(ev.key==='ArrowLeft'||ev.key==='ArrowRight')row[resizing?'width':'x']+=(ev.key==='ArrowLeft'?-delta:delta);else row[resizing?'height':'y']+=(ev.key==='ArrowUp'?-delta:delta);place(tool);persist();};
+  for(const [handle,resizing] of [[head,false],[resize,true]])handle.onkeydown=ev=>{if(ev.target&&ev.target!==handle&&ev.target.closest('input,button,select'))return;if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(ev.key))return;ev.preventDefault();const row=entry(tool.id),delta=ev.shiftKey?40:10;if(ev.key==='ArrowLeft'||ev.key==='ArrowRight')row[resizing?'width':'x']+=(ev.key==='ArrowLeft'?-delta:delta);else row[resizing?'height':'y']+=(ev.key==='ArrowUp'?-delta:delta);place(tool);persist();};
   element.hidden=!entry(tool.id).open||!settings.overlay_tools.includes(tool.id);place(tool);
  }
  function applySettings(value){
-  settings={...settings,...value};
+  settings={...settings,...value};dim();
   // Local geometry may have changed since the settings tool was opened.
   settings.overlay_layout=layout;
   for(const tool of manifest.tools){const view=windows.get(tool.id);view.element.hidden=!settings.overlay_tools.includes(tool.id)||!entry(tool.id).open;if(view.element.hidden)cancelTool(tool.id);else if(!requests.has(tool.id)&&!timers.has(tool.id))refresh(tool,generation);}
+  for(const tool of manifest.tools)setOpacity(tool.id,entry(tool.id).opacity);
   dock();
  }
  function clock(){if(!active)return;$('clock').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});if(!preview)clockTimer=setTimeout(clock,1000);}
@@ -108,7 +115,8 @@
    if(!active||epoch!==generation)return;
    document.documentElement.dataset.theme=params.get('theme')||manifest.theme;
    settings=manifest.settings;settings.overlay_tools||=manifest.tools.map(t=>t.id);layout=structuredClone(settings.overlay_layout||{});
-   // Pinned forms share the native HUD's two supported tools, never a WebView.
+   dim();
+   // Migrate the existing telemetry HUD to the native pinned forms.
    if(!Object.keys(layout).length){entry('performance').pinned=true;entry('hardware').pinned=true;}
    windows.clear();$('workspace').replaceChildren();for(const tool of manifest.tools)createWindow(tool);
    dock();clock();$('shortcut').textContent=settings.overlay_panel_hotkey+' to return to game';
@@ -131,7 +139,7 @@
   api('/api/overlay/panel',{action:'close'},null).catch(()=>{});
  }
  window.overlayPanelActive=value=>{requested=!!value;if(value&&!document.hidden)start();else stop();};
- window.overlayShell={get tools(){return manifest?.tools||[];},applySettings,close,showTool:id=>{const tool=manifest.tools.find(t=>t.id===id);if(tool)toggleTool(tool,true);},get layout(){return layout;}};
+ window.overlayShell={get tools(){return manifest?.tools||[];},applySettings,close,showTool:id=>{const tool=manifest.tools.find(t=>t.id===id);if(tool)toggleTool(tool,true);},setOpacity,saveLayout:persist,get layout(){return layout;}};
  $('close').onclick=close;$('backdrop').onclick=close;
  document.addEventListener('keydown',event=>{if(event.key==='Escape')close();});
  document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();else if(requested)start();});

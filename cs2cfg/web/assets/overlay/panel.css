@@ -14,3 +14,21 @@ table{width:100%;border-collapse:collapse;text-align:left;font-size:12px}th{font
 :root[data-theme="daylight"],:root[data-theme="paper"]{color-scheme:light}
 
 [hidden]{display:none!important}
+/* Background opacity changes surfaces only; foreground remains fully legible. */
+body.no-dim #backdrop{background:transparent;backdrop-filter:none}
+.tool-window{--surface-opacity:60%;background:rgb(from var(--panel) r g b / var(--surface-opacity));text-shadow:-1px -1px 0 #0c0c0c,1px -1px 0 #0c0c0c,-1px 1px 0 #0c0c0c,1px 1px 0 #0c0c0c}
+.tool-window .window-head{background:color-mix(in srgb,var(--panel-2) var(--surface-opacity),transparent)}
+.tool-window button,.tool-window select,.tool-window input[type=text]{background:color-mix(in srgb,var(--chip) var(--surface-opacity),transparent)}
+.tool-window button:hover{background:color-mix(in srgb,var(--panel-2) var(--surface-opacity),transparent)}
+.tool-window .primary,.tool-window button[aria-pressed=true]{background:color-mix(in srgb,var(--accent-dim) var(--surface-opacity),transparent)}
+.tool-window[data-clear=true]{border-color:transparent;box-shadow:none}
+.tool-window[data-clear=true] .window-head,.tool-window[data-clear=true] button,.tool-window[data-clear=true] input,.tool-window[data-clear=true] select{border-color:transparent}
+.tool-window svg{filter:drop-shadow(1px 1px 0 #0c0c0c) drop-shadow(-1px -1px 0 #0c0c0c)}
+.tool-window .trace{filter:drop-shadow(0 1px 0 #0c0c0c) drop-shadow(0 -1px 0 #0c0c0c)}
+.opacity-control{margin:0;display:flex;align-items:center;gap:4px;cursor:default;font-size:9px;flex-shrink:0;color:var(--ink)}
+.opacity-control input{width:44px;accent-color:var(--accent);margin:0}.opacity-control output{min-width:25px;font-variant-numeric:tabular-nums}
+.opacity-setting{display:grid;grid-template-columns:1fr 90px 30px;gap:10px;align-items:center}.opacity-setting input{width:90px;accent-color:var(--accent)}
+.tool-window .window-head,.tool-window button,.tool-window button:hover,.tool-window select,.tool-window input[type=text],.tool-window .primary,.tool-window button[aria-pressed=true]{background:transparent}
+:root[data-theme="daylight"] .tool-window,:root[data-theme="paper"] .tool-window{text-shadow:-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff,1px 1px 0 #fff}
+.opacity-settings{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;column-gap:24px}.opacity-settings h3,.opacity-settings p{grid-column:1/-1}.opacity-settings label{margin:5px 0}
+@container(max-width:550px){.opacity-settings{grid-template-columns:1fr}}

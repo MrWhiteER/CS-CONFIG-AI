@@ -75,6 +75,7 @@ class State:
         from .overlay.service import OverlayService
 
         self.overlay = OverlayService()  # Inert until enabled in preferences.
+        self.overlay.pinned_context = lambda: _overlay_pinned_context(self)
 
     def refresh(self, rescan: bool = False) -> None:
         if self.machine is None or rescan:
@@ -4360,6 +4361,21 @@ def _cloud_logout(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
 
     state._login = None
     return cloud.sign_out()
+
+
+def _overlay_pinned_context(state):
+    """Read saved profile names without rescanning configs or invoking web APIs."""
+    from . import profiles, setups, layouts
+    from .cli import load_prefs
+    prefs = load_prefs()
+    account = prefs.get('ui', {}).get('pinned_account')
+    if not account and state.steam_root:
+        from . import whoami
+        account, _ = whoami.current(state.steam_root, [u.account_id for u in state.users])
+    ui = profiles.ui_for(prefs, account)
+    current = layouts.load_current(state.cfg_scan.root) if state.cfg_scan else None
+    return {'theme': ui.get('theme', 'violet'),
+            'profiles': {'setup': setups.listing(ui).get('live'), 'layout': current}}
 
 
 def _setups(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:

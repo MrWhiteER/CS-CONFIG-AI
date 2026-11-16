@@ -77,6 +77,9 @@ class PanelScript(unittest.TestCase):
     def test_layout_pin_and_closed_tool_survive_reopen(self):
         self.check_script("layout")
 
+    def test_opacity_controls_all_pins_and_dim_persist(self):
+        self.check_script("opacity")
+
     def test_settings_disable_tool_and_update_dock(self):
         self.check_script("settings")
 

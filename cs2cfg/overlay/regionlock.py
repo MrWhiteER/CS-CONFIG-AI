@@ -49,6 +49,12 @@ class RegionLock:
                               "regions": self._regions, "status": self._status,
                               "poll": self.visible and bool(self._status.get("busy"))})
 
+    def native_snapshot(self):
+        """Read-only pinned status; no region listing, operations or WebView."""
+        if self.module is not None and self.clock() >= self._next:
+            self._refresh()
+        return self.snapshot()
+
     def open(self):
         self.visible = True
         if self.module is not None:

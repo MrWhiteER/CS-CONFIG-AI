@@ -21,7 +21,7 @@ class Registry(unittest.TestCase):
     def test_explicit_unique_registry_and_native_pin_support(self):
         self.assertEqual(tuple(REGISTRY), layout.IDS)
         self.assertEqual(len(TOOLS), 6)
-        self.assertEqual({t.id for t in TOOLS if t.pinnable}, {'performance', 'hardware'})
+        self.assertEqual({t.id for t in TOOLS if t.pinnable}, set(layout.IDS) - {'settings'})
         for tool in TOOLS:
             self.assertTrue(callable(tool.data))
             self.assertGreaterEqual(tool.refresh_hz, 0)
@@ -74,7 +74,7 @@ class LayoutSettings(unittest.TestCase):
         self.assertTrue(settings.read(prefs['ui'])['overlay_layout']['performance']['pinned'])
 
     def test_invalid_pins_ids_coordinates_and_order_rejected(self):
-        for value in ({'unknown': {}}, {'events': {'pinned': True}},
+        for value in ({'unknown': {}}, {'settings': {'pinned': True}},
                       {'performance': {'x': float('nan')}}, {'hardware': {'pinned': 1}},
                       {'hardware': []}):
             with self.subTest(value=value), self.assertRaises(ValueError):
@@ -309,5 +309,5 @@ class ActiveTheme(unittest.TestCase):
 class PinPlacement(unittest.TestCase):
     def test_saved_positions_are_clamped_to_new_monitor(self):
         from cs2cfg.overlay.service import pinned_position
-        self.assertEqual(pinned_position((-1920, 0, 0, 1080), {'x': 9999, 'y': 9999}), (-640, 960))
+        self.assertEqual(pinned_position((-1920, 0, 0, 1080), {'x': 9999, 'y': 9999}), (-360, 960))
         self.assertEqual(pinned_position((100, 200, 2020, 1280), {'x': 70, 'y': 90}), (170, 290))

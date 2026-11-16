@@ -184,7 +184,7 @@ class ServiceLifecycle(unittest.TestCase):
 
     def run_game(self, *, ready=True, capture_status="waiting", stall=False):
         service = OverlayService()
-        service._settings = settings.read({"overlay_enabled": True})
+        service._settings = settings.read({"overlay_enabled": True, "overlay_always_visible": True})
         service._stop = mock.Mock()
         service._stop.is_set.side_effect = [False, True]
         service._stop.wait.return_value = False
@@ -200,6 +200,7 @@ class ServiceLifecycle(unittest.TestCase):
               mock.patch("cs2cfg.overlay.hud.Hud") as hud,
               mock.patch("cs2cfg.overlay.permissions.frame_capture_ready", return_value=ready),
               mock.patch("cs2cfg.overlay.service.PresentMon") as capture):
+            hud.side_effect = lambda **kwargs: mock.Mock() if kwargs.get("register_hotkeys") is False else hud.return_value
             cpu.return_value.cpu_percent.return_value = 10
             gpu.return_value.sample.return_value = {"gpu_percent": 20, "gpu_temp_c": 60}
             capture.return_value.status.return_value = capture_status
@@ -234,7 +235,7 @@ class ServiceLifecycle(unittest.TestCase):
         self.assertEqual(service.summary()["worst_freeze_ms"], 500)
         self.assertEqual(service.snapshot()["events"][0]["type"], "not_responding")
         hud.return_value.set_allowed.assert_any_call(True)
-        text = " ".join(display_lines(hud.return_value.update.call_args.args[0]))
+        text = " ".join(display_lines(hud.return_value.update.call_args.args[0]["current"]))
         self.assertIn("FPS \u2014", text)
         self.assertIn("Frame \u2014", text)
         self.assertIn("CPU 10.0%", text)

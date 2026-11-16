@@ -13,4 +13,4 @@ def layout(state, args):
     return _cfg_layouts_apply(state, {'file': args.get('file')})
 
 TOOL = Tool('profiles', 'Profiles', 'layers', data,
-            {'setup': setup, 'layout': layout}, refresh_hz=0, default_size=(350, 330))
+            {'setup': setup, 'layout': layout}, refresh_hz=0, default_size=(350, 330), pinnable=True)

@@ -7,6 +7,7 @@ from .layout import IDS, validate
 FIELDS = ("fps", "one_percent_low", "frame_time_ms", "cpu_percent", "gpu_percent", "gpu_temp_c")
 CORNERS = ("top_left", "top_right", "bottom_left", "bottom_right")
 DEFAULTS = {
+    "overlay_dim_game": True,
     "overlay_layout": {},
     "overlay_tools": list(IDS),
     "overlay_enabled": False,

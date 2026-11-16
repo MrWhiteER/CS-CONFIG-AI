@@ -38,13 +38,14 @@ def hud_position(rect: tuple, corner: str) -> tuple[int, int]:
 
 def pinned_position(rect, row, corner="top_left", offset=0):
     """Keep native widgets reachable when the game's monitor changes."""
-    from .hud import WIDTH, HEIGHT
+    from .hud import PIN_WIDTH, HEIGHT
     left, top, right, bottom = rect
-    x, y = hud_position(rect, corner)
+    x = max(left + 20, right - PIN_WIDTH - 20) if corner.endswith("right") else left + 20
+    y = max(top + 20, bottom - HEIGHT - 20) if corner.startswith("bottom") else top + 20
     y += -offset if corner.startswith("bottom") else offset
-    x = left + row['x'] if 'x' in row else x
-    y = top + row['y'] if 'y' in row else y
-    return (max(left, min(x, right - WIDTH)), max(top, min(y, bottom - HEIGHT)))
+    x = left + row.get('pinned_x', row.get('x', x - left))
+    y = top + row.get('pinned_y', row.get('y', y - top))
+    return (max(left, min(x, right - PIN_WIDTH)), max(top, min(y, bottom - HEIGHT)))
 
 
 class OverlayService:
@@ -62,6 +63,9 @@ class OverlayService:
         self._hwnd = None
         self.panel = None
         self._hardware_widget = None
+        self._widgets = {}
+        self._widget_failed = set()
+        self.pinned_context = lambda: {}
         self._hardware_widget_failed = False
         self._modes = {}
         self._status = "disabled"
@@ -108,6 +112,9 @@ class OverlayService:
             self._game_state.update(state)
             if self._hud:
                 self._configure_hud(self._settings)
+                if not self._game_state.visible(auto_hide=self._settings['overlay_auto_hide'],
+                                                always_visible=self._settings['overlay_always_visible']):
+                    self.suspend_pins()
 
     def _reset_totals(self) -> None:
         self._frame_count = 0
@@ -350,7 +357,8 @@ class OverlayService:
         if self.panel:
             self.panel.hide(restore=False)
         # Independent cleanup: a failed native resource cannot strand capture.
-        for resource, method in ((self._hud, "stop"), (self._hardware_widget, "stop"),
+        for resource, method in (*[(widget, "stop") for widget in self._widgets.values()],
+                                 (self._hud, "stop"), (self._hardware_widget, "stop"),
                                  (self._capture, "stop"), (self._gpu, "close")):
             if resource:
                 try:
@@ -368,6 +376,8 @@ class OverlayService:
             self._aggregator = None
             self._hardware_widget = None
             self._hardware_widget_failed = False
+            self._widgets.clear()
+            self._widget_failed.clear()
             self._hwnd = None
 
     def _configure_hud(self, wanted):
@@ -379,7 +389,7 @@ class OverlayService:
                                 always_visible=wanted["overlay_always_visible"]))
 
     def suspend_pins(self):
-        for widget in (self._hud, self._hardware_widget):
+        for widget in (self._hud, self._hardware_widget, *self._widgets.values()):
             if widget:
                 widget.set_allowed(False)
 
@@ -390,42 +400,66 @@ class OverlayService:
         return [f for f in wanted['overlay_fields'] if f in settings.FIELDS[:3]]
 
     def _update_pins(self, sample, found, allowed):
-        layout = self._settings['overlay_layout']
-        if not layout:
-            return
-        manual_visible = self._hud.pin_requested()
-        native_visible = (allowed and manual_visible and not (self.panel and self.panel.visible)
+        layout = self._settings['overlay_layout'] or {
+            'performance': {'pinned': True}, 'hardware': {'pinned': True}}
+        has_pins = any(row.get('pinned') and tool in self._settings['overlay_tools']
+                       for tool, row in layout.items())
+        native_visible = (has_pins and allowed and self._hud.pin_requested() and not (self.panel and self.panel.visible)
                           and self._game_state.visible(
                               auto_hide=self._settings['overlay_auto_hide'],
                               always_visible=self._settings['overlay_always_visible']))
-        performance = layout.get('performance', {})
-        self._hud.set_allowed(native_visible and performance.get('pinned', False)
-                              and 'performance' in self._settings['overlay_tools'])
-        if performance.get('pinned'):
-            self._hud.update(sample, pinned_position(
-                found.rect, performance, self._settings['overlay_corner']))
-        hardware = layout.get('hardware', {})
-        pinned = hardware.get('pinned', False) and 'hardware' in self._settings['overlay_tools']
-        if pinned and self._hardware_widget is None and not self._hardware_widget_failed:
-            from .hud import Hud
-            self._hardware_widget = Hud(register_hotkeys=False)
-            self._hardware_widget.set_allowed(False)
-            try:
-                self._hardware_widget.start()
-            except (OSError, RuntimeError) as exc:
-                self._error = f"Hardware widget: {exc}"
-                self._hardware_widget.stop()
-                self._hardware_widget = None
-                self._hardware_widget_failed = True
-        if self._hardware_widget:
-            self._hardware_widget.configure(
-                fields=[f for f in self._settings['overlay_fields'] if f in settings.FIELDS[3:]],
-                hotkey=self._settings['overlay_hotkey'],
-                exclude_from_capture=self._settings['overlay_hide_from_capture'],
-                auto_visible=True)
-            self._hardware_widget.set_allowed(native_visible and pinned)
-            self._hardware_widget.update(sample, pinned_position(
-                found.rect, hardware, self._settings['overlay_corner'], offset=140))
+        # Only cheap read-only sources run here; never call tool dispatch or a WebView.
+        try:
+            context = self.pinned_context() if native_visible else {}
+        except (OSError, ValueError) as exc:
+            context = {}
+            self._error = f'Pinned profile status: {exc}'
+        for index, tool in enumerate(('performance', 'hardware', 'events', 'profiles', 'serverlock')):
+            row = layout.get(tool, {})
+            pinned = row.get('pinned', False) and tool in self._settings['overlay_tools']
+            widget = (self._hud if tool == 'performance' else self._hardware_widget
+                      if tool == 'hardware' else self._widgets.get(tool))
+            failed = self._hardware_widget_failed if tool == 'hardware' else tool in self._widget_failed
+            if pinned and widget is None and not failed:
+                from .hud import Hud
+                widget = Hud(register_hotkeys=False)
+                widget.set_allowed(False)
+                try:
+                    widget.start()
+                    if tool == 'hardware':
+                        self._hardware_widget = widget
+                    else:
+                        self._widgets[tool] = widget
+                except (OSError, RuntimeError) as exc:
+                    self._error = f'{tool} widget: {exc}'
+                    widget.stop()
+                    self._widget_failed.add(tool)
+                    if tool == 'hardware':
+                        self._hardware_widget_failed = True
+                    continue
+            if widget is None:
+                continue
+            widget.configure(fields=self._settings['overlay_fields'],
+                             hotkey=self._settings['overlay_hotkey'],
+                             panel_hotkey=self._settings['overlay_panel_hotkey'],
+                             exclude_from_capture=self._settings['overlay_hide_from_capture'],
+                             auto_visible=True, tool=tool, opacity=row.get('opacity', 60),
+                             theme=context.get('theme', 'violet'))
+            widget.set_allowed(native_visible and pinned)
+            if not (native_visible and pinned):
+                continue
+            data = sample
+            if tool == 'performance':
+                with self._lock:
+                    data = {'current': sample, 'history': list(self._history)[-60:]}
+            elif tool == 'events':
+                with self._lock:
+                    data = {'events': sorted(self._events, key=lambda e: e['at'], reverse=True)[:4]}
+            elif tool == 'profiles':
+                data = context.get('profiles', {})
+            elif tool == 'serverlock':
+                data = self.panel.regions.native_snapshot() if self.panel else {'text': 'Coming soon'}
+            widget.update(data, pinned_position(found.rect, row, self._settings['overlay_corner'], offset=index * 140))
 
     def panel_allowed(self):
         return bool(self._settings["overlay_enabled"] and self._hwnd)
@@ -483,13 +517,7 @@ class OverlayService:
                                     else "")
                 focused = allowed and window.foreground_hwnd() == found.hwnd
                 self._configure_hud(self._settings)
-                if self._settings['overlay_layout']:
-                    self._update_pins(sample, found, focused)
-                else:
-                    if self._hardware_widget:
-                        self._hardware_widget.set_allowed(False)
-                    self._hud.set_allowed(focused)
-                    self._hud.update(sample, hud_position(found.rect, self._settings["overlay_corner"]))
+                self._update_pins(sample, found, focused)
                 next_tick += 1
                 if next_tick < time.monotonic():
                     next_tick = time.monotonic() + 1

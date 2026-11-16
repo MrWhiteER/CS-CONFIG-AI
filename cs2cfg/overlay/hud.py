@@ -17,6 +17,7 @@ WS_EX_TOPMOST = 0x00000008
 WS_EX_TOOLWINDOW = 0x00000080
 WS_EX_NOACTIVATE = 0x08000000
 WIDTH, HEIGHT = 640, 120
+PIN_WIDTH = 360
 
 
 class Hotkeys:
@@ -81,6 +82,9 @@ class Hud:
     def __init__(self, exclude_from_capture: bool = False, *, corner="top_left",
                  fields=FIELDS, hotkey="Ctrl+Alt+O", panel_hotkey="Ctrl+Alt+P",
                  on_panel=None, register_hotkeys=True) -> None:
+        self.tool = None
+        self.opacity = 60
+        self.theme = "violet"
         self.exclude = exclude_from_capture
         self.corner, self.fields, self.hotkey = corner, tuple(fields), hotkey
         self._chord = parse_hotkey(hotkey)
@@ -147,12 +151,18 @@ class Hud:
                 self._kernel.SetEvent(self._wake)
 
     def configure(self, *, fields, hotkey: str, panel_hotkey="Ctrl+Alt+P",
-                  exclude_from_capture=None, auto_visible=True) -> None:
+                  exclude_from_capture=None, auto_visible=True, tool=None, opacity=None, theme=None) -> None:
         chord = parse_hotkey(hotkey)
         with self._lock:
             self.fields, self.hotkey, self._chord = tuple(fields), hotkey, chord
             self._panel_chord = parse_hotkey(panel_hotkey)
             self._auto_visible = auto_visible
+            if tool is not None:
+                self.tool = tool
+            if opacity is not None:
+                self.opacity = opacity
+            if theme is not None:
+                self.theme = theme
             if exclude_from_capture is not None:
                 self.exclude = exclude_from_capture
             if self._wake:
@@ -232,6 +242,10 @@ class Hud:
         bind(gdi, "SetBkMode", ctypes.c_int, [w.HDC, ctypes.c_int])
         bind(gdi, "TextOutW", w.BOOL, [w.HDC, ctypes.c_int, ctypes.c_int, w.LPCWSTR, ctypes.c_int])
         bind(gdi, "GdiFlush", w.BOOL, [])
+        bind(gdi, "CreateFontW", w.HFONT, [ctypes.c_int] * 5 + [w.DWORD] * 8 + [w.LPCWSTR])
+        bind(gdi, "CreatePen", w.HANDLE, [ctypes.c_int, ctypes.c_int, w.DWORD])
+        bind(gdi, "MoveToEx", w.BOOL, [w.HDC, ctypes.c_int, ctypes.c_int, ptr])
+        bind(gdi, "LineTo", w.BOOL, [w.HDC, ctypes.c_int, ctypes.c_int])
 
         @proc_type
         def procedure(hwnd, message, wp, lp):
@@ -242,6 +256,7 @@ class Hud:
             return user.DefWindowProcW(hwnd, message, wp, lp)
 
         hwnd = dc = bitmap = old_bitmap = old_font = wake = None
+        font = None
         registered = False
         shortcuts = None
         instance = kernel.GetModuleHandleW(None)
@@ -263,7 +278,8 @@ class Hud:
             if not hwnd:
                 raise ctypes.WinError(ctypes.get_last_error())
             shortcuts = Hotkeys(user, hwnd)
-            shortcuts.configure(self._chord, self._panel_chord if self.on_panel else None)
+            shortcuts.configure(self._chord if self.register_hotkeys else None,
+                                self._panel_chord if self.on_panel and self.register_hotkeys else None)
             self.warning = shortcuts.warning
             set_capture_exclusion(hwnd, self.exclude)
             excluded = self.exclude
@@ -276,11 +292,12 @@ class Hud:
             if not dc or not bitmap:
                 raise ctypes.WinError(ctypes.get_last_error())
             old_bitmap = gdi.SelectObject(dc, bitmap)
-            old_font = gdi.SelectObject(dc, gdi.GetStockObject(17))  # DEFAULT_GUI_FONT
+            font = gdi.CreateFontW(-16, 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 3, 0, "Segoe UI")
+            old_font = gdi.SelectObject(dc, font or gdi.GetStockObject(17))
             gdi.SetBkMode(dc, 1)
             gdi.SetTextColor(dc, 0x00EEEEEE)
             pixels = (ctypes.c_ubyte * (WIDTH * HEIGHT * 4)).from_address(bits.value)
-            background = bytes((22, 22, 22, 255)) * (WIDTH * HEIGHT)
+            background = bytes(WIDTH * HEIGHT * 4)
             last_drawn = None
             last_at = -math.inf
             shown = False
@@ -305,7 +322,11 @@ class Hud:
                     if shortcuts.desired != desired:
                         shortcuts.configure(*desired)
                         self.warning = shortcuts.warning
-                    lines = display_lines(self._sample, self.fields, self.hotkey)
+                    from .pinned import render, composite, palette
+                    model = render(self.tool, self._sample, self.fields) if self.tool else {
+                        'lines': display_lines(self._sample, self.fields, self.hotkey), 'graph': ()}
+                    lines, graph = model['lines'], model['graph']
+                    opacity, colors = self.opacity, palette(self.theme)
                     position = self._position
                     if excluded != self.exclude:
                         set_capture_exclusion(hwnd, self.exclude)
@@ -314,19 +335,36 @@ class Hud:
                 if shown and not self.visible:
                     user.ShowWindow(hwnd, 0)
                     shown = False
-                state = lines, position
+                state = lines, graph, position, opacity, colors
                 now = time.monotonic()
                 changed = state != last_drawn
                 if self.visible and changed and now - last_at >= 0.5:
                     ctypes.memmove(bits, background, len(background))
-                    for index, line in enumerate(lines):
-                        gdi.TextOutW(dc, 12, 9 + index * 26, line, len(line))
+                    # Outline and foreground are distinct nonzero mask colours.
+                    # Non-antialiased GDI avoids ClearType fringes on transparent pixels.
+                    for color, offsets in ((0x00181818, ((-1,-1),(0,-1),(1,-1),(-1,0),(1,0),(-1,1),(0,1),(1,1))),
+                                           (0x00FFFFFF, ((0,0),))):
+                        gdi.SetTextColor(dc, color)
+                        for index, line in enumerate(lines):
+                            for dx, dy in offsets:
+                                gdi.TextOutW(dc, 12 + dx, 7 + index * 21 + dy, line, len(line))
+                    if len(graph) > 1:
+                        peak = max(10, max(graph))
+                        points = [(12 + round(i * 300 / (len(graph)-1)), 111 - round(v * 34 / peak))
+                                  for i, v in enumerate(graph)]
+                        for width, color in ((4, 0x00181818), (2, 0x0000FF00)):
+                            pen = gdi.CreatePen(0, width, color)
+                            old_pen = gdi.SelectObject(dc, pen)
+                            gdi.MoveToEx(dc, *points[0], None)
+                            for point in points[1:]:
+                                gdi.LineTo(dc, *point)
+                            gdi.SelectObject(dc, old_pen)
+                            gdi.DeleteObject(pen)
                     gdi.GdiFlush()
-                    # GDI text clears alpha bytes. The panel is opaque in the
-                    # DIB and uniformly translucent through the blend alpha.
-                    pixels[3::4] = b"\xff" * (WIDTH * HEIGHT)
-                    destination, size, source = w.POINT(*position), w.SIZE(WIDTH, HEIGHT), w.POINT(0, 0)
-                    blend = BLEND(0, 0, 235, 1)
+                    output = composite(bytes(pixels), opacity, colors)
+                    ctypes.memmove(bits, bytes(output), len(output))
+                    destination, size, source = w.POINT(*position), w.SIZE(PIN_WIDTH if self.tool else WIDTH, HEIGHT), w.POINT(0, 0)
+                    blend = BLEND(0, 0, 255, 1)
                     if not user.UpdateLayeredWindow(hwnd, None, ctypes.byref(destination), ctypes.byref(size),
                                                      dc, ctypes.byref(source), 0, ctypes.byref(blend), 2):
                         raise ctypes.WinError(ctypes.get_last_error())
@@ -350,6 +388,8 @@ class Hud:
                 user.DestroyWindow(hwnd)
             if old_font:
                 gdi.SelectObject(dc, old_font)
+            if font:
+                gdi.DeleteObject(font)
             if old_bitmap:
                 gdi.SelectObject(dc, old_bitmap)
             if bitmap:

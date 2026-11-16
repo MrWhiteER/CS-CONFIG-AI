@@ -1,7 +1,9 @@
 ﻿/* Dependency-free DOM and manual clock for the production shell and renderers. */
 const assert=require('node:assert/strict'),fs=require('fs'),vm=require('vm');
 class Element{
- constructor(tag='div'){this.tagName=tag.toUpperCase();this.attrs={};this.children=[];this.parentElement=null;this.style={};this.dataset={};this._text='';this.listeners={};this.hidden=false;this.disabled=false;this.checked=false;this.selected=false;this._value='';this.classList={add:(...c)=>{this.className=[...new Set([...this.className.split(' '),...c])].join(' ');},remove:(...c)=>{this.className=this.className.split(' ').filter(x=>!c.includes(x)).join(' ');},contains:c=>this.className.split(' ').includes(c)};}
+ constructor(tag='div'){this.tagName=tag.toUpperCase();this.attrs={};this.children=[];this.parentElement=null;this.style={setProperty(k,v){this[k]=v;}};this.dataset={};this._text='';this.listeners={};this.hidden=false;this.disabled=false;this.checked=false;this.selected=false;this._value='';this.classList={add:(...c)=>{this.className=[...new Set([...this.className.split(' '),...c])].join(' ');},remove:(...c)=>{this.className=this.className.split(' ').filter(x=>!c.includes(x)).join(' ');},contains:c=>this.className.split(' ').includes(c)};}
+ get nextElementSibling(){const siblings=this.parentElement?.children||[];return siblings[siblings.indexOf(this)+1]||null;}
+ before(node){const parent=this.parentElement;node.parentElement=parent;parent.children.splice(parent.children.indexOf(this),0,node);}
  get id(){return this.attrs.id||'';}set id(v){this.attrs.id=v;}
  get className(){return this.attrs.class||'';}set className(v){this.attrs.class=v;}
  get value(){if(this.tagName==='SELECT')return (this.children.find(c=>c.selected)||this.children[0])?.value||'';return this._value;}
@@ -97,6 +99,16 @@ async function run(scenario){
   const resize=tool('performance').querySelector('.resize');resize.onpointerdown({button:0,target:resize,clientX:0,clientY:0,pointerId:2,preventDefault(){}});resize.onpointermove({clientX:60,clientY:20});resize.onpointerup();await flush();assert.equal(requests.at(-1).body.overlay_layout.performance.width,570);
  }else if(scenario==='close'){
   const before=count('performance');await $('close').click();await flush();assert.equal(timers.size,0);assert.equal(requests.at(-1).path,'/api/overlay/panel');assert.equal(requests.at(-1).body.action,'close');await tick();assert.equal(count('performance'),before);
+ }else if(scenario==='opacity'){
+  for(const id of ['performance','hardware','events','profiles','serverlock','settings']){
+   win.overlayShell.showTool(id);await flush();const input=q(id,'[data-opacity]');assert.equal(Number(input.value),60);
+   input.value=0;input.oninput();await input.onchange();await flush();assert.equal(requests.at(-1).body.overlay_layout[id].opacity,0);assert.equal(tool(id).dataset.clear,'true');
+   if(id==='settings')assert.equal(q(id,'[data-pin]'),null);else assert(q(id,'[data-pin]'));
+  }
+  hide();win.overlayPanelActive(true);await flush();assert.equal(Number(q('performance','[data-opacity]').value),0);
+  win.overlayShell.showTool('settings');await flush();const slider=q('settings','[data-tool-opacity="hardware"]');slider.value=100;slider.oninput();slider.onchange();await flush();assert.equal(win.overlayShell.layout.hardware.opacity,100);assert.equal(Number(q('hardware','[data-opacity]').value),100);
+  const dim=q('settings','[data-setting="overlay_dim_game"]');assert.equal(dim.checked,true);dim.checked=false;await q('settings','[data-save]').click();await flush();assert(document.body.classList.contains('no-dim'));assert.equal(fixture.manifest.settings.overlay_dim_game,false);
+  hide();win.overlayPanelActive(true);await flush();assert(document.body.classList.contains('no-dim'));
  }else if(scenario==='settings'){
   win.overlayShell.showTool('settings');await flush();const check=q('settings','[data-tool="hardware"]');check.checked=false;check.onchange();await q('settings','[data-save]').click();await flush();assert.equal(document.querySelector('[data-launch="hardware"]'),null);assert.equal(tool('hardware').hidden,true);
  }

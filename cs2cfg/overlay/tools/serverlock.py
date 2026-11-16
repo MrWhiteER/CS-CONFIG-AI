@@ -14,4 +14,4 @@ def unlock(state, args):
     return state.overlay.panel.regions.request()
 
 TOOL = Tool('serverlock', 'Server lock', 'globe', data,
-            {'lock': lock, 'unlock': unlock}, default_size=(350, 320))
+            {'lock': lock, 'unlock': unlock}, default_size=(350, 320), pinnable=True)
