@@ -75,6 +75,8 @@ class State:
         self.faceit: Optional[Dict[str, Any]] = None  # cached profile + history
         self.sync: Optional[Any] = None      # autosync.Loop, once started
         self.server_ping: Optional[Any] = None  # on-demand Valve relay survey
+        from .goxlr import Controller
+        self.goxlr = Controller()            # no I/O or background work at startup
 
     def refresh(self, rescan: bool = False) -> None:
         if self.machine is None or rescan:
@@ -2637,6 +2639,80 @@ def _audio(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     return audio.summary()
 
 
+def _goxlr_context(state: State, ui: Optional[Dict[str, Any]] = None,
+                   account: Optional[str] = None) -> Dict[str, Any]:
+    from . import goxlr, setups
+    from .cli import load_prefs
+    if ui is None:
+        account = _active_account(state)
+        ui = profiles.ui_for(load_prefs(), account)
+    names = [s["name"] for s in setups.listing(ui)["setups"]]
+    return {"setup_names": names, "bindings": goxlr.bindings(ui, account, names)}
+
+
+def _goxlr(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import goxlr
+    return {"ok": True, **goxlr.detect(str(body.get("serial") or "")), **_goxlr_context(state)}
+
+
+def _goxlr_switch(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import goxlr
+    kind = str(body.get("kind") or "")
+    if kind not in ("device", "mic"):
+        return {"ok": False, "error": "Choose a device or mic profile."}
+    try:
+        result = state.goxlr.switch(str(body.get("backend") or ""),
+                                    str(body.get("serial") or ""),
+                                    {kind: str(body.get("profile") or "")})
+        return {"ok": True, **result, **_goxlr_context(state)}
+    except goxlr.GoXLRError as exc:
+        return {"ok": False, "error": str(exc), "needs_refresh": True}
+
+
+def _goxlr_bind(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import goxlr
+    from .cli import load_prefs, save_prefs
+    account = _active_account(state)
+    prefs = load_prefs()
+    ui = profiles.ui_for(prefs, account)
+    name = str(body.get("setup") or "")
+    context = _goxlr_context(state, ui, account)
+    if name not in context["setup_names"]:
+        return {"ok": False, "error": "Save that Setup in Settings > Apply first."}
+    value = None
+    if not body.get("remove"):
+        current = goxlr.detect(str(body.get("serial") or ""))
+        if current["backend"] != "utility" or not current["can_switch"]:
+            return {"ok": False, "error": "Connect a GoXLR through Utility before linking."}
+        choices = {k: v for k, v in current["current"].items() if v}
+        if not choices:
+            return {"ok": False, "error": "Refresh GoXLR profiles before linking."}
+        value = {"backend": "utility", "serial": current["serial"], "profiles": choices}
+    profiles.remember(prefs, account, goxlr.update_binding(ui, account, name, value))
+    save_prefs(prefs)
+    return {"ok": True, **_goxlr_context(state)}
+
+
+def _goxlr_setup_use(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import goxlr
+    from .cli import load_prefs
+    name = str(body.get("setup") or "")
+    account = _active_account(state)
+    ui = profiles.ui_for(load_prefs(), account)
+    context = _goxlr_context(state, ui, account)
+    if name != ui.get("setup_live"):
+        return {"ok": False, "error": "That Setup is no longer selected."}
+    binding = context["bindings"].get(name)
+    if not binding:
+        return {"ok": True, "skipped": True}
+    try:
+        result = state.goxlr.switch(binding.get("backend"), binding.get("serial"),
+                                    binding.get("profiles") or {})
+        return {"ok": True, **result, **context}
+    except goxlr.GoXLRError as exc:
+        return {"ok": False, "error": str(exc), "needs_refresh": True}
+
+
 def _audio_pin(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     """Save the choice, apply it now, and keep it there.
 
@@ -4478,6 +4554,10 @@ def _setups_act(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     except setups.SetupError as exc:
         return {"ok": False, "error": str(exc)}
 
+    if what in ("rename", "delete"):
+        from . import goxlr
+        changes.update(goxlr.update_binding(ui, account, setups.clean_name(name),
+                       rename=setups.clean_name(str(body.get("to") or "")) if what == "rename" else ""))
     profiles.remember(prefs, account, changes)
     save_prefs(prefs)
     fresh = profiles.ui_for(prefs, account)
@@ -4738,6 +4818,10 @@ def make_handler(state: State):
         "/api/servers/ping/start": _servers_ping_start,
         "/api/audio": _audio,
         "/api/audio/pin": _audio_pin,
+        "/api/goxlr": _goxlr,
+        "/api/goxlr/switch": _goxlr_switch,
+        "/api/goxlr/bind": _goxlr_bind,
+        "/api/goxlr/setup/use": _goxlr_setup_use,
         "/api/fix/survey": _fix_survey,
         "/api/fix/run": _fix_run,
         "/api/temps/elevate": _temps_elevate,
@@ -5174,8 +5258,13 @@ def make_handler(state: State):
                 return
 
             try:
-                with state.lock:
+                # Local GoXLR I/O has its own nonblocking operation lock. A
+                # disconnected mixer must not hold up other UI requests.
+                if handler in (_goxlr, _goxlr_switch, _goxlr_setup_use):
                     self._send_json({"ok": True, **handler(state, body)})
+                else:
+                    with state.lock:
+                        self._send_json({"ok": True, **handler(state, body)})
             except (ProbeError, steam.SteamError, ValueError) as exc:
                 self._send_json({"ok": False, "error": str(exc)}, 400)
             except Exception as exc:  # surfaced in the page, not swallowed

@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="assets/faceit/dashboard.css">
 <link rel="stylesheet" href="assets/faceit/scoreboard.css">
 <link rel="stylesheet" href="assets/apps/apps.css">
+<link rel="stylesheet" href="assets/goxlr/sound.css">
 <!-- The same mark the application, the window and the notification area
      icon use, inline so the page carries it without a second request. -->
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3.52' fill='%23130c1f'/><path fill='%23a78bfa' d='M12 3H6L3 6V10L6 13H12V11H7L5 9V7L7 5H12Z'/><path fill='%23ececec' d='M10 5H12V7H14V9H12V11H10V9H8V7H10Z'/></svg>">
@@ -6553,6 +6554,11 @@ const startup = (() => {
       </div>
 
       <div class="subpane hidden" data-sub="sound">
+      <section class="panel" id="goxlr-card" aria-label="GoXLR profiles">
+        <div class="goxlr-heading"><h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="3"/><path d="M7 8v8m5-8v8m5-8v8M5 11h4m1 3h4m1-4h4"/></svg>GoXLR</h2><button type="button" class="btn goxlr-icon" id="goxlr-refresh" aria-label="Refresh GoXLR" title="Refresh GoXLR"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6.1 6.2A8 8 0 0 1 20 12M4 12a8 8 0 0 0 13.9 5.8"/></svg></button></div>
+        <div id="goxlr-out"><div class="goxlr-empty">Looking for GoXLR…</div></div>
+        <div class="sub2" id="goxlr-feedback" role="status" aria-live="polite"></div>
+      </section>
       <section class="panel" id="audio-card">
         <h2>Sound devices</h2>
         <p class="sub" style="margin:0 0 9px">
@@ -6740,6 +6746,7 @@ const startup = (() => {
 <script src="skin-viewer.js"></script>
 <script src="assets/faceit/dashboard.js"></script>
 <script src="assets/apps/apps.js"></script>
+<script src="assets/goxlr/sound.js"></script>
 <script>
 const TOKEN = "__CS2CFG_TOKEN__";
 const $ = (id) => document.getElementById(id);
@@ -8674,7 +8681,7 @@ function setSettingsSub(name, restoring) {
   if (landed && !restoring && was !== name) landed.classList.add("came-from-" + cameFrom);
   // Preference restoration only selects the pane. Startup owns its first loads.
   if (prefsReady && startup.finished) {
-    if (name === "sound") loadAudio(false);
+    if (name === "sound") { loadAudio(false); loadGoxlr(true); }
     if (name === "logs") loadHistory();
     if (name === "config" || name === "editing") ensureScan(false);
     if (name === "apps") { loadCompanions(); loadAppTiles(); }
@@ -13617,6 +13624,7 @@ document.addEventListener("click", async e => {
    is no second path that could set a control the first one would not.
 */
 let setupsData = null;
+let setupsRevision = 0;
 
 async function loadSetups() {
   try {
@@ -13664,17 +13672,21 @@ function renderSetups() {
 }
 
 async function setupsAct(body) {
+  const revision = ++setupsRevision;
   let r;
   try {
     r = await api("/api/setups/act", body);
   } catch (err) {
-    status(String(err && err.message || err), true);
+    if (revision === setupsRevision) status(String(err && err.message || err), true);
     return;
   }
+  if (revision !== setupsRevision) return;
   if (!r.ok) { status(r.error, true); return; }
   setupsData = r;
   if (r.ui) applyPrefs(r.ui);
   renderSetups();
+  if (body.do === "use" && typeof useGoxlrSetup === "function") r.goxlr = await useGoxlrSetup(body.name);
+  if (revision !== setupsRevision) return;
   return r;
 }
 
@@ -13691,8 +13703,8 @@ document.addEventListener("click", async e => {
   const use = e.target.closest("[data-setup-use]");
   if (use) {
     const name = use.dataset.setupUse;
-    await setupsAct({ do: "use", name });
-    status("Switched to " + name + ". Nothing is written until you apply.");
+    const r = await setupsAct({ do: "use", name });
+    if (r) status("Switched to " + name + ". " + (r.goxlr?.ok === false ? "GoXLR: " + r.goxlr.error : r.goxlr && !r.goxlr.skipped ? "GoXLR profiles switched." : "Game settings are ready to apply."), r.goxlr?.ok === false);
     return;
   }
   if (e.target.closest("#setup-keep")) {

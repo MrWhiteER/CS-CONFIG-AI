@@ -38,6 +38,7 @@ datas = collect_data_files("webview") + [
     ("cs2cfg/web/assets/devices/*", "cs2cfg/web/assets/devices"),
     ("cs2cfg/web/assets/faceit/*", "cs2cfg/web/assets/faceit"),
     ("cs2cfg/web/assets/apps/*", "cs2cfg/web/assets/apps"),
+    ("cs2cfg/web/assets/goxlr/*", "cs2cfg/web/assets/goxlr"),
     ("cs2cfg/web/assets/fixit/*", "cs2cfg/web/assets/fixit"),
     ("cs2cfg/web/assets/hardware/*", "cs2cfg/web/assets/hardware"),
     ("cs2cfg/web/assets/maps/*", "cs2cfg/web/assets/maps"),
