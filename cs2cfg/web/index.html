@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="assets/faceit/scoreboard.css">
 <link rel="stylesheet" href="assets/apps/apps.css">
 <link rel="stylesheet" href="assets/goxlr/sound.css">
+<link rel="stylesheet" href="assets/config/files.css">
 <!-- The same mark the application, the window and the notification area
      icon use, inline so the page carries it without a second request. -->
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3.52' fill='%23130c1f'/><path fill='%23a78bfa' d='M12 3H6L3 6V10L6 13H12V11H7L5 9V7L7 5H12Z'/><path fill='%23ececec' d='M10 5H12V7H14V9H12V11H10V9H8V7H10Z'/></svg>">
@@ -6573,6 +6574,30 @@ const startup = (() => {
       </div>
 
       <div class="subpane hidden" data-sub="config">
+      <section class="panel config-ready" id="config-ready" aria-busy="false">
+        <div class="config-ready-top">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3H15L20 8V21H5ZM15 3V8H20M8 14L11 17L17 11"/></svg>
+          <div class="config-ready-copy"><h2 id="configs-title">Preparing your configs…</h2><p id="configs-state" role="status" aria-live="polite">Built automatically each time you open the app.</p></div>
+          <div class="config-ready-actions"><button class="btn" id="configs-refresh" title="Prepare again and send to CS2 if allowed">Refresh</button><button class="btn primary" id="configs-allow">Allow config files</button></div>
+        </div>
+        <div class="config-guide">
+          <article><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3H15L20 8V21H5ZM15 3V8H20M8 13H16M8 17H14"/></svg><div><b>Start here</b><small>Loads the other files when CS2 starts.</small><code>autoexec.vcfg</code></div></article>
+          <article><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V12M10 19V5M16 19V9M22 19V3"/></svg><div><b>Performance</b><small>Applies the preset chosen for this PC.</small><code>Generated performance config</code></div></article>
+          <article><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7H21V18H3ZM6 10H7M10 10H11M14 10H15M18 10H19M7 14H17"/></svg><div><b>Your keys</b><small>Saves shortcuts from the Keyboard tab.</small><code>mainsettings/key_binds.vcfg</code></div></article>
+          <article><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6H20M4 12H20M4 18H20M8 3V9M16 9V15M10 15V21"/></svg><div><b>Game settings</b><small>Keeps your crosshair, radar and sound.</small><code>mainsettings/gamesettings.vcfg</code></div></article>
+          <article><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4L3 12L8 20M16 4L21 12L16 20M14 3L10 21"/></svg><div><b>Your scripts</b><small>Gives a name to a sequence of actions.</small><code>tools/alias.vcfg</code></div></article>
+          <article><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3V16M7 11L12 16L17 11M4 16V21H20V16"/></svg><div><b>Brought from your files</b><small>Keeps imported commands in their load order.</small><code>mainsettings/imported.vcfg · optional</code></div></article>
+        </div>
+        <p class="config-location" id="configs-location"></p>
+        <details class="config-location"><summary>Launch options note</summary><p><code>launch_options_generated.txt</code> lists suggested Steam launch options. Preparing files does not change Steam’s launch options; use Apply for that.</p></details>
+      </section>
+      <section class="panel" id="config-import-card"><h2>Bring your own configs</h2><p class="sub">Choose any file names. Review a rebuilt copy; your originals stay untouched.</p><div class="actions"><button class="btn primary" id="configs-import">Choose configs…</button></div></section>
+      <section class="panel" id="setup-card">
+        <h2>Take your setup with you</h2>
+        <p class="sub">Save your settings and files in one copy for another PC.</p>
+        <div class="actions"><button class="btn primary" id="setup-save">Save a copy…</button><button class="btn" id="setup-open">Open a saved setup…</button></div><div id="setup-out"></div>
+      </section>
+      <details class="config-advanced" id="config-advanced"><summary>Advanced <small>Scan, format, repair and create files</small></summary><div class="config-advanced-body">
       <section class="panel hidden" id="starter-card">
         <h2>Start a config</h2>
         <p class="sub" style="margin:0 0 9px">
@@ -6586,21 +6611,6 @@ const startup = (() => {
           <button class="btn primary" id="starter-make">Create it</button>
         </div>
         <div id="starter-out"></div>
-      </section>
-
-      <section class="panel" id="setup-card">
-        <h2>Carry this setup</h2>
-        <p class="sub" style="margin:0 0 11px">
-          Everything this account has chosen, plus a copy of its configuration folder,
-          in one file. Take it to another PC, or keep it as something to come back to.
-          Nothing identifying goes in &mdash; no account, no paths from this machine &mdash;
-          so it can be handed to somebody else as it is.
-        </p>
-        <div class="actions">
-          <button class="btn primary" id="setup-save">Save a copy&hellip;</button>
-          <button class="btn" id="setup-open">Open a saved setup&hellip;</button>
-        </div>
-        <div id="setup-out"></div>
       </section>
 
       <section class="panel" id="cfg-card">
@@ -6635,7 +6645,7 @@ const startup = (() => {
         <div id="cfg-files"></div>
         <div id="cfg-out"></div>
       </section>
-
+      </div></details>
       </div>
 
       <div class="subpane hidden" data-sub="logs">
@@ -6747,6 +6757,7 @@ const startup = (() => {
 <script src="assets/faceit/dashboard.js"></script>
 <script src="assets/apps/apps.js"></script>
 <script src="assets/goxlr/sound.js"></script>
+<script src="assets/config/files.js"></script>
 <script>
 const TOKEN = "__CS2CFG_TOKEN__";
 const $ = (id) => document.getElementById(id);
@@ -12981,9 +12992,9 @@ document.addEventListener("click", async e => {
 /* First-run setup. Drafts live only here: Next accepts a step's defaults,
    direct choices count as answers, and Skip removes that step's answer.
    Nothing previews through /api/prefs, including the live theme preview. */
-const SETUP_STEPS = ["sync", "permission", "sound", "preset", "region", "apps", "theme"];
-const SETUP_LABELS = { sync:"Steam sync", permission:"Allow once", sound:"Sound", preset:"Game preset", region:"Server region", apps:"Companions", theme:"Theme" };
-const SETUP_KEYS = { sync:"sync", permission:"cfg_write", sound:"sound", preset:"preset", region:"region_lock", apps:"apps", theme:"theme" };
+const SETUP_STEPS = ["sync", "permission", "import", "sound", "preset", "region", "apps", "theme"];
+const SETUP_LABELS = { sync:"Steam sync", permission:"Allow once", import:"Your configs", sound:"Sound", preset:"Game preset", region:"Server region", apps:"Companions", theme:"Theme" };
+const SETUP_KEYS = { sync:"sync", permission:"cfg_write", import:"import", sound:"sound", preset:"preset", region:"region_lock", apps:"apps", theme:"theme" };
 const setupReduced = window.matchMedia("(prefers-reduced-motion: reduce)");
 let setupSession = null, setupOpening = null;
 const setupDelay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -13014,7 +13025,7 @@ function setupDraft(data) {
     // A saved Allow from an older setup must never trigger the finish handler's
     // install fallback. Only a ready helper can turn this answer true.
     permission:helperReady(data.helper) ? true : current.cfg_write_ok === false ? false : null,
-    sound:{ output:device("output"), input:device("input") },
+    import:null, sound:{ output:device("output"), input:device("input") },
     preset:["competitive","balanced","quality"].includes(current.intent) ? current.intent : "balanced",
     region:setupRegions(data).some(r => r.id === current.region_lock) ? current.region_lock : null,
     apps:(data.apps || []).filter(a => a.with_game).map(a => a.id),
@@ -13069,6 +13080,7 @@ function setupStepHTML(s) {
       '</b><p>' + esc(busy ? 'Check your taskbar for the Windows prompt. Choose Yes to allow the helper.' : ready ? 'The administrator helper is installed and up to date. Overlay counters take effect at your next Windows sign-in.' : s.helperError ? s.helperError + ' You can continue and allow access later in Settings.' : 'The app stays open while Windows asks. Your game launches normally through Steam.') + '</p></div>' +
       (!cfg.writable ? '<p class="setup-note' + (ready ? '' : ' warn') + '">' + esc(setupPlain(cfg.reason, "CS2’s cfg folder is not writable yet. You can continue and check it later.")) + '</p>' : '') + '</div></div>';
   }
+  if (step === "import") return heading("OPTIONAL / YOUR FILES", "Bring your own configs", "Choose your .cfg or .vcfg files, whatever you named them. We’ll rebuild a copy into the app’s layout.") + setupImportHTML(s);
   if (step === "sound") return heading("SOUND CHECK", "Hear it. Call it.", "Choose your headset or speakers and your microphone. We’ll keep them in place if Windows switches devices.") +
     '<div class="setup-split">' + setupVisual("sound") + '<div class="setup-stack">' +
     setupSoundControl(s,"output","Speakers / headset","speaker",0) + setupSoundControl(s,"input","Microphone","microphone",1) +
@@ -13112,9 +13124,13 @@ function renderSetup(s, focus = true) {
   $('setup-back').disabled = s.index === 0;
   const permissionDone = step === 'permission' && helperReady(s.data.helper);
   $('setup-back').hidden = permissionDone; $('setup-skip').hidden = permissionDone;
-  for (const id of ['setup-close','setup-back','setup-skip','setup-next']) if (s.helperBusy) $(id).disabled = true;
+  for (const id of ['setup-close','setup-back','setup-skip','setup-next']) if (s.helperBusy || s.importBusy) $(id).disabled = true;
   document.querySelector('.setup-foot-note').textContent = 'Step ' + (s.index+1) + ' of ' + s.steps.length + '. Change any choice later in Settings.';
   $('setup-next').innerHTML = s.index === s.steps.length-1 ? 'Finish ' + setupIcon('play') : 'Next <span aria-hidden="true">&rarr;</span>';
+  if (step === 'import') {
+    $('setup-next').disabled=!!s.importBusy || !!s.importPick && !s.importResult;
+    if(s.importResult)$('setup-next').textContent='Use this copy →';
+  }
   $('setup-error').textContent = '';
   if (step === 'sync') {
     renderSetupSync(s);
@@ -13130,6 +13146,34 @@ function renderSetup(s, focus = true) {
     if (img.complete && img.naturalWidth) loaded();
   });
   if (focus) $('setup-title').focus({preventScroll:true});
+}
+function setupImportHTML(s) {
+  const pick=s.importPick,r=s.importResult;
+  return '<div class="config-import-actions"><button class="setup-action" data-import-pick="files"'+(s.importBusy?' disabled':'')+'>'+configIcon('file')+'Choose files…</button><button class="setup-action" data-import-pick="folder"'+(s.importBusy?' disabled':'')+'>'+configIcon('folder')+'Choose a folder…</button></div>'+
+    (pick&&!r?'<p class="setup-note">Choose the files to load, top to bottom. Their exec links bring in the rest of the chosen set. Pick a folder to include linked files.</p><div class="config-pick-list">'+pick.files.map((file,i)=>'<label><input type="checkbox" data-import-entry="'+i+'"'+(s.importEntries.includes(file)?' checked':'')+(s.importBusy?' disabled':'')+'>'+esc(file)+'</label>').join('')+'</div><button class="setup-action" id="setup-import-preview"'+(s.importBusy||!s.importEntries.length?' disabled':'')+'>Review this copy →</button>':'')+
+    (r?'<div class="config-result" role="status" aria-label="Import review">'+[['ready','Kept',r.kept,'commands · order kept'],['merge','Merged',r.merged,'exec links · inlined'],['drop','Dropped',r.dropped,'items · see details']].map(([icon,label,n,help])=>'<article>'+configIcon(icon)+'<b>'+Number(n||0)+'</b><span>'+label+'</span><small>'+help+'</small></article>').join('')+'</div><p class="setup-note">Rebuilt into <code>mainsettings/imported.vcfg</code>, after your preset. Later values still win. Use this copy to include it when you finish setup.</p><details class="config-import-details"><summary>What changed</summary><p>'+esc(r.note)+'</p><p>Linked files are merged in place. Duplicate settings stay in order. Deferred execs, missing links, invalid lines and game-owned files need manual review.</p><ul>'+(r.details||[]).map(d=>'<li><b>Dropped</b> · '+esc(d.file)+(d.line?':'+Number(d.line):'')+' — '+esc(d.reason)+'</li>').join('')+'</ul></details>':'')+
+    '<p class="config-import-status" aria-live="polite">'+esc(s.importBusy?'Reading your copy…':s.importError||'Originals stay untouched. Replaced app or CS2 files are backed up first.')+'</p><p class="setup-note">Optional. Skip to keep the app’s standard files.</p>';
+}
+async function setupImport(s,kind) {
+  if(!setupAlive(s)||s.importBusy)return;
+  s.importBusy=true;s.importError='';renderSetup(s,false);
+  try {
+    const r=await api(kind==='preview'?'/api/configs/import/preview':'/api/configs/import/pick',kind==='preview'?{token:s.importPick.token,entries:s.importEntries}:{kind});
+    if(!r.ok)throw Error(r.error||'Your files could not be read.');
+    if(!setupAlive(s)||r.cancelled)return;
+    delete s.answers.import;s.draft.import=null;
+    if(kind==='preview'){s.importResult=r;s.draft.import=r.token;}
+    else {s.importPick=r;s.importEntries=[...(r.selected||[])];s.importResult=null;}
+  } catch(e) {if(setupAlive(s))s.importError=setupPlain(e.message,'Your files could not be read. Choose them again.');}
+  finally {
+    s.importBusy=false;
+    if(setupAlive(s)) {
+      for(const id of ['setup-close','setup-back','setup-skip','setup-next'])$(id).disabled=false;
+      renderSetup(s,false);
+      if(s.importResult)$('setup-next').focus({preventScroll:true});
+      else $('setup-import-preview')?.focus({preventScroll:true});
+    }
+  }
 }
 function setupChoose(s, name, value, button) {
   s.skipped.delete(name);
@@ -13187,8 +13231,9 @@ function setupPreviewTheme(s, id, button) {
 }
 async function setupMove(direction, skip = false) {
   const s = setupSession;
-  if (!setupAlive(s) || s.moving || s.helperBusy) return;
+  if (!setupAlive(s) || s.moving || s.helperBusy || s.importBusy) return;
   const step = setupCurrentStep(s);
+  if(direction>0&&!skip&&step==='import'&&s.importPick&&!s.importResult)return;
   if (direction > 0) {
     if (skip) {
       delete s.answers[SETUP_KEYS[step]]; s.skipped.add(step);
@@ -13316,7 +13361,7 @@ async function openSetupWizard({step, data} = {}) {
 window.openSetupWizard = openSetupWizard;
 async function finishSetupWizard() {
   const s = setupSession;
-  if (!setupAlive(s) || s.helperBusy) return;
+  if (!setupAlive(s) || s.helperBusy || s.importBusy) return;
   s.finishing = true; clearTimeout(s.loginTimer); clearTimeout(s.fpsEnd); cancelAnimationFrame(s.fpsFrame);
   const controls = [...$('setup-wizard').querySelectorAll('button,input,select,a')];
   controls.forEach(el => { if ('disabled' in el) el.disabled = true; });
@@ -13336,7 +13381,7 @@ async function finishSetupWizard() {
     else { const play = $('play'); if (play) play.focus({preventScroll:true}); }
     // Refresh the affected panels on reruns; the normal startup does this on
     // first run, after this promise resolves, without duplicate probes.
-    if (prefsReady) { audioData = null; loadAudio(true); loadCompanions(); loadMachine(); previewPlan(); }
+    if (prefsReady) { audioData = null; loadAudio(true); loadCompanions(); loadMachine(); previewPlan(); if(typeof prepareConfigs==='function')prepareConfigs({choose:true}); }
     pollSyncStatus();
   } catch (err) {
     s.finishing = false; controls.forEach(el => { if ('disabled' in el) el.disabled = false; });
@@ -13373,8 +13418,10 @@ $('setup-close').addEventListener('click',finishSetupWizard);
 $('setup-again').addEventListener('click',() => openSetupWizard().catch(() => status('Setup could not be opened. Please try again.',true)));
 $('setup-content').addEventListener('click',e => {
   const s = setupSession;
-  if (!setupAlive(s) || s.moving || s.helperBusy) return;
+  if (!setupAlive(s) || s.moving || s.helperBusy || s.importBusy) return;
   const button = e.target.closest('button'); if (!button) return;
+  if(button.hasAttribute('data-import-pick'))setupImport(s,button.dataset.importPick);
+  if(button.id==='setup-import-preview')setupImport(s,'preview');
   if (button.hasAttribute('data-setup-permission')) {
     if (button.dataset.setupPermission === 'allow') setupInstallHelper(s);
     else setupChoose(s,'permission',false,button);
@@ -13388,6 +13435,11 @@ $('setup-content').addEventListener('click',e => {
 $('setup-content').addEventListener('change',e => {
   const s = setupSession, el = e.target;
   if (!setupAlive(s) || s.moving) return;
+  if(el.hasAttribute('data-import-entry')&&!s.importBusy) {
+    s.importEntries=[...$('setup-content').querySelectorAll('[data-import-entry]:checked')].map(n=>s.importPick.files[Number(n.dataset.importEntry)]);
+    s.importResult=null;s.draft.import=null;delete s.answers.import;
+    $('setup-import-preview').disabled=!s.importEntries.length;
+  }
   if (el.id === 'setup-sync-auto') { s.draft.sync = el.checked; s.answers.sync = el.checked; }
   if (el.dataset.setupAudio) { s.draft.sound[el.dataset.setupAudio] = el.value; s.answers.sound = {...s.draft.sound}; }
   if (el.hasAttribute('data-setup-app')) { s.draft.apps = [...$('setup-content').querySelectorAll('[data-setup-app]:checked')].map(input => input.dataset.setupApp); s.answers.apps = [...s.draft.apps]; }
@@ -16250,12 +16302,8 @@ $("rescan").addEventListener("click", () => scan(true));
       await startup.run("suggestions", refreshCfgSuggestions);
       let created = false;
       await startup.run("starter", async () => {
-        const first = await checkStarter();
-        if (prefsNow.cfg_write_ok === true && first && first.ok && !first.complete &&
-            !first.present.length && !first.autoexec &&
-            !($("cfg-folder") && $("cfg-folder").value.trim())) {
-          created = !!(await makeStarter(true));
-        }
+        await prepareConfigs({choose:true});
+        await checkStarter();
       });
       await startup.run("source", async () => {
         // makeStarter already awaits loadSource after creating a collection.

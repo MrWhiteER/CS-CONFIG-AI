@@ -70,6 +70,7 @@ class State:
         self.launch: Optional[Any] = None   # launcher.LaunchSession, once one starts
         self.ingame: Optional[Any] = None   # gamewatch.Watcher, started on demand
         self.cfg_scan: Optional[Any] = None  # cfgscan.ScanResult of the last scan
+        self.config_import: Optional[Dict[str, Any]] = None  # bounded wizard snapshot
         self.updates: Optional[Any] = None   # updates.Checker, started on demand
         self.demo: Optional[Any] = None      # _DemoJob, while one is downloading
         self.faceit: Optional[Dict[str, Any]] = None  # cached profile + history
@@ -2863,6 +2864,8 @@ def _cfg_starter(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     folder = str(body.get("folder") or state.cfg_folder).strip().strip("/\\")
     if not folder:
         return {"ok": False, "error": "no folder name given"}
+    from .configbundle import safe_relative
+    folder = safe_relative(folder)
 
     outcome = starter.plan(cfg_root, folder)
     shape = {
@@ -2878,6 +2881,13 @@ def _cfg_starter(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     }
     if not body.get("create"):
         return shape
+
+    from . import firstrun
+    from .cli import load_prefs
+    if profiles.ui_for(load_prefs(), _active_account(state)).get(firstrun.CFG_WRITE_KEY) is not True:
+        return {"ok": False, "error": "Allow config files in Setup first."}
+    if steam.cs2_running():
+        return {"ok": False, "error": "Close CS2 before creating config files."}
 
     session = backup.BackupSession(note=f"starter config in {folder}")
     try:
@@ -4224,6 +4234,82 @@ def _settle_win_graphics(state: State, wanted: bool) -> Dict[str, Any]:
 
 # --- first-run setup and automatic sync -------------------------------------
 
+def _configs_prepare(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Local startup work. Never invokes the helper or edits Steam preferences."""
+    from . import configbundle, firstrun
+    from .cli import load_prefs
+
+    state.refresh()
+    account = _active_account(state)
+    ui = profiles.ui_for(load_prefs(), account)
+    user = next((u for u in state.users if u.account_id == account), None)
+    target = ui.get("target_fps")
+    profile = build_profile(state.machine, state.kb,
+                            intent=ui.get("intent") or "balanced",
+                            target_fps=int(target) if target else None,
+                            current_video=steam.read_video_cfg(user) if user else {},
+                            hide_crosshair=bool(ui.get("hide_crosshair")),
+                            load_bias=str(ui.get("load_bias") or "auto"))
+    launch = plan_launch_options("", state.machine, state.kb,
+                                exec_path=f"{state.cfg_folder}\\autoexec.vcfg")
+    result = configbundle.prepare(account, state.cfg_folder, state.cfg_name,
+                                 emit.render_cfg(profile, state.kb, state.cfg_name),
+                                 emit.render_launch_notes(profile, launch.line, launch.removed, launch.added))
+    result.update(ok=True, state="ready", installed=False, reason="Ready in the app. Allow config files to send them to CS2.")
+    if not state.cs2_install:
+        result.update(state="no_game", reason="Ready in the app. CS2 is not installed on this PC.")
+    if ui.get(firstrun.CFG_WRITE_KEY) is True:
+        if steam.cs2_running():
+            result.update(state="waiting", reason="Ready in the app. Close CS2, then refresh to send them.")
+        elif not state.cs2_install:
+            result.update(state="no_game", reason="Ready in the app. CS2 is not installed on this PC.")
+        else:
+            try:
+                written = configbundle.install(Path(result["root"]), steam.cfg_dir(state.cs2_install), state.cfg_folder)
+                result.update(installed=True, state="installed", installation=written,
+                              reason="Ready in CS2. Existing files were backed up before changes.")
+                if written.get("preserved"):
+                    result["reason"] += " Your edits to the imported file were kept."
+            except (OSError, ValueError) as exc:
+                result.update(state="waiting", reason=str(exc))
+    result["folder"] = str(steam.cfg_dir(state.cs2_install) / state.cfg_folder) if result["installed"] else result["root"]
+    return result
+
+
+def _configs_import_pick(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import cfgscan, configbundle, picker
+    account = _active_account(state)
+    folder = body.get("kind") == "folder"
+    paths = [picker.pick_folder(title="Bring your own configs")] if folder else picker.pick_files()
+    if not paths or not paths[0]:
+        return {"ok": True, "cancelled": True}
+    texts = configbundle.snapshot(paths, folder=folder)
+    if account != _active_account(state):
+        raise ValueError("The Steam account changed. Choose your files again.")
+    scope = Path(paths[0]) if folder else Path(os.path.commonpath([str(Path(p).parent) for p in paths]))
+    root = cfgscan.find_cfg_root(scope)
+    app_root = configbundle.storage(account, state.cfg_folder).resolve()
+    if any(app_root == (root / r).resolve() or app_root in (root / r).resolve().parents for r in texts):
+        raise ValueError("These are already the app's prepared files. Choose your original config folder.")
+    token = secrets.token_urlsafe(24)
+    state.config_import = {"token": token, "account": account, "texts": texts,
+                           "sources": [str((root / r).resolve()).casefold() for r in texts]}
+    return {"ok": True, "token": token, "files": list(texts), "selected": [] if folder else list(texts)}
+
+
+def _configs_import_preview(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import configbundle
+    held = state.config_import
+    if not held or body.get("token") != held["token"] or held["account"] != _active_account(state):
+        raise ValueError("Choose your files again; this import has expired.")
+    entries = body.get("entries")
+    if not isinstance(entries, list):
+        raise ValueError("Choose the files to load.")
+    result = configbundle.rebuild(held["texts"], entries)
+    held["result"] = result
+    held["preview"] = secrets.token_urlsafe(24)
+    return {"ok": True, "token": held["preview"], **{k: v for k, v in result.items() if k != "text"}}
+
 def _game_cfg_root(state: State) -> Optional[Path]:
     state.refresh()
     return steam.cfg_dir(state.cs2_install) if state.cs2_install else None
@@ -4350,7 +4436,7 @@ def _firstrun(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
         "account": account,
         "cloud": cloud.status(),
         "sync": _sync_loop(state).last,
-        "cfg": firstrun.cfg_access(_game_cfg_root(state)),
+        "cfg": firstrun.cfg_access(_game_cfg_root(state), probe=False),
         "helper": elevated.status(),
         "sound": sound,
         "presets": firstrun.presets(state.machine, state.kb),
@@ -4398,6 +4484,26 @@ def _firstrun_finish(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     libraries = steam.find_libraries(state.steam_root) if state.steam_root else []
     answers = body.get("answers") if isinstance(body.get("answers"), dict) else body
 
+    imported = answers.get("import")
+    held = state.config_import
+    if imported:
+        from . import configbundle, layouts
+        if not held or imported != held.get("preview") or held["account"] != account:
+            raise ValueError("Choose your files again; this import has expired.")
+        app_root = configbundle.storage(account, state.cfg_folder)
+        source_file = app_root / "_import_sources.json"
+        sources = json.loads(source_file.read_text(encoding="utf-8")) if source_file.exists() else []
+        configbundle.write_changed(app_root, {
+            configbundle.IMPORTED: held["result"]["text"],
+            "_import_sources.json": json.dumps(sorted(set(sources) | set(held["sources"]))),
+        }, "accept wizard import")
+        # The rebuilt stream is the new standard layout, not a previously
+        # selected match profile. Keep pins/registry but clear that UI pointer.
+        pointer = layouts._current_path(app_root)
+        if layouts.load_current(app_root) is not None:
+            backup.BackupSession("import: standard layout pointer").add(pointer)
+            layouts.save_current(app_root, None)
+
     # Permission given but the helper not put in place yet (the page normally
     # does that on the permission step itself): this is the one prompt.
     helper: Dict[str, Any] = {}
@@ -4409,6 +4515,8 @@ def _firstrun_finish(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
 
     changes = firstrun.answers_to_changes(answers, ui,
                                           firstrun.known_apps(libraries, ui))
+    if imported:
+        changes["cfg_folder"] = str(configbundle.storage(account, state.cfg_folder))
     profiles.remember(prefs, account, changes)
     save_prefs(prefs)
 
@@ -4771,6 +4879,9 @@ def make_handler(state: State):
     routes_get: Dict[str, Callable[[], Dict[str, Any]]] = {}
     routes_post: Dict[str, Callable[[State, Dict[str, Any]], Dict[str, Any]]] = {
         "/api/plan": _plan_payload,
+        "/api/configs/prepare": _configs_prepare,
+        "/api/configs/import/pick": _configs_import_pick,
+        "/api/configs/import/preview": _configs_import_preview,
         "/api/apply": _apply,
         "/api/revert": _revert,
         "/api/backups": _backups,
@@ -5260,7 +5371,7 @@ def make_handler(state: State):
             try:
                 # Local GoXLR I/O has its own nonblocking operation lock. A
                 # disconnected mixer must not hold up other UI requests.
-                if handler in (_goxlr, _goxlr_switch, _goxlr_setup_use):
+                if handler in (_goxlr, _goxlr_switch, _goxlr_setup_use, _configs_import_pick):
                     self._send_json({"ok": True, **handler(state, body)})
                 else:
                     with state.lock:

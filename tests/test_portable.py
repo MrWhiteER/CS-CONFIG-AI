@@ -54,6 +54,15 @@ class Writing(unittest.TestCase):
         self.assertEqual(portable.read(Path(out["path"]))["prefs"]["intent"],
                          "quality")
 
+    def test_local_config_import_records_never_travel_with_a_setup(self):
+        for name in ("_import_sources.json", "_installed.json"):
+            (self.cfg / name).write_text('{"path":"C:/Users/player/private"}')
+        out = portable.write(self.root / "clean", {}, self.cfg)
+        back = portable.read(Path(out["path"]))
+        self.assertEqual(out["files"], 2)
+        self.assertNotIn("_import_sources.json", back["files"])
+        self.assertNotIn("_installed.json", back["files"])
+
 
 class Reading(unittest.TestCase):
     def setUp(self):

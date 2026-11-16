@@ -24,6 +24,10 @@ class Endpoints(unittest.TestCase):
             mock.patch("cs2cfg.cli.save_prefs", side_effect=self._save),
             mock.patch.object(webui, "_active_account", return_value="244173392"),
             mock.patch.object(webui, "_audio_pin", return_value={}),
+            mock.patch("cs2cfg.elevated.ready", return_value=True),
+            mock.patch("cs2cfg.elevated.run", return_value={"ok": True}),
+            mock.patch("cs2cfg.elevated.install", side_effect=AssertionError("No live helper in tests")),
+            mock.patch("cs2cfg.firstrun.known_apps", return_value=[]),
         ]
         for p in patches:
             p.start()
