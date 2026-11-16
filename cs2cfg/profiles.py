@@ -41,6 +41,7 @@ MACHINE_KEYS = frozenset({
     "audio_output",
     "audio_input",
     "audio_enforce",
+    "goxlr_setup_bindings",  # local device serials/profiles, scoped by account + Setup
     "settings_sub",   # which settings category was open
     # The first-run wizard's answers about this PC: whether it ran, whether
     # the app may write into this PC's CS2 cfg folder, and whether this PC

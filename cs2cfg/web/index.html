@@ -6,6 +6,9 @@
 <title>cs2-autoconfig</title>
 <link rel="stylesheet" href="assets/faceit/dashboard.css">
 <link rel="stylesheet" href="assets/faceit/scoreboard.css">
+<link rel="stylesheet" href="assets/apps/apps.css">
+<link rel="stylesheet" href="assets/goxlr/sound.css">
+<link rel="stylesheet" href="assets/config/files.css">
 <!-- The same mark the application, the window and the notification area
      icon use, inline so the page carries it without a second request. -->
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3.52' fill='%23130c1f'/><path fill='%23a78bfa' d='M12 3H6L3 6V10L6 13H12V11H7L5 9V7L7 5H12Z'/><path fill='%23ececec' d='M10 5H12V7H14V9H12V11H10V9H8V7H10Z'/></svg>">
@@ -448,11 +451,9 @@
   }
   .subpane.came-from-left  { animation: pane-in-right .36s cubic-bezier(.22, .9, .26, 1); }
   .subpane.came-from-right { animation: pane-in-left  .36s cubic-bezier(.22, .9, .26, 1); }
-  .settings-box.resizing { transition: height .36s cubic-bezier(.22, .9, .26, 1); }
 
   @media (prefers-reduced-motion: reduce) {
     .subpane.came-from-left, .subpane.came-from-right { animation: none; }
-    .settings-box.resizing { transition: none; }
   }
 
   /* The followed FACEIT account, and its recent matches. */
@@ -682,13 +683,7 @@
     .demo-get input:focus { box-shadow: none; }
   }
 
-  /* Crosshair X, as its own thing rather than another row of checkboxes.
-
-     The mark is drawn here rather than lifted from the application: a
-     crosshair is the obvious shape for it and nobody owns a circle with four
-     ticks, but their actual logo is theirs. A ring, a gap at each quarter,
-     a centre dot -- and it is cyan, which in this window already means "this
-     is telling you something" rather than a state of the game. */
+  /* Crosshair X integration. The asset slot is documented in assets/apps/. */
   .xh-head {
     display: flex; align-items: center; gap: 14px; margin-bottom: 4px;
   }
@@ -974,7 +969,7 @@
   /* The two parts the choice is about, drawn rather than described.
      "Lean on the graphics card" means something different once you can see
      which card it is and how far ahead of the processor it actually is. */
-  .parts { display: grid; grid-template-columns: 1fr auto 1fr; gap: 14px;
+  .parts { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px;
            align-items: center; margin: 12px 0 14px; }
   .part { display: flex; gap: 12px; align-items: center; min-width: 0; }
   .part.gpu { flex-direction: row-reverse; text-align: right; }
@@ -1984,6 +1979,85 @@
 @keyframes sp-pulse { 50% { transform:scale(1.7); opacity:.35; } }
 @media(prefers-reduced-motion:reduce) { .sp-panel,.sp-panel *,.sp-chip * { animation:none !important; } }
 @media(max-width:700px) { [data-panel="launcher"] .home-hero { padding-bottom:100px; }.sp-chip { right:16px; bottom:16px; font-size:11px; max-width:calc(100% - 32px); } }
+/* Section 3: the shared connection chip owns its anchored diagnostic panel. */
+.net-control { position:relative; }
+#chip-net { cursor:pointer; font:inherit; font-size:10.5px; }
+#chip-net:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.net-popover { position:fixed; top:64px; left:clamp(16px, 30vw, 500px); width:min(680px, calc(100vw - 32px)); max-height:calc(100dvh - 90px); overflow:auto; z-index:100; padding:20px; border:1px solid var(--line); border-radius:12px; background:var(--panel-2); backdrop-filter:blur(24px); color:var(--ink); box-shadow:0 16px 48px rgba(0,0,0,.3); }
+.net-popover[hidden] { display:none; }
+.net-popover-head { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.net-popover-head h2 { margin:0; }
+.net-popover > p { margin:12px 0 18px; }
+.net-popover .netgrid { grid-template-columns:1fr; }
+.net-popover .netbar-fill { width:100%; transform-origin:left; transition:none; }
+[data-panel="launcher"] > .grid2 { grid-template-columns:1fr; }
+#settings-subtabs [data-hardware-icon] { display:inline-flex; vertical-align:middle; }
+
+/* Apply receipt: compact persistent status, expandable read-only checklist. */
+.verification { margin:0 0 20px; border:1px solid var(--line); border-radius:12px; background:var(--panel); --verify-tone:var(--warn); }
+.verification[data-state="verified"] { --verify-tone:var(--good); }
+.verification[data-state="failed"] { --verify-tone:var(--bad); }
+.verification summary { list-style:none; display:flex; align-items:center; gap:16px; padding:16px 20px; cursor:pointer; }
+.verification summary::-webkit-details-marker { display:none; }
+.verification summary:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.verification summary strong { display:block; font-size:15px; }.verification summary small { display:block; margin-top:4px; color:var(--muted); font:11px var(--mono); }
+.verify-shield { width:34px; height:34px; flex:none; color:var(--verify-tone); }.verify-chevron { margin-left:auto; color:var(--accent); transition:transform .2s; }.verification[open] .verify-chevron { transform:rotate(180deg); }
+.verify-body { padding:4px 20px 16px; border-top:1px solid var(--line); }.verify-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }.verify-head h2 { margin:16px 0; }
+.verification-list { list-style:none; padding:0 0 6px; margin:12px 0 0; max-height:560px; overflow:auto; }
+.verify-row { display:grid; grid-template-columns:24px minmax(0,1fr) auto; gap:10px; padding:10px 0; border-top:1px solid var(--line); align-items:center; }
+.verify-row svg { width:21px; height:21px; color:var(--warn); }.verify-row[data-state="verified"] svg { color:var(--good); }.verify-row[data-state="failed"] svg { color:var(--bad); }.verify-row small { display:block; color:var(--muted); font-size:11px; margin-top:4px; }.verify-row b { font-size:12px; font-weight:500; }.verify-row > span:last-child { font:10px var(--mono); color:var(--muted); }
+.verify-row[data-state="verified"] small { display:none; }
+.verify-row[data-state="not_applicable"] svg { color:var(--muted); }
+.verify-action { display:block; margin-top:6px; font-size:11px; }
+.verification.reveal .verify-row { animation:verify-arrive .25s both; animation-delay:calc(var(--i) * 35ms); }.verification.reveal .verify-tick { animation:verify-arrive .35s both; }
+@keyframes verify-arrive { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
+.hidden .verification *,html.verify-paused .verification *,details.verification:not([open]) .verify-row { animation-play-state:paused!important; }
+@media(prefers-reduced-motion:reduce) { .verification * { animation:none!important; transition:none!important; } }
+@media(max-width:700px) { .verification summary { padding:14px; gap:10px; }.verification summary strong { font-size:13px; }.verify-body { padding:4px 14px 14px; }.verify-row { grid-template-columns:21px minmax(0,1fr); }.verify-row > span:last-child { grid-column:2; } }
+/* Section 5: a shared Settings grid and plan-backed preset reveal. */
+.settings-box .subpane { grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:stretch;padding:16px 18px; }
+.settings-box .subpane > :is(.panel,.card) { min-width:0;min-height:220px;padding:20px; }
+.settings-box #machine-card { grid-column:auto;order:0; }
+.settings-box [data-sub="apply"] > .panel:has(#w-video) { order:1; }
+.settings-box #setups-card { order:2; }
+.settings-box #results { display:contents; }
+.settings-box #results > .card { order:3;min-width:0;padding:20px;margin:0; }
+.settings-box #results > .card:has(.chg-list) { max-height:560px;overflow:auto; }
+.settings-box .settings-tools { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px; }
+.settings-box .settings-tools > .fix-tile { margin:0;min-width:0; }
+.settings-box #steam-tools:empty,.settings-box #steam-tools-feedback:has(#steam-tools-status:empty):has(button[hidden]) { display:none; }
+.settings-box #steam-profile { position:relative;margin-top:16px; }
+.settings-box #steam-profile .rail-profile { width:100%;justify-content:flex-start;background:var(--panel-2);color:var(--ink);border:1px solid var(--line);border-radius:8px; }
+.settings-box #steam-profile .nm { display:grid!important;text-align:left; }
+.settings-box #steam-profile .who-menu { position:relative;inset:auto;width:100%;margin-bottom:8px; }
+.settings-box .parts { gap:16px;margin-bottom:20px; }
+.settings-box .part { min-width:0; }
+.settings-box .part-name { font-size:13px;overflow-wrap:anywhere; }
+.settings-box .part-sub { font-size:11px; }
+.settings-box .bias { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;position:relative;isolation:isolate;border:1px solid var(--line);border-radius:10px;padding:4px;flex-wrap:nowrap; }
+.settings-box .bias .bias-thumb { position:absolute;top:4px;bottom:4px;left:4px;width:calc((100% - 8px)/3);background:var(--accent-dim);border:1px solid var(--accent);border-radius:7px;transform:translateX(calc(var(--bias-index)*100%));transition:transform .25s ease;z-index:-1; }
+.settings-box .bias button { min-width:0;padding:12px 4px;border:0;background:transparent;box-shadow:none;flex:initial; }
+.settings-box .bias button[aria-pressed="true"] { background:transparent;border:0; }
+.settings-box .bias button b { font-size:11px;white-space:nowrap; }
+.settings-box .wg-row { margin-top:16px;gap:8px; }
+.preset-veil { position:fixed;inset:0;z-index:50;pointer-events:none;background:color-mix(in srgb,var(--bg) 78%,transparent);animation:preset-fade .18s ease both; }
+.mode-card.preset-active { z-index:51;isolation:isolate;transform:none!important;transition:none!important; }
+.mode-card.preset-active .mode-copy,.mode-card.preset-active .mode-index,.mode-card.preset-active .mode-selected { opacity:0; }
+.preset-changes { position:absolute;inset:0;display:flex;flex-direction:column;padding:16px;background:color-mix(in srgb,var(--panel) 96%,transparent);text-align:left; }
+.preset-heading { font:600 16px var(--display);color:var(--ink);margin-bottom:10px;display:flex;justify-content:space-between;gap:8px; }
+.preset-heading small { font:11px var(--body);color:var(--muted); }
+.preset-rows { display:block;overflow:auto;min-height:0;scrollbar-width:thin; }
+.preset-row { display:grid;grid-template-columns:22px minmax(0,1fr);gap:4px 8px;border-top:1px solid var(--line);padding:8px 0;color:var(--ink);font-size:11px;animation:preset-row .22s ease both; }
+.preset-row .hw-icon { grid-row:span 2; }
+.preset-row .preset-value { color:var(--muted);overflow-wrap:anywhere; }
+.preset-value b { color:var(--accent);font-weight:500; }
+@keyframes preset-row { from { opacity:0;transform:translateY(6px); } to { opacity:1;transform:translateY(0); } }
+@keyframes preset-fade { from { opacity:0; } to { opacity:1; } }
+.hidden .preset-row,.hidden .preset-veil { animation-play-state:paused; }
+@media(max-width:900px) { .settings-box .subpane,.settings-box .settings-tools { grid-template-columns:minmax(0,1fr); }.settings-box #machine-card { grid-column:1/-1; } }
+.hw-paused .bias-thumb,.hidden .bias-thumb { transition:none!important; }
+@media(prefers-reduced-motion:reduce) { .settings-box .bias .bias-thumb { transition:none!important; }.preset-row,.preset-veil { animation:none!important; } }
+
 </style>
 <style>
   /* ------------------------------------------------------------------------
@@ -5354,8 +5428,6 @@
 .mode-card[aria-pressed="true"] { transform:translateY(-5px); }.mode-card[aria-pressed="true"]::after { border-color:var(--accent); box-shadow:inset 0 -32px 35px -30px var(--accent); }
 .mode-card:hover { transform:translateY(-5px); }.mode-card:focus-visible { outline:0; }.mode-card:focus-visible::after { border:3px solid var(--accent); }
 .mode-index { position:absolute; left:18px; top:16px; font:600 10px var(--mono); color:#fff; letter-spacing:.1em; }
-.mode-fps { position:absolute; top:12px; right:20px; display:flex; flex-direction:column; align-items:flex-end; color:#fff; }
-.mode-fps b { font:700 27px var(--mono); text-shadow:0 2px 12px #000; }.mode-fps small { font:8px var(--mono); letter-spacing:.12em; }
 .mode-copy { position:absolute; left:20px; bottom:20px; right:22px; display:flex; flex-direction:column; color:#fff; gap:5px; }
 .mode-copy strong { font-size:21px; font-weight:700; letter-spacing:-.025em; }.mode-copy > span { font-size:11px; color:#ddd; }
 .mode-selected { position:absolute; bottom:23px; right:18px; color:var(--accent); opacity:0; }.mode-card[aria-pressed="true"] .mode-selected { opacity:1; }
@@ -5378,7 +5450,37 @@
 [data-panel="launcher"] #history-stats .stat::before { float:right; font-size:17px; color:var(--muted); }
 [data-panel="launcher"] #hw .row { padding:6px 0; border-bottom:1px solid var(--line); }[data-panel="launcher"] #hw .k { font-size:10px; }[data-panel="launcher"] #hw .v { font-size:11px; overflow-wrap:anywhere; }
 [data-panel="launcher"] .assess { margin-top:22px; padding-top:16px; border-top:1px solid var(--line); }[data-panel="launcher"] .assess .stats { grid-template-columns:repeat(2,minmax(0,1fr)); display:grid; }
-[data-panel="launcher"] .spark { height:78px; overflow:hidden; background:repeating-linear-gradient(0deg,var(--line) 0 1px,transparent 1px 25%); }.chart-tip { filter:drop-shadow(0 0 4px currentColor); }
+.hardware-graph { --hardware-gpu:var(--good); --hardware-ram:var(--warn); --hardware-vram:var(--ink); margin-top:18px; min-width:0; }
+:root[data-theme="acid"] .hardware-graph { --hardware-gpu:var(--cat-config); }
+:root[data-theme="paper"] .hardware-graph,:root[data-theme="ember"] .hardware-graph { --hardware-ram:var(--cat-editing); }
+:root[data-theme="carbon"] .hardware-graph { --hardware-vram:var(--cat-editing); }
+.hardware-toolbar,.hardware-toolbar>div { display:flex; align-items:center; gap:8px; justify-content:space-between; }
+.hardware-toolbar button[aria-pressed="true"] { border-color:var(--accent); color:var(--accent); }
+.hardware-legend { display:flex; flex-wrap:wrap; gap:7px; margin:12px 0 18px; }
+.hardware-chip { display:flex; flex:1 1 95px; align-items:center; gap:7px; padding:8px; border:1px solid var(--line); border-radius:7px; background:transparent; color:var(--ink); cursor:pointer; font:inherit; font-size:11px; transition:opacity .2s; }
+.hardware-chip svg { width:19px; height:19px; flex:none; fill:none; stroke:var(--series); stroke-width:1.6; stroke-linejoin:round; }
+.hardware-chip b { margin-left:auto; font-variant-numeric:tabular-nums; }
+.hardware-chip[aria-pressed="true"] { border-color:var(--series); }
+.hardware-chip:focus-visible,.hardware-plot:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.hardware-plot { position:relative; padding-left:37px; }
+#hardware-chart { display:block; width:100%; height:180px; overflow:hidden; touch-action:pan-y; }
+.hardware-grid path { stroke:var(--line); stroke-width:1; fill:none; }
+.hardware-axis { position:absolute; top:-6px; bottom:-6px; left:0; color:var(--muted); font:10px/90px var(--mono,monospace); line-height:90px; transform:translateY(-39px); pointer-events:none; }
+.hardware-area { pointer-events:none; }
+.hardware-line { fill:none; stroke-width:2; vector-effect:non-scaling-stroke; pointer-events:none; }
+.hardware-hit { fill:none; stroke:transparent; stroke-width:14; vector-effect:non-scaling-stroke; cursor:pointer; pointer-events:stroke; }
+#hardware-scroll>g { transition:opacity .2s; }
+.hardware-muted { opacity:.12; }
+.hardware-chip.hardware-muted { opacity:.5; }
+.hardware-muted .hardware-hit { pointer-events:none; }
+.hardware-crosshair { stroke:var(--muted); stroke-width:1; stroke-dasharray:3 3; fill:none; pointer-events:none; }
+.hardware-tooltip { position:absolute; z-index:2; top:12px; min-width:125px; padding:10px 12px; background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:7px; box-shadow:0 5px 18px #0003; pointer-events:none; font-size:11px; }
+.hardware-tooltip>b { display:block; margin-bottom:7px; }
+.hardware-tooltip span { display:flex; align-items:center; gap:7px; margin-top:4px; }
+.hardware-tooltip i { width:6px; height:6px; border-radius:50%; }
+.hardware-tooltip strong { margin-left:auto; font-variant-numeric:tabular-nums; }
+.hardware-times { display:flex; justify-content:space-between; gap:8px; margin:9px 0 0 37px; font-size:10px; }
+@media(prefers-reduced-motion:reduce) { .hardware-chip,#hardware-scroll>g { transition:none; } }
 [data-panel="launcher"] #net-card { margin-top:20px; border-left:3px solid var(--accent); }[data-panel="launcher"] #net-card > p { max-width:900px; line-height:1.7; }
 .topbar .chip i { box-shadow:0 0 calc(2px + var(--chip-load,0)*8px) var(--accent); }
 .topbar .chip { position:relative; overflow:hidden; }.topbar .chip::after { content:''; position:absolute; inset:auto 0 0; height:2px; background:var(--accent); transform:scaleX(var(--chip-load,0)); transform-origin:left; }
@@ -5390,7 +5492,7 @@
 @keyframes home-sweep { 0%,65% { transform:translateX(-55%); } 100% { transform:translateX(55%); } }
 .home-paused .mode-card::before, .home-paused :is(.hero-art img,.monitor-light,.desk-light,.mode-card img) { animation-play-state:paused; }
 @media(max-width:1150px) { [data-panel="launcher"] .home-hero { padding:26px; min-height:365px; }.home-hero .hero-copy { width:58%; }.home-hero .fix-row { display:flex; flex-direction:column; align-items:flex-start; }.mode-card { height:180px; padding:15px; }.mode-copy strong { font-size:18px; }[data-panel="launcher"] .grid2 { grid-template-columns:1fr; } }
-@media(max-width:700px) { .home-hero .hero-copy { width:100%; }.home-hero::after { background:color-mix(in srgb,var(--panel) 84%,transparent); }.mode-cards { gap:8px; }.mode-card { height:190px; }.mode-copy { left:12px; bottom:15px; }.mode-copy strong { font-size:15px; }.mode-copy > span { font-size:10px; }.mode-fps { top:40px; right:12px; }.mode-index { left:12px; font-size:8px; }[data-panel="launcher"] :is(#live-card,#hw-card,#net-card) { padding:16px; } }
+@media(max-width:700px) { .home-hero .hero-copy { width:100%; }.home-hero::after { background:color-mix(in srgb,var(--panel) 84%,transparent); }.mode-cards { gap:8px; }.mode-card { height:190px; }.mode-copy { left:12px; bottom:15px; }.mode-copy strong { font-size:15px; }.mode-copy > span { font-size:10px; }.mode-index { left:12px; font-size:8px; }[data-panel="launcher"] :is(#live-card,#hw-card,#net-card) { padding:16px; } }
 @media(prefers-reduced-motion:reduce) { .mode-card::before, :is(.hero-art img,.monitor-light,.desk-light,.mode-card img) { animation:none; }.mode-card { transition:none; }.mode-card:hover,.mode-card[aria-pressed="true"] { transform:none; } }
 
 </style>
@@ -5503,6 +5605,9 @@
 
 <link rel="stylesheet" href="assets/devices/workspace.css">
 <link rel="stylesheet" href="assets/fixit/toolbox.css">
+<link rel="stylesheet" href="assets/hardware/icons.css">
+<script src="assets/hardware/icons.js"></script>
+<script src="assets/fixit/icons.js"></script>
 <style>
 /* First run: one decision on a full-window stage. Motion stays on compositor
    properties; even theme previews fade a frozen copy rather than tween colours. */
@@ -5672,7 +5777,7 @@ const startup = (() => {
   let nextTip = 0, finished = false, tipTimer;
   const names = ["scan", "prefs", "plan", "machine", "setups", "crosshair",
     "companions", "audio", "history", "suggestions", "starter", "source",
-    "settings-pane", "profile", "launch", "monitor", "updates", "cloud"];
+    "settings-pane", "profile", "launch", "monitor", "updates", "cloud", "connection"];
   let settled = 0;
   const tasks = new Map(names.map(name => {
     let resolve;
@@ -5805,23 +5910,21 @@ const startup = (() => {
       <button class="tab" data-tab="cs2" role="tab" aria-selected="false" title="CS2 Settings">
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.3"/><circle cx="10" cy="17" r="2.3"/></svg></i><span class="tx">CS2 Settings</span></button>
       <button class="tab" data-tab="keyboard" role="tab" aria-selected="false" title="Keyboard">
-        <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2.5"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/></svg></i><span class="tx">Keyboard</span></button>
+        <i class="ic"><span data-hardware-icon="keyboard"></span></i><span class="tx">Keyboard</span></button>
       <button class="tab" data-tab="scripts" role="tab" aria-selected="false" title="Scripts">
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7l-5 5 5 5M15 7l5 5-5 5"/></svg></i><span class="tx">Scripts</span></button>
       <button class="tab" data-tab="files" role="tab" aria-selected="false" title="Files">
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 012-2h4l2 2.5h8a2 2 0 012 2V18a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></i><span class="tx">Files</span></button>
       <button class="tab" data-tab="gpu" role="tab" aria-selected="false" title="Graphics">
-        <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="7" width="16" height="11" rx="2"/><rect x="9" y="11" width="6" height="4" rx="1"/><path d="M8 4v3M16 4v3M8 18v2M16 18v2"/></svg></i><span class="tx">Graphics</span></button>
+        <i class="ic"><span data-hardware-icon="gpu"></span></i><span class="tx">Graphics</span></button>
       <button class="tab" data-tab="fix" role="tab" aria-selected="false" title="Fix It">
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a4 4 0 00-5.4 5.4L4 17v3h3l5.3-5.3a4 4 0 005.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg></i><span class="tx">Fix It</span></button>
       <button class="tab" data-tab="settings" role="tab" aria-selected="false" title="Settings">
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1z"/><circle cx="12" cy="12" r="3"/></svg></i><span class="tx">Settings</span></button>
     </div>
 
-    <!-- The foot carries the two things that are about this copy of the
-         launcher rather than about the game: what version it is, and whose
-         settings it is showing. Both open upward, because there is no room
-         below them. -->
+    <!-- Version and updates stay in the rail. Account selection lives in
+         Settings > Steam alongside the client controls. -->
     <div class="rail-foot">
       <button class="updc" id="updc" aria-haspopup="dialog" aria-expanded="false"
               aria-controls="updc-pop" title="Update centre">
@@ -5845,14 +5948,7 @@ const startup = (() => {
         </button>
         <div class="ver">__CS2CFG_VERSION__</div>
       </div>
-      <div class="account-label">Steam account</div>
-      <div class="who-menu hidden" id="who-menu"></div>
-      <button class="rail-profile" id="who" aria-haspopup="true" aria-expanded="false"
-              title="Whose settings are shown">
-        <i class="orb" id="who-face"></i>
-        <span class="nm"><b id="who-name">Looking&hellip;</b>
-          <small id="who-how"></small></span>
-      </button>
+
 
     </div>
   </aside>
@@ -5867,9 +5963,17 @@ const startup = (() => {
   <main class="stage">
 
     <div class="topbar">
-      <span class="chip" id="chip-cpu"><i></i>CPU <b>—</b></span>
-      <span class="chip" id="chip-gpu"><i></i>GPU <b>—</b></span>
-      <span class="chip" id="chip-ram"><i></i>RAM <b>—</b></span>
+      <span class="chip" id="chip-cpu"><span data-hardware-icon="cpu"></span> <b>—</b></span>
+      <span class="chip" id="chip-gpu"><span data-hardware-icon="gpu"></span> <b>—</b></span>
+      <span class="chip" id="chip-ram"><span data-hardware-icon="ram"></span> <b>—</b></span>
+      <div class="net-control">
+        <button type="button" class="chip" id="chip-net" aria-expanded="false" aria-controls="net-card" title="Connection details"><span data-hardware-icon="network"></span> <b id="net-summary">Checking&hellip;</b></button>
+        <section id="net-card" class="net-popover" role="region" aria-label="Connection details" hidden>
+          <div class="net-popover-head"><h2>Connection</h2><button type="button" class="btn small" id="net-run" title="Re-test connection">↻ Re-test</button></div>
+          <p class="sub">Real download sample, then router and internet ping.</p>
+          <div id="net-out" aria-live="polite"></div>
+        </section>
+      </div>
       <span class="spacer"></span>
       <div class="modebadge" id="mode-badge"></div>
       <div class="scorebar" id="scorebar"></div>
@@ -5935,13 +6039,18 @@ const startup = (() => {
         </div>
       </div>
 
+
+      <details id="verification" class="verification" hidden>
+        <summary><svg class="verify-shield" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M16 3 27 7v9c0 6-5 10-11 13C10 26 5 22 5 16V7Z"/><path class="verify-tick" d="m10 16 4 4 8-9"/></svg><span><strong id="verification-title" role="status">Apply settings to verify</strong><small id="verification-time"></small></span><span class="verify-chevron" aria-hidden="true">&#8964;</span></summary>
+        <div class="verify-body"><div class="verify-head"><h2>Applied and verified</h2><button class="btn small" id="verify-again" type="button">Read again</button></div><p class="sub" id="verification-context"></p><ul id="verification-list" class="verification-list"></ul></div>
+      </details>
       <section class="panel">
         <h2>Optimise for</h2>
         <div class="mode-cards" id="intents" role="group" aria-label="Optimise for">
-          <button class="mode-card" data-intent="competitive" type="button" aria-pressed="false" title="Choose Competitive"><img src="assets/home/mode-competitive.webp" alt="Competitive rendering of a Mediterranean training courtyard"><span class="mode-shade"></span><span class="mode-index">01 / FPS</span><span class="mode-fps"><b data-mode-fps="competitive">—</b><small>EST. FPS</small></span><span class="mode-copy"><strong>Competitive</strong><span>Maximum frames. Clear sightlines.</span></span><span class="mode-selected" aria-hidden="true">&#10003;</span></button>
-          <button class="mode-card" data-intent="balanced" type="button" aria-pressed="true" title="Choose Balanced"><img src="assets/home/mode-balanced.webp" alt="Balanced rendering of a Mediterranean training courtyard"><span class="mode-shade"></span><span class="mode-index">02 / BALANCE</span><span class="mode-fps"><b data-mode-fps="balanced">—</b><small>EST. FPS</small></span><span class="mode-copy"><strong>Balanced</strong><span>Clarity meets atmosphere.</span></span><span class="mode-selected" aria-hidden="true">&#10003;</span></button>
-          <button class="mode-card" data-intent="quality" type="button" aria-pressed="false" title="Choose Quality"><img src="assets/home/mode-quality.webp" alt="Quality rendering of a Mediterranean training courtyard"><span class="mode-shade"></span><span class="mode-index">03 / DETAIL</span><span class="mode-fps"><b data-mode-fps="quality">—</b><small>EST. FPS</small></span><span class="mode-copy"><strong>Quality</strong><span>Every detail. Every shadow.</span></span><span class="mode-selected" aria-hidden="true">&#10003;</span></button>
-        </div><p class="mode-note sub">FPS estimates use your hardware and current settings; actual performance varies.</p>
+          <button class="mode-card" data-intent="competitive" type="button" aria-pressed="false" title="Choose Competitive"><img src="assets/home/mode-competitive.webp" alt="Competitive rendering of a Mediterranean training courtyard"><span class="mode-shade"></span><span class="mode-index">01 / FOCUS</span><span class="mode-copy"><strong>Competitive</strong><span>Less detail. Clear sightlines.</span></span><span class="mode-selected" aria-hidden="true">&#10003;</span></button>
+          <button class="mode-card" data-intent="balanced" type="button" aria-pressed="true" title="Choose Balanced"><img src="assets/home/mode-balanced.webp" alt="Balanced rendering of a Mediterranean training courtyard"><span class="mode-shade"></span><span class="mode-index">02 / BALANCE</span><span class="mode-copy"><strong>Balanced</strong><span>Clarity meets atmosphere.</span></span><span class="mode-selected" aria-hidden="true">&#10003;</span></button>
+          <button class="mode-card" data-intent="quality" type="button" aria-pressed="false" title="Choose Quality"><img src="assets/home/mode-quality.webp" alt="Quality rendering of a Mediterranean training courtyard"><span class="mode-shade"></span><span class="mode-index">03 / DETAIL</span><span class="mode-copy"><strong>Quality</strong><span>Every detail. Every shadow.</span></span><span class="mode-selected" aria-hidden="true">&#10003;</span></button>
+        </div>
 
       </section>
 
@@ -5967,15 +6076,18 @@ const startup = (() => {
           <div class="gauges" id="live-gauges"></div>
           <div class="temps" id="live-temps"></div>
           <div class="stats" id="history-stats"></div>
-          <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:12px">
-            <div style="flex:1 1 200px;min-width:170px">
-              <div class="sub" style="margin-bottom:2px">CPU load</div>
-              <svg class="spark" id="spark-cpu" viewBox="0 0 240 46" preserveAspectRatio="none"></svg>
+          <div class="hardware-graph" id="hardware-graph">
+            <div class="hardware-toolbar"><span class="sub">Hardware activity</span><div>
+              <button type="button" class="btn small" id="hardware-all" aria-pressed="true">All</button>
+              <button type="button" class="btn small" id="hardware-temperature" aria-pressed="false" title="Switch between usage and temperature history">°C</button>
+            </div></div>
+            <div class="hardware-legend" id="hardware-legend" role="group" aria-label="Isolate a hardware series"></div>
+            <div class="hardware-plot" id="hardware-plot" tabindex="0" role="group" aria-describedby="hardware-tooltip" aria-label="Hardware history. Arrow keys inspect samples; Escape clears the cursor. Use the legend to isolate a series.">
+              <span class="hardware-axis" id="hardware-axis">100%<br>50%<br>0%</span>
+              <svg id="hardware-chart" viewBox="0 0 600 180" preserveAspectRatio="none" aria-hidden="true"></svg>
+              <div class="hardware-tooltip" id="hardware-tooltip" role="tooltip" hidden></div>
             </div>
-            <div style="flex:1 1 200px;min-width:170px">
-              <div class="sub" style="margin-bottom:2px">GPU load</div>
-              <svg class="spark" id="spark-gpu" viewBox="0 0 240 46" preserveAspectRatio="none"></svg>
-            </div>
+            <div class="hardware-times sub"><span>~2 min ago</span><span id="hardware-state">Waiting for samples</span><span>Now</span></div>
           </div>
           <div class="sub" id="live-note" style="margin-top:8px">&nbsp;</div>
           <!-- Last in the card on purpose. It is an offer, not a reading, and
@@ -5984,29 +6096,9 @@ const startup = (() => {
           <div class="sub2" id="temps-note"></div>
         </section>
 
-        <section class="panel" id="hw-card">
-          <h2>Detected</h2>
-          <div id="hw"><span class="sub">&hellip;</span></div>
-          <!-- The verdict belongs under the hardware it is a verdict on,
-               rather than in a card of its own further down the page. -->
-          <div id="assessment-out"></div>
-        </section>
       </div>
 
-      <section class="panel" id="net-card">
-        <h2>Connection</h2>
-        <p class="sub" style="margin:0 0 9px">
-          CS2 timestamps the exact moment you click, so a packet that never arrives is a
-          shot the server never saw &mdash; however clearly it landed on your screen. That is
-          what &ldquo;no reg&rdquo; usually is. This measures loss and jitter to your own router and
-          out to the internet separately, so you can tell which side the trouble is on.
-          It takes five seconds and changes nothing.
-        </p>
-        <div class="actions">
-          <button class="btn primary" id="net-run">Measure my connection</button>
-        </div>
-        <div id="net-out"></div>
-      </section>
+
 
 
 
@@ -6141,7 +6233,7 @@ const startup = (() => {
         </div>
         <div class="fps-copy">
           <h3>Target frame rate</h3>
-          <p id="fps-say">Left blank, everything is chosen to clear your refresh rate.</p>
+          <p id="fps-say">Use your refresh rate as the settings target.</p>
         </div>
         <div class="fps-set">
           <input type="number" id="target" min="30" max="1000" placeholder="auto"
@@ -6324,6 +6416,8 @@ const startup = (() => {
         <div class="segbar" id="settings-subtabs" role="tablist">
           <div class="seg-thumb" id="seg-thumb"></div>
           <button class="seg-item" data-sub="apply" role="tab" aria-selected="true">Apply</button>
+          <button class="seg-item" data-sub="this-pc" role="tab" aria-selected="false"><span data-hardware-icon="display"></span> This PC</button>
+          <button class="seg-item" data-sub="steam" role="tab" aria-selected="false">Steam</button>
           <button class="seg-item" data-sub="account" role="tab" aria-selected="false">Account</button>
           <button class="seg-item" data-sub="apps" role="tab" aria-selected="false">Apps</button>
           <button class="seg-item" data-sub="look" role="tab" aria-selected="false">Look</button>
@@ -6333,6 +6427,16 @@ const startup = (() => {
           <button class="seg-item" data-sub="editing" role="tab" aria-selected="false">Editing</button>
           <button class="seg-item" data-sub="logs" role="tab" aria-selected="false">Logs</button>
         </div>
+      </div>
+
+      <div class="subpane hidden" data-sub="this-pc">
+        <section class="panel" id="hw-card">
+          <h2><span data-hardware-icon="display"></span> This PC</h2>
+          <div id="hw"><span class="sub">&hellip;</span></div>
+          <!-- The verdict belongs under the hardware it is a verdict on,
+               rather than in a card of its own further down the page. -->
+          <div id="assessment-out"></div>
+        </section>
       </div>
 
       <div class="subpane" data-sub="apply">
@@ -6365,7 +6469,6 @@ const startup = (() => {
         <label class="opt"><input type="checkbox" id="w-video" checked> Picture quality (cs2_video.txt)</label>
         <label class="opt"><input type="checkbox" id="p-video" checked> Set CS2 to borderless windowed before launching</label>
         <label class="opt"><input type="checkbox" id="w-cfg" checked> Generated .vcfg config</label>
-        <label class="opt"><input type="checkbox" id="w-launch" checked> Steam launch options</label>
         <label class="opt"><input type="checkbox" id="w-autoexec"> Add exec line to autoexec.vcfg</label>
         <label class="opt"><input type="checkbox" id="w-scaling" checked> Full-screen scaling (no black bars when stretched)</label>
         <div class="actions">
@@ -6392,7 +6495,28 @@ const startup = (() => {
       <!-- The other programs that run alongside the game. Crosshair X was
            here only because it was the first one written; it is not a setting
            about CS2's configuration and never was. -->
-      <!-- Signing in, and what the plan includes. -->
+      <!-- Local Steam account, client, launch options and repairs. -->
+      <div class="subpane hidden" data-sub="steam">
+        <section class="panel" id="steam-client-card"><h2>Steam client</h2><div id="steam-status"></div>
+          <div id="steam-profile"><div class="account-label">Steam account</div>
+      <div class="who-menu hidden" id="who-menu"></div>
+      <button class="rail-profile" id="who" aria-haspopup="true" aria-expanded="false"
+              title="Whose settings are shown">
+        <i class="orb" id="who-face"></i>
+        <span class="nm"><b id="who-name">Looking&hellip;</b>
+          <small id="who-how"></small></span>
+      </button></div>
+        </section>
+        <section class="panel" id="steam-launch-card"><h2>Steam launch options</h2>
+          <label class="opt"><input type="checkbox" id="w-launch" checked> Apply launch options with next Apply</label>
+          <div id="steam-launch-out"><span class="sub">Preview changes to read launch options.</span></div>
+          <div class="actions"><button class="btn" id="steam-preview">Preview changes</button><button class="btn" id="steam-apply">Review Apply</button></div>
+        </section>
+        <div class="wide" id="steam-tools-feedback"><span id="steam-tools-status" class="sub" role="status"></span><button class="btn small" id="steam-tools-retry" hidden>Retry Steam tools</button></div>
+        <div id="steam-tools" class="settings-tools wide"></div>
+      </div>
+
+      <!-- App sign-in, linking and subscription stay separate from Steam settings. -->
       <div class="subpane hidden" data-sub="account">
         <section class="panel wide" id="account-card">
           <h2>Account</h2>
@@ -6401,8 +6525,21 @@ const startup = (() => {
       </div>
 
       <div class="subpane hidden" data-sub="apps">
-      <section class="panel hidden" id="xhair-card">
-        <div id="xhair-out"></div>
+      <section id="apps-overview" class="apps-overview">
+        <div class="apps-heading"><h2>Apps</h2><p>Ready when you play.</p></div>
+        <div class="app-tiles">
+          <button type="button" class="app-tile" data-app-tile="faceit" aria-label="FACEIT settings"><img src="assets/faceit/faceit-mark.svg" alt=""><b>FACEIT</b><span class="app-addon">+ Anti-cheat</span><small data-app-status="faceit">Checking…</small><span class="app-arrow" aria-hidden="true">↗</span></button>
+          <button type="button" class="app-tile" data-app-tile="discord" aria-label="Discord settings"><img src="assets/apps/discord-logo.svg" alt=""><b>Discord</b><small data-app-status="discord">Checking…</small><span class="app-arrow" aria-hidden="true">↗</span></button>
+          <button type="button" class="app-tile" data-app-tile="teamspeak" aria-label="TeamSpeak settings"><span class="app-brand" data-app-logo="teamspeak"><img class="app-logo-on-dark" src="assets/apps/teamspeak-logo.svg" alt=""><img class="app-logo-on-light" src="assets/apps/teamspeak-logo-dark.svg" alt=""></span><b>TeamSpeak</b><small data-app-status="teamspeak">Checking…</small><span class="app-arrow" aria-hidden="true">↗</span></button>
+          <button type="button" class="app-tile" data-app-tile="crosshairx" aria-label="Crosshair X settings"><span class="app-brand" data-app-logo="crosshairx"><img src="assets/apps/crosshairx-logo.png" alt=""></span><b>Crosshair X</b><small data-app-status="crosshairx">Checking…</small><span class="app-arrow" aria-hidden="true">↗</span></button>
+        </div>
+      </section>
+      <section id="app-detail" hidden>
+        <button class="btn small ghost" id="app-back">← Back to Apps</button>
+        <div class="app-detail-head"><span class="app-brand" id="app-detail-brand"><img id="app-detail-logo" class="app-logo-on-dark" alt=""><img class="app-logo-on-light" src="assets/apps/teamspeak-logo-dark.svg" alt=""></span><div><h2 id="app-detail-title" tabindex="-1"></h2><p id="app-detail-caption"></p></div></div>
+        <div class="app-controls" id="app-controls"></div>
+        <section class="panel hidden" id="xhair-card"><div id="xhair-out"></div></section>
+        <p class="app-feedback" id="app-feedback" role="status" aria-live="polite"></p>
       </section>
 
       <!-- Everything else that runs alongside the game. Crosshair X above is
@@ -6410,12 +6547,9 @@ const startup = (() => {
            here gets the general case -- find it, say whether it is up, start
            it -- and nothing this application cannot honestly offer. -->
       <section class="panel wide" id="companions-card">
-        <h2>Companions</h2>
+        <h2>Your companions</h2>
         <p class="sub" style="margin:0 0 9px">
-          Other programs you run with CS2 &mdash; a clip recorder, an overlay, whatever
-          it is. Add one and it gets a Start button here and the choice to come up on
-          its own when the game does. Nothing in its own settings is touched; this only
-          finds it, watches whether it is running, and starts it.
+          Add other programs to start with CS2.
         </p>
         <div id="companions-out"></div>
       </section>
@@ -6432,6 +6566,11 @@ const startup = (() => {
       </div>
 
       <div class="subpane hidden" data-sub="sound">
+      <section class="panel" id="goxlr-card" aria-label="GoXLR profiles">
+        <div class="goxlr-heading"><h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="3"/><path d="M7 8v8m5-8v8m5-8v8M5 11h4m1 3h4m1-4h4"/></svg>GoXLR</h2><button type="button" class="btn goxlr-icon" id="goxlr-refresh" aria-label="Refresh GoXLR" title="Refresh GoXLR"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6.1 6.2A8 8 0 0 1 20 12M4 12a8 8 0 0 0 13.9 5.8"/></svg></button></div>
+        <div id="goxlr-out"><div class="goxlr-empty">Looking for GoXLR…</div></div>
+        <div class="sub2" id="goxlr-feedback" role="status" aria-live="polite"></div>
+      </section>
       <section class="panel" id="audio-card">
         <h2>Sound devices</h2>
         <p class="sub" style="margin:0 0 9px">
@@ -6446,6 +6585,30 @@ const startup = (() => {
       </div>
 
       <div class="subpane hidden" data-sub="config">
+      <section class="panel config-ready" id="config-ready" aria-busy="false">
+        <div class="config-ready-top">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3H15L20 8V21H5ZM15 3V8H20M8 14L11 17L17 11"/></svg>
+          <div class="config-ready-copy"><h2 id="configs-title">Preparing your configs…</h2><p id="configs-state" role="status" aria-live="polite">Built automatically each time you open the app.</p></div>
+          <div class="config-ready-actions"><button class="btn" id="configs-refresh" title="Prepare again and send to CS2 if allowed">Refresh</button><button class="btn primary" id="configs-allow">Allow config files</button></div>
+        </div>
+        <div class="config-guide">
+          <article><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3H15L20 8V21H5ZM15 3V8H20M8 13H16M8 17H14"/></svg><div><b>Start here</b><small>Loads the other files when CS2 starts.</small><code>autoexec.vcfg</code></div></article>
+          <article><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V12M10 19V5M16 19V9M22 19V3"/></svg><div><b>Performance</b><small>Applies the preset chosen for this PC.</small><code>Generated performance config</code></div></article>
+          <article><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7H21V18H3ZM6 10H7M10 10H11M14 10H15M18 10H19M7 14H17"/></svg><div><b>Your keys</b><small>Saves shortcuts from the Keyboard tab.</small><code>mainsettings/key_binds.vcfg</code></div></article>
+          <article><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6H20M4 12H20M4 18H20M8 3V9M16 9V15M10 15V21"/></svg><div><b>Game settings</b><small>Keeps your crosshair, radar and sound.</small><code>mainsettings/gamesettings.vcfg</code></div></article>
+          <article><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4L3 12L8 20M16 4L21 12L16 20M14 3L10 21"/></svg><div><b>Your scripts</b><small>Gives a name to a sequence of actions.</small><code>tools/alias.vcfg</code></div></article>
+          <article><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3V16M7 11L12 16L17 11M4 16V21H20V16"/></svg><div><b>Brought from your files</b><small>Keeps imported commands in their load order.</small><code>mainsettings/imported.vcfg · optional</code></div></article>
+        </div>
+        <p class="config-location" id="configs-location"></p>
+        <details class="config-location"><summary>Launch options note</summary><p><code>launch_options_generated.txt</code> lists suggested Steam launch options. Preparing files does not change Steam’s launch options; use Apply for that.</p></details>
+      </section>
+      <section class="panel" id="config-import-card"><h2>Bring your own configs</h2><p class="sub">Choose any file names. Review a rebuilt copy; your originals stay untouched.</p><div class="actions"><button class="btn primary" id="configs-import">Choose configs…</button></div></section>
+      <section class="panel" id="setup-card">
+        <h2>Take your setup with you</h2>
+        <p class="sub">Save your settings and files in one copy for another PC.</p>
+        <div class="actions"><button class="btn primary" id="setup-save">Save a copy…</button><button class="btn" id="setup-open">Open a saved setup…</button></div><div id="setup-out"></div>
+      </section>
+      <details class="config-advanced" id="config-advanced"><summary>Advanced <small>Scan, format, repair and create files</small></summary><div class="config-advanced-body">
       <section class="panel hidden" id="starter-card">
         <h2>Start a config</h2>
         <p class="sub" style="margin:0 0 9px">
@@ -6459,21 +6622,6 @@ const startup = (() => {
           <button class="btn primary" id="starter-make">Create it</button>
         </div>
         <div id="starter-out"></div>
-      </section>
-
-      <section class="panel" id="setup-card">
-        <h2>Carry this setup</h2>
-        <p class="sub" style="margin:0 0 11px">
-          Everything this account has chosen, plus a copy of its configuration folder,
-          in one file. Take it to another PC, or keep it as something to come back to.
-          Nothing identifying goes in &mdash; no account, no paths from this machine &mdash;
-          so it can be handed to somebody else as it is.
-        </p>
-        <div class="actions">
-          <button class="btn primary" id="setup-save">Save a copy&hellip;</button>
-          <button class="btn" id="setup-open">Open a saved setup&hellip;</button>
-        </div>
-        <div id="setup-out"></div>
       </section>
 
       <section class="panel" id="cfg-card">
@@ -6508,7 +6656,7 @@ const startup = (() => {
         <div id="cfg-files"></div>
         <div id="cfg-out"></div>
       </section>
-
+      </div></details>
       </div>
 
       <div class="subpane hidden" data-sub="logs">
@@ -6618,6 +6766,9 @@ const startup = (() => {
 </div>
 <script src="skin-viewer.js"></script>
 <script src="assets/faceit/dashboard.js"></script>
+<script src="assets/apps/apps.js"></script>
+<script src="assets/goxlr/sound.js"></script>
+<script src="assets/config/files.js"></script>
 <link rel="stylesheet" href="assets/home/server-lock.css">
 <script src="assets/home/server-lock.js"></script>
 <script>
@@ -6719,7 +6870,7 @@ function renderDisplays(d) {
     const options = rates.map(r => '<option value="' + Number(r) + '"' + (r === s.refresh ? ' selected' : '') + '>' + esc(hz(r)) + '</option>').join('');
     const reported = s.width > 0 && s.height > 0;
     return '<article class="gfx-monitor" id="disp-' + esc(s.device) + '">' +
-      '<header><b>Display ' + (i+1) + '</b>' + (s.primary ? '<span class="flag">Primary</span>' : '') +
+      '<header><b>' + hwIcon('display', 'Display ' + (i+1)) + ' ' + (i+1) + '</b>' + (s.primary ? '<span class="flag">Primary</span>' : '') +
       '<span class="sub">' + (s.at_best ? 'Highest offered at this resolution' : s.best ? esc(hz(s.best)) + ' available' : 'Available rates not reported') + '</span></header>' +
       '<div class="gfx-monitor-body"><div class="gfx-hardware">' + gfxScene() + '<div class="gfx-stand"></div></div>' +
       '<div class="gfx-readout"><strong>' + (s.refresh > 0 ? esc(s.refresh) + '<small> Hz</small>' : '—') + '</strong><b>' +
@@ -6774,6 +6925,8 @@ function renderScaling(d) {
     '<p class="gfx-note">These rows show the driver’s current scaling policy, not CS2’s live resolution. Fix saves full-screen scaling permanently. The launcher also fixes scaling for stretched play and restores it on exit.</p></section>';
 }
 function gfxIcon(kind) {
+  const hardware = {screen:'display',power:'power',chip:'gpu'}[kind];
+  if (hardware) return hwIcon(hardware);
   const paths = {screen:'M3 4H21V16H3ZM9 20H15M12 16V20',frames:'M3 5H15V15H3ZM8 2H20V12M7 19H20',image:'M3 3H21V21H3ZM3 17L9 11L13 15L17 10L21 14M7 7H8',power:'M12 2V11M6 5A9 9 0 1 0 18 5',chip:'M6 6H18V18H6ZM9 1V6M15 1V6M9 18V23M15 18V23M1 9H6M1 15H6M18 9H23M18 15H23',info:'M12 10V17M12 6V7M12 2A10 10 0 1 0 12 22A10 10 0 1 0 12 2'};
   return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="' + (paths[kind] || paths.info) + '"/></svg>';
 }
@@ -6942,13 +7095,10 @@ function renderHardware(d) {
       (m.primary ? ' <span class="sub">primary</span>' : "") +
       (m.confident ? "" : ' <span class="sub">(from EDID)</span>'), null]));
   bits.push(["Power", esc(d.power_plan || "unknown"), null]);
-  if (d.cs2_install) bits.push(["CS2", '<span class="mono">' + esc(d.cs2_install) + "</span>", null]);
-  bits.push(["Steam", d.steam_running
-    ? '<span style="color:var(--warn)">running — close it before applying launch options</span>'
-    : "not running", null]);
+  $('steam-status').innerHTML = '<p class="sub">' + (d.steam_running ? 'Running · close Steam before applying launch options' : 'Steam is closed') + '</p><div class="row"><span class="k">Steam path</span><span class="v mono">' + esc(d.steam_path || 'Not found') + '</span></div><div class="row"><span class="k">CS2 path</span><span class="v mono">' + esc(d.cs2_install || 'Not found') + '</span></div>';
 
   $("hw").innerHTML = bits.map(([k, v, sub]) =>
-    '<div class="row"><span class="k">' + esc(k) + '</span><span class="v">' + v +
+    '<div class="row"><span class="k">' + (hwIcon(k) || esc(k)) + '</span><span class="v">' + v +
     (sub ? '<br><span class="sub">' + esc(sub) + "</span>" : "") + "</span></div>").join("");
 
 }
@@ -7113,6 +7263,7 @@ function homePatchReadouts(host, markup) {
   else [...host.children].forEach((el, i) => {
     const fresh = template.content.children[i];
     el.title = fresh.title;
+    el.style.setProperty("--hw-speed", fresh.style.getPropertyValue("--hw-speed"));
     const oldSub = el.querySelector('.sub2'), nextSub = fresh.querySelector('.sub2');
     if (oldSub && nextSub) oldSub.textContent = nextSub.textContent;
     else if (nextSub) el.append(nextSub.cloneNode(true));
@@ -7154,36 +7305,161 @@ function homeSmoothPath(points) {
   }
   return path;
 }
-function homeChart(id, series, colour) {
-  const el = $(id); if (!el) return;
-  const samples = (series || []).slice(-40);
-  if (samples.filter(v => Number.isFinite(v)).length < 2) {
-    homeCancel(el); el.innerHTML = '<text x="6" y="26" fill="var(--muted)" font-size="11">no samples yet</text>'; return;
+/* Combined hardware history. Geometry changes only on a sample; each frame only
+   translates the persistent series group. Null sensors split paths, never read 0. */
+const hardwareGraph = {
+  mode: 'usage', selected: null, data: {}, temperatures: {}, at: null,
+  cursor: null, offset: 0, fromOffset: 0, raf: 0, started: 0, duration: 2000,
+  usage: [
+    ['cpu', 'CPU', 'var(--accent)'],
+    ['gpu', 'GPU', 'var(--hardware-gpu)'],
+    ['ram', 'RAM', 'var(--hardware-ram)'],
+    ['vram', 'VRAM', 'var(--hardware-vram)']
+  ], thermal: []
+};
+function hardwareSeries() { return hardwareGraph.mode === 'usage' ? hardwareGraph.usage : hardwareGraph.thermal; }
+function hardwareValues(key) { return (hardwareGraph.mode === 'usage' ? hardwareGraph.data : hardwareGraph.temperatures)[key] || []; }
+function hardwareUnit() { return hardwareGraph.mode === 'usage' ? '%' : '°C'; }
+function hardwareLegend() {
+  const g = hardwareGraph, host = $('hardware-legend');
+  const signature = hardwareSeries().map(s => s[0]).join('|');
+  // Keep focused legend buttons mounted across the two-second polling updates.
+  if (host.dataset.signature !== signature) host.innerHTML = hardwareSeries().map(([key, name, tone]) => {
+    const value = hardwareValues(key).at(-1), known = Number.isFinite(value);
+    return '<button type="button" class="hardware-chip" data-hardware="' + key + '" style="--series:' + tone + '" aria-pressed="' + (g.selected === key) + '" title="' + esc(name + ': click to isolate; click again for all') + '">' + hwIcon(g.mode === 'temperature' ? key.slice(5) : key, name) + '<b>' + (known ? Math.round(value) + hardwareUnit() : '—') + '</b></button>';
+  }).join('');
+  host.dataset.signature = signature;
+  for (const [key] of hardwareSeries()) {
+    const value = hardwareValues(key).at(-1);
+    host.querySelector('[data-hardware="' + key + '"] b').textContent = Number.isFinite(value) ? Math.round(value) + hardwareUnit() : '—';
   }
-  const points = samples.map(v => Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : null);
-  const previous = el.homeSamples || points;
-  el.homeSamples = points;
-  const gid = 'home-gradient-' + id;
-  if (!el.querySelector('.chart-line')) el.innerHTML = '<defs><linearGradient id="' + gid + '" x2="0" y2="1"><stop stop-color="' + colour + '" stop-opacity=".4"/><stop offset="1" stop-color="' + colour + '" stop-opacity="0"/></linearGradient></defs><path class="chart-area" fill="url(#' + gid + ')"/><path class="chart-line" fill="none" stroke="' + colour + '" stroke-width="1.8"/><circle class="chart-tip" r="2.6" fill="' + colour + '"/>';
-  el.setAttribute('role', 'img'); el.setAttribute('aria-label', id.replace('spark-', '').toUpperCase() + ' load history; latest ' + (points.at(-1) ?? 'unavailable') + '%');
-  el.dataset.homescroll = 0;
-  homeTween(el, 'scroll', 1, progress => {
-    const count = points.length, step = 240 / (count - 1), segments = []; let segment = [];
-    // Slide the old window left while the newest measured point enters from right.
-    const values = [...previous.slice(-count), points.at(-1)];
-    for (let i = 0; i < values.length; i++) {
-      const v = values[i];
-      if (v === null) { if (segment.length) segments.push(segment); segment = []; continue; }
-      segment.push([(i - progress) * step, 43 - v * .4]);
-    }
-    if (segment.length) segments.push(segment);
-    el.querySelector('.chart-line').setAttribute('d', segments.map(homeSmoothPath).join(' '));
-    el.querySelector('.chart-area').setAttribute('d', segments.map(p => homeSmoothPath(p) + ' L' + p.at(-1)[0] + ' 46 L' + p[0][0] + ' 46 Z').join(' '));
-    const latest = values.at(-2), next = values.at(-1), tip = el.querySelector('.chart-tip');
-    tip.style.opacity = latest === null || next === null ? 0 : 1;
-    tip.setAttribute('cx', 240); tip.setAttribute('cy', 43 - ((latest ?? 0) + ((next ?? 0) - (latest ?? 0)) * progress) * .4);
-  }, 1900);
+  $('hardware-all').setAttribute('aria-pressed', String(!g.selected));
 }
+function hardwareSelect(key) {
+  hardwareGraph.selected = hardwareGraph.selected === key ? null : key;
+  hardwarePaintSelection();
+}
+function hardwarePaintSelection() {
+  const key = hardwareGraph.selected;
+  document.querySelectorAll('[data-hardware]').forEach(el => {
+    el.classList.toggle('hardware-muted', !!key && el.dataset.hardware !== key);
+    if (el.tagName === 'BUTTON') el.setAttribute('aria-pressed', String(el.dataset.hardware === key));
+  });
+  $('hardware-all').setAttribute('aria-pressed', String(!key));
+}
+function hardwareDraw() {
+  const g = hardwareGraph, max = g.mode === 'usage' ? 100 : 120, step = 600 / 59;
+  let svg = '<defs>' + hardwareSeries().map(([key,,tone]) => '<linearGradient id="hardware-fill-' + key + '" x1="0" y1="0" x2="0" y2="1"><stop stop-color="' + tone + '" stop-opacity=".26"/><stop offset="1" stop-color="' + tone + '" stop-opacity=".01"/></linearGradient>').join('') + '</defs><g class="hardware-grid">';
+  for (let y = 0; y <= 180; y += 45) svg += '<path d="M0 ' + y + 'H600"/>';
+  svg += '</g><g id="hardware-scroll">';
+  let known = 0;
+  for (const [key,,tone] of hardwareSeries()) {
+    const values = hardwareValues(key).slice(-61), segments = []; let part = [];
+    values.forEach((value, i) => {
+      if (!Number.isFinite(value)) { if (part.length) segments.push(part); part = []; return; }
+      known++;
+      part.push([(60 - values.length + i) * step, 180 - Math.max(0, Math.min(max, value)) / max * 180]);
+    });
+    if (part.length) segments.push(part);
+    const line = segments.map(homeSmoothPath).join(' ');
+    const area = segments.map(p => homeSmoothPath(p) + ' L' + p.at(-1)[0] + ' 180 L' + p[0][0] + ' 180 Z').join(' ');
+    svg += '<g data-hardware="' + key + '" style="--series:' + tone + '"><path class="hardware-area" fill="url(#hardware-fill-' + key + ')" d="' + area + '"/><path class="hardware-line" stroke="' + tone + '" d="' + line + '"/>' + segments.filter(p => p.length === 1).map(p => '<circle cx="' + p[0][0] + '" cy="' + p[0][1] + '" r="3" fill="' + tone + '"/>').join('') + '<path class="hardware-hit" data-hardware-line="' + key + '" d="' + line + '"/></g>';
+  }
+  svg += '</g><path id="hardware-crosshair" class="hardware-crosshair" visibility="hidden"/>';
+  $('hardware-chart').innerHTML = svg;
+  $('hardware-state').textContent = known ? (g.mode === 'usage' ? 'Usage · %' : 'Temperature · °C') : 'No readings available';
+  $('hardware-axis').innerHTML = max + hardwareUnit() + '<br>' + max / 2 + hardwareUnit() + '<br>0' + hardwareUnit();
+  hardwareLegend(); hardwarePaintSelection(); hardwareTranslate();
+}
+function hardwareTranslate() {
+  const el = $('hardware-scroll');
+  if (el) el.style.transform = 'translateX(' + hardwareGraph.offset + 'px)';
+  if (hardwareGraph.cursor !== null) hardwareInspect(hardwareGraph.cursor);
+}
+function hardwareFrame(now) {
+  const g = hardwareGraph; g.raf = 0;
+  if (!homeVisible() || homeMotion.reduced.matches) return;
+  g.offset = g.fromOffset * (1 - Math.min(1, (now - g.started) / g.duration));
+  hardwareTranslate();
+  if (g.offset > 0) g.raf = requestAnimationFrame(hardwareFrame);
+}
+function hardwarePause() {
+  const g = hardwareGraph;
+  cancelAnimationFrame(g.raf); g.raf = 0;
+  // Resume at the measured window instead of replaying time spent hidden.
+  g.offset = 0; hardwareTranslate();
+}
+function hardwareUpdate(d) {
+  const g = hardwareGraph;
+  if (d.at != null && g.at === d.at) return;
+  const animate = g.at !== null && Number(d.at) > g.at && Number(d.at) - g.at < 4 && homeVisible() && !homeMotion.reduced.matches;
+  const previous = g.data;
+  g.data = {};
+  for (const [key] of g.usage) {
+    g.data[key] = (d.history?.[key] || []).slice(-60);
+    // Retain the point leaving the left edge until its translation finishes.
+    if (animate && g.data[key].length === 60 && previous[key]?.length >= 60) g.data[key].unshift(previous[key].at(-60));
+  }
+  // Temperatures have no server history: begin collecting at this page's first poll.
+  const parts = (d.temps?.parts || []).filter(p => ['cpu', 'gpu', 'system'].includes(p.part));
+  if (!parts.some(p => p.part === 'gpu')) parts.push({part:'gpu', label:'GPU', celsius:d.gpu?.temperature, known:Number.isFinite(d.gpu?.temperature)});
+  for (const p of parts) {
+    const key = 'temp-' + p.part;
+    if (!g.thermal.some(s => s[0] === key)) g.thermal.push([key, p.part === 'system' ? 'System' : p.part.toUpperCase(), p.part === 'gpu' ? 'var(--good)' : p.part === 'system' ? 'var(--warn)' : 'var(--accent)']);
+  }
+  for (const [key] of g.thermal) {
+    const p = parts.find(p => key === 'temp-' + p.part);
+    const values = g.temperatures[key] ||= [];
+    if (g.at !== null && Number(d.at) - g.at >= 4) values.push(null);
+    values.push(p?.known && Number.isFinite(p.celsius) ? p.celsius : null);
+    g.temperatures[key] = values.slice(-60);
+  }
+  cancelAnimationFrame(g.raf); g.raf = 0; g.at = Number(d.at) || Date.now() / 1000;
+  g.offset = animate ? g.offset + 600 / 59 : 0;
+  g.fromOffset = g.offset;
+  hardwareDraw();
+  if (animate) { g.started = performance.now(); g.raf = requestAnimationFrame(hardwareFrame); }
+}
+function hardwareInspect(x) {
+  const g = hardwareGraph; g.cursor = Math.max(0, Math.min(600, x));
+  const age = Math.max(0, Math.min(59, Math.round((600 - g.cursor + g.offset) / (600 / 59))));
+  const cross = $('hardware-crosshair');
+  cross?.setAttribute('d', 'M' + g.cursor + ' 0V180'); cross?.setAttribute('visibility', 'visible');
+  const tip = $('hardware-tooltip'); tip.hidden = false;
+  tip.style.left = Math.min(68, g.cursor / 6) + '%';
+  const signature = [g.at, g.mode, age, hardwareSeries().length].join('|');
+  if (tip.dataset.sample === signature) return;
+  tip.dataset.sample = signature;
+  tip.innerHTML = '<b>' + (age ? '~' + age * 2 + 's ago' : 'Latest sample') + '</b>' + hardwareSeries().map(([key,name,tone]) => {
+    const values = hardwareValues(key), value = values[values.length - 1 - age];
+    return '<span><i style="background:' + tone + '"></i>' + esc(name) + '<strong>' + (Number.isFinite(value) ? Math.round(value) + hardwareUnit() : '—') + '</strong></span>';
+  }).join('');
+}
+function hardwareClearCursor() {
+  hardwareGraph.cursor = null; $('hardware-tooltip').hidden = true;
+  $('hardware-crosshair')?.setAttribute('visibility', 'hidden');
+}
+$('hardware-legend').addEventListener('click', e => { const chip = e.target.closest('[data-hardware]'); if (chip) hardwareSelect(chip.dataset.hardware); });
+$('hardware-chart').addEventListener('click', e => { const line = e.target.closest('[data-hardware-line]'); if (line) hardwareSelect(line.dataset.hardwareLine); });
+$('hardware-all').addEventListener('click', () => { hardwareGraph.selected = null; hardwarePaintSelection(); });
+$('hardware-temperature').addEventListener('click', () => {
+  const g = hardwareGraph; g.mode = g.mode === 'usage' ? 'temperature' : 'usage'; g.selected = null;
+  $('hardware-temperature').setAttribute('aria-pressed', String(g.mode === 'temperature'));
+  hardwareDraw();
+});
+$('hardware-plot').addEventListener('pointermove', e => { const r = $('hardware-chart').getBoundingClientRect(); hardwareInspect((e.clientX - r.left) / r.width * 600); });
+$('hardware-plot').addEventListener('pointerleave', hardwareClearCursor);
+$('hardware-plot').addEventListener('blur', hardwareClearCursor);
+$('hardware-plot').addEventListener('keydown', e => {
+  if (e.key === 'Escape') hardwareClearCursor();
+  else if (['ArrowLeft','ArrowRight','Home','End'].includes(e.key)) {
+    e.preventDefault(); hardwareInspect(e.key === 'Home' ? 0 : e.key === 'End' ? 600 : (hardwareGraph.cursor ?? 600) + (e.key === 'ArrowLeft' ? -1 : 1) * 600 / 59);
+  }
+});
+document.addEventListener('visibilitychange', hardwarePause);
+homeMotion.reduced.addEventListener('change', hardwarePause);
+new MutationObserver(hardwarePause).observe(document.querySelector('[data-panel="launcher"]'), {attributes:true, attributeFilter:['class']});
+hardwareDraw();
 
 function scoreRing(value, cap, label, detail, tone) {
   const share = Math.max(0, Math.min(1, value / cap));
@@ -7198,21 +7474,12 @@ function scoreRing(value, cap, label, detail, tone) {
       ' transform="rotate(-90 16 16)"/>' +
     "</svg>" +
     '<span class="score-text"><b>' + Math.round(value) + "</b>" +
-    "<i>" + esc(label) + "</i></span></span>";
+    "<i>" + (hwIcon(label) || esc(label)) + "</i></span></span>";
 }
 
-function renderScores(p, headroomPct, hue) {
+function renderScores() {
   const box = $("scorebar");
-  if (!box || !p) return;
-  homePatchReadouts(box,
-    scoreRing(headroomPct, 100, "Headroom",
-              p.headroom + "× of " + p.target_fps + " Hz", hue) +
-    scoreRing(p.cpu_score, 105, "CPU",
-              "score " + p.cpu_score + ", ceiling ~" + p.cpu_ceiling + " fps",
-              "var(--warn)") +
-    scoreRing(p.gpu_score, 135, "GPU",
-              "score " + p.gpu_score + ", ceiling ~" + p.gpu_ceiling + " fps",
-              "var(--accent)"));
+  if (box) box.replaceChildren();
 }
 
 function renderPlan(p) {
@@ -7222,37 +7489,13 @@ function renderPlan(p) {
 
   // What the target actually cost, said where the target is typed.
   const level = (p.settings || []).find(x => /gpu level|overall quality/i.test(x.name || ""));
-  fpsEffect = "Tier " + esc(p.tier) + " · " + p.headroom + "× headroom" +
-    (level && level.after ? " · picture " + esc(String(level.after)) : "");
+  fpsEffect = level && level.after ? "Picture " + esc(String(level.after)) : "";
   renderFps();
-  setBandFigures(p);
 
-  const hue = p.headroom >= 1.15 ? "var(--good)" : p.headroom >= 0.85 ? "var(--warn)" : "var(--bad)";
+
   const changed = p.settings.filter(s => s.changed);
-
-  const headroomPct = Math.min(100, (p.headroom / 2) * 100);
-  // The three scores go to the title bar. They are a verdict on the machine
-  // rather than something that changes while you read, so they belong where
-  // the other standing figures are -- and the assessment card stops opening
-  // with a row of rings repeating the numbers printed underneath them.
-  renderScores(p, headroomPct, hue);
-
-  let assessment = '<div class="assess">' +
-    '<div class="subcat">Assessment</div>' +
-    '<div class="stats">' +
-    '<div class="stat"><b>' + esc(p.tier) + '</b><span>tier</span></div>' +
-    '<div class="stat"><b style="color:' + hue + '">~' + p.estimated_fps + '</b><span>est. fps</span></div>' +
-    '<div class="stat"><b>' + p.headroom + '×</b><span>of ' + p.target_fps + ' Hz</span></div>' +
-    '<div class="stat"><b>' + esc(p.bottleneck) + '</b><span>limited by</span></div>' +
-    "</div>" +
-    '<div class="row" style="margin-top:8px"><span class="k">CPU</span><span class="v">score ' +
-      p.cpu_score + (p.cpu_exact ? "" : ' <span class="sub">(' + esc(p.cpu_note) + ")</span>") +
-      ' · ceiling ~' + p.cpu_ceiling + ' fps</span></div>' +
-    '<div class="row"><span class="k">GPU</span><span class="v">score ' +
-      p.gpu_score + (p.gpu_exact ? "" : ' <span class="sub">(' + esc(p.gpu_note) + ")</span>") +
-      ' · ceiling ~' + p.gpu_ceiling + ' fps</span></div>' +
-    "</div>";
-  $("assessment-out").innerHTML = assessment;
+  renderScores();
+  $("assessment-out").innerHTML = '<div class="assess"><div class="subcat">Selected settings</div><span class="sub">' + esc(p.intent) + ' \u00b7 ' + p.settings.length + ' picture settings reviewed</span></div>';
 
   // A change you cannot see is a change you cannot check. Anything moving gets
   // a full row with the reason attached; the rest collapses out of the way.
@@ -7276,7 +7519,7 @@ function renderPlan(p) {
         : '<span class="chg-chip new">new</span>' +
           '<span class="chg-arrow">→</span>' + chip(s.after, null, "to")) +
       "</div>" +
-      (s.reason ? '<div class="chg-why">' + esc(s.reason) + "</div>" : "") +
+      (s.reason ? '<div class="chg-why">' + esc(/headroom|\btier\b|estimated|ceiling/i.test(s.reason) ? 'Selected for this picture profile.' : s.reason) + "</div>" : "") +
       "</div>";
   }).join("");
 
@@ -7298,21 +7541,12 @@ function renderPlan(p) {
       "</span></div></div>").join("") +
     "</div></section>";
 
-  html += '<section class="card"><h2>Steam launch options</h2>' +
-    '<div class="sub">current</div><pre class="opts">' + esc(p.launch_current || "(none set)") + "</pre>" +
-    '<div class="sub">new</div><pre class="opts">' + esc(p.launch_new) + "</pre>" +
-    p.launch_removed.map(r => '<div class="note"><div class="rm">− ' + esc(r.option) +
-      '</div><div class="d">' + esc(r.reason) + "</div></div>").join("") +
-    p.launch_added.map(a => '<div class="note"><div class="ad">+ ' + esc(a.option) +
-      '</div><div class="d">' + esc(a.reason) + "</div></div>").join("") +
-    "</section>";
-
-  if (p.advisories.length) {
-    html += '<section class="card"><h2>Worth knowing</h2>' +
-      p.advisories.map(a => '<div class="note ' + esc(a.level) + '"><div class="t">' +
-        (a.level === "warn" ? "! " : "i ") + esc(a.title) + '</div><div class="d">' +
-        esc(a.detail) + "</div></div>").join("") + "</section>";
-  }
+  $('steam-launch-out').innerHTML =
+    '<div class="sub">Current</div><pre class="opts">' + esc(p.launch_current || '(none set)') + '</pre>' +
+    '<div class="sub">Next Apply</div><pre class="opts">' + esc(p.launch_new || '(none set)') + '</pre>' +
+    (p.launch_removed || []).map(r => '<div class="note"><div class="rm">− ' + esc(r.option) + '</div><div class="d">' + esc(r.reason) + '</div></div>').join('') +
+    (p.launch_added || []).map(a => '<div class="note"><div class="ad">+ ' + esc(a.option) + '</div><div class="d">' + esc(a.reason) + '</div></div>').join('');
+  presetReveal(p);
 
   $("results").innerHTML = html;
   const toggle = $("show-unchanged");
@@ -7337,6 +7571,8 @@ async function scan(rescan) {
   try {
     lastScan = await api("/api/scan" + (rescan ? "?rescan=1" : ""));
     renderHardware(lastScan);
+    verificationStarted = true;
+    refreshVerification();
     renderFps();
     status("Ready.");
   } catch (e) { status("Scan failed: " + esc(e.message), true); }
@@ -7376,6 +7612,12 @@ let confirmOpen = false;
 let changeSeq = 0;
 
 function noteChange(label, revert) {
+  verificationDirty = true;
+  if (!$('verification').hidden) {
+    $('verification').dataset.state = 'changed';
+    $('verification-title').textContent = 'Settings changed \u00b7 apply to verify';
+    renderApplyVerification();
+  }
   // The same control moved twice is still one thing to answer for, and the
   // older revert is the one that goes all the way back.
   const already = pendingChanges.find(c => c.label.split("→")[0] === label.split("→")[0]);
@@ -7652,6 +7894,7 @@ $("confirm-veil").addEventListener("keydown", e => {
    lost, and the dial shows the last reply rather than the average.
    --------------------------------------------------------------------------- */
 let netTimer = null;
+let netJob = null;
 let netData = null;
 
 // Where the dial tops out. A competitive player on a bad route is at 90; past
@@ -7730,13 +7973,13 @@ function netSide(probe, sent, total) {
   if (!probe) return "";
   const tone = netTone(probe);
   const times = probe.times || [];
-  const last = times.length ? times[times.length - 1] : 0;
+  const average = probe.average;
   return '<div class="netside ' + tone + '">' +
     '<div class="netside-head">' + esc(probe.label) +
       (probe.host ? ' <span class="sub mono">' + esc(probe.host) + "</span>" : "") +
     "</div>" +
     '<div class="netside-body">' +
-      netDial(last, times.length > 0, tone) +
+      netDial(average, times.length > 0 && Number.isFinite(average), tone) +
       '<div class="netside-right">' +
         netLine(probe) +
         '<div class="netstats">' +
@@ -7751,9 +7994,17 @@ function netSide(probe, sent, total) {
 }
 
 function renderNet(d) {
+  const measured = d?.download?.mbps;
+  const speed = Number.isFinite(measured) && measured > 0 ? (measured < 1 ? measured.toFixed(2) : measured.toFixed(1).replace(/\.0$/, '')) + ' Mbps' : '—';
+  const ping = d?.internet?.reachable && Number.isFinite(d.internet.average) ? Math.round(d.internet.average) + ' ms' : '— ms';
+  const summary = d?.error ? 'Unavailable' : d?.running ? 'Checking…' : d?.idle || !d ? 'Not tested' : speed + ' · ' + ping;
+  $('net-summary').textContent = summary;
+  $('chip-net').title = 'Connection · Download: ' + speed + ' · Internet ping: ' + ping;
+  $('chip-net').classList.toggle('warn', !!d?.error || (!d?.running && (!d?.internet?.reachable || !Number.isFinite(measured) || measured <= 0)));
+  $('chip-net').style.setProperty('--chip-load', d?.running ? '.35' : '1');
   const box = $("net-out");
   if (!box) return;
-  if (!d || d.idle) { box.innerHTML = ""; return; }
+  if (!d || d.idle) { box.textContent = "No measurement yet. Use Re-test to check your connection."; return; }
   if (d.error) {
     box.innerHTML = '<span class="sub warn">' + esc(d.error) + "</span>";
     return;
@@ -7765,15 +8016,19 @@ function renderNet(d) {
 
   let html = "";
   if (d.running) {
-    html += '<div class="netbar"><div class="netbar-fill" style="width:' + pct + '%"></div></div>' +
+    html += '<div class="netbar"><div class="netbar-fill" style="transform:scaleX(' + pct / 100 + ')"></div></div>' +
       '<div class="sub" style="margin:6px 0 12px">Measuring&hellip; ' + pct + "%" +
-      "  <span class=\"sub2\">about " + Math.max(0, Math.round(((total - sent) / 2) * 1)) +
-      "s left</span></div>";
+      "</div>";
   }
+
+  html += '<div class="sub" style="margin:0 0 6px"><b>Download: ' + speed + '</b></div>' +
+    '<div class="sub2" style="margin:0 0 12px">' +
+    (d.running && !d.download ? 'Sampling download, then ping…' : d.download?.error || !Number.isFinite(measured) ? 'Download unavailable. Use Re-test to try again.' : 'Short sample · Cloudflare · up to 4 s / 25 MB') +
+    '</div>';
 
   if (d.adapter) {
     html += '<div class="sub" style="margin:0 0 12px">' + esc(d.adapter.name) + " " +
-      '<span class="sub2">' + esc(d.adapter.speed) + "</span>" +
+      '<span class="sub2">Link speed: ' + esc(d.adapter.speed) + "</span> " +
       (d.adapter.wireless
         ? '<span class="flag warn">Wi-Fi</span>'
         : '<span class="flag">wired</span>') + "</div>";
@@ -7792,69 +8047,126 @@ function renderNet(d) {
   box.innerHTML = html;
 }
 
-async function pollNet() {
-  try {
-    netData = await api("/api/net", {});
-    renderNet(netData);
-    if (netData.done || !netData.running) {
-      clearInterval(netTimer);
-      netTimer = null;
-      const button = $("net-run");
-      if (button) { button.disabled = false; button.textContent = "Measure again"; }
+// One bounded job covers start + serialized polling. Startup waits for this promise.
+function runNetCheck() {
+  if (netJob) return netJob;
+  netJob = (async () => {
+    const button = $('net-run');
+    button.disabled = true;
+    button.textContent = 'Checking…';
+    const deadline = Date.now() + 12000;
+    const request = (route) => new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('Connection test timed out. Try again.')), Math.max(1, deadline - Date.now()));
+      Promise.resolve().then(() => api(route, {})).then(resolve, reject).finally(() => clearTimeout(timer));
+    });
+    try {
+      netData = await request('/api/net/start');
+      renderNet(netData);
+      while (netData.running && !netData.done && !netData.error) {
+        await new Promise(resolve => { netTimer = setTimeout(resolve, 500); });
+        if (Date.now() >= deadline) throw new Error('Connection test timed out. Try again.');
+        netData = await request('/api/net');
+        renderNet(netData);
+      }
+    } catch (error) {
+      netData = { error: error.message || 'Connection test unavailable. Try again.' };
+      renderNet(netData);
+    } finally {
+      clearTimeout(netTimer); netTimer = null;
+      button.disabled = false;
+      button.textContent = '↻ Re-test';
     }
-  } catch (err) {
-    clearInterval(netTimer);
-    netTimer = null;
-    const button = $("net-run");
-    if (button) { button.disabled = false; button.textContent = "Measure my connection"; }
-  }
+  })().finally(() => { netJob = null; });
+  return netJob;
 }
-
-async function runNetCheck() {
-  const button = $("net-run");
-  button.disabled = true;
-  button.textContent = "Measuring…";
-  try {
-    netData = await api("/api/net/start", {});
-    renderNet(netData);
-    if (netTimer) clearInterval(netTimer);
-    // Twice a second: the replies land about once a second each, and a poll
-    // that is slower than the thing it is watching draws a stuttering line.
-    netTimer = setInterval(pollNet, 500);
-  } catch (err) {
-    button.disabled = false;
-    button.textContent = "Measure my connection";
-    status("Could not start the measurement: " + (err && err.message || err), true);
-  }
+$('net-run').addEventListener('click', runNetCheck);
+function closeNetDetails(restoreFocus = false) {
+  $('net-card').hidden = true;
+  $('chip-net').setAttribute('aria-expanded', 'false');
+  if (restoreFocus) $('chip-net').focus();
 }
-
-if ($("net-run")) $("net-run").addEventListener("click", runNetCheck);
+$('chip-net').addEventListener('click', () => {
+  const open = $('net-card').hidden;
+  $('net-card').hidden = !open;
+  if (open) positionNetDetails();
+  $('chip-net').setAttribute('aria-expanded', String(open));
+});
+function positionNetDetails() {
+  if ($('net-card').hidden) return;
+  const rect = $('chip-net').getBoundingClientRect();
+  $('net-card').style.left = Math.max(16, Math.min(rect.left, innerWidth - $('net-card').offsetWidth - 16)) + 'px';
+  $('net-card').style.top = rect.bottom + 12 + 'px';
+}
+document.addEventListener('click', event => {
+  if (!event.target.closest('.net-control')) closeNetDetails();
+});
+window.addEventListener('resize', positionNetDetails);
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && !$('net-card').hidden) { closeNetDetails(true); event.stopPropagation(); }
+});
 
 /* Three scene cards share the existing preference and plan-preview flow. */
 const INTENTS = ["competitive", "balanced", "quality"];
 
-/* Every card uses the backend's existing plan estimate, with a request snapshot
-   so a late response cannot overwrite estimates for newer settings. */
-let modeEstimateRevision = 0;
-let modeEstimateKey = "";
-function setBandFigures(plan) {
-  const body = requestBody();
-  const key = JSON.stringify({...body, intent: null});
-  const selected = document.querySelector('[data-mode-fps="' + plan.intent + '"]');
-  if (selected) homeNumber(selected, plan.estimated_fps);
-  if (key === modeEstimateKey) return;
-  const revision = ++modeEstimateRevision;
-  modeEstimateKey = key;
-  document.querySelectorAll('[data-mode-fps]').forEach(el => { el.textContent = "—"; });
-  INTENTS.forEach(async name => {
-    try {
-      const p = name === plan.intent ? plan : await api("/api/plan", {...body, intent: name});
-      if (revision !== modeEstimateRevision) return;
-      const el = document.querySelector('[data-mode-fps="' + name + '"]');
-      if (el) homeNumber(el, p.estimated_fps);
-    } catch (_) { if (revision === modeEstimateRevision) modeEstimateKey = ""; }
-  });
+/* Every card uses the same settings preview; estimates stay internal. */
+let presetSession = null;
+function presetClose() {
+  if (presetSession) clearTimeout(presetSession.timer);
+  presetSession = null;
+  document.querySelector('.preset-veil')?.remove();
+  document.querySelectorAll('.preset-active').forEach(card => { card.classList.remove('preset-active');card.querySelector('.preset-changes')?.remove(); });
 }
+function presetBegin(name) {
+  presetClose();
+  if (!homeVisible()) return;
+  const card = document.querySelector('.mode-card[data-intent="' + name + '"]');
+  if (!card) return;
+  presetSession = {name,card,timer:0};
+  const veil = document.createElement('div');veil.className='preset-veil';veil.setAttribute('aria-hidden','true');veil.onclick=presetClose;document.body.append(veil);
+  card.classList.add('preset-active');
+  card.insertAdjacentHTML('beforeend','<span class="preset-changes"><span class="preset-heading">' + esc(name[0].toUpperCase()+name.slice(1)) + '<small>Preview · click to close</small></span><span class="preset-rows" role="status" aria-live="polite">Reading settings…</span></span>');
+  presetPosition();
+}
+// Cut a window through the dimmer. Existing glass panels create stacking
+// contexts, so a z-index on the card alone cannot lift it above a page veil.
+function presetPosition() {
+  if (!presetSession) return;
+  const r=presetSession.card.getBoundingClientRect();
+  const veil=document.querySelector('.preset-veil');
+  if (veil) veil.style.clipPath='polygon(evenodd,0 0,100% 0,100% 100%,0 100%,0 0,' + r.left + 'px ' + r.top + 'px,' + r.right + 'px ' + r.top + 'px,' + r.right + 'px ' + r.bottom + 'px,' + r.left + 'px ' + r.bottom + 'px,' + r.left + 'px ' + r.top + 'px)';
+}
+window.addEventListener('resize',presetPosition);
+document.addEventListener('scroll',presetPosition,true);
+document.addEventListener('click',e => { if (!e.target.closest('#intents')) presetClose(); });
+function presetReveal(plan) {
+  const session = presetSession;
+  if (!session || session.name !== plan.intent) return;
+  const rows = session.card.querySelector('.preset-rows');rows.replaceChildren();
+  const changes = (plan.settings || []).filter(s => s.changed);
+  const glyph = name => /cpu|thread/i.test(name) ? 'cpu' : /texture|memory/i.test(name) ? 'vram' : /display|resolution|sync|refresh/i.test(name) ? 'display' : 'gpu';
+  let at=0;
+  function next() {
+    if (presetSession !== session) return;
+    if (!homeVisible()) { presetClose();return; }
+    const setting=changes[at++];
+    if (setting) {
+      const value = (label,raw) => esc(String(label ?? 'Not set')) + (setting.same_label && raw != null ? ' (' + esc(String(raw)) + ')' : '');
+      rows.insertAdjacentHTML('beforeend','<span class="preset-row">' + hwIcon(glyph(setting.name)) + '<span>' + esc(setting.name) + '</span><span class="preset-value">' + value(setting.before,setting.before_raw) + ' → <b>' + value(setting.after,setting.after_raw) + '</b></span></span>');
+      rows.scrollTop=rows.scrollHeight;
+    }
+    if (at < changes.length && !matchMedia('(prefers-reduced-motion: reduce)').matches) session.timer=setTimeout(next,360);
+    else if (at < changes.length) next();
+    else { if (!changes.length) rows.textContent='Everything already matches.';session.timer=setTimeout(presetClose,2800); }
+  }
+  next();
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') presetClose(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) presetClose(); });
+new MutationObserver(() => { if (!homeVisible()) presetClose(); }).observe(document.querySelector('[data-panel="launcher"]'),{attributes:true,attributeFilter:['class']});
+$('steam-preview').addEventListener('click', () => $('preview').click());
+$('steam-apply').addEventListener('click', () => setSettingsSub('apply'));
+
+
 function paintIntent(name) {
   if (!INTENTS.includes(name)) return;
   const cards = $("intents");
@@ -7878,6 +8190,7 @@ function chooseIntent(name, quiet) {
   rememberPrefs();
   if (!quiet) {
     noteChange("Optimise for → " + name, () => chooseIntent(before, true));
+    presetBegin(name);
     $("preview").click();
   }
 }
@@ -7886,7 +8199,8 @@ function chooseIntent(name, quiet) {
   const cards = $("intents");
   cards.addEventListener("click", e => {
     const card = e.target.closest(".mode-card");
-    if (card) chooseIntent(card.dataset.intent);
+    if (card?.classList.contains('preset-active')) presetClose();
+    else if (card) { if(card.dataset.intent === intent) { presetBegin(intent); $('preview').click(); } else chooseIntent(card.dataset.intent); }
   });
   cards.addEventListener("keydown", e => {
     let at = INTENTS.indexOf(intent);
@@ -7901,23 +8215,106 @@ function chooseIntent(name, quiet) {
   paintIntent(intent);
 })();
 
+
+/* Read-only Apply verification; only server receipts supply the counts. */
+let verificationBusy = false, verificationRevision = 0, verificationDirty = false, verificationStarted = false;
+function renderVerification(result, animate = false) {
+  verificationStarted = true;
+  const box = $('verification');
+  box.classList.remove('reveal');
+  if (!result || !result.total) { box.hidden = true; return; }
+  box.hidden = false;
+  const selection = result.selection;
+  const chosen = selection ? requestBody() : {};
+  const selectionChanged = selection && Object.keys(selection).some(k => String(selection[k] ?? '') !== String(chosen[k] ?? ''));
+  const accountChanged = typeof currentAccount === 'function' && currentAccount() && String(currentAccount()) !== String(result.account);
+  const needsApply = verificationDirty || selectionChanged || accountChanged;
+  const complete = result.verified === result.total && !needsApply;
+  box.querySelector('.verify-tick').setAttribute('d', complete ? 'm10 16 4 4 8-9' : 'M16 10v8m0 3v1');
+  box.dataset.state = complete ? 'verified' : result.items.some(x => x.status === 'failed') ? 'failed' : 'changed';
+  $('verification-title').textContent = (complete ? 'Your PC is set: ' : needsApply ? 'Settings changed \u00b7 ' : 'Review settings: ') + result.verified + '/' + result.total + ' verified';
+  $('verification-time').textContent = 'Checked ' + new Date(result.checked_at * 1000).toLocaleString();
+  $('verification-context').textContent = (result.intent || 'Applied') + ' \u00b7 Account ' + (result.account || 'unknown') + ' \u00b7 Applied ' + new Date(result.applied_at * 1000).toLocaleString() + (result.storage_warning ? ' \u00b7 ' + result.storage_warning : '');
+  const labels = {verified:'Matches',changed:'Changed',failed:'Failed',not_checked:'Not checked',not_set:'Not set',not_applicable:'Not applicable'};
+  const actions = {nvidia:'Review NVIDIA settings',power:'Open power control',wingraphics:'Open Windows graphics'};
+  $('verification-list').innerHTML = result.items.map((item, i) => '<li class="verify-row" data-state="' + esc(item.status) + '" data-counted="' + (item.counted !== false) + '" style="--i:' + i + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="' + (item.status === 'verified' ? 'm7 12 3 3 7-7' : item.status === 'failed' ? 'm8 8 8 8m0-8-8 8' : item.status === 'not_applicable' ? 'M8 12h8' : 'M12 6v7m0 3v2') + '"/></svg><span><b>' + esc(item.label) + '</b><small>' + esc(item.detail) + '</small>' + (Object.hasOwn(actions, item.action) && ['not_set','not_checked'].includes(item.status) ? '<button class="btn small verify-action" data-verify-action="' + esc(item.action) + '">' + actions[item.action] + '</button>' : '') + '</span><span>' + (labels[item.status] || labels.not_checked) + '</span></li>').join('');
+  if (animate) { box.open = true; void box.offsetWidth; box.classList.add('reveal'); }
+  renderApplyVerification();
+}
+function renderApplyVerification() {
+  const report = $('apply-verification'), box = $('verification');
+  if (!report || box.hidden) return;
+  report.dataset.state = box.dataset.state;
+  report.innerHTML = '<div class="verify-body"><div class="verify-head"><h2>Applied and verified</h2></div><p class="verify-summary" role="status">' + esc($('verification-title').textContent) + '</p><p class="sub">' + esc($('verification-time').textContent) + '</p><ul class="verification-list">' + $('verification-list').innerHTML + '</ul></div>';
+}
+function openVerificationControl(action) {
+  let target;
+  if (action === 'nvidia') { setTab('gpu'); target = $('gpu-out'); }
+  else if (action === 'power') { setTab('fix'); target = document.querySelector('[data-fix="power.performance"]'); }
+  else if (action === 'wingraphics') { setSettingsSub('apply', true); setTab('settings'); target = $('wg-apply') || $('machine-card'); }
+  if (target) { target.scrollIntoView({block:'center'}); if (target.matches('button')) target.focus(); }
+}
+document.addEventListener('click', e => {
+  const button = e.target.closest('[data-verify-action]');
+  if (button) openVerificationControl(button.dataset.verifyAction);
+});
+async function refreshVerification() {
+  if (!verificationStarted || verificationBusy || document.hidden) return;
+  const revision = verificationRevision;
+  verificationBusy = true;
+  $('verify-again').disabled = true;
+  let timeout;
+  try {
+    const result = await Promise.race([
+      api('/api/verification'),
+      new Promise((_, reject) => { timeout = setTimeout(() => reject(new Error('Read-back timed out')), 8000); }),
+    ]);
+    if (revision === verificationRevision) renderVerification(result);
+  } catch (_) {
+    if (revision === verificationRevision && !$('verification').hidden) {
+      $('verification').dataset.state = 'changed';
+      $('verification-title').textContent = 'Not checked \u00b7 read-back unavailable';
+      $('verification-time').textContent = 'Last check could not be refreshed. Use Read again.';
+      renderApplyVerification();
+    }
+  } finally { clearTimeout(timeout); verificationBusy = false; $('verify-again').disabled = false; }
+}
+$('verify-again').addEventListener('click', refreshVerification);
+document.addEventListener('visibilitychange', () => {
+  document.documentElement.classList.toggle('verify-paused', document.hidden);
+  if (!document.hidden) refreshVerification();
+});
+setInterval(() => { if (!document.hidden && !$('verification').hidden) refreshVerification(); }, 15000);
+
+let planRevision = 0;
 async function previewPlan() {
   busy("Building plan…");
   $("preview").disabled = true;
-  try { renderPlan(await api("/api/plan", requestBody())); }
-  catch (e) { status("Plan failed: " + esc(e.message), true); }
-  finally { $("preview").disabled = false; }
+  $("apply").disabled = true;
+  const revision = ++planRevision, body = requestBody();
+  try { const plan = await api("/api/plan", body); if (revision === planRevision && body.intent === intent) renderPlan(plan); }
+  catch (e) { if (revision === planRevision) { presetClose(); status("Plan failed: " + esc(e.message), true); } }
+  finally { if (revision === planRevision) $("preview").disabled = false; }
 }
 $("preview").addEventListener("click", previewPlan);
 
 $("apply").addEventListener("click", async () => {
   if (!planned) return;
-  if (!confirm("Apply the tier " + planned.tier + " / " + planned.intent +
+  if (!confirm("Apply the " + planned.intent +
                " profile?\n\nEverything changed is backed up first.")) return;
+  verificationRevision++;
+  verificationDirty = true;
+  if (!$('verification').hidden) {
+    $('verification-title').textContent = 'Applying and reading back…';
+    $('verification').dataset.state = 'changed';
+  }
   busy("Writing…");
   $("apply").disabled = true;
   try {
     const r = await api("/api/apply", requestBody());
+    verificationDirty = false;
+    verificationRevision++;
+    renderVerification(r.verification, true);
     settleChanges();          // written to disk; nothing left to answer for
     $("results").insertAdjacentHTML("afterbegin",
       '<section class="card"><h2>Written</h2>' +
@@ -7933,13 +8330,18 @@ $("apply").addEventListener("click", async () => {
           "</div></div>";
       }).join("") +
       (r.backup ? '<p class="sub">Backup ' + esc(r.backup) + " — use Undo last to revert.</p>" : "") +
-      "</section>");
+      '</section>');
+    $('apply-verification')?.remove();
+    $('results').insertAdjacentHTML('afterbegin', '<section id="apply-verification" class="verification reveal"></section>');
+    renderApplyVerification();
     // Never just "Applied." when part of it was not: that is how somebody
     // ends up believing a setting was written when it was stood down.
     const stood = r.skipped || [];
     if (stood.length) {
       status("Applied — but " + stood.map(x => esc(x.what)).join(" and ") +
              " could not be written yet. " + esc(stood[0].detail), true);
+    } else if (r.steps.some(s => !s.ok)) {
+      status('Applied with errors. Review the read-back checklist.', true);
     } else {
       status("Applied.");
     }
@@ -8174,7 +8576,7 @@ function ring(value, caption, sub, unit) {
   const r = 34, c = 2 * Math.PI * r;
   const colour = !known ? "var(--line)"
     : pct >= 90 ? "var(--bad)" : pct >= 70 ? "var(--warn)" : "var(--accent)";
-  return '<div class="gauge"><svg width="92" height="92" viewBox="0 0 92 92">' +
+  return '<div class="gauge" title="' + esc(caption) + '" style="--hw-speed:' + (5 - pct * .025).toFixed(2) + 's"><svg width="92" height="92" viewBox="0 0 92 92">' +
     '<circle class="ring-bg" cx="46" cy="46" r="' + r + '" fill="none" stroke-width="7"/>' +
     '<circle class="ring-fg" cx="46" cy="46" r="' + r + '" fill="none" stroke-width="7"' +
     ' stroke="' + colour + '" stroke-linecap="round"' +
@@ -8185,7 +8587,7 @@ function ring(value, caption, sub, unit) {
     (known ? Math.round(pct) : "—") + "</text>" +
     (known && unit !== false
       ? '<text class="unit" x="46" y="61" text-anchor="middle">%</text>' : "") +
-    "</svg><span class=\"cap\">" + esc(caption) + "</span>" +
+    "</svg><span class=\"cap\">" + (hwIcon(caption) || esc(caption)) + "</span>" +
     (sub ? '<span class="sub2">' + esc(sub) + "</span>" : "") + "</div>";
 }
 
@@ -8194,10 +8596,6 @@ function meter(label, value, max, text, tone) {
   return '<div class="meter' + (tone ? " " + tone : "") + '">' +
     '<div class="lbl"><span>' + esc(label) + "</span><b>" + esc(text) + "</b></div>" +
     '<div class="track"><div class="fill" style="width:' + pct.toFixed(1) + '%"></div></div></div>';
-}
-
-function sparkline(id, series, colour) {
-  homeChart(id, series, colour);
 }
 
 /* Sensor availability, elevation and alarm handling are shared by thermal strips. */
@@ -8284,8 +8682,10 @@ let settingsSub = "apply";
 // server after the page is usable, and a late arrival must not pull the view
 // out from under a click that already happened.
 let settingsSubChosen = false;
+document.addEventListener('cs2cfg:ready', () => { if (settingsSub === 'steam') loadFixes(); });
 
 function setSettingsSub(name, restoring) {
+  if (!document.querySelector('#settings-subtabs [data-sub="' + name + '"]')) name = "apply";
   const was = settingsSub;
   settingsSub = name;
   if (!restoring) settingsSubChosen = true;
@@ -8296,41 +8696,22 @@ function setSettingsSub(name, restoring) {
   moveSegThumb("settings-subtabs");
 
   const panes = [...document.querySelectorAll('[data-panel="settings"] .subpane')];
-  const box = document.querySelector(".settings-box");
-  // Measured before and after the swap so the surround can travel with the
-  // pane instead of snapping to the new content underneath it.
-  const from = box ? box.getBoundingClientRect().height : 0;
   panes.forEach(pane => {
     pane.classList.remove("came-from-left", "came-from-right");
     pane.classList.toggle("hidden", pane.dataset.sub !== name);
   });
   const landed = panes.find(pane => pane.dataset.sub === name);
 
-  if (box && landed && !restoring && was !== name) {
-    const to = box.getBoundingClientRect().height;
-    landed.classList.add("came-from-" + cameFrom);
-    if (Math.abs(to - from) > 1) {
-      box.style.height = from + "px";
-      box.classList.add("resizing");
-      void box.offsetHeight;          // commit the start height before moving
-      box.style.height = to + "px";
-      const done = () => {
-        box.classList.remove("resizing");
-        // Let it size itself again: panes load their contents after this and
-        // a fixed height would clip whatever arrives late.
-        box.style.height = "";
-        box.removeEventListener("transitionend", done);
-      };
-      box.addEventListener("transitionend", done);
-    }
-  }
+  if (landed && !restoring && was !== name) landed.classList.add("came-from-" + cameFrom);
   // Preference restoration only selects the pane. Startup owns its first loads.
   if (prefsReady && startup.finished) {
     if (name === "overlay") loadOverlay();
-    if (name === "sound") loadAudio(false);
+    if (name === "sound") { loadAudio(false); loadGoxlr(true); }
     if (name === "logs") loadHistory();
     if (name === "config" || name === "editing") ensureScan(false);
-    if (name === "apps") loadCompanions();
+    if (name === "apps") { loadCompanions(); loadAppTiles(); }
+    if (name === "steam") { loadFixes(); loadWho(); }
+    if (name === "account") loadCloud();
   }
   rememberPrefs();
 }
@@ -8516,10 +8897,10 @@ function renderAudio() {
   }
 
   box.innerHTML = head +
-    '<div class="row"><span class="k">Output</span><span class="v">' +
+    '<div class="row"><label class="k" for="audio-output">' + hwIcon('headset', 'Sound output') + '</label><span class="v">' +
       '<select id="audio-output">' + audioOptions(d.output, d.pinned_output) + "</select>" +
     "</span></div>" +
-    '<div class="row"><span class="k">Input</span><span class="v">' +
+    '<div class="row"><label class="k" for="audio-input">' + hwIcon('mic', 'Microphone input') + '</label><span class="v">' +
       '<select id="audio-input">' + audioOptions(d.input, d.pinned_input) + "</select>" +
     "</span></div>" +
     '<label class="opt"><input type="checkbox" id="audio-enforce"' +
@@ -8655,12 +9036,15 @@ function fixPauseMotion() { document.documentElement.classList.toggle("fix-pause
 document.addEventListener("visibilitychange", fixPauseMotion);
 fixPauseMotion();
 $("fix-refresh").addEventListener("click", () => loadFixes(true));
+$('steam-tools-retry').addEventListener('click', () => loadFixes(true));
 
 async function loadFixes(force) {
   const box = $("fix-out");
   if (fixSurveyPending || [...fixStates.values()].some(s => s.phase === "fixing")) return;
   if (fixData && !force) { renderFixes(); return; }
   fixSurveyPending = true;
+  $('steam-tools-status').textContent = 'Reading Steam tools…';
+  $('steam-tools-retry').hidden = true;
   (fixData?.fixes || []).forEach(f => paintFixState(f.id));
   $("fix-refresh").disabled = true;
   $("fix-refresh").textContent = "Checking...";
@@ -8668,7 +9052,10 @@ async function loadFixes(force) {
   try {
     [fixData] = await Promise.all([api("/api/fix/survey", {}), refreshHelperStatus()]);
     renderFixes();
+    $('steam-tools-status').textContent = '';
   } catch (err) {
+    $('steam-tools-status').textContent = 'Steam tools unavailable: ' + String(err && err.message || err);
+    $('steam-tools-retry').hidden = false;
     if (box) { box.querySelector(".fix-survey-error")?.remove(); box.insertAdjacentHTML("afterbegin", '<p class="fix-banner fix-survey-error" role="alert">Could not read the machine: ' + esc(String(err && err.message || err)) + '. Use Check current settings to retry.</p>'); }
   } finally { fixSurveyPending = false; $("fix-refresh").disabled = false; $("fix-refresh").textContent = "Check current settings"; (fixData?.fixes || []).forEach(f => paintFixState(f.id)); }
 }
@@ -8680,24 +9067,7 @@ async function loadFixes(force) {
    family colour so the four groups are separable before a word is read, and
    the colour is never the only signal -- every tile still says what it is.
 */
-const FIX_ART = {
-  "net.restart": "<path d=\"M5 3v4m5-4v4M3 7h9v4l-3 3v4H6v-4l-3-3M15 6a7 7 0 0 1 5 12m-4 1h5v-5M8 22h8\"/>",
-  "net.flush": "<path d=\"M3 4h11M3 8h8M3 12h6M3 16h4m14-13-8 11m-2-2 5 3-3 6-7-5zM8 17l3 2m-1-4 3 2\"/>",
-  "gpu.restart": "<path d=\"M2 6h15v13H2zM5 19v2m4-2v2m4-2v2M17 14h4v4h-4\"/><circle cx=\"9\" cy=\"12\" r=\"3\"/><path d=\"M16 3a5 5 0 0 1 6 7m0-4v4h-4\"/>",
-  "device.restart": "<path d=\"M4 8a5 5 0 0 1 10 0v9a5 5 0 0 1-10 0zM9 5v6m8-8a6 6 0 0 1 5 8m0-4v4h-4m0 4a6 6 0 0 1-1 6\"/>",
-  "sound.apps": "<path d=\"M9 5 5 9H2v6h3l4 4zM14 4v16M20 4v16M12 9h4m2 6h4\"/>",
-  "sound.restart": "<path d=\"M9 5 5 9H2v6h3l4 4zM12 12h2l2-5 3 10 2-5h2\"/>",
-  "display.restore": "<rect x=\"2.5\" y=\"4\" width=\"19\" height=\"13\" rx=\"2.2\"/><path d=\"M9 20.5h6M12 17v3.5\"/><path d=\"M10.1 9.9L6.7 6.6M13.9 9.9L17.3 6.6M10.1 11.6L6.7 14.9M13.9 11.6L17.3 14.9\"/><path d=\"M6.7 6.6h2.7M6.7 6.6v2.7M17.3 6.6h-2.7M17.3 6.6v2.7M6.7 14.9h2.7M6.7 14.9v-2.7M17.3 14.9h-2.7M17.3 14.9v-2.7\"/>",
-  "steam.restart": "<path d=\"M5 16a5 5 0 0 1-1-10 7 7 0 0 1 13-1 5 5 0 0 1 4 7M9 14a6 6 0 1 0 10 6m1-5v5h-5\"/>",
-  "shader.clear": "<path d=\"m2 6 8-4 8 4-8 4zM2 10l8 4 4-2M2 14l8 4m12-9-7 7m-2-2 5 3-3 5-6-4zM11 19l3 2\"/>",
-  "steam.zombie": "<rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"1.5\"/><path d=\"M3 9h18M9 13l6 6M15 13l-6 6\"/>",
-  "steam.verify": "<path d=\"M4 2h10l6 6v14H4zM14 2v6h6M8 15l3 3 6-7\"/>",
-  "mic.privacy": "<rect x=\"4\" y=\"2\" width=\"6\" height=\"12\" rx=\"3\"/><path d=\"M1 10a6 6 0 0 0 12 0M7 16v5M3 21h8m7-13 5 2v5c0 3-3 5-5 6-2-1-5-3-5-6v-5zM16 14l2 2 3-4\"/>",
-  "startup.apps": "<path d=\"M2 5h20v17H2zM2 10h20m10 9v-6m-3 3 3-3 3 3M5 7h1m3 0h1\"/>",
-  "defender.exclude": "<path d=\"m12 2 9 4v6c0 5-5 8-9 10-4-2-9-5-9-10V6zM7 12h10\"/>",
-  "fullscreen.exclusive": "<path d=\"M3 8V3h5m8 0h5v5M3 16v5h5m8 0h5v-5M7 7h10v10H7zM10 10l4 4m0-4-4 4\"/>",
-  "power.performance": "<path d=\"M15 2 6 13h6l-3 9 10-12h-6zM3 5h4M1 9h3m14 10h4m-2-4h3\"/>"
-};
+/* Repair artwork is in assets/fixit/icons.js. */
 
 const FIX_FAMILY_NAME = {
   network: "Connection",
@@ -8864,15 +9234,18 @@ function renderFixes() {
   html += "</div>";
   // Keep controls across refreshes and returning to this tab.
   const held = {};
+  document.querySelectorAll('#steam-tools input').forEach(el => { held[el.id] = {value:el.value,checked:el.checked}; });
   box.querySelectorAll("select,input").forEach(el => { held[el.id] = {value:el.value,checked:el.checked}; });
   box.innerHTML = html;
   const grid = box.querySelector(".fix-grid");
   const nav = document.createElement("div"); nav.className = "fix-categories"; nav.setAttribute("aria-label", "Tool categories");
-  [["all","All tools"], ...Object.entries(FIX_FAMILY_NAME)].forEach(([key,label]) => {
+  [["all","All tools"], ...Object.entries(FIX_FAMILY_NAME).filter(([key]) => key !== "steam")].forEach(([key,label]) => {
     const button = document.createElement("button"); button.className = "btn"; button.textContent = label; button.setAttribute("aria-pressed", String(fixFilter === key));
     button.onclick = () => { fixFilter = key; nav.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b === button))); grid.querySelectorAll(".fix-tile").forEach(t => { t.hidden = key !== "all" && t.dataset.family !== key; }); }; nav.append(button);
   });
   grid.before(nav);
+  $('steam-tools').replaceChildren(...grid.querySelectorAll('[data-family="steam"]'));
+  $('steam-tools').querySelectorAll('.fix-tile').forEach(t => { t.hidden = false; });
   grid.querySelectorAll(".fix-tile").forEach(t => { t.hidden = fixFilter !== "all" && t.dataset.family !== fixFilter; });
   Object.entries(held).forEach(([id,state]) => { const el = $(id); if (el && el.type === "checkbox") el.checked = state.checked; });
   if (held["fix-all-devices"]?.checked) $("fix-device").innerHTML = listFor(true);
@@ -9001,7 +9374,8 @@ document.addEventListener("click", e => {
 
 // Horizontal thermal strips preserve the sensor's own floor and hot limit.
 function thermoGauge(part) {
-  return '<div class="temp-gauge" data-label="' + esc(part.label) + '"><div class="heat-heading"><span class="cap">' + esc(part.label) + '</span><b class="t-read">—</b></div><div class="heat-track"><span class="t-fill"></span></div></div>';
+  const kind = hwKey(part.part);
+  return '<div class="temp-gauge" data-label="' + esc(part.label) + '" title="' + esc(part.label + ' temperature') + '"><div class="thermal-ring">' + hwIcon(HW_ART[kind] ? kind : 'temperature', part.label) + '<b class="t-read">&#8212;</b><span class="thermal-badge">' + hwIcon('temperature') + '</span></div><div class="heat-heading"><span class="cap">' + (HW_ART[hwKey(part.label)] ? '' : esc(part.label)) + '</span><span class="t-reason"></span><div class="heat-track"><span class="t-fill"></span></div></div></div>';
 }
 function paintTempGauge(el, part) {
   const known = !!part.known;
@@ -9013,7 +9387,9 @@ function paintTempGauge(el, part) {
   homeTween(fill, "heat", level, v => { fill.style.transform = "scaleX(" + v + ")"; });
   const read = el.querySelector(".t-read");
   if (known) homeNumber(read, part.celsius, "\u00b0C");
-  else { homeCancel(read); read.textContent = part.unavailable || "—"; }
+  else { homeCancel(read); read.textContent = "\u2014"; }
+  el.querySelector(".t-reason").textContent = known ? "" : (part.unavailable || "No reading");
+  el.setAttribute("aria-label", part.label + " temperature: " + (known ? Math.round(part.celsius) + "\u00b0C, " + part.state : part.unavailable || "unavailable"));
 }
 
 function renderTemps(data) {
@@ -9085,8 +9461,7 @@ async function pollLive() {
              ? Math.round(gpu.vram_used_mb / 1024 * 10) / 10 + " / " +
                Math.round(gpu.vram_total_mb / 1024) + " GB" : null));
 
-    sparkline("spark-cpu", (d.history || {}).cpu, "var(--accent)");
-    sparkline("spark-gpu", (d.history || {}).gpu, "var(--good)");
+    hardwareUpdate(d);
     renderTemps(d.temps);
 
     const note = [];
@@ -9707,8 +10082,8 @@ function renderFps() {
 
   if (say) {
     say.innerHTML = (now
-      ? "Everything is chosen to hold " + esc(now) + " fps."
-      : "Left blank, everything is chosen to clear your refresh rate.") +
+      ? "Settings target: " + esc(now) + " fps."
+      : "Use your refresh rate as the settings target.") +
       (fpsEffect ? ' <b class="fps-effect">' + fpsEffect + "</b>" : "");
   }
   if (!box) return;
@@ -11202,7 +11577,7 @@ const KB_ICONS = {
 };
 
 function kbIcon(name) {
-  const art = KB_ICONS[name] || KB_ICONS.dot;
+  const art = (name === "board" ? HW_ART.keyboard : HW_ART[hwKey(name)]) || KB_ICONS[name] || KB_ICONS.dot;
   return '<svg class="kb-ico-art" viewBox="0 0 24 24" aria-hidden="true">' +
     art + "</svg>";
 }
@@ -11927,25 +12302,17 @@ function renderCrosshairX() {
   if (!card || !box) return;
   const d = xhairData;
   // Nothing to offer if it is not there.
-  card.classList.toggle("hidden", !(d && d.installed));
-  if (!d || !d.installed) return;
+  card.classList.toggle("hidden", appSelected !== 'crosshairx');
+  if (!d || !d.installed) {
+    box.innerHTML = '<p class="sub">' + (d?.error ? esc(d.error) : 'Crosshair X was not found in your Steam libraries.') + '</p><a class="btn small" href="https://store.steampowered.com/app/1366800/" target="_blank" rel="noopener">View on Steam</a>';
+    paintAppTiles();
+    return;
+  }
 
   const hide = !!(prefsNow && prefsNow.hide_crosshair);
   const withGame = !!(prefsNow && prefsNow.crosshairx_launch);
 
-  // Drawn, not borrowed: a ring with a gap at each quarter and a dot in the
-  // middle. The shape a crosshair application would obviously use, without
-  // reproducing the one that belongs to them.
-  const mark =
-    '<span class="xh-mark"><svg viewBox="0 0 26 26" aria-hidden="true">' +
-      // r 8.2 -> circumference 51.52, so a quarter is 12.88. A dash of 8.6
-      // leaves a 4.28 gap, and the offset puts half a gap at the path start,
-      // which lands all four gaps on the four ticks rather than near them.
-      '<circle cx="13" cy="13" r="8.2" stroke-dasharray="8.6 4.2805"' +
-      ' stroke-dashoffset="10.74"/>' +
-      '<path d="M13 1.1V7M13 19v5.9M1.1 13H7M19 13h5.9"/>' +
-      '<circle cx="13" cy="13" r="1.5" fill="currentColor" stroke="none"/>' +
-    "</svg></span>";
+  const mark = '<span class="xh-mark"><img src="assets/apps/crosshairx-logo.png" width="60" height="48" alt=""></span>';
 
   box.innerHTML =
     '<div class="xh-head">' + mark +
@@ -11977,7 +12344,9 @@ function renderCrosshairX() {
       "This application does not know your event&rsquo;s rules and makes no claim " +
       "about them." +
     "</p>";
+  box.insertAdjacentHTML('beforeend','<div class="actions"><button class="btn small" data-app-launch="gamebar">Wake overlay ↗</button><span class="sub">Opens Game Bar. Enable your Crosshair X widget there.</span></div>');
   paintCrosshairLive();
+  paintAppTiles();
 }
 
 /* The two parts of the card that are only true for this second.
@@ -12017,11 +12386,12 @@ function startCrosshairWatch() {
   if (xhairTimer) return;
   xhairTimer = setInterval(async () => {
     const card = $("xhair-card");
-    if (document.hidden || activeTab !== "settings" || !card) return;
+    if (document.hidden || activeTab !== "settings" || settingsSub !== "apps" || !card) return;
     let fresh;
     try { fresh = await api("/api/crosshairx", {}); } catch (err) { return; }
     const was = xhairData || {};
     xhairData = fresh;
+    paintAppTiles();
     // Appearing or disappearing changes the whole card; running or not is two
     // words and a button, and the light touch is the safe one.
     if (!!was.installed !== !!fresh.installed) renderCrosshairX();
@@ -12074,7 +12444,7 @@ function companionTile(c) {
 function renderCompanions() {
   const box = $("companions-out");
   if (!box) return;
-  const rows = companionsData.map(companionTile).join("");
+  const rows = companionsData.filter(c => !["faceit-client", "faceit-ac", "discord", "teamspeak"].includes(c.integration) && !["discord", "discordptb", "discordcanary", "teamspeak"].includes(c.id)).map(companionTile).join("");
   box.innerHTML =
     (rows || '<p class="sub">Nothing added yet.</p>') +
     '<div class="actions" style="margin-top:10px">' +
@@ -12160,7 +12530,7 @@ function startCompanionsWatch() {
   if (companionsTimer) return;
   companionsTimer = setInterval(() => {
     if (document.hidden || activeTab !== "settings" || settingsSub !== "apps") return;
-    loadCompanions();
+    loadCompanions(); loadAppTiles();
   }, 5000);
 }
 
@@ -12748,13 +13118,13 @@ document.addEventListener("click", async e => {
 /* First-run setup. Drafts live only here: Next accepts a step's defaults,
    direct choices count as answers, and Skip removes that step's answer.
    Nothing previews through /api/prefs, including the live theme preview. */
-const SETUP_STEPS = ["sync", "permission", "sound", "preset", "region", "apps", "theme"];
-const SETUP_LABELS = { sync:"Steam sync", permission:"Allow once", sound:"Sound", preset:"Game preset", region:"Server region", apps:"Companions", theme:"Theme" };
-const SETUP_KEYS = { sync:"sync", permission:"cfg_write", sound:"sound", preset:"preset", region:"region_lock", apps:"apps", theme:"theme" };
+const SETUP_STEPS = ["sync", "permission", "import", "sound", "preset", "region", "apps", "theme"];
+const SETUP_LABELS = { sync:"Steam sync", permission:"Allow once", import:"Your configs", sound:"Sound", preset:"Game preset", region:"Server region", apps:"Companions", theme:"Theme" };
+const SETUP_KEYS = { sync:"sync", permission:"cfg_write", import:"import", sound:"sound", preset:"preset", region:"region_lock", apps:"apps", theme:"theme" };
 const setupReduced = window.matchMedia("(prefers-reduced-motion: reduce)");
 let setupSession = null, setupOpening = null;
 const setupDelay = ms => new Promise(resolve => setTimeout(resolve, ms));
-function setupIcon(name) { return '<svg viewBox="0 0 24 24" aria-hidden="true">' + (name === 'microphone' ? '<rect x="8" y="3" width="8" height="12" rx="4"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8"/>' : '<use href="#i-' + name + '"></use>') + '</svg>'; }
+function setupIcon(name) { const hardware = hwIcon(name); if (hardware) return hardware; return '<svg viewBox="0 0 24 24" aria-hidden="true">' + (name === 'microphone' ? '<rect x="8" y="3" width="8" height="12" rx="4"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8"/>' : '<use href="#i-' + name + '"></use>') + '</svg>'; }
 function setupCheck() { return '<svg viewBox="0 0 24 24" aria-hidden="true"><g><path d="m5 12 4 4 10-10"/></g></svg>'; }
 function setupTick() { return '<span class="setup-tick" aria-hidden="true">' + setupCheck() + '</span>'; }
 // Server reasons sometimes include an OS error containing a path. The cfg path
@@ -12781,7 +13151,7 @@ function setupDraft(data) {
     // A saved Allow from an older setup must never trigger the finish handler's
     // install fallback. Only a ready helper can turn this answer true.
     permission:helperReady(data.helper) ? true : current.cfg_write_ok === false ? false : null,
-    sound:{ output:device("output"), input:device("input") },
+    import:null, sound:{ output:device("output"), input:device("input") },
     preset:["competitive","balanced","quality"].includes(current.intent) ? current.intent : "balanced",
     region:setupRegions(data).some(r => r.id === current.region_lock) ? current.region_lock : null,
     apps:(data.apps || []).filter(a => a.with_game).map(a => a.id),
@@ -12836,19 +13206,17 @@ function setupStepHTML(s) {
       '</b><p>' + esc(busy ? 'Check your taskbar for the Windows prompt. Choose Yes to allow the helper.' : ready ? 'The administrator helper is installed and up to date. Overlay counters take effect at your next Windows sign-in.' : s.helperError ? s.helperError + ' You can continue and allow access later in Settings.' : 'The app stays open while Windows asks. Your game launches normally through Steam.') + '</p></div>' +
       (!cfg.writable ? '<p class="setup-note' + (ready ? '' : ' warn') + '">' + esc(setupPlain(cfg.reason, "CS2’s cfg folder is not writable yet. You can continue and check it later.")) + '</p>' : '') + '</div></div>';
   }
+  if (step === "import") return heading("OPTIONAL / YOUR FILES", "Bring your own configs", "Choose your .cfg or .vcfg files, whatever you named them. We’ll rebuild a copy into the app’s layout.") + setupImportHTML(s);
   if (step === "sound") return heading("SOUND CHECK", "Hear it. Call it.", "Choose your headset or speakers and your microphone. We’ll keep them in place if Windows switches devices.") +
     '<div class="setup-split">' + setupVisual("sound") + '<div class="setup-stack">' +
     setupSoundControl(s,"output","Speakers / headset","speaker",0) + setupSoundControl(s,"input","Microphone","microphone",1) +
     ((d.sound || {}).error ? '<p class="setup-note warn">Sound devices could not be read. You can continue and choose them in Settings.</p>' : '<p class="setup-note">Windows defaults are selected for a new setup. Your saved choices are kept when you run setup again.</p>') + '</div></div>';
   if (step === "preset") return heading("TUNED FOR THIS PC", "Find your advantage.", "More frames, more detail, or a little of both. Choose how you want CS2 to feel.") +
     '<div class="setup-hardware" id="setup-hardware"></div><div class="setup-presets">' + (d.presets || []).map(p => {
-      const fps = p.fps !== null && p.fps !== undefined && Number.isFinite(Number(p.fps)) && Number(p.fps) >= 0;
-      const limit = /gpu/i.test(p.bottleneck || '') ? 'GPU' : /cpu/i.test(p.bottleneck || '') ? 'CPU' : '';
       return '<button type="button" class="setup-choice setup-preset" data-setup-preset="' + esc(p.id) + '" aria-pressed="' + (draft.preset === p.id) + '">' + setupTick() +
         '<svg viewBox="0 0 22 22" aria-hidden="true">' + (MODE_ART[p.id] || '') + '</svg><b>' + esc(p.id === 'quality' ? 'Visual' : p.label) + '</b>' +
-        (fps ? '<span class="setup-fps" aria-label="About ' + Number(p.fps) + ' FPS">~<span data-setup-fps="' + Number(p.fps) + '" aria-hidden="true">' + (setupReduced.matches ? Number(p.fps) : 0) + '</span><small aria-hidden="true">FPS</small></span>' : '<span class="setup-fps unavailable">Estimate unavailable</span>') +
-        '<p>' + esc(p.blurb) + '</p>' + (limit ? '<span class="setup-limit">Limited by ' + limit + '</span>' : '') + '</button>';
-    }).join('') + '</div><p class="setup-note">Estimated frames per second. Actual performance varies by map and what’s running.</p>';
+        '<p>' + esc({competitive:'Less detail. Clear sightlines.',balanced:'Clarity meets atmosphere.',quality:'Every detail. Every shadow.'}[p.id] || '') + '</p></button>';
+    }).join('') + '</div>';
   if (step === "region") return heading("OPTIONAL / YOUR SERVERS", "Lock to one server region.", "Choose one region to play in. Every other region is blocked for CS2 only. Change it any time in the overlay or the app.") +
     '<div class="setup-regions">' + [{id:null,label:'Keep all regions open',blurb:'No server region lock.'},...setupRegions(d)].map((r,i) =>
       '<button type="button" class="setup-choice setup-region setup-scan" style="--scan-index:' + i + '" data-setup-region="' + esc(r.id || '') + '" aria-pressed="' + (draft.region === r.id) + '">' + setupIcon(r.id ? 'globe' : 'shield') + setupTick() + '<b>' + esc(r.label || r.name) + '</b><p>' + esc(r.blurb || 'Play here. Block every other region for CS2.') + '</p></button>').join('') + '</div><p class="setup-note">Optional. Skip to leave your current region choice as it is.</p>';
@@ -12866,24 +13234,8 @@ function renderSetupHardware(s) {
   if (!setupAlive(s) || setupCurrentStep(s) !== 'preset' || !$('setup-hardware')) return;
   const scan = lastScan;
   $('setup-hardware').innerHTML = scan && (scan.cpu || scan.gpu)
-    ? [['CPU',scan.cpu && scan.cpu.name,'device'],['GPU',scan.gpu && scan.gpu.name,'gpu']].filter(x => x[1]).map(([kind,name,icon]) => '<span>' + setupIcon(icon) + esc(kind + ' · ' + name) + '</span>').join('')
+    ? [['CPU',scan.cpu && scan.cpu.name,'device'],['GPU',scan.gpu && scan.gpu.name,'gpu']].filter(x => x[1]).map(([kind,name,icon]) => '<span>' + hwIcon(kind) + esc(name) + '</span>').join('')
     : '<span>' + setupIcon('device') + (s.hardwareFailed ? 'Hardware details unavailable' : 'Reading your CPU and GPU…') + '</span>';
-}
-function setupCountFPS(s) {
-  cancelAnimationFrame(s.fpsFrame); clearTimeout(s.fpsEnd);
-  const numbers = [...$('setup-content').querySelectorAll('[data-setup-fps]')];
-  if (setupReduced.matches) { numbers.forEach(n => { n.textContent = n.dataset.setupFps; }); return; }
-  const start = performance.now();
-  const tick = now => {
-    if (!setupAlive(s) || setupCurrentStep(s) !== 'preset') return;
-    if (document.hidden) { numbers.forEach(n => { n.textContent = n.dataset.setupFps; }); return; }
-    const t = Math.min(1,(now-start)/720), ease = 1-Math.pow(1-t,3);
-    numbers.forEach(n => { n.textContent = Math.round(Number(n.dataset.setupFps)*ease); });
-    if (t < 1) s.fpsFrame = requestAnimationFrame(tick);
-  };
-  s.fpsFrame = requestAnimationFrame(tick);
-  // Settle even when the host throttles animation frames during a resize.
-  s.fpsEnd = setTimeout(() => { if (setupAlive(s) && setupCurrentStep(s) === 'preset') { cancelAnimationFrame(s.fpsFrame); numbers.forEach(n => { n.textContent = n.dataset.setupFps; }); } },760);
 }
 function renderSetup(s, focus = true) {
   if (!setupAlive(s)) return;
@@ -12898,16 +13250,20 @@ function renderSetup(s, focus = true) {
   $('setup-back').disabled = s.index === 0;
   const permissionDone = step === 'permission' && helperReady(s.data.helper);
   $('setup-back').hidden = permissionDone; $('setup-skip').hidden = permissionDone;
-  for (const id of ['setup-close','setup-back','setup-skip','setup-next']) if (s.helperBusy) $(id).disabled = true;
+  for (const id of ['setup-close','setup-back','setup-skip','setup-next']) if (s.helperBusy || s.importBusy) $(id).disabled = true;
   document.querySelector('.setup-foot-note').textContent = 'Step ' + (s.index+1) + ' of ' + s.steps.length + '. Change any choice later in Settings.';
   $('setup-next').innerHTML = s.index === s.steps.length-1 ? 'Finish ' + setupIcon('play') : 'Next <span aria-hidden="true">&rarr;</span>';
+  if (step === 'import') {
+    $('setup-next').disabled=!!s.importBusy || !!s.importPick && !s.importResult;
+    if(s.importResult)$('setup-next').textContent='Use this copy →';
+  }
   $('setup-error').textContent = '';
   if (step === 'sync') {
     renderSetupSync(s);
     if ((s.data.cloud || {}).signed_in && !(s.data.cloud || {}).needs_steam && !s.synced && !s.syncBusy && !s.syncError) setupSync(s);
   }
   if (step === 'preset') {
-    renderSetupHardware(s); setupCountFPS(s);
+    renderSetupHardware(s);
     if (!lastScan && !s.hardwareJob) s.hardwareJob = api('/api/scan').then(scan => { lastScan = scan; renderSetupHardware(s); }).catch(() => { s.hardwareFailed = true; renderSetupHardware(s); });
   }
   content.querySelectorAll('[data-setup-app-icon]').forEach(img => {
@@ -12916,6 +13272,34 @@ function renderSetup(s, focus = true) {
     if (img.complete && img.naturalWidth) loaded();
   });
   if (focus) $('setup-title').focus({preventScroll:true});
+}
+function setupImportHTML(s) {
+  const pick=s.importPick,r=s.importResult;
+  return '<div class="config-import-actions"><button class="setup-action" data-import-pick="files"'+(s.importBusy?' disabled':'')+'>'+configIcon('file')+'Choose files…</button><button class="setup-action" data-import-pick="folder"'+(s.importBusy?' disabled':'')+'>'+configIcon('folder')+'Choose a folder…</button></div>'+
+    (pick&&!r?'<p class="setup-note">Choose the files to load, top to bottom. Their exec links bring in the rest of the chosen set. Pick a folder to include linked files.</p><div class="config-pick-list">'+pick.files.map((file,i)=>'<label><input type="checkbox" data-import-entry="'+i+'"'+(s.importEntries.includes(file)?' checked':'')+(s.importBusy?' disabled':'')+'>'+esc(file)+'</label>').join('')+'</div><button class="setup-action" id="setup-import-preview"'+(s.importBusy||!s.importEntries.length?' disabled':'')+'>Review this copy →</button>':'')+
+    (r?'<div class="config-result" role="status" aria-label="Import review">'+[['ready','Kept',r.kept,'commands · includes profiles'],['merge','Merged',r.merged,'exec links · inlined'],['drop','Dropped',r.dropped,'items · see details']].map(([icon,label,n,help])=>'<article>'+configIcon(icon)+'<b>'+Number(n||0)+'</b><span>'+label+'</span><small>'+help+'</small></article>').join('')+'</div><p class="setup-note config-profile-count"><b>Profiles: '+Number(r.profiles||0)+'</b> · Copied for binds and aliases. They run only when called.</p><p class="setup-note">Rebuilt into <code>mainsettings/imported.vcfg</code>, after your preset. Later values still win. Use this copy to include it when you finish setup.</p><details class="config-import-details"><summary>What changed</summary><p>'+esc(r.note)+'</p><p>Startup execs are merged in place. Runtime execs point to copied profiles; nested links stay in that copy. Duplicate settings stay in order. Missing links, unsafe loops, invalid lines and game-owned files are reported below.</p><ul>'+(r.details||[]).map(d=>'<li><b>'+(d.kind==='profile'?'Kept profile':'Dropped')+'</b> · '+esc(d.file)+(d.line?':'+Number(d.line):'')+' — '+(d.kind==='profile'?esc(d.binding)+' → <code>'+esc(d.target)+'</code> · ':'')+esc(d.reason)+'</li>').join('')+'</ul></details>':'')+
+    '<p class="config-import-status" aria-live="polite">'+esc(s.importBusy?'Reading your copy…':s.importError||'Originals stay untouched. Replaced app or CS2 files are backed up first.')+'</p><p class="setup-note">Optional. Skip to keep the app’s standard files.</p>';
+}
+async function setupImport(s,kind) {
+  if(!setupAlive(s)||s.importBusy)return;
+  s.importBusy=true;s.importError='';renderSetup(s,false);
+  try {
+    const r=await api(kind==='preview'?'/api/configs/import/preview':'/api/configs/import/pick',kind==='preview'?{token:s.importPick.token,entries:s.importEntries}:{kind});
+    if(!r.ok)throw Error(r.error||'Your files could not be read.');
+    if(!setupAlive(s)||r.cancelled)return;
+    delete s.answers.import;s.draft.import=null;
+    if(kind==='preview'){s.importResult=r;s.draft.import=r.token;}
+    else {s.importPick=r;s.importEntries=[...(r.selected||[])];s.importResult=null;}
+  } catch(e) {if(setupAlive(s))s.importError=setupPlain(e.message,'Your files could not be read. Choose them again.');}
+  finally {
+    s.importBusy=false;
+    if(setupAlive(s)) {
+      for(const id of ['setup-close','setup-back','setup-skip','setup-next'])$(id).disabled=false;
+      renderSetup(s,false);
+      if(s.importResult)$('setup-next').focus({preventScroll:true});
+      else $('setup-import-preview')?.focus({preventScroll:true});
+    }
+  }
 }
 function setupChoose(s, name, value, button) {
   s.skipped.delete(name);
@@ -12973,8 +13357,9 @@ function setupPreviewTheme(s, id, button) {
 }
 async function setupMove(direction, skip = false) {
   const s = setupSession;
-  if (!setupAlive(s) || s.moving || s.helperBusy) return;
+  if (!setupAlive(s) || s.moving || s.helperBusy || s.importBusy) return;
   const step = setupCurrentStep(s);
+  if(direction>0&&!skip&&step==='import'&&s.importPick&&!s.importResult)return;
   if (direction > 0) {
     if (skip) {
       delete s.answers[SETUP_KEYS[step]]; s.skipped.add(step);
@@ -13102,7 +13487,7 @@ async function openSetupWizard({step, data} = {}) {
 window.openSetupWizard = openSetupWizard;
 async function finishSetupWizard() {
   const s = setupSession;
-  if (!setupAlive(s) || s.helperBusy) return;
+  if (!setupAlive(s) || s.helperBusy || s.importBusy) return;
   s.finishing = true; clearTimeout(s.loginTimer); clearTimeout(s.fpsEnd); cancelAnimationFrame(s.fpsFrame);
   const controls = [...$('setup-wizard').querySelectorAll('button,input,select,a')];
   controls.forEach(el => { if ('disabled' in el) el.disabled = true; });
@@ -13122,7 +13507,7 @@ async function finishSetupWizard() {
     else { const play = $('play'); if (play) play.focus({preventScroll:true}); }
     // Refresh the affected panels on reruns; the normal startup does this on
     // first run, after this promise resolves, without duplicate probes.
-    if (prefsReady) { audioData = null; loadAudio(true); loadCompanions(); loadMachine(); previewPlan(); }
+    if (prefsReady) { audioData = null; loadAudio(true); loadCompanions(); loadMachine(); previewPlan(); if(typeof prepareConfigs==='function')prepareConfigs({choose:true}); }
     pollSyncStatus();
   } catch (err) {
     s.finishing = false; controls.forEach(el => { if ('disabled' in el) el.disabled = false; });
@@ -13159,8 +13544,10 @@ $('setup-close').addEventListener('click',finishSetupWizard);
 $('setup-again').addEventListener('click',() => openSetupWizard().catch(() => status('Setup could not be opened. Please try again.',true)));
 $('setup-content').addEventListener('click',e => {
   const s = setupSession;
-  if (!setupAlive(s) || s.moving || s.helperBusy) return;
+  if (!setupAlive(s) || s.moving || s.helperBusy || s.importBusy) return;
   const button = e.target.closest('button'); if (!button) return;
+  if(button.hasAttribute('data-import-pick'))setupImport(s,button.dataset.importPick);
+  if(button.id==='setup-import-preview')setupImport(s,'preview');
   if (button.hasAttribute('data-setup-permission')) {
     if (button.dataset.setupPermission === 'allow') setupInstallHelper(s);
     else setupChoose(s,'permission',false,button);
@@ -13174,6 +13561,11 @@ $('setup-content').addEventListener('click',e => {
 $('setup-content').addEventListener('change',e => {
   const s = setupSession, el = e.target;
   if (!setupAlive(s) || s.moving) return;
+  if(el.hasAttribute('data-import-entry')&&!s.importBusy) {
+    s.importEntries=[...$('setup-content').querySelectorAll('[data-import-entry]:checked')].map(n=>s.importPick.files[Number(n.dataset.importEntry)]);
+    s.importResult=null;s.draft.import=null;delete s.answers.import;
+    $('setup-import-preview').disabled=!s.importEntries.length;
+  }
   if (el.id === 'setup-sync-auto') { s.draft.sync = el.checked; s.answers.sync = el.checked; }
   if (el.dataset.setupAudio) { s.draft.sound[el.dataset.setupAudio] = el.value; s.answers.sound = {...s.draft.sound}; }
   if (el.hasAttribute('data-setup-app')) { s.draft.apps = [...$('setup-content').querySelectorAll('[data-setup-app]:checked')].map(input => input.dataset.setupApp); s.answers.apps = [...s.draft.apps]; }
@@ -13263,11 +13655,11 @@ let wgData = null;
 
 const BIAS = [
   ["auto", "Automatic",
-   "Reads the machine and spares whichever part is actually the slower half."],
-  ["gpu", "Lean on the graphics card",
-   "Keeps graphics detail up. For a machine whose card is the stronger half — which is most of them, because CS2 leans on the processor."],
-  ["cpu", "Lean on the processor",
-   "Gives the graphics card less to draw. For a weaker card next to a processor that can carry it."],
+   "Automatically reduces picture detail for the slower part."],
+  ["gpu", "Lean on GPU",
+   "Keeps more graphics detail when the GPU is the stronger part."],
+  ["cpu", "Lean on CPU",
+   "Reduces graphics detail for a weaker GPU. Does not move work between parts."],
 ];
 
 async function loadMachine() {
@@ -13297,76 +13689,22 @@ function renderMachine() {
   const parts = wgData && wgData.parts;
   if (parts && parts.cpu && parts.gpu) {
     const cpu = parts.cpu, gpu = parts.gpu;
-    const total = (cpu.ceiling || 0) + (gpu.ceiling || 0);
-    const share = total ? Math.round((cpu.ceiling / total) * 100) : 50;
-    const limit = !cpu.ceiling || !gpu.ceiling ? ""
-      : cpu.ceiling < gpu.ceiling ? "the processor runs out first"
-      : gpu.ceiling < cpu.ceiling ? "the graphics card runs out first"
-      : "evenly matched";
-    const chip =
-      '<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/>' +
-      '<rect x="9.5" y="9.5" width="5" height="5" rx="1"/>' +
-      '<path d="M9 6V3M15 6V3M9 21v-3M15 21v-3M6 9H3M6 15H3M21 9h-3M21 15h-3"/></svg>';
-    const card =
-      '<svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2"/>' +
-      '<circle cx="9" cy="12" r="3.2"/><path d="M15 9.5h4M15 12h4M15 14.5h4"/>' +
-      '<path d="M6 18v2.5M18 18v2.5"/></svg>';
+    const chip = hwIcon('cpu');
+    const card = hwIcon('gpu');
 
-    html +=
-      '<div class="parts">' +
-        '<span class="part cpu"><span class="part-ic">' + chip + "</span>" +
-          '<span class="part-txt"><span class="part-kind">PROCESSOR</span>' +
-          '<span class="part-name" title="' + esc(cpu.name) + '">' +
-            esc(shortPart(cpu.name)) + "</span>" +
-          '<span class="part-sub">' + esc(cpu.detail || "") + "</span>" +
-          '<span class="part-fps">' + (cpu.ceiling || "—") +
-            " <span>FPS</span></span></span></span>" +
-
-        '<span class="part-vs"><b>LIMIT</b>' +
-          '<span class="part-bar"><i style="width:' + share + '%"></i></span>' +
-          "<small>" + esc(limit) + "</small></span>" +
-
-        '<span class="part gpu"><span class="part-ic">' + card + "</span>" +
-          '<span class="part-txt"><span class="part-kind">GRAPHICS CARD</span>' +
-          '<span class="part-name" title="' + esc(gpu.name) + '">' +
-            esc(shortPart(gpu.name)) + "</span>" +
-          '<span class="part-sub">' + esc(gpu.detail || "") + "</span>" +
-          '<span class="part-fps">' + (gpu.ceiling || "—") +
-            " <span>FPS</span></span></span></span>" +
-      "</div>";
+    html += '<div class="parts">' + [cpu,gpu].map((part,i) =>
+      '<span class="part ' + (i ? 'gpu' : 'cpu') + '"><span class="part-ic">' + (i ? card : chip) + '</span><span class="part-txt"><span class="part-name" title="' + esc(part.name) + '">' + esc(shortPart(part.name)) + '</span><span class="part-sub">' + esc(part.detail || '') + '</span></span></span>').join('') + '</div>';
   }
 
-  html +=
-    '<p class="sub">Where the detail budget goes when the machine cannot have ' +
-    "everything. These are picture settings, not a scheduler — nothing here " +
-    "moves work between the two parts, it decides which one is asked to draw " +
-    'less.</p><div class="bias">' +
-    BIAS.map(([id, name, why]) =>
-      '<button type="button" data-bias="' + id + '" aria-pressed="' +
-      (now === id) + '"><b>' + esc(name) + "</b><span>" + esc(why) +
-      "</span></button>").join("") +
-    "</div>";
+  html += '<div class="bias" role="group" aria-label="Picture detail balance" style="--bias-index:' + Math.max(0, BIAS.findIndex(b => b[0] === now)) + '"><i class="bias-thumb" aria-hidden="true"></i>' +
+    BIAS.map(([id,name,why]) => '<button type="button" data-bias="' + id + '" title="' + esc(why) + '" aria-pressed="' + (now === id) + '"><b>' + esc(name) + '</b></button>').join('') + '</div>';
 
   if (wgData && wgData.supported) {
     const set = wgData.high_performance && wgData.windowed_optimised;
     html +=
-      '<div class="wg-row"><span class="sub2"><b>Windows graphics settings</b><br>' +
-      "Windows keeps its own per-game settings: which card to render on, and " +
-      "whether a windowed game gets the low-latency presentation path. CS2 is " +
-      "currently <b>" + (set ? "set for performance" : "on Windows&rsquo; defaults") +
-      "</b>." +
-      (wgData.gpu_choice_matters ? "" :
-        " This machine has one graphics adapter, so the card choice changes " +
-        "nothing here; the windowed optimisation still does.") +
-      "</span>" +
-      '<button class="btn small" id="wg-apply"' + (set ? " disabled" : "") + ">" +
-      (set ? "Already set" : "Set for performance") + "</button></div>" +
-      '<label class="opt"><input type="checkbox" id="wg-auto"' +
-      (keep ? " checked" : "") + '><span class="xh-opt">' +
-      "<b>Keep it set on every launch</b>" +
-      '<span class="sub2">Checked before the game starts, and only written when ' +
-      "Windows does not already agree. Other applications&rsquo; settings in the " +
-      "same place are left alone.</span></span></label>";
+      '<div class="wg-row"><span class="sub2" title="Per-game Windows adapter preference and windowed optimisation.">Windows graphics · ' + (set ? 'Performance' : 'Default') + '</span>' +
+      '<button class="btn small" id="wg-apply"' + (set ? ' disabled' : '') + '>' + (set ? 'Already set' : 'Set for performance') + '</button></div>' +
+      '<label class="opt" title="Check these per-game Windows settings before each launch."><input type="checkbox" id="wg-auto"' + (keep ? ' checked' : '') + '> Keep set on launch</label>';
   } else if (wgData && wgData.reason) {
     html += '<p class="wg-row"><span class="sub2">Windows graphics settings are ' +
             "unavailable: " + esc(wgData.reason) + "</span></p>";
@@ -13379,7 +13717,9 @@ document.addEventListener("click", async e => {
   if (pick) {
     const want = pick.dataset.bias;
     if (prefsNow) prefsNow.load_bias = want;
-    renderMachine();
+    const track = pick.closest('.bias');
+    track.style.setProperty('--bias-index', BIAS.findIndex(b => b[0] === want));
+    track.querySelectorAll('[data-bias]').forEach(b => b.setAttribute('aria-pressed', String(b === pick)));
     try { await api("/api/prefs", { load_bias: want }); } catch (err) { /* below */ }
     // The generated config just changed, so the preview is stale.
     $("preview").click();
@@ -13462,6 +13802,7 @@ document.addEventListener("click", async e => {
    is no second path that could set a control the first one would not.
 */
 let setupsData = null;
+let setupsRevision = 0;
 
 async function loadSetups() {
   try {
@@ -13509,17 +13850,21 @@ function renderSetups() {
 }
 
 async function setupsAct(body) {
+  const revision = ++setupsRevision;
   let r;
   try {
     r = await api("/api/setups/act", body);
   } catch (err) {
-    status(String(err && err.message || err), true);
+    if (revision === setupsRevision) status(String(err && err.message || err), true);
     return;
   }
+  if (revision !== setupsRevision) return;
   if (!r.ok) { status(r.error, true); return; }
   setupsData = r;
   if (r.ui) applyPrefs(r.ui);
   renderSetups();
+  if (body.do === "use" && typeof useGoxlrSetup === "function") r.goxlr = await useGoxlrSetup(body.name);
+  if (revision !== setupsRevision) return;
   return r;
 }
 
@@ -13536,8 +13881,8 @@ document.addEventListener("click", async e => {
   const use = e.target.closest("[data-setup-use]");
   if (use) {
     const name = use.dataset.setupUse;
-    await setupsAct({ do: "use", name });
-    status("Switched to " + name + ". Nothing is written until you apply.");
+    const r = await setupsAct({ do: "use", name });
+    if (r) status("Switched to " + name + ". " + (r.goxlr?.ok === false ? "GoXLR: " + r.goxlr.error : r.goxlr && !r.goxlr.skipped ? "GoXLR profiles switched." : "Game settings are ready to apply."), r.goxlr?.ok === false);
     return;
   }
   if (e.target.closest("#setup-keep")) {
@@ -16070,6 +16415,7 @@ $("rescan").addEventListener("click", () => scan(true));
 // refresh rather than pretending nothing is happening.
 (async () => {
   await checkFirstRun();
+  const connectionReady = startup.run("connection", runNetCheck);
   startSyncWatch();
   setStretchMode(stretchMode);
   // prefs also calls State.refresh(). Starting it alongside scan can run the
@@ -16086,11 +16432,12 @@ $("rescan").addEventListener("click", () => scan(true));
   // GET monitor/status and independent local loaders need not wait for the
   // starter config. Every promise includes its loader's final render.
   await Promise.allSettled([
+    connectionReady,
     startup.run("plan", previewPlan),
     startup.run("machine", loadMachine),
     startup.run("setups", loadSetups),
     startup.run("crosshair", loadCrosshairX),
-    startup.run("companions", async () => { await loadCompanions(); startCompanionsWatch(); }),
+    startup.run("companions", async () => { await loadCompanions(); await loadAppTiles(); startCompanionsWatch(); }),
     startup.run("audio", () => loadAudio(false)),
     startup.run("history", loadHistory),
     startup.run("profile", loadWho),
@@ -16103,12 +16450,8 @@ $("rescan").addEventListener("click", () => scan(true));
       await startup.run("suggestions", refreshCfgSuggestions);
       let created = false;
       await startup.run("starter", async () => {
-        const first = await checkStarter();
-        if (prefsNow.cfg_write_ok === true && first && first.ok && !first.complete &&
-            !first.present.length && !first.autoexec &&
-            !($("cfg-folder") && $("cfg-folder").value.trim())) {
-          created = !!(await makeStarter(true));
-        }
+        await prepareConfigs({choose:true});
+        await checkStarter();
       });
       await startup.run("source", async () => {
         // makeStarter already awaits loadSource after creating a collection.
@@ -16117,6 +16460,7 @@ $("rescan").addEventListener("click", () => scan(true));
       await startup.run("settings-pane", async () => {
         if (settingsSub === "overlay") await loadOverlay();
         if (settingsSub === "config" || settingsSub === "editing") await ensureScan(false);
+        if (settingsSub === "steam") await loadFixes();
       });
     })(),
   ]);
@@ -16160,7 +16504,7 @@ $("rescan").addEventListener("click", () => scan(true));
     "Picture quality": "picture", "Optimise for": "gauge", "Match demos": "play",
     "Keyboard": "keyboard", "Fix It": "wrench", "Files": "folder",
     "Detected": "layers", "System": "device", "Connection": "gauge",
-    "Steam launch options": "terminal", "Worth knowing": "text", "Settings": "sliders"
+    "Steam launch options": "terminal", "Steam client": "device", "Settings": "sliders"
   };
 
   /* Convar names, by what they govern. First match wins. */
@@ -16249,7 +16593,7 @@ $("rescan").addEventListener("click", () => scan(true));
       const cap = g.querySelector(".cap");
       const val = g.querySelector("text.val");
       if (!cap || !val) return;
-      seen[cap.textContent.trim().toUpperCase()] = val.textContent.trim();
+      seen[(cap.querySelector("[data-hw]")?.dataset.hw || cap.textContent.trim()).toUpperCase()] = val.textContent.trim();
     });
     for (const [name, id] of Object.entries(CHIPS)) {
       const chip = document.getElementById(id);

@@ -32,7 +32,7 @@ class BackupSet:
     @property
     def when(self) -> str:
         try:
-            return datetime.strptime(self.stamp, "%Y%m%d-%H%M%S").strftime("%Y-%m-%d %H:%M:%S")
+            return datetime.strptime(self.stamp[:15], "%Y%m%d-%H%M%S").strftime("%Y-%m-%d %H:%M:%S")
         except ValueError:
             return self.stamp
 
@@ -53,7 +53,17 @@ class BackupSession:
 
     def _start(self) -> None:
         if not self._started:
-            self.dir.mkdir(parents=True, exist_ok=True)
+            # Startup preparation and installation can finish in one second.
+            # Never reuse their manifests or overwrite an earlier backup set.
+            base, suffix = self.stamp, 0
+            while True:
+                try:
+                    self.dir.mkdir(parents=True, exist_ok=False)
+                    break
+                except FileExistsError:
+                    suffix += 1
+                    self.stamp = f"{base}-{suffix:06d}"
+                    self.dir = backups_root() / self.stamp
             self._started = True
 
     def add(self, path: Path) -> Optional[Path]:

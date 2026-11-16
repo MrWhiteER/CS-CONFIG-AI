@@ -481,6 +481,7 @@ def _watch_for_matches(url: str) -> None:
 
     def open_alert() -> None:
         close()
+        options = load_prefs()
         width, height = 460, 300
         try:
             user32 = ctypes.WinDLL("user32", use_last_error=True)
@@ -503,7 +504,7 @@ def _watch_for_matches(url: str) -> None:
             win = webview.create_window(
                 ALERT_TITLE, url.rstrip("/") + "/alert.html",
                 width=width, height=height, x=x, y=y,
-                resizable=False, frameless=True, on_top=True,
+                resizable=False, frameless=True, on_top=bool(options.get("match_alert_on_top", True)),
                 focus=True, confirm_close=False)
         except Exception:
             return
@@ -537,8 +538,9 @@ def _watch_for_matches(url: str) -> None:
         try:
             import winsound
 
-            winsound.PlaySound("SystemExclamation",
-                               winsound.SND_ALIAS | winsound.SND_ASYNC)
+            if options.get("match_alert_sound", True):
+                winsound.PlaySound("SystemExclamation",
+                                   winsound.SND_ALIAS | winsound.SND_ASYNC)
         except Exception:
             pass
 

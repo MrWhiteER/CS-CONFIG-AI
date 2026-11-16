@@ -183,7 +183,7 @@ def set_with_game(prefs_ui: Dict[str, Any], kind: str, on: bool,
         if exe:
             current["exe"] = exe
         return {"companions": held}
-    if not on:
+    if not on and not exe:
         return {"companions": held}
 
     path = Path(exe) if exe else find(kind)
@@ -192,7 +192,7 @@ def set_with_game(prefs_ui: Dict[str, Any], kind: str, on: bool,
     if len(held) >= companions.MAX_COMPANIONS:
         raise companions.CompanionError("there is no room for another companion")
     held.append({"id": kind, "name": APPS[kind]["name"], "exe": str(path),
-                 "args": "", "with_game": True, "integration": kind})
+                 "args": "", "with_game": bool(on), "integration": kind})
     return {"companions": held}
 
 

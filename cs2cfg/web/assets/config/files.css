@@ -1,0 +1,58 @@
+/* Plain file guide, using the same Settings grid and all ten theme tokens. */
+.config-ready { grid-column:1/-1; }
+.config-ready-top { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+.config-ready-top > svg { width:42px; height:42px; color:var(--accent); fill:none; stroke:currentColor; stroke-width:1.5; }
+.config-ready-copy { flex:1; min-width:160px; }
+.config-ready-copy h2 { margin:0 0 6px; }
+.config-ready-copy p { margin:0; color:var(--muted); font-size:13px; }
+.config-ready-actions { display:flex; gap:8px; flex-wrap:wrap; }
+.config-guide { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin:20px 0 8px; }
+.config-guide article { display:flex; gap:12px; padding:15px; border:1px solid var(--line); border-radius:var(--radius); background:var(--panel-2); min-width:0; }
+.config-guide svg,.config-import-actions svg,.config-result svg { width:24px; height:24px; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; flex:none; color:var(--accent); }
+.config-guide article > div { min-width:0; overflow-wrap:anywhere; }
+.config-guide b { display:block; font-size:13px; }
+.config-guide small { display:block; color:var(--muted); font-size:12px; line-height:1.55; margin-top:4px; }
+.config-guide code { display:block; font-size:10px; color:var(--muted); overflow-wrap:anywhere; margin-top:7px; }
+.config-location { margin:12px 0 0; font-size:11px; color:var(--muted); overflow-wrap:anywhere; }
+.config-advanced { grid-column:1/-1; min-width:0; border:1px solid var(--line); border-radius:var(--radius); background:var(--panel); }
+.config-advanced > summary { padding:18px 22px; cursor:pointer; font-size:14px; font-weight:600; }
+.config-advanced > summary small { margin-left:12px; color:var(--muted); font-weight:400; font-size:12px; }
+.config-advanced-body { padding:0 18px 18px; display:grid; grid-template-columns:minmax(0,1fr); gap:14px; }
+.config-advanced summary:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.config-import-actions { display:flex; gap:12px; flex-wrap:wrap; margin:22px 0; }
+.config-import-actions button { display:flex; align-items:center; gap:10px; }
+.config-pick-list { max-height:190px; overflow:auto; margin:14px 0; padding:4px; border:1px solid var(--line); border-radius:var(--radius); }
+.config-pick-list label { display:flex; gap:10px; padding:9px 12px; overflow-wrap:anywhere; font-size:13px; align-items:flex-start; }
+.config-pick-list input { flex:none; accent-color:var(--accent); }
+.config-result { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:24px 0 16px; }
+.config-result article { padding:20px; border:1px solid var(--line); border-radius:var(--radius); background:var(--panel-2); }
+.config-result b { display:block; font-size:28px; margin:10px 0 4px; }
+.config-result small { display:block; color:var(--muted); margin-top:5px; line-height:1.5; }
+.config-import-details { font-size:12px; color:var(--muted); }
+.config-import-details li { margin:9px 0; overflow-wrap:anywhere; }
+.config-import-details ul { max-height:150px; overflow:auto; }
+.config-import-status { font-size:13px; color:var(--muted); margin-top:14px; }
+.config-is-busy .config-ready-top > svg { animation:config-breathe 1s ease-in-out infinite alternate; }
+@keyframes config-breathe { to { opacity:.35; transform:translateY(-2px); } }
+.hidden .config-is-busy svg,.config-paused .config-is-busy svg { animation-play-state:paused; }
+@media(max-width:800px) { .config-guide { grid-template-columns:repeat(2,minmax(0,1fr)); }.config-advanced-body { grid-template-columns:1fr; } }
+@media(max-width:480px) {
+  .config-guide { grid-template-columns:1fr; }
+  .config-guide article { flex-direction:column; padding:8px; }
+  .config-ready-copy { min-width:0; flex-basis:100%; }
+  .subpane[data-sub="config"] { overflow-wrap:anywhere; }
+  .subpane[data-sub="config"] > .panel { padding:10px !important; }
+  .subpane[data-sub="config"] button { min-width:0; max-width:100%; white-space:normal; overflow-wrap:anywhere; }
+  .config-ready-actions { min-width:0; }
+  .config-advanced > summary { padding:12px; }
+  .config-advanced > summary small { display:block; margin:8px 0 0; }
+  .config-advanced-body { padding:0 6px 8px; }
+  .config-advanced .row { display:block; }
+  .config-advanced .row .v { display:block; }
+  .config-advanced :is(select,input) { width:100%; max-width:100%; min-width:0; box-sizing:border-box; }
+  .config-advanced .diff { table-layout:fixed; }
+  .config-advanced .diff td { white-space:normal; overflow-wrap:anywhere; }
+  .config-advanced .stats { flex-wrap:wrap; }
+  .config-result { gap:7px; }.config-result article { padding:12px 9px; }.config-result small { font-size:10px; }
+}
+@media(prefers-reduced-motion:reduce) { .config-is-busy .config-ready-top > svg { animation:none; } }

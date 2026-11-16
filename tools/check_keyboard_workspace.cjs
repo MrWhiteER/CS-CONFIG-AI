@@ -9,7 +9,7 @@ const page=fs.readFileSync('cs2cfg/web/index.html','utf8');
 for(const x of page.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g))new vm.Script(x[1]);
 new vm.Script(fs.readFileSync('cs2cfg/web/assets/devices/workspace.js','utf8'));
 const slice=(a,b)=>page.slice(page.indexOf(a),page.indexOf(b,page.indexOf(a)));
-let code=`const $=id=>document.getElementById(id); const esc=x=>String(x??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');
+let code=fs.readFileSync(path.join(root,'cs2cfg/web/assets/hardware/icons.js'),'utf8')+'\n'+fs.readFileSync(path.join(root,'cs2cfg/web/assets/fixit/icons.js'),'utf8')+'\n'+`const $=id=>document.getElementById(id); const esc=x=>String(x??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');
 let profileData={default_active:true,profiles:[{file:'warmup.cfg',label:'Warmup',override_count:2,active:false,missing_defaults:[]}]};
 let layoutData={profiles:[]},layoutPending={},cloudData=null,kbswPopover=null,kbswMenu=null;
 const calls=[],notices=[];const confirm=()=>true;function status(t){notices.push(t)}async function ensureScan(){return true}function noFolderYet(){}

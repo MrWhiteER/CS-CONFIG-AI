@@ -1,0 +1,32 @@
+/* Round 3: one hardware vocabulary, inherited theme colours. */
+.hw-icon { display:inline-flex; width:24px; height:24px; flex:none; vertical-align:middle; color:var(--accent); align-items:center; justify-content:center; }
+.hw-icon svg { width:100%; height:100%; overflow:visible; }
+.hw-icon svg { animation:hw-breathe var(--hw-speed,4s) ease-in-out infinite; }
+@keyframes hw-breathe { 50% { opacity:.65; transform:translateY(-.5px); } }
+.hw-paused .hw-icon svg,.hidden .hw-icon svg,[hidden] .hw-icon svg { animation-play-state:paused; }
+.chip .hw-icon { width:19px; height:19px; margin-right:5px; }
+.hardware-chip .hw-icon { width:21px; height:21px; color:var(--series); }
+.hardware-chip .hw-icon svg { width:21px; height:21px; }
+.gauge>.cap { display:flex; justify-content:center; margin-top:-1px; }
+.gauge>.cap .hw-icon { width:25px; height:25px; }
+.score-text i .hw-icon { width:15px; height:15px; }
+.row .k:has(.hw-icon) { min-width:38px; width:38px; }
+.part-ic .hw-icon { width:42px; height:42px; }
+.gfx-monitor header .hw-icon { margin-right:7px; }
+.thermal-ring { position:relative; width:100px; height:100px; flex:none; display:grid; place-items:center; border-radius:50%; background:linear-gradient(var(--panel),var(--panel)) padding-box, conic-gradient(from 210deg,var(--accent),var(--good),var(--accent)) border-box; border:3px solid transparent; }
+.thermal-ring::after { content:""; position:absolute; inset:5px; border:1px solid var(--line); border-radius:50%; pointer-events:none; }
+.thermal-ring .t-read { font:600 24px var(--mono); color:var(--ink); white-space:nowrap; }
+.thermal-ring .hw-icon { position:absolute; top:-8px; left:-7px; background:var(--panel); border-radius:8px; padding:3px; box-sizing:content-box; }
+.thermal-ring .thermal-badge { position:absolute; bottom:7px; right:5px; width:23px; height:23px; color:var(--accent); background:var(--panel); border-radius:50%; }
+[data-panel="launcher"] .temp-gauge { display:flex; align-items:center; gap:12px; min-width:0; }
+.temp-gauge .heat-heading { display:flex; flex-direction:column; align-items:flex-start; min-width:0; flex:1; margin:0; gap:8px; }
+.temp-gauge .heat-heading .cap { font:11px var(--mono); overflow-wrap:anywhere; }
+.temp-gauge .heat-track { width:100%; }
+.temp-gauge.warm .thermal-ring { border-bottom-color:var(--warn); }
+.temp-gauge.hot .thermal-ring { border-bottom-color:var(--bad); }
+.temp-gauge.hot .thermal-badge { color:var(--bad); }
+.temp-gauge.warm .thermal-badge { color:var(--warn); }
+.temp-gauge.unknown .thermal-ring { opacity:.65; }
+.temp-gauge.unknown .t-reason { color:var(--muted); font:10px/1.4 var(--sans,system-ui); }
+@media(prefers-reduced-motion:reduce) { .hw-icon svg { animation:none!important; } }
+@media(max-width:700px) { .thermal-ring { width:82px; height:82px; }.thermal-ring .t-read { font-size:20px; } }

@@ -20,7 +20,7 @@ console.log(`node --check: all ${scripts} inline script bodies passed`);
 const slice = (a,b) => { const start = source.indexOf(a), end = source.indexOf(b,start); assert(start >= 0 && end > start, a); return source.slice(start,end); };
 assert(source.indexOf('await checkFirstRun();') < source.indexOf('await startup.run("scan"'), 'setup gates startup');
 const preview = process.env.SETUP_STEP || '', theme = process.env.SETUP_THEME || 'violet';
-const code = `
+const code = fs.readFileSync(path.join(root,'cs2cfg/web/assets/hardware/icons.js'),'utf8')+'\n'+fs.readFileSync(path.join(root,'cs2cfg/web/assets/fixit/icons.js'),'utf8')+'\n'+`
 window.addEventListener('error',event=>{const pre=document.createElement('pre');pre.id='setup-checks';pre.textContent=JSON.stringify({error:event.message+' at '+event.lineno,checks:[]});document.body.append(pre)});
 const $ = id => document.getElementById(id);
 ${slice('function esc(s) {','async function api(')}
@@ -34,7 +34,7 @@ let helperReply = null, helperDelay = 40, fixDelay = 40;
 const readyHelper = {supported:true,installed:true,current:true,version:1,wanted:1};
 const regionsFixture = [{id:'dubai',label:'Dubai'},{id:'frankfurt',name:'Frankfurt'},{id:'singapore',label:'Singapore'}];
 const fixture = {
-  ok:true,needed:true,steps:['sync','permission','sound','preset','apps','theme'],
+  ok:true,needed:true,steps:['sync','permission','import','sound','preset','apps','theme'],
   cloud:{configured:true,signed_in:false},sync:{},
   cfg:{path:'C:\\\\Games\\\\Counter-Strike 2\\\\game\\\\csgo\\\\cfg',exists:true,writable:true,reason:''},
   helper:{supported:true,installed:false,current:false,version:0,wanted:1},
@@ -44,6 +44,8 @@ const fixture = {
   themes:THEMES.map(t=>t[0]),current:{intent:'balanced',theme:'violet',cfg_write_ok:null,sync_auto:true}
 };
 let response = structuredClone(fixture);
+let importCancel=false,importDelay=0,importBad=false;
+const importReview={ok:true,token:'review-token',kept:46,merged:3,dropped:2,files:6,profiles:2,note:'Order and later overrides kept. Originals stay untouched.',details:[{kind:'profile',file:'my-match.cfg',line:8,binding:'bind F5',target:'custom/imported_profiles/practice-a873c29e179b.cfg',reason:'Copied profile; runs when its exec is called'},{kind:'profile',file:'tools/aliases.vcfg',line:3,binding:'bind F6 → match → load_match',target:'custom/imported_profiles/match-4089c9b169b2.cfg',reason:'Copied profile via alias chain'},{kind:'dropped',file:'old-settings.cfg',line:8,reason:'Syntax needs review in Advanced'},{kind:'dropped',file:'practice.cfg',line:12,reason:'Exec target missing; choose its folder: missing.cfg'}]};
 function status(text,error) { statuses.push({text,error}); }
 function applyPrefs(ui) { prefsNow = {...ui}; applyTheme(ui.theme); }
 function renderCloud() {} function loadAudio() {} function loadCompanions() {} function loadMachine() {} function previewPlan() {}
@@ -52,6 +54,12 @@ function homeTween(el,key,value,paint) { if(el)paint(value); } function homeCanc
 async function api(route,body) {
   calls.push({route,body:structuredClone(body)});
   if (failures[route]) throw new Error(failures[route]);
+  if(route.startsWith('/api/configs/import/')) {
+    if(importDelay)await new Promise(r=>setTimeout(r,importDelay));
+    if(importBad)return {ok:false,error:'Could not read these configs.'};
+    if(route.endsWith('/pick'))return importCancel?{ok:true,cancelled:true}:{ok:true,token:'pick-token',files:['my-match.cfg','tools/aliases.vcfg','old-settings.cfg'],selected:body.kind==='folder'?[]:['my-match.cfg']};
+    return structuredClone(importReview);
+  }
   if (route === '/api/firstrun') return structuredClone(response);
   if (route === '/api/helper') return {ok:true,...structuredClone(response.helper)};
   if (route === '/api/helper/install') {
@@ -78,13 +86,14 @@ async function api(route,body) {
   throw Error('Unexpected API: '+route);
 }
 ${slice('/* First-run setup.','/* The Machine card:')}
+${fs.readFileSync(path.join(root,'cs2cfg/web/assets/config/files.js'),'utf8')}
 ${slice('/* Administrator helper status','// --- live system readout')}
 document.querySelector('.boot-screen')?.remove();
 document.documentElement.classList.remove('setup-checking');
 const checks=[];
 function check(name,value) { checks.push({name,ok:!!value});if(!value) throw Error(name); }
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-const reset=()=>{ response=structuredClone(fixture);helperStatus=null;helperReply=null;helperDelay=40;failures={};calls=[];syncReply={ok:true,action:'none'};remoteCurrent=null;syncDelay=0;fixData=null;fixStates.clear(); };
+const reset=()=>{ response=structuredClone(fixture);helperStatus=null;helperReply=null;helperDelay=40;failures={};calls=[];syncReply={ok:true,action:'none'};remoteCurrent=null;syncDelay=0;fixData=null;fixStates.clear();importCancel=false;importDelay=0;importBad=false; };
 const tap=selector=>{ const el=document.querySelector(selector);if(!el)throw Error('Missing '+selector);el.click(); };
 const move=async(skip=false)=>{ await setupMove(1,skip); };
 async function close() { await finishSetupWizard(); }
@@ -95,7 +104,7 @@ async function suite() {
   check('first request is POST first-run data',calls[0].route==='/api/firstrun'&&calls[0].body);
   check('needed setup opens before startup continues',!!setupSession&&!$('setup-wizard').hidden&&document.querySelector('.app').inert);
   check('Steam step has a single primary decision',getComputedStyle($('setup-steam')).display!=='none'&&getComputedStyle($('setup-steam-link')).display==='none'&&getComputedStyle($('setup-sync-retry')).display==='none');
-  check('all six progress segments are present',$('setup-progress').children.length===6);
+  check('all seven progress segments include Your configs',$('setup-progress').children.length===7&&setupSession.steps[2]==='import');
   await move(true);check('skip sync leaves it unanswered',!Object.hasOwn(setupSession.answers,'sync'));
   await loadFixes(true);
   const lockedTemps = {can_elevate:true,parts:[{label:'Board',part:'board',known:false,unavailable:'Administrator required'}]};
@@ -119,10 +128,12 @@ async function suite() {
   check('ready helper omits administrator approval from fix progress',!$(fixProgId('net.flush')).textContent.includes('administrator approval'));
   await fixJob;
   await move();
+  check('import follows permission and is skippable',setupCurrentStep()==='import'&&$('setup-title').textContent==='Bring your own configs');
+  await move(true);
   check('Windows sound defaults preselected',$('setup-audio-output').value==='out-headset'&&$('setup-audio-input').value==='in-mic');
   await move(true);await sleep(800);
   check('hardware chips reuse scan data',$('setup-hardware').textContent.includes('RTX 4070')&&$('setup-hardware').textContent.includes('i7-13700K'));
-  check('FPS counters reach backend estimates',[...document.querySelectorAll('[data-setup-fps]')].every(n=>n.textContent===n.dataset.setupFps));
+  check('preset cards do not display estimates',!document.querySelector('[data-setup-fps]'));
   check('Visual maps to quality id',document.querySelector('[data-setup-preset="quality"] b').textContent==='Visual');
   tap('[data-setup-preset="competitive"]');await move();
   check('companion defaults match this PC',[...document.querySelectorAll('[data-setup-app]:checked')].map(n=>n.dataset.setupApp).join(',')==='discord,faceit-client');
@@ -139,7 +150,7 @@ async function suite() {
   const finishCalls=calls.filter(c=>c.route==='/api/firstrun/finish').length;await checkFirstRun();check('completed setup does not auto-open twice',!setupSession&&calls.filter(c=>c.route==='/api/firstrun/finish').length===finishCalls);
   reset();response.cloud.configured=false;await openSetupWizard({step:'sync'});
   check('unconfigured cloud silently skips sync',setupCurrentStep()==='permission'&&!setupSession.steps.includes('sync'));
-  check('hidden steps do not leave progress segments or counts',$('setup-progress').children.length===5&&$('setup-progress').getAttribute('aria-label').includes('step 1 of 5')&&$('setup-content').querySelector('.setup-eyebrow').textContent.startsWith('01'));
+  check('hidden steps do not leave progress segments or counts',$('setup-progress').children.length===6&&$('setup-progress').getAttribute('aria-label').includes('step 1 of 6')&&$('setup-content').querySelector('.setup-eyebrow').textContent.startsWith('01'));
   await close();check('closing untouched setup saves no defaults',JSON.stringify(calls.find(c=>c.route==='/api/firstrun/finish').body.answers)==='{}');
   reset();helperReply={ok:false,declined:true,error:'The operation was cancelled.'};await openSetupWizard({step:'permission'});
   tap('[data-setup-permission="allow"]');await helperSettled();
@@ -174,10 +185,10 @@ async function suite() {
   reset();await openSetupWizard({step:'permission'});tap('[data-setup-permission="later"]');await close();
   check('Not now saves false without calling install',calls.find(c=>c.route==='/api/firstrun/finish').body.answers.cfg_write===false&&!calls.some(c=>c.route==='/api/helper/install'));
   reset();response.regions=structuredClone(regionsFixture);await openSetupWizard({step:'preset'});await move(true);
-  check('region appears immediately after preset when catalogue is present',setupCurrentStep()==='region'&&$('setup-progress').children.length===7&&$('setup-progress').getAttribute('aria-label').includes('step 5 of 7'));
+  check('region appears immediately after preset when catalogue is present',setupCurrentStep()==='region'&&$('setup-progress').children.length===8&&$('setup-progress').getAttribute('aria-label').includes('step 6 of 8'));
   check('region explains CS2 scope and how to change it',$('setup-content').textContent.includes('Every other region is blocked for CS2 only')&&$('setup-content').textContent.includes('overlay or the app'));
   tap('[data-setup-region="dubai"]');await move();
-  check('region continues to companions',setupCurrentStep()==='apps'&&$('setup-content').querySelector('.setup-eyebrow').textContent.startsWith('06'));
+  check('region continues to companions',setupCurrentStep()==='apps'&&$('setup-content').querySelector('.setup-eyebrow').textContent.startsWith('07'));
   await close();check('selected region id is sent on finish',calls.find(c=>c.route==='/api/firstrun/finish').body.answers.region_lock==='dubai');
   reset();response.regions=structuredClone(regionsFixture);response.current.region_lock='frankfurt';await openSetupWizard({step:'region'});
   check('direct region entry works and prefills saved lock',setupCurrentStep()==='region'&&document.querySelector('[data-setup-region="frankfurt"]').getAttribute('aria-pressed')==='true');
@@ -198,8 +209,8 @@ async function suite() {
   document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await sleep(450);check('Esc saves answered choices and closes',!setupSession&&calls.find(c=>c.route==='/api/firstrun/finish').body.answers.preset==='competitive');
   reset();response.cfg={path:'',writable:false,reason:'CS2 was not found on this PC'};response.apps=[];response.sound={error:'No audio stack'};response.presets[2].fps=null;
   await openSetupWizard({step:'permission'});check('unwritable folder explains reason and permits continuing',$('setup-content').textContent.includes('CS2 was not found')&&!$('setup-next').disabled);
-  await move(true);check('missing audio remains usable',$('setup-content').textContent.includes('could not be read')&&$('setup-audio-output').value==='');
-  await move(true);check('missing FPS never shows invented zero',document.querySelector('[data-setup-preset="quality"]').textContent.includes('Estimate unavailable'));
+  await move(true);await move(true);check('missing audio remains usable',$('setup-content').textContent.includes('could not be read')&&$('setup-audio-output').value==='');
+  await move(true);check('preset choice remains available without an estimate',!!document.querySelector('[data-setup-preset="quality"]'));
   await move(true);check('empty companion list has recovery copy',$('setup-content').textContent.includes('No companion apps found on this PC'));
   await close();
   reset();await openSetupWizard({step:'preset'});tap('[data-setup-preset="quality"]');failures['/api/firstrun/finish']='Save failed';await close();
@@ -229,6 +240,38 @@ async function suite() {
   calls=[];syncReply={ok:true,action:'push'};tap('#sync-now');await sleep(30);check('Sync now uses expected endpoint',calls[0].route==='/api/sync/now'&&$('sync-label').textContent==='Synced to cloud');
   $('sync-auto').checked=false;$('sync-auto').dispatchEvent(new Event('change',{bubbles:true}));await sleep(20);check('auto toggle sends on boolean',calls.some(c=>c.route==='/api/sync/auto'&&c.body.on===false));
   failures['/api/sync/auto']='Offline';$('sync-auto').checked=true;$('sync-auto').dispatchEvent(new Event('change',{bubbles:true}));await sleep(20);check('failed auto update rolls back UI',!$('sync-auto').checked&&!$('sync-auto').disabled);failures={};
+  reset();await openSetupWizard({step:'import'});
+  check('import uses two labelled native picker actions',document.querySelectorAll('[data-import-pick]').length===2&&$('setup-content').textContent.includes('whatever you named'));
+  importCancel=true;await setupImport(setupSession,'files');check('cancelling keeps the skippable empty step',!setupSession.importPick&&!$('setup-next').disabled);
+  importCancel=false;await setupImport(setupSession,'folder');
+  check('folder requires explicit entry files',setupSession.importEntries.length===0&&$('setup-import-preview').disabled&&$('setup-next').disabled);
+  const entry=document.querySelector('[data-import-entry="0"]');entry.checked=true;entry.dispatchEvent(new Event('change',{bubbles:true}));
+  check('entry selection enables review',!$('setup-import-preview').disabled&&setupSession.importEntries[0]==='my-match.cfg');
+  importDelay=100;const pendingImport=setupImport(setupSession,'preview');await close();await move(true);
+  check('pending import blocks close navigation and duplicates',setupSession.importBusy&&setupCurrentStep()==='import'&&$('setup-close').disabled&&$('setup-skip').disabled);
+  const n=calls.length;await setupImport(setupSession,'files');check('duplicate import is ignored',calls.length===n);await pendingImport;importDelay=0;
+  check('review sends snapshot and chosen entries',calls.at(-1).route==='/api/configs/import/preview'&&calls.at(-1).body.token==='pick-token'&&calls.at(-1).body.entries.join(',')==='my-match.cfg');
+  check('review shows icons and kept merged dropped counts',document.querySelectorAll('.config-result article').length===3&&document.querySelectorAll('.config-result svg').length===3&&$('setup-content').textContent.includes('46')&&$('setup-content').textContent.includes('Merged')&&$('setup-content').textContent.includes('Dropped'));
+  check('profiles count as kept and retain runtime timing',$('setup-content').textContent.includes('Profiles: 2')&&$('setup-content').textContent.includes('includes profiles')&&$('setup-content').textContent.includes('They run only when called')&&!$('setup-content').textContent.includes('Deferred execs,'));
+  check('details distinguish kept profiles from actual drops',document.querySelectorAll('.config-import-details li b').length===4&&[...document.querySelectorAll('.config-import-details li b')].map(n=>n.textContent).join(',')==='Kept profile,Kept profile,Dropped,Dropped');
+  check('details map direct and alias-chain binds to copied targets',$('setup-content').textContent.includes('bind F5 → custom/imported_profiles/practice-a873c29e179b.cfg')&&$('setup-content').textContent.includes('bind F6 → match → load_match → custom/imported_profiles/match-4089c9b169b2.cfg'));
+  check('missing runtime target remains a reported loss',$('setup-content').textContent.includes('Exec target missing; choose its folder: missing.cfg'));
+  const savedDetails=setupSession.importResult.details;
+  setupSession.importResult.details=[{kind:'profile',file:'<img src=x>',binding:'bind <F5>',target:'custom/<script>.cfg',reason:'<unsafe>'}];renderSetup(setupSession,false);
+  check('profile details escape every source and target',!document.querySelector('.config-import-details img,.config-import-details script')&&document.querySelector('.config-import-details code').textContent==='custom/<script>.cfg');
+  setupSession.importResult.details=savedDetails;renderSetup(setupSession,false);
+  tap('.config-import-details summary');
+  check('profile details open with the native disclosure',document.querySelector('.config-import-details').open);
+  $('setup-viewport').scrollTop=$('setup-viewport').scrollHeight;
+  check('copied target paths fit the scrollable review',[...document.querySelectorAll('.config-import-details code')].every(n=>n.getBoundingClientRect().right<=$('setup-viewport').getBoundingClientRect().right)&&$('setup-viewport').scrollWidth===$('setup-viewport').clientWidth);
+  check('review details explain losses and original preservation',$('setup-content').textContent.includes('Syntax needs review')&&$('setup-content').textContent.includes('Originals stay untouched')&&$('setup-next').textContent.includes('Use this copy'));
+  check('preview does not accept or grant permission',!Object.hasOwn(setupSession.answers,'import')&&!Object.hasOwn(setupSession.answers,'cfg_write')&&!calls.some(c=>c.route==='/api/helper/install'));
+  await move();check('Next accepts only the reviewed token',setupSession.answers.import==='review-token'&&setupCurrentStep()==='sound');await close();
+  check('finish sends reviewed import token',calls.find(c=>c.route==='/api/firstrun/finish').body.answers.import==='review-token');
+  reset();await openSetupWizard({step:'import'});await setupImport(setupSession,'files');await setupImport(setupSession,'preview');await move(true);await close();
+  check('Skip discards reviewed import',!Object.hasOwn(calls.find(c=>c.route==='/api/firstrun/finish').body.answers,'import'));
+  reset();await openSetupWizard({step:'import'});importBad=true;await setupImport(setupSession,'files');
+  check('read error stays on step with working Skip',setupCurrentStep()==='import'&&$('setup-content').textContent.includes('Could not read')&&!$('setup-skip').disabled);await close();
   reset();response.regions=structuredClone(regionsFixture);await openSetupWizard({step:'preset'});
   for (const [id] of THEMES) {
     applyTheme(id);
@@ -240,23 +283,30 @@ async function suite() {
   }
   await openSetupWizard({step:'theme'});applyTheme('violet');
   const reduced=setupReduced.matches;
-  if (reduced) { await openSetupWizard({step:'preset'});check('reduced motion skips FPS countups',[...document.querySelectorAll('[data-setup-fps]')].every(n=>n.textContent===n.dataset.setupFps));check('reduced motion removes particles',getComputedStyle(document.querySelector('.setup-particles')).display==='none'); }
+  if (reduced) { await openSetupWizard({step:'preset'});check('reduced motion has no FPS countups',!document.querySelector('[data-setup-fps]'));check('reduced motion removes particles',getComputedStyle(document.querySelector('.setup-particles')).display==='none'); }
   await close();
-  let created=false, made=0;async function checkStarter(){return {ok:true,complete:false,present:[],autoexec:false}}async function makeStarter(){made++;return {ok:true}}
+  let made=0;async function checkStarter(){return {ok:true,complete:false,present:[],autoexec:false}}async function prepareConfigs(options){check('startup chooses a prepared collection',options.choose===true);made++;return {ok:true}}
   async function starterAfterSetup(){${source.match(/await startup.run\("starter", async \(\) => \{([\s\S]*?)\n      \}\);/)[1]}}
-  $('cfg-folder').value='';prefsNow={};await starterAfterSetup();check('skipping permission prevents automatic starter writes',made===0);
-  prefsNow.cfg_write_ok=false;await starterAfterSetup();check('Not now prevents automatic starter writes',made===0);
-  prefsNow.cfg_write_ok=true;await starterAfterSetup();check('Allow keeps automatic starter behavior',made===1&&created);
+  $('cfg-folder').value='';prefsNow={};await starterAfterSetup();check('startup prepares app copy when permission was skipped',made===1);
+  prefsNow.cfg_write_ok=false;await starterAfterSetup();check('startup prepares app copy after Not now',made===2);
+  prefsNow.cfg_write_ok=true;await starterAfterSetup();check('startup delegates install permission to server',made===3);
 }
 (async()=>{try {
   if (!${JSON.stringify(preview)}) await suite();
   reset();response.current.theme=${JSON.stringify(theme)};
   if (${JSON.stringify(preview)} === 'region') response.regions=structuredClone(regionsFixture);
   if (${JSON.stringify(process.env.SETUP_HELPER || '')} === 'ready') response.helper=structuredClone(readyHelper);
-  await openSetupWizard({step:${JSON.stringify(preview || 'preset')}});await sleep(900);
+  await openSetupWizard({step:${JSON.stringify(preview === 'import-result' ? 'import' : preview || 'preset')}});
+  if(${JSON.stringify(preview)}==='import')await setupImport(setupSession,'folder');
+  if(${JSON.stringify(preview)}==='import-result'){await setupImport(setupSession,'files');await setupImport(setupSession,'preview');document.querySelector('.config-import-details').open=true;}
+  await sleep(900);
   // Headless virtual time advances timers independently of CSS animation time.
   // Settle finite effects for an honest screenshot of the final layout.
   for (const animation of document.getAnimations()) if (animation.effect?.target?.closest('.setup-wizard') && Number.isFinite(animation.effect.getComputedTiming().endTime)) animation.finish();
+  if(${JSON.stringify(preview)}==='import-result'){
+    const viewport=$('setup-viewport');
+    viewport.scrollTop+=document.querySelector('.config-result').getBoundingClientRect().top-viewport.getBoundingClientRect().top-24;
+  }
   const nav=$('setup-next').getBoundingClientRect();
   check('preview navigation fits viewport',nav.bottom<=innerHeight&&nav.right<=innerWidth);
   document.body.insertAdjacentHTML('beforeend','<pre id="setup-checks" hidden>'+JSON.stringify({passed:checks.length,viewport:{width:innerWidth,height:innerHeight,next:nav.toJSON()},checks})+'</pre>');
@@ -282,6 +332,7 @@ if (report.error) console.error(report.error,report.checks.filter(c=>!c.ok));
 assert(!report.error,'Browser checks failed; inspect '+work);
 console.log(`Browser checks: ${report.passed} passed`);
 console.log('Screenshot and fixture: '+work);
+if(preview==='import'||preview==='import-result')fs.copyFileSync(path.join(work,'preview.png'),path.join(root,'docs/redesign/round3/preview',preview==='import'?'sec8-after-wizard-import.png':'sec8b-after-wizard-result.png'));
 
 // Exercise the entire unextracted page too: definitions and event hooks from
 // other features must not throw or start work underneath the first-run gate.

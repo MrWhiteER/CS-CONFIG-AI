@@ -168,6 +168,7 @@ class ThePanel(unittest.TestCase):
             encoding="utf-8", errors="replace")
 
     def test_it_has_its_own_place_rather_than_being_wedged_in(self):
+        self.assertIn('data-sub="steam"', self.page)
         self.assertIn('data-sub="account"', self.page)
         self.assertIn('id="account-card"', self.page)
 

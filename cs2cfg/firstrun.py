@@ -11,13 +11,14 @@ on its first launch, asked once, in order:
    below still applies: devices and companion apps belong to this PC.
 2. **Permission** -- may the app write into CS2's cfg folder. Nothing is
    generated there until the answer is yes.
-3. **Sound** -- the default speakers/headset and microphone, held there by the
+3. **Bring your own configs** -- choose files or a folder, review a rebuilt
+   copy, then accept it or skip. Originals are never changed.
+4. **Sound** -- the default speakers/headset and microphone, held there by the
    same keeper the Settings tab uses.
-4. **Preset** -- Competitive, Balanced or Visual, each shown with the frame
-   rate this machine is estimated to reach on it.
-5. **Before the game** -- which of the companion apps found on this PC start
+5. **Preset** -- Competitive, Balanced or Visual.
+6. **Before the game** -- which of the companion apps found on this PC start
    when CS2 does.
-6. **Theme**.
+7. **Theme**.
 
 This module holds the answers' logic and nothing about how the steps look;
 the page draws them. Every step can be skipped, and finishing records that
@@ -34,7 +35,7 @@ from typing import Any, Dict, Iterable, List, Optional
 DONE_KEY = "firstrun_done"
 CFG_WRITE_KEY = "cfg_write_ok"     # the same key autosync reads
 
-STEPS = ("sync", "permission", "sound", "preset", "apps", "theme")
+STEPS = ("sync", "permission", "import", "sound", "preset", "apps", "theme")
 
 # The page calls the third preset "Visual"; the engine has always called it
 # "quality". The label is the only thing that changes.
@@ -55,7 +56,7 @@ def needed(prefs: Dict[str, Any]) -> bool:
 
 # --- step 2: the cfg folder --------------------------------------------------
 
-def cfg_access(cfg_root: Optional[Path]) -> Dict[str, Any]:
+def cfg_access(cfg_root: Optional[Path], probe: bool = True) -> Dict[str, Any]:
     """Where the app would write, and whether it actually can.
 
     Tested with a real throwaway file rather than an access check, because on
@@ -69,6 +70,9 @@ def cfg_access(cfg_root: Optional[Path]) -> Dict[str, Any]:
     if not root.is_dir():
         return {"path": str(root), "exists": False, "writable": False,
                 "reason": "CS2's cfg folder does not exist yet; start the game once"}
+    if not probe:
+        return {"path": str(root), "exists": True, "writable": False,
+                "reason": "Folder found. Access is checked when configs are sent."}
     try:
         handle, name = tempfile.mkstemp(prefix=".cs2cfg-", suffix=".tmp", dir=str(root))
         os.close(handle)
