@@ -272,6 +272,9 @@ class ServerLock:
     def __init__(self, root: Path, context, directory, survey):
         from .serverwatch import MatchWatch
         self.root, self.context, self.directory, self.survey = root, context, directory, survey
+        # Set by shared(): the automatic Steam restart, max ping and console
+        # log after a lock change. None in tests, so they never touch Steam.
+        self.follow_up = None
         self.lock = threading.RLock()
         self.operation = threading.Lock()
         self.stop_event = threading.Event()
@@ -508,9 +511,20 @@ class ServerLock:
         current = self.snapshot()["firewall"]
         verified = (current["status"] == "locked" and current["code"] == plan["code"]
                     if action == "apply" else current["present"] is False)
+        done = ""
+        if result.get("ok") and verified and self.follow_up is not None:
+            ping = None
+            if action == "apply":
+                row = next((r for r in self.survey().get("regions", [])
+                            if set(r.get("codes", [r.get("code")])) & set(plan["codes"])), {})
+                ping = row.get("ping_ms")
+            follow = self.follow_up(action, ping) or {}
+            done = " " + follow.get("detail", "") if follow.get("detail") else ""
+            if follow.get("ok"):
+                done += " Start CS2 and queue."
         with self.lock:
             self.data.update(detail=("Region lock applied." if action == "apply" else "Region lock removed.")
-                             + " Restart Steam and CS2 to re-measure relays." if result.get("ok") and verified else "",
+                             + (done or " Restart Steam and CS2 to re-measure relays.") if result.get("ok") and verified else "",
                              error="" if result.get("ok") and verified else result.get("error") or result.get("detail")
                              or "Windows did not confirm the requested firewall state. Check the lock status.")
 
@@ -571,6 +585,8 @@ def shared(context=None, directory=None, survey=None):
             cached = serverping.ServerPing(root / "sdr-relays.json")
             _shared = ServerLock(root, context or discover_context,
                                  directory or cached.directory_snapshot, survey or cached.snapshot)
+            from . import lockfollowup
+            _shared.follow_up = lockfollowup.run
             _shared.start()
         elif context is not None:
             with _shared.lock:
