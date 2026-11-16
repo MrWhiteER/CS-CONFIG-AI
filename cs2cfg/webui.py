@@ -4305,10 +4305,10 @@ def _configs_import_preview(state: State, body: Dict[str, Any]) -> Dict[str, Any
     entries = body.get("entries")
     if not isinstance(entries, list):
         raise ValueError("Choose the files to load.")
-    result = configbundle.rebuild(held["texts"], entries)
+    result = configbundle.rebuild(held["texts"], entries, state.cfg_folder)
     held["result"] = result
     held["preview"] = secrets.token_urlsafe(24)
-    return {"ok": True, "token": held["preview"], **{k: v for k, v in result.items() if k != "text"}}
+    return {"ok": True, "token": held["preview"], **{k: v for k, v in result.items() if k not in ("text", "profile_files")}}
 
 def _game_cfg_root(state: State) -> Optional[Path]:
     state.refresh()
@@ -4495,6 +4495,7 @@ def _firstrun_finish(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         sources = json.loads(source_file.read_text(encoding="utf-8")) if source_file.exists() else []
         configbundle.write_changed(app_root, {
             configbundle.IMPORTED: held["result"]["text"],
+            **held["result"]["profile_files"],
             "_import_sources.json": json.dumps(sorted(set(sources) | set(held["sources"]))),
         }, "accept wizard import")
         # The rebuilt stream is the new standard layout, not a previously

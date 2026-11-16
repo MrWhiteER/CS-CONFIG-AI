@@ -6,6 +6,35 @@ git writes, helper calls, dependencies, helper jobs or new administrator prompts
 
 ## What changed
 
+- **R3-8 follow-up / Edy's decision: “keep all”. Question 7 is closed.**
+  Deferred execs in binds and aliases now remain deferred. Each reachable
+  command config gets one separate app-owned copy under `imported_profiles/`.
+  Names combine a safe source basename with source-path identity, so profiles
+  with the same name in different folders cannot overwrite each other. Bind,
+  alias and nested exec targets are rewritten to the configured layout prefix
+  and copied filename, including explicit extensions. Copies only use the
+  bounded selected snapshot; no external target is read or executed.
+- A queue guards deferred/self-referencing profile graphs without dropping
+  normal switches back to an earlier profile. Immediate exec cycles in copied
+  files have their closing link dropped with its source, line and reason.
+  Missing targets still count as Dropped; safe sibling commands remain. Alias
+  reporting has a cycle guard, and deferred bodies share the command budget.
+  The review refuses a layout prefix containing whitespace because it cannot
+  be embedded safely inside Source's quoted bind/alias body; source filenames
+  are sanitized independently and do not have that restriction.
+- The wizard includes copied commands in **Kept** and shows a **Profiles**
+  count. What changed distinguishes kept profiles from actual losses and
+  lists direct binds and binds reached through alias chains against copied
+  targets. Alias mappings describe possible definitions in the imported set;
+  they do not execute or predict the player's runtime alias state.
+- Finish writes the reviewed startup stream, all copied profiles and source
+  protection metadata through one `write_changed` / `BackupSession` batch:
+  every backup completes before any replacement. Review exposes counts and
+  mapping details, not config bodies. Later Keyboard/Editing changes in an
+  installed copied profile survive preparation just like the imported stream;
+  a changed newly accepted copy replaces its predecessor with a backup.
+  Original-file collision behavior stays app-only. NVIDIA targets are unchanged.
+
 - Startup builds the standard starter layout, the chosen preset's performance
   config and launch-options notes in account-scoped app data. It uses the
   existing `starter` loading-coordinator task, after first-run decisions and
@@ -48,12 +77,13 @@ git writes, helper calls, dependencies, helper jobs or new administrator prompts
   to the new standard layout, with its old pointer backed up; pins are retained.
   Kept / Merged / Dropped have SVG icons and short labels; Details lists every
   dropped item's source file, line where available and reason.
-- **Import limit:** deferred execs inside binds/aliases, malformed lines,
-  missing exec targets, loops and game-owned KeyValues files are dropped with
-  explicit review reasons. Deferred execs are not moved to startup. They need
-  manual setup through the retained advanced tools. Merged counts exec links;
-  Kept counts commands; Dropped counts commands/lines/files as explained by
-  each detail. This is an import review, not a promise of game compatibility.
+- **Import limit:** malformed lines, missing exec targets, immediate exec
+  loops and game-owned KeyValues files are dropped with explicit review
+  reasons. Deferred execs are kept through copied profiles and are never moved
+  to startup. Merged counts startup exec links; Kept counts retained commands
+  across the startup stream and copied files; Profiles counts unique copied
+  files. Dropped counts commands/lines/files as explained by each detail.
+  This is an import review, not a promise of game compatibility.
 - Review does not save anything. Use this copy accepts the review token; Finish
   saves it with a backup. Skip removes the import answer. Tokens are bound to
   the snapshot and Steam account. Choosing new files invalidates old tokens;
@@ -88,8 +118,12 @@ git writes, helper calls, dependencies, helper jobs or new administrator prompts
 - `cs2cfg/portable.py`: withholds local installation/source records.
 - `cs2cfg/web/index.html`, `web/assets/config/files.js`, `files.css`: simplified
   tab, disclosure, import UI and startup wiring.
-- `tests/test_configbundle.py`: 48 new test methods using temp directories,
-  fake preferences/profiles and stubbed native pickers, game state and helper.
+- `tests/test_configbundle.py`: temp-directory checks using fake preferences,
+  profiles and stubbed native pickers, game state and helper. Follow-up cases
+  cover rewritten binds, alias chains/cycles, nested execs, deferred return
+  switches, immediate cycles, missing targets, name collisions, original bytes,
+  reviewed-snapshot commit, copied-profile installation/edit preservation,
+  original collisions and backup failure before any replacement.
 - `tests/test_portable.py`: one new local-metadata exclusion test.
 - `tests/test_firstrun_web.py`: existing endpoint fixtures now stub helper
   readiness/run/install and app discovery; they cannot invoke the live helper.
@@ -99,7 +133,8 @@ git writes, helper calls, dependencies, helper jobs or new administrator prompts
 ## Validation
 
 Python was **not run**, as instructed. The caller must run `python -m unittest`.
-The 49 new Python methods are a definition count, not a Python pass claim.
+The original round's 49 new Python methods were a definition count, not a
+Python pass claim. Follow-up Python cases have also **not been executed**.
 No existing Python markup assertions required replacement.
 
 The wizard browser test deliberately updates the old six-step / optional-region
@@ -122,8 +157,8 @@ All eleven `tools/check_*.cjs` suites touching `index.html` pass:
 | check_home_launcher.cjs | 202 |
 | check_keyboard_workspace.cjs | 2845 |
 | check_server_ping_widget.cjs | 535 |
-| check_setup_wizard.cjs | 190 |
-| **Total** | **4307** |
+| check_setup_wizard.cjs | 197 |
+| **Total** | **4314** |
 
 Wizard validation also checks all five inline script bodies and full-page
 first-run ordering. Config checks exercise the production readiness handlers,
@@ -132,8 +167,11 @@ keyboard, studio scan/format handlers, all ten themes, 820/480/360 widths, long
 paths, hidden/background motion and reduced motion. These are synthetic API
 fixtures, not backend execution or proof of CS2 loading a config.
 
-All 78 earlier-section PNGs were preserved byte-for-byte across suites that
-automatically recapture previews. `git diff --check` passes.
+All 85 existing section 1–8 PNGs (including section follow-ups) were preserved
+byte-for-byte across suites that automatically recapture previews. Only the new
+`sec8b-after-wizard-result.png` is added. `git diff --check` passes. No Python,
+backend startup, game/helper calls or git write commands were run in this
+follow-up.
 
 ## Screenshots
 
@@ -145,6 +183,8 @@ freeze motion. Shell telemetry and paths are synthetic fixture data.
 - `sec8-after-advanced.png`: open disclosure with real scan renderer.
 - `sec8-after-wizard-import.png`: folder picked; explicit entry-file choices.
 - `sec8-after-wizard-result.png`: Kept / Merged / Dropped review.
+- `sec8b-after-wizard-result.png`: follow-up review, scrolled to the results
+  with What changed open: Profiles, kept direct/alias binds and actual drops.
 - `sec8-after-paper.png`: light theme.
 
 ## On a PC with CS2 installed / questions for Edy
@@ -167,8 +207,23 @@ freeze motion. Shell telemetry and paths are synthetic fixture data.
 6. Confirm account switching, Apply/Play, Steam sync, portable save/open and
    manual Advanced formatting with actual installations. Local path metadata
    must not appear in a shared portable setup.
-7. Edy: should a later round preserve deferred exec profile switching in a
-   separate copied profile tree? This round reports those drops explicitly and
-   keeps the manual tools; it does not silently turn deferred actions into
-   startup commands. Also confirm that original-file collisions should continue
-   to keep the rebuilt set app-only instead of modifying the original autoexec.
+7. **Closed — Edy chose “keep all”.** Deferred profile switching is preserved
+   in a separate copied tree. Original collisions continue to keep the rebuilt
+   set app-only instead of modifying an original autoexec or profile.
+8. On the home PC, import a folder containing an entry with
+   `bind F5 "exec practice"`, an alias-chain bind to a match config, and two
+   differently located `practice.cfg` files. Select only the intended startup
+   entry. Confirm Kept/Profiles and each copied target in What changed. Finish
+   without Allow first: originals must retain their exact bytes and no game
+   file should change. With Allow and CS2 closed, Refresh, then Apply and launch.
+   Startup must not run practice/match commands; F5 and the alias bind must
+   switch to the copies, including nested execs and return-profile binds.
+9. Repeat with a missing nested target, a deferred A↔B switch and an immediate
+   A→B→A exec loop. Missing/unsafe links should be reported with reasons;
+   ordinary return switches should remain. Rename or move the source folder
+   after deployment to confirm runtime links use only the rebuilt set.
+10. Edit a copied profile in Keyboard/Editing and restart/Refresh: the edit must
+    survive. Accept a changed import and restore its predecessor from Backups.
+    Try an original occupying a generated profile destination: the entire set
+    must stay app-only with no partial deployment. Check that the existing
+    NVIDIA target and collision messaging still behave as before.

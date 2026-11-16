@@ -45,7 +45,7 @@ const fixture = {
 };
 let response = structuredClone(fixture);
 let importCancel=false,importDelay=0,importBad=false;
-const importReview={ok:true,token:'review-token',kept:42,merged:3,dropped:2,files:4,note:'Order and later overrides kept. Originals stay untouched.',details:[{kind:'dropped',file:'old-settings.cfg',line:8,reason:'Syntax needs review in Advanced'},{kind:'dropped',file:'practice.cfg',line:12,reason:'Exec target missing; choose its folder'}]};
+const importReview={ok:true,token:'review-token',kept:46,merged:3,dropped:2,files:6,profiles:2,note:'Order and later overrides kept. Originals stay untouched.',details:[{kind:'profile',file:'my-match.cfg',line:8,binding:'bind F5',target:'custom/imported_profiles/practice-a873c29e179b.cfg',reason:'Copied profile; runs when its exec is called'},{kind:'profile',file:'tools/aliases.vcfg',line:3,binding:'bind F6 → match → load_match',target:'custom/imported_profiles/match-4089c9b169b2.cfg',reason:'Copied profile via alias chain'},{kind:'dropped',file:'old-settings.cfg',line:8,reason:'Syntax needs review in Advanced'},{kind:'dropped',file:'practice.cfg',line:12,reason:'Exec target missing; choose its folder: missing.cfg'}]};
 function status(text,error) { statuses.push({text,error}); }
 function applyPrefs(ui) { prefsNow = {...ui}; applyTheme(ui.theme); }
 function renderCloud() {} function loadAudio() {} function loadCompanions() {} function loadMachine() {} function previewPlan() {}
@@ -251,7 +251,19 @@ async function suite() {
   check('pending import blocks close navigation and duplicates',setupSession.importBusy&&setupCurrentStep()==='import'&&$('setup-close').disabled&&$('setup-skip').disabled);
   const n=calls.length;await setupImport(setupSession,'files');check('duplicate import is ignored',calls.length===n);await pendingImport;importDelay=0;
   check('review sends snapshot and chosen entries',calls.at(-1).route==='/api/configs/import/preview'&&calls.at(-1).body.token==='pick-token'&&calls.at(-1).body.entries.join(',')==='my-match.cfg');
-  check('review shows icons and kept merged dropped counts',document.querySelectorAll('.config-result article').length===3&&document.querySelectorAll('.config-result svg').length===3&&$('setup-content').textContent.includes('42')&&$('setup-content').textContent.includes('Merged')&&$('setup-content').textContent.includes('Dropped'));
+  check('review shows icons and kept merged dropped counts',document.querySelectorAll('.config-result article').length===3&&document.querySelectorAll('.config-result svg').length===3&&$('setup-content').textContent.includes('46')&&$('setup-content').textContent.includes('Merged')&&$('setup-content').textContent.includes('Dropped'));
+  check('profiles count as kept and retain runtime timing',$('setup-content').textContent.includes('Profiles: 2')&&$('setup-content').textContent.includes('includes profiles')&&$('setup-content').textContent.includes('They run only when called')&&!$('setup-content').textContent.includes('Deferred execs,'));
+  check('details distinguish kept profiles from actual drops',document.querySelectorAll('.config-import-details li b').length===4&&[...document.querySelectorAll('.config-import-details li b')].map(n=>n.textContent).join(',')==='Kept profile,Kept profile,Dropped,Dropped');
+  check('details map direct and alias-chain binds to copied targets',$('setup-content').textContent.includes('bind F5 → custom/imported_profiles/practice-a873c29e179b.cfg')&&$('setup-content').textContent.includes('bind F6 → match → load_match → custom/imported_profiles/match-4089c9b169b2.cfg'));
+  check('missing runtime target remains a reported loss',$('setup-content').textContent.includes('Exec target missing; choose its folder: missing.cfg'));
+  const savedDetails=setupSession.importResult.details;
+  setupSession.importResult.details=[{kind:'profile',file:'<img src=x>',binding:'bind <F5>',target:'custom/<script>.cfg',reason:'<unsafe>'}];renderSetup(setupSession,false);
+  check('profile details escape every source and target',!document.querySelector('.config-import-details img,.config-import-details script')&&document.querySelector('.config-import-details code').textContent==='custom/<script>.cfg');
+  setupSession.importResult.details=savedDetails;renderSetup(setupSession,false);
+  tap('.config-import-details summary');
+  check('profile details open with the native disclosure',document.querySelector('.config-import-details').open);
+  $('setup-viewport').scrollTop=$('setup-viewport').scrollHeight;
+  check('copied target paths fit the scrollable review',[...document.querySelectorAll('.config-import-details code')].every(n=>n.getBoundingClientRect().right<=$('setup-viewport').getBoundingClientRect().right)&&$('setup-viewport').scrollWidth===$('setup-viewport').clientWidth);
   check('review details explain losses and original preservation',$('setup-content').textContent.includes('Syntax needs review')&&$('setup-content').textContent.includes('Originals stay untouched')&&$('setup-next').textContent.includes('Use this copy'));
   check('preview does not accept or grant permission',!Object.hasOwn(setupSession.answers,'import')&&!Object.hasOwn(setupSession.answers,'cfg_write')&&!calls.some(c=>c.route==='/api/helper/install'));
   await move();check('Next accepts only the reviewed token',setupSession.answers.import==='review-token'&&setupCurrentStep()==='sound');await close();
@@ -286,11 +298,15 @@ async function suite() {
   if (${JSON.stringify(process.env.SETUP_HELPER || '')} === 'ready') response.helper=structuredClone(readyHelper);
   await openSetupWizard({step:${JSON.stringify(preview === 'import-result' ? 'import' : preview || 'preset')}});
   if(${JSON.stringify(preview)}==='import')await setupImport(setupSession,'folder');
-  if(${JSON.stringify(preview)}==='import-result'){await setupImport(setupSession,'files');await setupImport(setupSession,'preview');}
+  if(${JSON.stringify(preview)}==='import-result'){await setupImport(setupSession,'files');await setupImport(setupSession,'preview');document.querySelector('.config-import-details').open=true;}
   await sleep(900);
   // Headless virtual time advances timers independently of CSS animation time.
   // Settle finite effects for an honest screenshot of the final layout.
   for (const animation of document.getAnimations()) if (animation.effect?.target?.closest('.setup-wizard') && Number.isFinite(animation.effect.getComputedTiming().endTime)) animation.finish();
+  if(${JSON.stringify(preview)}==='import-result'){
+    const viewport=$('setup-viewport');
+    viewport.scrollTop+=document.querySelector('.config-result').getBoundingClientRect().top-viewport.getBoundingClientRect().top-24;
+  }
   const nav=$('setup-next').getBoundingClientRect();
   check('preview navigation fits viewport',nav.bottom<=innerHeight&&nav.right<=innerWidth);
   document.body.insertAdjacentHTML('beforeend','<pre id="setup-checks" hidden>'+JSON.stringify({passed:checks.length,viewport:{width:innerWidth,height:innerHeight,next:nav.toJSON()},checks})+'</pre>');
@@ -316,7 +332,7 @@ if (report.error) console.error(report.error,report.checks.filter(c=>!c.ok));
 assert(!report.error,'Browser checks failed; inspect '+work);
 console.log(`Browser checks: ${report.passed} passed`);
 console.log('Screenshot and fixture: '+work);
-if(preview==='import'||preview==='import-result')fs.copyFileSync(path.join(work,'preview.png'),path.join(root,'docs/redesign/round3/preview',preview==='import'?'sec8-after-wizard-import.png':'sec8-after-wizard-result.png'));
+if(preview==='import'||preview==='import-result')fs.copyFileSync(path.join(work,'preview.png'),path.join(root,'docs/redesign/round3/preview',preview==='import'?'sec8-after-wizard-import.png':'sec8b-after-wizard-result.png'));
 
 // Exercise the entire unextracted page too: definitions and event hooks from
 // other features must not throw or start work underneath the first-run gate.

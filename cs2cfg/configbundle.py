@@ -9,7 +9,9 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import tempfile
+from dataclasses import replace
 from pathlib import Path
 
 from . import backup, cfgformat, cfglang, cfgscan, starter
@@ -18,6 +20,7 @@ from .paths import user_data_dir
 MAX_FILES = 256
 MAX_BYTES = 4 * 1024 * 1024
 IMPORTED = "mainsettings/imported.vcfg"
+PROFILES = "imported_profiles"
 
 
 def safe_relative(value):
@@ -110,7 +113,8 @@ def install(root, cfg_root, folder):
         text = path.read_text(encoding="utf-8")
         digest = hashlib.sha256(text.encode()).hexdigest()
         before = previous.get("files", {}).get(relative)
-        if relative == IMPORTED and before == digest and (target / relative).is_file():
+        imported = relative == IMPORTED or relative.startswith(PROFILES + "/")
+        if imported and before == digest and (target / relative).is_file():
             current = (target / relative).read_text(encoding="utf-8")
             if hashlib.sha256(current.encode()).hexdigest() != before:
                 preserved.append(relative)
@@ -178,14 +182,17 @@ def snapshot(paths, folder=False):
     return texts
 
 
-def rebuild(texts, entries):
+def rebuild(texts, entries, folder="mrwhiteer"):
     """Flatten explicitly chosen entry points in their exact execution order.
 
     No sorting/deduplication of commands: later overrides still win. Deferred
-    execs cannot be flattened without changing when they run, so are dropped
-    visibly, along with malformed commands and unavailable exec targets.
+    execs retain their timing and point into an isolated, copied profile graph.
+    Only immediate entry execs are flattened. Invalid/missing links are reported.
     Unknown console commands are kept; nothing is ever executed here.
     """
+    folder = safe_relative(folder)
+    if len(texts) > MAX_FILES or sum(len(t.encode("utf-8")) for t in texts.values()) > MAX_BYTES:
+        raise ValueError("Choose a smaller set (up to 256 files / 4 MiB).")
     if not entries or len(entries) > MAX_FILES or any(not isinstance(e, str) or e not in texts for e in entries):
         raise ValueError("Choose at least one listed file to load.")
     with tempfile.TemporaryDirectory(prefix="cs2cfg-import-") as tmp:
@@ -201,24 +208,110 @@ def rebuild(texts, entries):
     def resolve(name):
         return scanner._resolve(name)  # includes its unambiguous collection-tail fallback
     out, report, visited = [], [], set()
-    kept, merged, dropped, expanded = 0, 0, 0, 0
+    kept, merged, dropped, expanded, rewritten_count = 0, 0, 0, 0, 0
+    profile_paths, profile_files, pending, immediate_edges = {}, {}, [], {}
+    definitions, bindings = {}, []
 
     def drop(file, line, reason):
         nonlocal dropped
         dropped += 1
         report.append({"kind": "dropped", "file": file, "line": line, "reason": reason})
 
-    def deferred_exec(command, depth=0):
-        if depth > 16:
-            return True
-        if command.lname in ("exec", "execifexists"):
-            return True
-        if command.lname in ("alias", "bind", "bindtoggle"):
-            return any(deferred_exec(c, depth + 1) for c in cfglang.parse_command_string(command.arg_text(1)))
+    def profile_path(config):
+        if any(c.isspace() for c in folder):
+            raise ValueError("Runtime profile links need a config folder without spaces or tabs.")
+        if config.relative not in profile_paths:
+            # A safe readable name plus source identity avoids basename, case,
+            # punctuation and file/directory collisions in the copied tree.
+            stem = re.sub(r"[^a-zA-Z0-9_-]", "_", Path(config.relative).stem)[:32] or "profile"
+            digest = hashlib.sha256(config.relative.encode()).hexdigest()[:12]
+            name = f"{PROFILES}/{stem}-{digest}.cfg"
+            suffix = 0
+            used = {p.casefold() for p in profile_paths.values()}
+            while name.casefold() in used:
+                suffix += 1
+                name = f"{PROFILES}/{stem}-{digest}-{suffix}.cfg"
+            profile_paths[config.relative] = name
+            pending.append(config)
+        return f"{folder}/{profile_paths[config.relative]}"
+
+    def reaches(start, end):
+        todo, seen = [start], set()
+        while todo:
+            node = todo.pop()
+            if node == end:
+                return True
+            if node not in seen:
+                seen.add(node)
+                todo.extend(immediate_edges.get(node, ()))
         return False
 
+    def rewrite(command, file, line, context=(), depth=0):
+        nonlocal rewritten_count
+        rewritten_count += 1
+        if rewritten_count > 20000:
+            raise ValueError("Choose a smaller set (up to 20,000 commands, including deferred bodies).")
+        if depth > 16:
+            drop(file, line, "Deferred command nesting too deep")
+            return None
+        if command.lname in cfglang.EXEC_COMMANDS:
+            if len(command.args) != 1:
+                drop(file, line, "Exec arguments need review in Advanced")
+                return None
+            target = resolve(command.arg_text(0))
+            if target is None:
+                drop(file, line, "Exec target missing; choose its folder: " + command.arg_text(0))
+                return None
+            if not target.is_commands:
+                drop(file, line, "Game-owned KeyValues file: " + target.relative)
+                return None
+            if not context:
+                # Deferred switches may return to a profile on a later keypress.
+                # Only an immediate exec cycle would recurse at runtime.
+                if reaches(target.relative, file):
+                    drop(file, line, "Exec loop in copied profiles: " + target.relative)
+                    return None
+                immediate_edges.setdefault(file, set()).add(target.relative)
+            destination = profile_path(target)
+            report.append({"kind": "profile", "file": file, "line": line,
+                           "binding": " → ".join(context) or "exec",
+                           "source": target.relative, "target": destination,
+                           "reason": "Copied profile; runs when its exec is called"})
+            # Bare paths inside a quoted bind/alias body avoid nested quotes,
+            # which Source's console language does not escape.
+            return cfglang.render_command(replace(command, tokens=[command.tokens[0],
+                replace(command.args[0], text=destination, quoted=not context)]))
+        if command.lname in cfglang.DEFERRING and len(command.args) >= 2:
+            body = cfglang.tokenize_line(command.arg_text(1))
+            if body.issues:
+                drop(file, line, "Deferred syntax needs review in Advanced")
+                return None
+            label = command.lname + " " + command.arg_text(0)
+            rewritten = [rewrite(c, file, line, context + (label,), depth + 1) for c in body.commands]
+            value = "; ".join(c for c in rewritten if c is not None)
+            if any(c is None for c in rewritten) or value != cfglang.render_commands(body.commands):
+                tokens = list(command.tokens)
+                tokens[2] = replace(tokens[2], text=value, quoted=True)
+                command = replace(command, tokens=tokens)
+        return cfglang.render_command(command)
+
+    def keep(command, file, line, output):
+        nonlocal kept
+        rendered = rewrite(command, file, line)
+        if rendered is None:
+            return
+        output.append(rendered)
+        kept += 1
+        if kept > 20000:
+            raise ValueError("Choose a smaller set (up to 20,000 commands).")
+        parsed = cfglang.parse_command_string(rendered)[0]
+        if parsed.lname == "alias":
+            definitions.setdefault(parsed.arg_text(0).lower(), []).append(parsed.arg_text(1))
+        elif parsed.lname in ("bind", "bindtoggle"):
+            bindings.append((file, line, parsed))
+
     def visit(relative, stack):
-        nonlocal kept, merged, expanded
+        nonlocal merged, expanded
         expanded += 1
         if expanded > 1024:
             raise ValueError("Too many repeated exec links. Choose a smaller set.")
@@ -252,20 +345,52 @@ def rebuild(texts, entries):
                         visit(target.relative, stack + [config.relative])
                     else:
                         drop(config.relative, line.number, "Exec target missing; choose its folder")
-                elif deferred_exec(command):
-                    drop(config.relative, line.number, "Deferred exec needs manual setup in Advanced")
                 else:
-                    out.append(cfglang.render_command(command))
-                    kept += 1
-                    if kept > 20000:
-                        raise ValueError("Choose a smaller set (up to 20,000 commands).")
+                    keep(command, config.relative, line.number, out)
 
     for entry in entries:
         visit(entry, [])
+    # Queue each copied source once, including deferred cycles. Never promote
+    # these commands to the startup stream or read outside the snapshot.
+    for config in pending:
+        visited.add(config.relative)
+        copied = ["// Copied profile from " + config.relative]
+        for line in config.document.lines:
+            if line.issues or any(ord(c) < 32 and c != "\t" for c in line.raw):
+                drop(config.relative, line.number, "Syntax needs review in Advanced")
+                continue
+            if not line.commands:
+                copied.append(line.raw)
+            for command in line.commands:
+                keep(command, config.relative, line.number, copied)
+        profile_files[profile_paths[config.relative]] = "\n".join(copied) + "\n"
+
+    # Explain indirect binds too, without executing aliases or following alias
+    # cycles. Multiple definitions describe possible runtime targets.
+    alias_links = 0
+    for file, line, binding in bindings:
+        todo = [(c, ()) for c in cfglang.parse_command_string(binding.arg_text(1))]
+        seen, targets = set(), set()
+        while todo:
+            alias_links += 1
+            if alias_links > 20000:
+                raise ValueError("Too many repeated alias links. Choose a smaller set.")
+            command, chain = todo.pop()
+            if command.lname in cfglang.EXEC_COMMANDS and chain:
+                targets.add((command.arg_text(0), chain))
+            elif command.lname in definitions and command.lname not in seen:
+                seen.add(command.lname)
+                for body in definitions[command.lname]:
+                    todo.extend((c, chain + (command.name,)) for c in cfglang.parse_command_string(body))
+        for target, chain in sorted(targets):
+            report.append({"kind": "profile", "file": file, "line": line,
+                           "binding": binding.lname + " " + binding.arg_text(0) + " → " + " → ".join(chain),
+                           "target": target, "reason": "Copied profile via alias chain"})
     text = "\n".join(out) + "\n"
     polished = cfgformat.polish(text, IMPORTED)
     if polished.safe:
         text = polished.formatted
     return {"text": text, "kept": kept, "merged": merged, "dropped": dropped,
+            "profile_files": profile_files, "profiles": len(profile_files),
             "files": len(visited), "layouts": layout_count, "details": report,
             "note": "Order and later overrides kept. Originals stay untouched."}

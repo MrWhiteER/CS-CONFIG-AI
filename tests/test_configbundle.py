@@ -163,6 +163,32 @@ class Installation(Sandbox):
         self.assertTrue(any(s.files.get(str(path)) and (s.path / s.files[str(path)]).read_text() == "volume 0.25\n"
                             for s in backup.list_sets()))
 
+    def test_copied_profiles_install_with_backups_and_preserve_later_edits(self):
+        relative = bundle.PROFILES + "/practice-123.cfg"
+        bundle.write_changed(self.app, {relative: "volume 1\n"}, "first profile")
+        self.install()
+        path = self.dest / relative
+        path.write_text("volume 0.25\n")
+        self.assertIn(relative, self.install()["preserved"])
+        self.assertEqual(path.read_text(), "volume 0.25\n")
+        bundle.write_changed(self.app, {relative: "volume 0.75\n"}, "new profile")
+        self.install()
+        self.assertEqual(path.read_text(), "volume 0.75\n")
+        self.assertTrue(any(s.files.get(str(path)) and (s.path / s.files[str(path)]).read_text() == "volume 0.25\n"
+                            for s in backup.list_sets()))
+
+    def test_original_collision_with_a_copied_profile_keeps_entire_set_app_only(self):
+        relative = bundle.PROFILES + "/practice-123.cfg"
+        path = self.dest / relative
+        path.parent.mkdir(parents=True)
+        path.write_text("original profile\n")
+        bundle.write_changed(self.app, {relative: "volume 1\n",
+                             "_import_sources.json": json.dumps([str(path.resolve()).casefold()])}, "test profile")
+        with self.assertRaisesRegex(ValueError, "Original files"):
+            self.install()
+        self.assertEqual(path.read_text(), "original profile\n")
+        self.assertFalse((self.dest / "autoperf.vcfg").exists())
+
 
 class Importing(Sandbox):
     def test_arbitrarily_renamed_cfg_is_kept_and_never_modified(self):
@@ -204,11 +230,112 @@ class Importing(Sandbox):
         result = bundle.rebuild({"a.cfg": text}, ["a.cfg"])
         self.assertEqual(cfglang.parse(text).signature(), cfglang.parse(result["text"]).signature())
 
-    def test_deferred_exec_is_reported_instead_of_run_at_start(self):
-        out = bundle.rebuild({"a.cfg": 'bind "f1" "exec practice.cfg"\nvolume 1\n'}, ["a.cfg"])
-        self.assertEqual(out["kept"], 1)
-        self.assertEqual(out["dropped"], 1)
-        self.assertIn("Deferred exec", out["details"][0]["reason"])
+    def test_bind_exec_is_kept_rewritten_and_never_loaded_at_start(self):
+        out = bundle.rebuild({"a.cfg": 'bind "F5" "exec practice"\nvolume 1\n',
+                              "practice.cfg": "sv_cheats 1\n"}, ["a.cfg"], "custom")
+        self.assertEqual((out["kept"], out["merged"], out["dropped"], out["profiles"]), (3, 0, 0, 1))
+        path, text = next(iter(out["profile_files"].items()))
+        startup = list(cfglang.parse(out["text"]).commands())
+        self.assertEqual([c.lname for c in startup], ["bind", "volume"])
+        self.assertEqual(startup[0].arg_text(1), "exec custom/" + path)
+        self.assertIn("sv_cheats 1", text)
+        self.assertEqual(out["details"][0]["binding"], "bind F5")
+        self.assertEqual(out["details"][0]["target"], "custom/" + path)
+
+    def test_alias_chain_keeps_runtime_target_and_explains_the_bind(self):
+        out = bundle.rebuild({"a.cfg": 'alias practice next_profile\nalias next_profile "exec practice.cfg"\nbind F5 practice\n',
+                              "practice.cfg": "volume 0.5\n"}, ["a.cfg"])
+        commands = list(cfglang.parse(out["text"]).commands())
+        target = "mrwhiteer/" + next(iter(out["profile_files"]))
+        self.assertEqual(commands[0].arg_text(1), "next_profile")
+        self.assertEqual(commands[1].arg_text(1), "exec " + target)
+        self.assertEqual(commands[2].arg_text(1), "practice")
+        self.assertTrue(any(d.get("binding") == "bind F5 → practice → next_profile" and d["target"] == target
+                            for d in out["details"]))
+        self.assertEqual(out["dropped"], 0)
+
+    def test_copied_nested_execs_rewrite_without_flattening_into_startup(self):
+        out = bundle.rebuild({"a.cfg": 'bind F5 "exec practice.cfg"\n',
+                              "practice.cfg": 'volume 0.5\nexecifexists tools.vcfg\n',
+                              "tools.vcfg": "sensitivity 2\n"}, ["a.cfg"], "custom")
+        self.assertEqual((out["profiles"], out["merged"], out["dropped"]), (2, 0, 0))
+        texts = out["profile_files"]
+        practice = next(t for t in texts.values() if "// Copied profile from practice.cfg" in t)
+        tools = next(p for p, t in texts.items() if "// Copied profile from tools.vcfg" in t)
+        self.assertEqual(list(cfglang.parse(practice).commands())[1].signature(), ("execifexists", "custom/" + tools))
+        self.assertNotIn("sensitivity", out["text"])
+
+    def test_deferred_profile_switch_cycle_is_kept_once_per_source(self):
+        out = bundle.rebuild({"a.cfg": 'bind F5 "exec b.cfg"\n',
+                              "b.cfg": 'bind F6 "exec a.cfg"\n'}, ["a.cfg"])
+        self.assertEqual((out["profiles"], out["dropped"]), (2, 0))
+        paths = {"mrwhiteer/" + p for p in out["profile_files"]}
+        for text in out["profile_files"].values():
+            body = next(cfglang.parse(text).commands()).arg_text(1)
+            self.assertIn(cfglang.parse_command_string(body)[0].arg_text(0), paths)
+
+    def test_immediate_cycle_inside_copied_profiles_is_cut_and_reported(self):
+        out = bundle.rebuild({"a.cfg": 'bind F5 "exec b.cfg"\n',
+                              "b.cfg": "exec c.cfg\nvolume 1\n",
+                              "c.cfg": "exec b.cfg\nsensitivity 2\n"}, ["a.cfg"])
+        self.assertEqual((out["profiles"], out["dropped"]), (2, 1))
+        self.assertTrue(any(d["kind"] == "dropped" and d["file"] == "c.cfg" and d["line"] == 1
+                            and "Exec loop" in d["reason"] for d in out["details"]))
+        self.assertEqual(sum(c.lname == "exec" for t in out["profile_files"].values()
+                             for c in cfglang.parse(t).commands()), 1)
+
+    def test_alias_cycle_is_bounded_and_keeps_profile_mapping(self):
+        out = bundle.rebuild({"a.cfg": 'alias a "b; exec practice.cfg"\nalias b a\nbind F5 a\n',
+                              "practice.cfg": "volume 1\n"}, ["a.cfg"])
+        self.assertEqual((out["profiles"], out["dropped"]), (1, 0))
+        self.assertTrue(any(d.get("binding") == "bind F5 → a" for d in out["details"]))
+
+    def test_missing_deferred_exec_is_dropped_with_reason_and_siblings_kept(self):
+        out = bundle.rebuild({"a.cfg": 'bind F5 "exec missing.cfg; say ready"\n'}, ["a.cfg"])
+        self.assertEqual((out["profiles"], out["dropped"]), (0, 1))
+        self.assertEqual(next(cfglang.parse(out["text"]).commands()).arg_text(1), "say ready")
+        self.assertIn("missing.cfg", out["details"][0]["reason"])
+        self.assertEqual((out["details"][0]["file"], out["details"][0]["line"]), ("a.cfg", 1))
+
+    def test_missing_link_in_copied_profile_does_not_read_an_external_file(self):
+        (self.root / "outside.cfg").write_text("quit\n")
+        out = bundle.rebuild({"a.cfg": 'bind F5 "exec b.cfg"\n',
+                              "b.cfg": "exec outside.cfg\nvolume 1\n"}, ["a.cfg"])
+        self.assertEqual((out["profiles"], out["dropped"]), (1, 1))
+        self.assertNotIn("quit", str(out["profile_files"]))
+        self.assertTrue(any(d["kind"] == "dropped" and d["file"] == "b.cfg" for d in out["details"]))
+
+    def test_profile_names_do_not_collide_and_repeated_targets_share_a_copy(self):
+        out = bundle.rebuild({"a.cfg": 'bind F5 "exec one/practice.cfg"\nbind F6 "exec two/practice.cfg"\nbind F7 "exec one/practice.cfg"\n',
+                              "one/practice.cfg": "volume 1\n", "two/practice.cfg": "volume 0.5\n"}, ["a.cfg"])
+        self.assertEqual((out["profiles"], out["dropped"]), (2, 0))
+        self.assertEqual(len({p.casefold() for p in out["profile_files"]}), 2)
+        commands = list(cfglang.parse(out["text"]).commands())
+        self.assertNotEqual(commands[0].arg_text(1), commands[1].arg_text(1))
+        self.assertEqual(commands[0].arg_text(1), commands[2].arg_text(1))
+
+    def test_runtime_links_refuse_an_unquotable_destination_folder(self):
+        with self.assertRaisesRegex(ValueError, "folder without spaces"):
+            bundle.rebuild({"a.cfg": 'bind F5 "exec b.cfg"\n', "b.cfg": "volume 1\n"}, ["a.cfg"], "my configs")
+
+    def test_deferred_bodies_share_the_command_limit(self):
+        text = 'alias many "' + "; ".join(["volume 1"] * 20001) + '"\n'
+        with self.assertRaisesRegex(ValueError, "20,000 commands"):
+            bundle.rebuild({"a.cfg": text}, ["a.cfg"])
+
+    def test_profile_snapshot_and_original_bytes_stay_untouched(self):
+        originals = {"a.cfg": b'bind F5 "exec practice.cfg"\r\n',
+                     "practice.cfg": b'// caf\xe9\r\nvolume 1\r\n'}
+        for name, raw in originals.items():
+            (self.root / name).write_bytes(raw)
+        texts = bundle.snapshot([self.root], folder=True)
+        before = dict(texts)
+        out = bundle.rebuild(texts, ["a.cfg"])
+        app = Path(self.prepare()["root"])
+        bundle.write_changed(app, {bundle.IMPORTED: out["text"], **out["profile_files"]}, "test import")
+        self.assertEqual(texts, before)
+        for name, raw in originals.items():
+            self.assertEqual((self.root / name).read_bytes(), raw)
 
     def test_missing_exec_and_syntax_have_source_line_details(self):
         out = bundle.rebuild({"a.cfg": 'exec missing.cfg\nsensitivity "2\n'}, ["a.cfg"])
@@ -349,6 +476,7 @@ class Routes(Sandbox):
         out = webui._configs_import_preview(self.state, {"token": chosen["token"], "entries": chosen["files"]})
         self.assertNotEqual(out["token"], chosen["token"])
         self.assertNotIn("text", out)
+        self.assertNotIn("profile_files", out)
         self.assertIn("sensitivity 2", self.state.config_import["result"]["text"])
         self.assertFalse(bundle.storage("account-a", "custom").exists())
 
@@ -366,6 +494,45 @@ class Routes(Sandbox):
         self.assertTrue((bundle.storage("account-a", "custom") / bundle.IMPORTED).is_file())
         self.assertEqual((self.root / "renamed.cfg").read_text(), "sensitivity 2\n")
         self.assertFalse(self.game.exists())
+
+    def test_finish_saves_reviewed_runtime_profiles_and_backs_up_replacements(self):
+        entry, profile = self.root / "entry.cfg", self.root / "practice.cfg"
+        original = b'bind F5 "exec practice.cfg"\n'
+        entry.write_bytes(original)
+        profile.write_text("volume 1\n")
+        with mock.patch("cs2cfg.picker.pick_files", return_value=[str(entry), str(profile)]):
+            chosen = webui._configs_import_pick(self.state, {"kind": "files"})
+        review = webui._configs_import_preview(self.state, {"token": chosen["token"], "entries": ["entry.cfg"]})
+        self.assertEqual(review["profiles"], 1)
+        self.assertNotIn("profile_files", review)
+        root = bundle.storage("account-a", "custom")
+        copied = next(iter(self.state.config_import["result"]["profile_files"]))
+        path = root / copied
+        path.parent.mkdir(parents=True)
+        path.write_text("volume 0.25\n")
+        # Finish uses only the reviewed snapshot, even if the source changes.
+        profile.write_text("volume 99\n")
+        webui._firstrun_finish(self.state, {"answers": {"import": review["token"]}})
+        self.assertIn("volume 1", path.read_text())
+        self.assertIn("exec custom/" + copied, (root / bundle.IMPORTED).read_text())
+        self.assertEqual(entry.read_bytes(), original)
+        self.assertEqual(profile.read_text(), "volume 99\n")
+        self.assertFalse(self.game.exists())
+        self.assertTrue(any(s.files.get(str(path)) and (s.path / s.files[str(path)]).read_text() == "volume 0.25\n"
+                            for s in backup.list_sets()))
+
+    def test_failed_profile_backup_prevents_overwriting_the_import_stream(self):
+        chosen = self.pick()
+        review = webui._configs_import_preview(self.state, {"token": chosen["token"], "entries": chosen["files"]})
+        root = bundle.storage("account-a", "custom")
+        root.joinpath(bundle.IMPORTED).parent.mkdir(parents=True)
+        root.joinpath(bundle.IMPORTED).write_text("volume 0.25\n")
+        self.state.config_import["result"]["profile_files"] = {bundle.PROFILES + "/profile.cfg": "volume 1\n"}
+        with mock.patch.object(backup.BackupSession, "add", side_effect=[None, OSError("backup full")]):
+            with self.assertRaisesRegex(OSError, "backup full"):
+                webui._firstrun_finish(self.state, {"answers": {"import": review["token"]}})
+        self.assertEqual(root.joinpath(bundle.IMPORTED).read_text(), "volume 0.25\n")
+        self.assertFalse(root.joinpath(bundle.PROFILES).exists())
 
     def test_import_selects_standard_layout_but_keeps_profile_pins(self):
         from cs2cfg import layouts
