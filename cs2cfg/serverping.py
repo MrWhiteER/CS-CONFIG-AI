@@ -134,6 +134,17 @@ class ServerPing:
         with self.lock:
             return copy.deepcopy(self.data)
 
+    def directory_snapshot(self):
+        """Read-only directory access for region locking; never fetch or use fallback."""
+        with self.lock:
+            if self.config is not None:
+                return copy.deepcopy(self.config)
+        try:
+            cached = json.loads(self.cache_path.read_text(encoding="utf-8"))
+            return cached["config"] if isinstance(cached.get("config"), dict) else None
+        except (OSError, ValueError, KeyError, TypeError):
+            return None
+
     def _regions(self):
         now = time.time()
         if self.config is None:

@@ -46,3 +46,4 @@ desktop.ini
 # somebody's email address. Nothing here is a credential, and none of it
 # belongs in a public repository either.
 .wrangler/
+tools/matchfound_probe.log
