@@ -126,19 +126,21 @@ class LaunchWaitsForTheAntiCheat(unittest.TestCase):
 
         up = {"n": 0}
 
-        def running(_name):
+        def pids(_name):
             up["n"] += 1
-            # Not running when first checked, up after 30 "seconds": longer
-            # than the ordinary companion wait, inside the anti-cheat one.
-            return up["n"] > 30
+            # Not there when first checked, up after 30 "seconds": longer
+            # than the ordinary companion wait.
+            return [7] if up["n"] > 30 else []
 
         said = []
-        # The service is faked as running too: readiness asks Windows for
-        # FACEITService, and the real one on the machine running the tests
-        # must not decide the result.
+        # Every readiness sign is faked: the real FACEIT AC on the machine
+        # running the tests must not decide the result.
         with mock.patch.object(launcher, "COMPANION_WAIT", 5.0), \
-             mock.patch.object(faceit_apps, "_service_state", return_value=4), \
-             mock.patch.object(companions, "running", side_effect=running), \
+             mock.patch.object(faceit_apps, "_pids", side_effect=pids), \
+             mock.patch.object(faceit_apps, "ac_service_running", return_value=True), \
+             mock.patch.object(faceit_apps, "_remote_connections", return_value=1), \
+             mock.patch.object(faceit_apps, "_visible_windows", return_value=0), \
+             mock.patch.object(companions, "running", return_value=False), \
              mock.patch.object(companions, "start",
                                return_value={"ok": True, "already": False,
                                              "elevated": True}), \
@@ -154,49 +156,75 @@ class LaunchWaitsForTheAntiCheat(unittest.TestCase):
 
 
 class AntiCheatReadiness(unittest.TestCase):
-    """CS2 waits until FACEIT AC is ready, not merely started: the tray
-    program appears at once, its service seconds later (2026-11-17 report:
-    the game started first and FACEIT demanded a restart)."""
+    """Ready is read from FACEIT AC itself, never from a timer (Edy,
+    2026-11-17: on a day FACEIT AC updates, any fixed wait is wrong)."""
 
-    def make(self, running, service):
-        t = {"now": 0.0}
-        r = faceit_apps.AcReadiness(clock=lambda: t["now"],
-                                    running=lambda: running["v"],
-                                    service=lambda: service["v"])
-        return r, t
+    def make(self, **state):
+        st = {"pids": [11], "service": True, "online": 1, "windows": 0}
+        st.update(state)
+        st.setdefault("service_online", 0)
 
-    def test_process_without_service_is_not_ready(self):
-        r, t = self.make({"v": True}, {"v": False})
-        for second in range(20):
-            t["now"] = float(second)
+        def online(pids):
+            # Service pid 99 carries the lasting connection.
+            return st["online"] + (st["service_online"] if 99 in pids else 0)
+
+        r = faceit_apps.AcReadiness(pids=lambda: st["pids"],
+                                    service=lambda: st["service"],
+                                    online=online,
+                                    windows=lambda p: st["windows"],
+                                    service_pids=lambda: [99])
+        return r, st
+
+    def test_the_recorded_good_launch(self):
+        r, st = self.make(pids=[], service=False, online=0, windows=0)
+        r.started_here = True
+        steps = [
+            dict(pids=[11]),                       # +0.0 faceitclient starts
+            dict(service=True),                    # +1.6 service running
+            dict(windows=1),                       # +5.1 "FACEIT AC" opens
+            dict(windows=0),                       # +7.4 it closes; client not online yet
+        ]
+        for step in steps:
+            st.update(step)
+            self.assertFalse(r(), (step, r.last))
+        st["online"] = 1                           # +8.8 client online: ready
+        self.assertTrue(r())
+
+    def test_busy_titles(self):
+        self.assertTrue(faceit_apps._is_busy_title("FACEIT AC"))
+        self.assertTrue(faceit_apps._is_busy_title("Updating FACEIT AC..."))
+        # Its main window may be waiting for the game: never waited on.
+        self.assertFalse(faceit_apps._is_busy_title("FACEIT Anti-cheat"))
+
+    def test_an_update_keeps_it_not_ready_however_long(self):
+        r, st = self.make(windows=1)               # updating: window stays up
+        r.started_here = True
+        for _ in range(1000):
             self.assertFalse(r())
+        self.assertIn("updating", r.last)
 
-    def test_ready_only_after_settling(self):
-        running, service = {"v": True}, {"v": True}
-        r, t = self.make(running, service)
+    def test_not_ready_until_the_client_is_online(self):
+        r, st = self.make(online=0)
         self.assertFalse(r())
-        t["now"] = faceit_apps.AC_SETTLE - 0.5
+        self.assertIn("connecting", r.last)
+
+    def test_service_down_is_not_ready(self):
+        r, st = self.make(service=False)
         self.assertFalse(r())
-        t["now"] = faceit_apps.AC_SETTLE
+
+    def test_already_up_long_ago_is_ready_through_the_service(self):
+        # Checked on Edy's PC: the client's own connection had closed two
+        # minutes after start; the service's stays up.
+        r, st = self.make(online=0, service_online=1)
+        self.assertTrue(r.up_now())
+
+    def test_while_starting_the_client_itself_must_get_through(self):
+        r, st = self.make(online=0, service_online=1)
+        r.started_here = True
+        self.assertFalse(r())
+        st["online"] = 1
         self.assertTrue(r())
-
-    def test_a_drop_restarts_the_settle(self):
-        running, service = {"v": True}, {"v": True}
-        r, t = self.make(running, service)
-        r()
-        t["now"] = 3.0
-        service["v"] = False
-        self.assertFalse(r())
-        service["v"] = True
-        t["now"] = 4.0
-        self.assertFalse(r())
-        t["now"] = 4.0 + faceit_apps.AC_SETTLE
-        self.assertTrue(r())
-
-    def test_no_service_found_falls_back_to_the_process(self):
-        r, t = self.make({"v": True}, {"v": None})
-        r()
-        t["now"] = faceit_apps.AC_SETTLE
+        st["online"] = 0                 # closes later: stays ready
         self.assertTrue(r())
 
 
@@ -206,6 +234,9 @@ class LaunchWaitsForAntiCheatReadiness(unittest.TestCase):
         calls = {"n": 0}
 
         class FakeReady:
+            last = ""
+            started_here = False
+
             def __init__(self):
                 pass
 
@@ -227,6 +258,56 @@ class LaunchWaitsForAntiCheatReadiness(unittest.TestCase):
         start.assert_not_called()
         self.assertTrue(any("waiting for FACEIT AC" in t for t in said), said)
         self.assertTrue(any("FACEIT AC is up" in t for t in said), said)
+
+
+class AntiCheatHasNoTimeLimit(unittest.TestCase):
+    """Edy, 2026-11-17: keep checking FACEIT AC and only start CS2 once it is
+    ready. Never 'did not answer in time, starting anyway' for the AC."""
+
+    def run_wait(self, ready_after, stop_after=None):
+        said = []
+        clock = {"t": 0.0}
+        checks = {"n": 0}
+
+        class FakeReady:
+            last = "connecting"
+            started_here = False
+
+            def up_now(self):
+                return False
+
+            def __call__(self):
+                checks["n"] += 1
+                return ready_after is not None and checks["n"] >= ready_after
+
+        def sleep(seconds):
+            clock["t"] += seconds
+
+        stop = (lambda: stop_after is not None and clock["t"] >= stop_after)
+        with mock.patch.object(faceit_apps, "AcReadiness", FakeReady), \
+             mock.patch.object(companions, "running", return_value=False), \
+             mock.patch.object(companions, "start",
+                               return_value={"ok": True, "already": False}), \
+             mock.patch.object(launcher.time, "monotonic", side_effect=lambda: clock["t"]), \
+             mock.patch.object(launcher.time, "sleep", side_effect=sleep):
+            launcher._bring_up_companions(
+                [{"name": "FACEIT AC", "exe": "C:/x/faceitclient.exe",
+                  "integration": "faceit-ac"}],
+                False, lambda text, tag="": said.append(text), stop)
+        return said, clock["t"]
+
+    def test_waits_past_any_old_limit_until_ready(self):
+        # Ready after ~5 minutes of checks: still waited for.
+        said, waited = self.run_wait(ready_after=600)
+        self.assertGreater(waited, 200)
+        self.assertTrue(any("FACEIT AC is up" in t for t in said))
+        self.assertFalse(any("starting CS2 anyway" in t for t in said), said)
+        self.assertTrue(any("waiting for FACEIT AC: connecting" in t for t in said), said)
+
+    def test_stop_ends_the_wait(self):
+        said, waited = self.run_wait(ready_after=None, stop_after=30.0)
+        self.assertLess(waited, 31.0)
+        self.assertFalse(any("starting CS2 anyway" in t for t in said), said)
 
 
 if __name__ == "__main__":
