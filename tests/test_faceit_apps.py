@@ -133,7 +133,11 @@ class LaunchWaitsForTheAntiCheat(unittest.TestCase):
             return up["n"] > 30
 
         said = []
+        # The service is faked as running too: readiness asks Windows for
+        # FACEITService, and the real one on the machine running the tests
+        # must not decide the result.
         with mock.patch.object(launcher, "COMPANION_WAIT", 5.0), \
+             mock.patch.object(faceit_apps, "_service_state", return_value=4), \
              mock.patch.object(companions, "running", side_effect=running), \
              mock.patch.object(companions, "start",
                                return_value={"ok": True, "already": False,
