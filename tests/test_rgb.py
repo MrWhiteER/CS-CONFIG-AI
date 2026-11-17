@@ -500,3 +500,15 @@ class RazerUsb(unittest.TestCase):
         self.assertTrue(_wait(lambda: usb.active))
         time.sleep(0.1)
         self.assertNotIn("start", chroma_p.log)
+
+
+class RazerUsbPacing(unittest.TestCase):
+    def test_waits_while_device_is_busy(self):
+        from cs2cfg.rgb import razer_usb
+        answers = [b"\0\x01", b"\0\x01", b"\0\x02"]
+        handle = mock.Mock()
+        handle.get_feature.side_effect = lambda n: answers.pop(0)
+        dev = razer_usb._Device(handle, razer_usb.MODELS[0x00DB], 0x00DB, True)
+        dev.send(razer_usb.spectrum())
+        self.assertEqual(handle.get_feature.call_count, 3)
+        self.assertEqual(handle.set_feature.call_count, 1)

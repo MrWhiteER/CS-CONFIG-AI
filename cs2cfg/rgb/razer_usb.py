@@ -34,7 +34,7 @@ REPORT_LEN = 90
 NOSTORE = 0x00
 ZERO_LED = 0x00
 EFFECT_STATIC, EFFECT_SPECTRUM, EFFECT_CUSTOM = 0x01, 0x03, 0x08
-STATUS_OK = 0x02
+STATUS_BUSY, STATUS_OK = 0x01, 0x02
 
 
 @dataclass(frozen=True)
@@ -111,14 +111,22 @@ class _Device:
         self.handle, self.model, self.pid, self.known = handle, model, pid, known
 
     def send(self, data: bytes) -> None:
+        """Send one report and wait until the device has taken it.
+
+        The firmware answers "busy" (0x01) while it works; a wireless mouse
+        stays busy for several milliseconds, a wired keyboard for about one.
+        Sending the next report before then drops it, so the answer is read
+        back until it is anything but busy, for at most ~50 ms.
+        """
         self.handle.set_feature(b"\0" + data)
-        # The firmware wants a breath between reports; reading the answer
-        # back is how OpenRGB paces it too, and tells us it was taken.
-        time.sleep(0.001)
-        try:
-            self.handle.get_feature(REPORT_LEN + 1)
-        except OSError:
-            pass
+        for _ in range(25):
+            time.sleep(0.002)
+            try:
+                status = self.handle.get_feature(REPORT_LEN + 1)[1]
+            except (OSError, IndexError):
+                return
+            if status != STATUS_BUSY:
+                return
 
     @property
     def label(self) -> str:
