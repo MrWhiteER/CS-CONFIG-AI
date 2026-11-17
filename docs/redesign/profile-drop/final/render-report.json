@@ -1,0 +1,192 @@
+{
+  "renderer": "Edge headless / CDP; real index.html; desktop API disabled; no screenshot state fixtures",
+  "shots": [
+    {
+      "file": "theme-violet.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 949476
+    },
+    {
+      "file": "theme-ember.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 956714
+    },
+    {
+      "file": "theme-carbon.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 957259
+    },
+    {
+      "file": "theme-acid.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 947652
+    },
+    {
+      "file": "theme-crimson.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 945892
+    },
+    {
+      "file": "theme-frost.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 953950
+    },
+    {
+      "file": "theme-neon.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 964491
+    },
+    {
+      "file": "theme-daylight.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 972017
+    },
+    {
+      "file": "theme-paper.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 1016096
+    },
+    {
+      "file": "theme-pro.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 862053
+    },
+    {
+      "file": "profile-rail-idle-dark.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 986458
+    },
+    {
+      "file": "profile-rail-hover-dark.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 994612
+    },
+    {
+      "file": "profile-rail-shelf-dark.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 947685
+    },
+    {
+      "file": "profile-rail-idle-daylight.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 1007225
+    },
+    {
+      "file": "profile-rail-hover-daylight.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 1008729
+    },
+    {
+      "file": "profile-rail-shelf-daylight.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 971279
+    }
+  ],
+  "checks": [
+    "three direct radios",
+    "initial unknown is honest",
+    "End focuses without selecting",
+    "shelf focuses selected radio",
+    "Escape restores trigger",
+    "Tab out dismisses shelf",
+    "outside dismisses shelf",
+    "hover does not open immediately",
+    "hover opens after delay",
+    "hover leaves cleanly",
+    "off Home safe selection and plan",
+    "undo refreshes background plan",
+    "Home preserves preset path",
+    "native Enter selects",
+    "native Space selects",
+    "native Tab dismisses shelf",
+    "verification verified",
+    "verification changed",
+    "verification failed",
+    "Apply busy is actual request lifetime",
+    "Apply failure clears busy",
+    "Apply success clears busy without inventing verification",
+    "reduced motion is plain fades",
+    "hidden control cancels motion",
+    "860 rail and shelf fit without chip collision",
+    "hidden window cancels all rail motion"
+  ],
+  "contrast": [
+    {
+      "theme": "violet",
+      "ink": 15.077118782497402,
+      "muted": 7.434938241062461,
+      "rect": 350
+    },
+    {
+      "theme": "ember",
+      "ink": 14.628564768495036,
+      "muted": 7.395159528681428,
+      "rect": 350
+    },
+    {
+      "theme": "carbon",
+      "ink": 14.031710187725698,
+      "muted": 7.173485725766321,
+      "rect": 350
+    },
+    {
+      "theme": "acid",
+      "ink": 15.149675208914365,
+      "muted": 7.591859214341477,
+      "rect": 350
+    },
+    {
+      "theme": "crimson",
+      "ink": 15.320118801774484,
+      "muted": 4.870099307993312,
+      "rect": 350
+    },
+    {
+      "theme": "frost",
+      "ink": 15.311775195379152,
+      "muted": 5.005967553217687,
+      "rect": 350
+    },
+    {
+      "theme": "neon",
+      "ink": 14.991859540214678,
+      "muted": 4.8112057102833345,
+      "rect": 350
+    },
+    {
+      "theme": "daylight",
+      "ink": 18.09822768100439,
+      "muted": 6.238398050816228,
+      "rect": 350
+    },
+    {
+      "theme": "paper",
+      "ink": 17.215078864658302,
+      "muted": 5.947074855118801,
+      "rect": 350
+    },
+    {
+      "theme": "pro",
+      "ink": 14.924944741801498,
+      "muted": 7.525606264178456,
+      "rect": 350
+    }
+  ],
+  "errors": []
+}
