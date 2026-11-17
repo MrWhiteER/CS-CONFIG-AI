@@ -313,7 +313,7 @@ class Sync(unittest.TestCase):
     def setUp(self):
         self.fake = FakeProvider()
         self.missing = FakeProvider(there=False)
-        self.s = sync.RgbSync(lambda: [self.fake, self.missing])
+        self.s = sync.RgbSync(lambda _vendor_apps: [self.fake, self.missing])
         self.addCleanup(self.s.stop)
 
     def test_off_by_default_and_inert(self):
@@ -358,14 +358,14 @@ class Sync(unittest.TestCase):
     def test_cache_written_only_while_enabled(self):
         with tempfile.TemporaryDirectory() as tmp:
             cache = Path(tmp) / "rgb-board.json"
-            s = sync.RgbSync(lambda: [], cache=cache)
+            s = sync.RgbSync(lambda _v: [], cache=cache)
             s.update(BOUND)
             self.assertFalse(cache.exists())
             s.configure({"rgb_enabled": True})
             s.stop()
             saved = json.loads(cache.read_text())
             self.assertEqual(saved["scancode8"], {"script": "Jumpthrow", "enabled": True})
-            self.assertTrue(sync.RgbSync(lambda: [], cache=cache).status()["has_board"])
+            self.assertTrue(sync.RgbSync(lambda _v: [], cache=cache).status()["has_board"])
 
 
 class Api(unittest.TestCase):
@@ -400,3 +400,103 @@ class Api(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FakeHid:
+    """Stands in for winhid: records every feature report sent."""
+
+    def __init__(self, infos):
+        self.infos, self.sent, self.closed = infos, [], []
+        outer = self
+
+        class Handle:
+            def __init__(self, path):
+                self.path = path
+
+            def set_feature(self, data):
+                outer.sent.append((self.path, bytes(data)))
+
+            def get_feature(self, length, report_id=0):
+                return bytes(length)
+
+            def close(self):
+                outer.closed.append(self.path)
+
+        self.Handle = Handle
+
+    def devices(self, vendor_id=None):
+        return [i for i in self.infos if vendor_id in (None, i.vendor_id)]
+
+
+class RazerUsb(unittest.TestCase):
+    def _hid(self):
+        from cs2cfg.rgb.winhid import HidInfo
+        return FakeHid([
+            HidInfo("kb-input", 0x1532, 0x02A6, 1, 6, 0),          # typing: never used
+            HidInfo("kb-ctrl", 0x1532, 0x02A6, 1, 6, 91),
+            HidInfo("mouse-ctrl", 0x1532, 0x00DB, 1, 2, 91),
+            HidInfo("other", 0x046D, 0xC52B, 1, 6, 91),
+        ])
+
+    def test_report_layout_and_crc(self):
+        from cs2cfg.rgb import razer_usb
+        r = razer_usb.report(0x0F, 0x02, b"\x00\x00\x03", size=6)
+        self.assertEqual(len(r), 90)
+        self.assertEqual((r[1], r[5], r[6], r[7]), (0x1F, 6, 0x0F, 0x02))
+        crc = 0
+        for b in r[2:88]:
+            crc ^= b
+        self.assertEqual(r[88], crc)
+        row = razer_usb.frame_row(2, [(1, 2, 3)] * 22)
+        self.assertEqual((row[6], row[7], row[5]), (0x0F, 0x03, 5 + 66))
+        self.assertEqual(row[8:13], bytes((0, 0, 2, 0, 21)))
+        self.assertEqual(row[13:16], bytes((1, 2, 3)))
+
+    def test_paints_keyboard_rows_and_mouse_then_hands_back(self):
+        from cs2cfg.rgb import razer_usb
+        hid = self._hid()
+        p = razer_usb.RazerUsbProvider(hid)
+        self.assertTrue(p.probe())
+        p.start()
+        self.assertEqual(sorted(p.devices), ["Razer Cobra HyperSpeed", "Razer Huntsman V3 Pro"])
+        f = palette.frame(BOUND)
+        p.apply(f)
+        kb = [d[1:] for path, d in hid.sent if path == "kb-ctrl"]
+        self.assertTrue(all(len(d) == 90 for d in kb))
+        self.assertEqual([d[7] for d in kb], [3] * 6 + [2])           # 6 rows, then effect
+        self.assertEqual(kb[-1][8:11], bytes((0, 0, razer_usb.EFFECT_CUSTOM)))
+        row2 = kb[2]
+        w_at = 8 + 5 + 3 * 3                                          # W: row 2, col 3
+        self.assertEqual(row2[w_at:w_at + 3], bytes(palette.COLOURS["bound"]))
+        mouse = [d[1:] for path, d in hid.sent if path == "mouse-ctrl"]
+        self.assertEqual(mouse[0][10], razer_usb.EFFECT_STATIC)
+        self.assertEqual(mouse[0][14:17], bytes(f.body))
+        self.assertNotIn("kb-input", [s[0] for s in hid.sent])
+        self.assertNotIn("other", [s[0] for s in hid.sent])
+        hid.sent.clear()
+        p.stop()
+        self.assertEqual({d[1:][10] for _p, d in hid.sent}, {razer_usb.EFFECT_SPECTRUM})
+        self.assertEqual(sorted(hid.closed), ["kb-ctrl", "mouse-ctrl"])
+
+    def test_nothing_razer_present(self):
+        from cs2cfg.rgb import razer_usb
+        p = razer_usb.RazerUsbProvider(FakeHid([]))
+        self.assertFalse(p.probe())
+        self.assertIn("No Razer", p.why)
+
+    def test_vendor_apps_off_by_default(self):
+        names = [p.id for p in sync.default_providers()]
+        self.assertEqual(names, ["razer-usb", "openrgb"])
+        names = [p.id for p in sync.default_providers(True)]
+        self.assertEqual(names, ["razer-usb", "razer", "steelseries", "openrgb"])
+
+    def test_chroma_steps_aside_when_usb_owns_razer(self):
+        usb, chroma_p = FakeProvider(), FakeProvider()
+        usb.vendors = chroma_p.vendors = ("razer",)
+        s = sync.RgbSync(lambda _v: [usb, chroma_p])
+        self.addCleanup(s.stop)
+        s.update(BOUND)
+        s.configure({"rgb_enabled": True, "rgb_vendor_apps": True})
+        self.assertTrue(_wait(lambda: usb.active))
+        time.sleep(0.1)
+        self.assertNotIn("start", chroma_p.log)

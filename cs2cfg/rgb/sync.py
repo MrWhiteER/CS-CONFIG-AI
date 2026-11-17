@@ -25,7 +25,11 @@ KEEPALIVE_S = 5.0
 REPROBE_S = 30.0
 
 FREE_MODES = ("dim", "off")
-DEFAULTS = {"rgb_enabled": False, "rgb_free": "dim", "rgb_brightness": 100}
+# rgb_vendor_apps: also talk to Razer Synapse / SteelSeries GG when they are
+# running. Off by default: the direct USB route needs neither, and asking
+# Synapse's SDK for a session can wake the Razer app.
+DEFAULTS = {"rgb_enabled": False, "rgb_free": "dim", "rgb_brightness": 100,
+            "rgb_vendor_apps": False}
 
 
 def read_settings(ui: Optional[Mapping[str, Any]] = None, *, strict: bool = False) -> dict:
@@ -35,7 +39,7 @@ def read_settings(ui: Optional[Mapping[str, Any]] = None, *, strict: bool = Fals
         if key not in ui:
             continue
         value = ui[key]
-        if key == "rgb_enabled":
+        if key in ("rgb_enabled", "rgb_vendor_apps"):
             ok = isinstance(value, bool)
         elif key == "rgb_free":
             ok = value in FREE_MODES
@@ -48,13 +52,20 @@ def read_settings(ui: Optional[Mapping[str, Any]] = None, *, strict: bool = Fals
     return out
 
 
-def default_providers() -> List[Provider]:
-    from .chroma import ChromaProvider
-    from .gamesense import GameSenseProvider
+def default_providers(vendor_apps: bool = False) -> List[Provider]:
     from .openrgb import OpenRGBProvider
+    from .razer_usb import RazerUsbProvider
 
-    # Vendor APIs first; OpenRGB last, so it can leave their devices alone.
-    return [ChromaProvider(), GameSenseProvider(), OpenRGBProvider()]
+    # Direct USB first: it needs nothing from Razer. The vendor apps come
+    # only when asked for, and step aside for devices already driven
+    # directly. OpenRGB last, so it leaves every claimed device alone.
+    out: List[Provider] = [RazerUsbProvider()]
+    if vendor_apps:
+        from .chroma import ChromaProvider
+        from .gamesense import GameSenseProvider
+
+        out += [ChromaProvider(), GameSenseProvider()]
+    return out + [OpenRGBProvider()]
 
 
 def _slim(bound: Mapping[str, Mapping[str, Any]]) -> Dict[str, dict]:
@@ -64,7 +75,7 @@ def _slim(bound: Mapping[str, Mapping[str, Any]]) -> Dict[str, dict]:
 
 
 class RgbSync:
-    def __init__(self, providers: Optional[Callable[[], List[Provider]]] = None,
+    def __init__(self, providers: Optional[Callable[[bool], List[Provider]]] = None,
                  cache: Optional[Path] = None) -> None:
         self._make = providers or default_providers
         self.cache = cache
@@ -85,8 +96,12 @@ class RgbSync:
 
     # -- called by the web layer ---------------------------------------------
     def configure(self, settings: Mapping[str, Any]) -> None:
+        wanted = read_settings(settings)
+        if (wanted["rgb_vendor_apps"] != self.settings["rgb_vendor_apps"]
+                and self._thread and self._thread.is_alive()):
+            self.stop()          # a different set of backends: start over
         with self._lock:
-            self.settings = read_settings(settings)
+            self.settings = wanted
             self._dirty = True
             enabled = self.settings["rgb_enabled"]
         if enabled:
@@ -170,7 +185,10 @@ class RgbSync:
 
     def _run(self) -> None:
         with self._lock:
-            self.providers = self._make()
+            vendor_apps = self.settings["rgb_vendor_apps"]
+        made = self._make(vendor_apps)
+        with self._lock:
+            self.providers = made
         since_probe = REPROBE_S
         while not self._halt.is_set():
             if since_probe >= REPROBE_S or not any(p.active for p in self.providers):
@@ -205,6 +223,9 @@ class RgbSync:
         for p in self.providers:
             if p.active or self._halt.is_set():
                 continue
+            owned = owner_vendors(self.providers)
+            if p.vendors and all(v in owned for v in p.vendors):
+                continue         # already driven by a better route
             try:
                 if not p.probe():
                     continue
