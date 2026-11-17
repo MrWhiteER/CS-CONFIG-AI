@@ -6169,9 +6169,15 @@ const startup = (() => {
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1z"/><circle cx="12" cy="12" r="3"/></svg></i><span class="tx">Settings</span></button>
     </div>
 
-    <!-- Version and updates stay in the rail. Account selection lives in
-         Settings > Steam alongside the client controls. -->
+    <!-- Main identity expands into connected accounts and Steam switching. -->
     <div class="rail-foot">
+      <section class="accounts-dock" id="accounts-dock" aria-label="Connected accounts">
+        <button type="button" class="dock-row dock-main" id="dock-main" aria-expanded="false" aria-controls="dock-panel" aria-haspopup="dialog"></button>
+        <div id="dock-panel" class="dock-panel" popover="manual" role="dialog" aria-label="Accounts" inert>
+          <div class="dock-heading">Your accounts<span class="dock-summary" id="dock-summary"></span></div>
+          <div id="dock-rows"></div>
+        </div>
+      </section>
       <button class="updc" id="updc" aria-haspopup="dialog" aria-expanded="false"
               aria-controls="updc-pop" title="Update centre">
         <span class="updc-face">
@@ -7011,6 +7017,8 @@ const startup = (() => {
 </div>
 <script src="skin-viewer.js"></script>
 <script src="assets/faceit/dashboard.js"></script>
+<link rel="stylesheet" href="assets/accounts/dock.css">
+<script src="assets/accounts/dock.js"></script>
 <script src="assets/apps/apps.js"></script>
 <script src="assets/goxlr/sound.js"></script>
 <script src="assets/config/files.js"></script>
@@ -12196,6 +12204,7 @@ function startFaceitWatch() {
 }
 
 function renderFaceit() {
+  renderAccountsDock();
   fcRenderDashboard();
 }
 
@@ -13354,6 +13363,7 @@ function cloudWay(kind, title, blurb, link) {
 }
 
 function renderCloud() {
+  renderAccountsDock();
   const box = $("account-out");
   if (!box || !cloudData) return;
   const d = cloudData;
@@ -13471,7 +13481,7 @@ document.addEventListener("click", async e => {
                           { provider: kind, link: pick.dataset.link === "1" });
       if (!r.ok) { status(esc(r.error), true); }
       else {
-        status(r.opened ? "Finish in your browser, then come back here."
+        status(r.opened ? "Finish signing in on Steam’s page, then come back here."
                         : "Open this to finish: " + esc(r.url));
         watchCloudLogin();
       }
@@ -13867,7 +13877,7 @@ function renderSetupSync(s) {
   else if (last.action === 'pull') setupSyncMessage(s,'Brought over your settings from ' + setupSource(last) + ': ' + setupFileCount(last) + ' files',true,'The game preset and theme are prefilled from your other PC.' + (last.waiting > 0 ? ' Your config files will wait for permission in the next step.' : ''));
   else if (signed && s.synced) setupSyncMessage(s,'Your Steam account is connected.',true,last.action === 'push' ? 'Your settings are saved and ready to follow you.' : 'This PC has your latest settings.');
   else if (signed) setupSyncMessage(s,'Your Steam account is connected.',true,'Ready to check for your settings.');
-  else setupSyncMessage(s,s.loginPending ? 'Finish signing in in your browser.' : 'Your settings. Every PC.',false,s.loginPending ? 'Come back here when Steam has signed you in.' : 'Sign in with Steam to bring your setup with you.');
+  else setupSyncMessage(s,s.loginPending ? 'Finish signing in on Steam’s page.' : 'Your settings. Every PC.',false,s.loginPending ? 'It closes by itself when Steam has signed you in.' : 'Sign in with Steam once. It brings your setup with you and your match history.');
 }
 async function setupSync(s) {
   if (!setupAlive(s) || s.syncBusy) return;
@@ -15621,6 +15631,7 @@ function paintFace(frame, account) {
 }
 
 function renderWho() {
+  renderAccountsDock();
   const name = $("who-name"), how = $("who-how");
   if (!name) return;
   if (!whoData || whoData.ok === false || !whoData.steam) {
@@ -15703,7 +15714,7 @@ document.addEventListener("click", async e => {
     await reloadForAccount();
     return;
   }
-  if (!e.target.closest("#who-menu")) whoOpen(false);
+  if (!e.target.closest("#who-menu, #dock-steam")) whoOpen(false);
 });
 
 // Switching account changes which files every view is reading, so the views

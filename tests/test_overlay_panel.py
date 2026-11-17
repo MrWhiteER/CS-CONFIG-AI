@@ -318,7 +318,10 @@ class DesktopPanel(unittest.TestCase):
         service, controller = OverlayService(), mock.Mock()
         with (mock.patch.dict(sys.modules, {"webview":fake}),
               mock.patch.object(panel, "Panel", return_value=controller) as create_panel,
-              mock.patch.object(desktop, "_keep_running_in_the_tray")):
+              mock.patch.object(desktop, "_keep_running_in_the_tray"),
+              # The launch hands the app's Steam window factory to steamweb;
+              # keep that from leaking into later tests.
+              mock.patch("cs2cfg.steamweb.window_factory", None)):
             self.assertTrue(desktop._launch_webview("http://127.0.0.1:8765/", None, mock.Mock(), overlay=service))
         self.assertIs(service.panel, controller)
         fake.create_window.assert_called_once()

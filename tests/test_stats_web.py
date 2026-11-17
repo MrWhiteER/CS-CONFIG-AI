@@ -32,7 +32,8 @@ class Endpoint(unittest.TestCase):
 
     def _stats(self, body):
         with mock.patch.object(webui, "_faceit", return_value=self.faceit), \
-             mock.patch.object(webui, "_active_account", return_value="39734273"):
+             mock.patch.object(webui, "_active_account", return_value="39734273"), \
+             mock.patch("cs2cfg.steamweb.linked", return_value=False):
             return webui._stats(self.state, body)
 
     def test_both_sources(self):
@@ -52,6 +53,27 @@ class Endpoint(unittest.TestCase):
         out = self._stats({})
         self.assertEqual([m["source"] for m in out["matches"]], ["cs2"])
         self.assertFalse(out["faceit"]["linked"])
+
+    def test_steam_sign_in_without_the_app_window(self):
+        from cs2cfg import steamweb
+        with mock.patch.object(steamweb, "window_factory", None), \
+             mock.patch.object(steamweb, "linked", return_value=False):
+            out = webui._stats_steam(self.state, {"action": "signin"})
+        self.assertFalse(out["ok"])
+        self.assertFalse(out["available"])
+
+    def test_steam_sign_in_opens_steam_and_reads_history_after(self):
+        from cs2cfg import steamweb
+        opened, started = [], []
+        with mock.patch.object(steamweb, "window_factory", object()), \
+             mock.patch.object(steamweb, "sign_in", side_effect=lambda url=None: opened.append(url) or True), \
+             mock.patch.object(steamweb, "linked", return_value=False), \
+             mock.patch.object(webui, "_steam_history_start", side_effect=lambda st: started.append(st)):
+            out = webui._stats_steam(self.state, {"action": "signin"})
+            self.assertTrue(out["ok"])
+            self.assertEqual(opened, [None])
+            steamweb.on_signed_in[0]()
+        self.assertEqual(started, [self.state])
 
     def test_feed_reaches_the_recorder(self):
         seen = []

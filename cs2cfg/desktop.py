@@ -349,7 +349,15 @@ def _launch_webview(url: str, icon: Optional[Path], on_closed: Callable[[], None
         _keep_running_in_the_tray(window, icon)
         _watch_for_matches(url)
 
-        kwargs = {}
+        # The app's one Steam sign-in lives in windows of our own (steamweb).
+        # Not private, so it is remembered between launches.
+        from . import steamweb
+        from .paths import user_data_dir
+
+        steamweb.window_factory = lambda title, url, **kw: webview.create_window(
+            title, url, **kw)
+        kwargs = {"private_mode": False,
+                  "storage_path": str(user_data_dir() / "webview")}
         if icon and icon.exists():
             kwargs["icon"] = str(icon)
         try:

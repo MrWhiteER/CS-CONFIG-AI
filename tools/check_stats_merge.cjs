@@ -10,7 +10,9 @@ for(const script of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g))new vm
 const renderer=fs.readFileSync('cs2cfg/web/assets/faceit/dashboard.js','utf8');new vm.Script(renderer);
 const slice=(a,b)=>html.slice(html.indexOf(a),html.indexOf(b,html.indexOf(a)));
 
-let code=[fs.readFileSync('tests/stats_merge_browser.js','utf8'),renderer,slice('let demoData = null;','/* Crosshair X.'),'runStatsChecks();'].join('\n');
+// This isolated Stats fixture does not boot the account dock. Its refresh hook
+// is covered by docs/redesign/accounts-dock/capture.cjs with the real dock.
+let code=['function renderAccountsDock() {}',fs.readFileSync('tests/stats_merge_browser.js','utf8'),renderer,slice('let demoData = null;','/* Crosshair X.'),'runStatsChecks();'].join('\n');
 let page=html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'').replace('<head>','<head><base href="'+url.pathToFileURL(path.join(root,'cs2cfg/web/')).href+'">');
 if(process.env.FACEIT_RAIL)page=page.replace('<div class="app"','<div style="--rail:'+Number(process.env.FACEIT_RAIL)+'px" class="app"');
 // Escaped malicious fixture text must not terminate the harness script element.
