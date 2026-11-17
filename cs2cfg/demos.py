@@ -303,6 +303,15 @@ def history(player_id: str, size: int = 20,
             "assists": int(_num(row.get("i7"))),
             "kd": _num(row.get("c2")),
             "adr": _num(row.get("c10")),
+            # Same keys as the scoreboard (PLAYER_STATS). Left as None when a
+            # row does not carry one, so the list shows a dash, not a zero.
+            "kr": _opt(row, "c3"),
+            "hs_percent": _opt(row, "c4"),
+            "mvps": _opt(row, "i9", whole=True),
+            "double": _opt(row, "i40", whole=True),
+            "triple": _opt(row, "i14", whole=True),
+            "quadro": _opt(row, "i15", whole=True),
+            "penta": _opt(row, "i16", whole=True),
             "team": str(row.get("i5") or ""),
         })
     out.sort(key=lambda r: r["played_at"], reverse=True)
@@ -328,6 +337,13 @@ PLAYER_STATS = {
 }
 TEAM_STATS = {"name": "i5", "score": "c5",
               "first_half": "i3", "second_half": "i4", "won": "i17"}
+
+
+def _opt(row: Dict[str, Any], key: str, whole: bool = False) -> Any:
+    if row.get(key) in (None, ""):
+        return None
+    value = _num(row.get(key))
+    return int(value) if whole else value
 
 
 def _num(text: Any) -> float:

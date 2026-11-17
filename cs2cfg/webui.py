@@ -75,6 +75,9 @@ class State:
         self.updates: Optional[Any] = None   # updates.Checker, started on demand
         self.demo: Optional[Any] = None      # _DemoJob, while one is downloading
         self.faceit: Optional[Dict[str, Any]] = None  # cached profile + history
+        self.stats_token = ""                # secret for CS2's stats GSI feed
+        self.stats_recorder: Optional[Any] = None  # matchlog.Recorder, once set up
+        self.stats_store: Optional[Any] = None     # matchlog.Store
         self.sync: Optional[Any] = None      # autosync.Loop, once started
         self.server_ping: Optional[Any] = None  # on-demand Valve relay survey
         from .goxlr import Controller
@@ -3728,6 +3731,72 @@ def _faceit(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     return {"ok": True, "linked": True, "cached": False, **data}
 
 
+def _stats_store(state: State):
+    from . import matchlog
+    from .paths import user_data_dir
+
+    if state.stats_store is None:
+        state.stats_store = matchlog.Store(user_data_dir())
+    return state.stats_store
+
+
+def _stats_setup(state: State, install_finder, port: int) -> None:
+    """Point CS2's stats feed at this app. No admin: it is a file in CS2's cfg.
+
+    Rewritten only when it changed (a different port). CS2 reads it at start,
+    so a CS2 already running picks it up from its next launch.
+    """
+    from . import matchlog
+    from .cli import load_prefs
+    from .paths import user_data_dir
+
+    store = _stats_store(state)
+    state.stats_recorder = matchlog.Recorder(store.add)
+    try:
+        install = install_finder()
+        if not install:
+            return
+        if load_prefs().get("ui", {}).get("cs2_stats_record", True) is False:
+            matchlog.remove_cfg(install)
+            return
+        state.stats_token = matchlog.install_token(user_data_dir())
+        matchlog.write_cfg(install, port, state.stats_token)
+    except (OSError, ValueError):
+        pass
+
+
+def _stats_receive(state: State, raw: bytes) -> None:
+    from . import matchlog
+
+    payload = matchlog.parse_payload(raw, state.stats_token)
+    if state.stats_recorder is not None:
+        state.stats_recorder.feed(payload)
+
+
+def _stats(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """FACEIT and CS2 matches as one list, filtered by ``source``.
+
+    FACEIT comes through the same cached call the FACEIT tab already polls, so
+    asking for the combined list costs FACEIT nothing extra. CS2 matches are
+    the ones recorded on this PC for the account on screen.
+    """
+    from . import matchlog
+
+    source = str(body.get("source") or "all").lower()
+    faceit = _faceit(state, {"force": bool(body.get("force"))})
+    account = _active_account(state)
+    steam64 = matchlog.account_to_steam64(account) if account else ""
+    cs2 = _stats_store(state).matches(steam64) if steam64 else []
+    out = matchlog.combined(faceit.get("matches") or [], cs2, source)
+    return {
+        "ok": True,
+        **out,
+        "faceit": {k: faceit.get(k) for k in ("linked", "player", "error", "stale")
+                   if k in faceit},
+        "cs2": {"recording": bool(state.stats_token)},
+    }
+
+
 def _faceit_forget(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     """Stop following an account."""
     from .cli import load_prefs, save_prefs
@@ -5099,6 +5168,7 @@ def make_handler(state: State):
         "/api/demos/identities": _demo_identities,
         "/api/faceit": _faceit,
         "/api/faceit/forget": _faceit_forget,
+        "/api/stats": _stats,
         "/api/match/state": _match_state,
         "/api/match/accept": _match_accept,
         "/api/match/dismiss": _match_dismiss,
@@ -5502,6 +5572,32 @@ def make_handler(state: State):
             self._send_json({"error": "not found"}, 404)
 
         def do_POST(self) -> None:
+            if self.path.split("?", 1)[0] == "/api/stats/gsi":
+                from .matchlog import MAX_BODY as STATS_MAX
+
+                # Same rules as the overlay feed: CS2's cfg secret, loopback
+                # only, size checked before reading.
+                self.close_connection = True
+                if not self._host_ok() or self.client_address[0] != "127.0.0.1":
+                    self._send_json({"error": "host not allowed"}, 403)
+                    return
+                try:
+                    length = int(self.headers.get("Content-Length", "0"))
+                    if self.headers.get("Transfer-Encoding") or not 0 < length <= STATS_MAX:
+                        self._send_json({"error": "invalid body size"}, 413)
+                        return
+                    self.connection.settimeout(2)
+                    raw = self.rfile.read(length)
+                    if len(raw) != length:
+                        raise ValueError("Incomplete GSI body")
+                    _stats_receive(state, raw)
+                except PermissionError:
+                    self._send_json({"error": "invalid GSI token"}, 403)
+                except (ValueError, OSError):
+                    self._send_json({"error": "invalid GSI body"}, 400)
+                else:
+                    self._send_json({"ok": True})
+                return
             if self.path.split("?", 1)[0] == "/api/overlay/gsi":
                 from .overlay.gsi import MAX_BODY
 
@@ -5632,5 +5728,6 @@ def serve(port: int = 8765, cfg_folder: str = "mrwhiteer",
         return state.cs2_install
 
     state.overlay.bind_gsi(overlay_install, server.server_address[1])
+    _stats_setup(state, overlay_install, server.server_address[1])
     state.overlay.configure(overlay_settings(load_prefs().get("ui")))
     return server, state
