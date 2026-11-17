@@ -1,0 +1,214 @@
+{
+  "renderer": "Microsoft Edge headless, native Chrome DevTools Protocol (no added dependencies)",
+  "shots": [
+    {
+      "file": "concept-A-idle-dark.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 998834
+    },
+    {
+      "file": "concept-A-hover-dark.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 996027
+    },
+    {
+      "file": "concept-A-switcher-dark.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 947516
+    },
+    {
+      "file": "concept-A-transition-dark.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 998959
+    },
+    {
+      "file": "concept-A-switcher-dark-1100.png",
+      "width": 1100,
+      "height": 900,
+      "bytes": 727726
+    },
+    {
+      "file": "concept-A-idle-daylight.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 1009733
+    },
+    {
+      "file": "concept-A-hover-daylight.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 1011185
+    },
+    {
+      "file": "concept-A-switcher-daylight.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 970788
+    },
+    {
+      "file": "concept-A-transition-daylight.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 1014393
+    },
+    {
+      "file": "concept-A-switcher-daylight-1100.png",
+      "width": 1100,
+      "height": 900,
+      "bytes": 752698
+    },
+    {
+      "file": "concept-A-framestrip.png",
+      "width": 3200,
+      "height": 163,
+      "bytes": 102381
+    },
+    {
+      "file": "concept-A-reduced-motion-dark-1100.png",
+      "width": 1100,
+      "height": 900,
+      "bytes": 386633
+    },
+    {
+      "file": "concept-A-switcher-dark-860.png",
+      "width": 860,
+      "height": 900,
+      "bytes": 399404
+    },
+    {
+      "file": "concept-B-idle-dark.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 996118
+    },
+    {
+      "file": "concept-B-hover-dark.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 992233
+    },
+    {
+      "file": "concept-B-switcher-dark.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 935966
+    },
+    {
+      "file": "concept-B-transition-dark.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 998726
+    },
+    {
+      "file": "concept-B-switcher-dark-1100.png",
+      "width": 1100,
+      "height": 900,
+      "bytes": 728947
+    },
+    {
+      "file": "concept-B-idle-daylight.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 1012035
+    },
+    {
+      "file": "concept-B-hover-daylight.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 1009053
+    },
+    {
+      "file": "concept-B-switcher-daylight.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 961684
+    },
+    {
+      "file": "concept-B-transition-daylight.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 1016262
+    },
+    {
+      "file": "concept-B-switcher-daylight-1100.png",
+      "width": 1100,
+      "height": 900,
+      "bytes": 754457
+    },
+    {
+      "file": "concept-B-framestrip.png",
+      "width": 3200,
+      "height": 163,
+      "bytes": 106485
+    },
+    {
+      "file": "concept-B-reduced-motion-dark-1100.png",
+      "width": 1100,
+      "height": 900,
+      "bytes": 386001
+    },
+    {
+      "file": "concept-B-switcher-dark-860.png",
+      "width": 860,
+      "height": 900,
+      "bytes": 415064
+    }
+  ],
+  "checks": [
+    {
+      "concept": "A",
+      "initial": true
+    },
+    {
+      "concept": "A",
+      "threeOptions": true,
+      "switch": true
+    },
+    {
+      "concept": "A",
+      "keyboardEnd": true
+    },
+    {
+      "concept": "A",
+      "escape": true
+    },
+    {
+      "concept": "A",
+      "otherTab": true
+    },
+    {
+      "concept": "A",
+      "reducedMotion": true
+    },
+    {
+      "concept": "B",
+      "initial": true
+    },
+    {
+      "concept": "B",
+      "threeOptions": true,
+      "switch": true
+    },
+    {
+      "concept": "B",
+      "keyboardEnd": true
+    },
+    {
+      "concept": "B",
+      "escape": true
+    },
+    {
+      "concept": "B",
+      "otherTab": true
+    },
+    {
+      "concept": "B",
+      "reducedMotion": true
+    }
+  ],
+  "errors": []
+}
