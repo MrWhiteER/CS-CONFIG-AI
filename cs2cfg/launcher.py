@@ -450,6 +450,7 @@ def _bring_up_companions(
 
     pending: List[Tuple[str, Callable[[], bool]]] = []
     required: set = set()       # waited for with no time limit
+    ac_checks: Dict[str, Any] = {}  # FACEIT AC readiness, for the status line
     wait = COMPANION_WAIT
 
     if start_crosshairx:
@@ -486,8 +487,10 @@ def _bring_up_companions(
 
             ready = AcReadiness()
             if ready.up_now():
-                report(f"  {entry['name']} is already running", "dim")
+                report(f"  {entry['name']} is already running and ready", "dim")
                 continue
+            ready.started_here = True
+            ac_checks[entry["name"]] = ready
             required.add(entry["name"])
             if companions_mod.running(exe_name):
                 report(f"  waiting for {entry['name']} to finish starting...", "")
@@ -552,8 +555,9 @@ def _bring_up_companions(
         if blocking and waited >= told + 10:
             told = waited
             for name in sorted(blocking):
-                report(f"  still waiting for {name} to be ready ({waited}s) -- "
-                       "CS2 starts as soon as it is", "")
+                why = getattr(ac_checks.get(name), "last", "") or "not ready yet"
+                report(f"  waiting for {name}: {why} ({waited}s) -- "
+                       "CS2 starts as soon as it is ready", "")
         time.sleep(0.5)
     for name in still - required:
         report(f"  {name} did not answer in time — starting CS2 anyway", "warn")

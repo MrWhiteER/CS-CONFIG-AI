@@ -62,17 +62,37 @@ APPS: Dict[str, Dict[str, Any]] = {
 AC_WAIT = 90.0
 
 
-# What "the anti-cheat is ready" means. The tray program (faceitclient.exe)
-# appears the moment it is started, but FACEIT AC is only protecting anything
-# once its Windows service is running -- and a CS2 started in that gap is the
-# one FACEIT tells you to restart. So the launch waits for the service, then a
-# few seconds more for it to settle.
+# What "the anti-cheat is ready" means -- read from FACEIT AC itself, never
+# from a timer. Recorded on the player's PC (2026-11-17, a launch that worked):
+#
+#   +0.0s  faceitclient.exe starts
+#   +1.0s  FACEITService START_PENDING, +1.6s RUNNING
+#   +1.5s  visible window "FACEIT Anti-cheat" opens
+#   +4.2s  the service connects to FACEIT's servers
+#   +5.1s  a second window "FACEIT AC" opens
+#   +7.3s  faceitclient links to the service on 127.0.0.1; "FACEIT AC" closes
+#   +8.8s  faceitclient itself connects to FACEIT's servers: ready
+#   +9.4s  CS2 starts and "FACEIT Anti-cheat" closes -- possibly *because*
+#          the game appeared, so that window is never waited on: it could
+#          wait for us while we wait for it.
+#
+# On a day FACEIT AC updates itself, all of that takes longer by an amount
+# nobody can know in advance, and a CS2 started in the middle is the one
+# FACEIT asks you to restart. So readiness is the end state, checked live:
+#
+#   1. faceitclient.exe running and FACEITService RUNNING
+#   2. faceitclient.exe has its own connection to FACEIT's servers
+#      (an ESTABLISHED TCP connection to anything that is not this machine)
+#   3. no FACEIT AC working window open ("FACEIT AC", or anything saying it
+#      is updating). Only required when this launch saw the anti-cheat start;
+#      an AC that was already up and connected is ready as it is.
+#
+# All three are read without administrator rights.
 AC_PROCESS = "faceitclient.exe"
 # Not "FACEIT": that name is the kernel driver, which runs from boot and so
 # says nothing about whether the anti-cheat has been started. Confirmed on the
 # player's PC: FACEITService, demand-start, binary faceitservice.exe.
 AC_SERVICES = ("FACEITService",)
-AC_SETTLE = 5.0
 
 _SERVICE_RUNNING = 4      # SERVICE_RUNNING, the same in every Windows language
 
@@ -131,35 +151,186 @@ def ac_service_running() -> Optional[bool]:
     return False if seen else None
 
 
-class AcReadiness:
-    """Answers "is FACEIT AC ready for CS2 yet?" for the launcher's wait loop.
+def _pids(exe: str) -> List[int]:
+    """Process ids with this image name (case-insensitive)."""
+    if sys.platform != "win32":
+        return []
+    import ctypes
+    from ctypes import wintypes
 
-    Ready = the tray program is running, the service is running (when there
-    is one to check), and both have stayed that way for AC_SETTLE seconds.
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+
+    class ENTRY(ctypes.Structure):
+        _fields_ = [("dwSize", wintypes.DWORD), ("cntUsage", wintypes.DWORD),
+                    ("th32ProcessID", wintypes.DWORD),
+                    ("th32DefaultHeapID", ctypes.c_size_t),
+                    ("th32ModuleID", wintypes.DWORD), ("cntThreads", wintypes.DWORD),
+                    ("th32ParentProcessID", wintypes.DWORD),
+                    ("pcPriClassBase", ctypes.c_long), ("dwFlags", wintypes.DWORD),
+                    ("szExeFile", ctypes.c_wchar * 260)]
+
+    kernel32.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
+    kernel32.CreateToolhelp32Snapshot.argtypes = [wintypes.DWORD, wintypes.DWORD]
+    kernel32.Process32FirstW.argtypes = [wintypes.HANDLE, ctypes.POINTER(ENTRY)]
+    kernel32.Process32NextW.argtypes = [wintypes.HANDLE, ctypes.POINTER(ENTRY)]
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    snap = kernel32.CreateToolhelp32Snapshot(0x2, 0)            # PROCESSES
+    if not snap or snap == wintypes.HANDLE(-1).value:
+        return []
+    out: List[int] = []
+    try:
+        entry = ENTRY()
+        entry.dwSize = ctypes.sizeof(ENTRY)
+        ok = kernel32.Process32FirstW(snap, ctypes.byref(entry))
+        while ok:
+            if entry.szExeFile.lower() == exe.lower():
+                out.append(int(entry.th32ProcessID))
+            ok = kernel32.Process32NextW(snap, ctypes.byref(entry))
+    finally:
+        kernel32.CloseHandle(snap)
+    return out
+
+
+def _remote_connections(pids: Iterable[int]) -> int:
+    """ESTABLISHED TCP connections owned by these processes to anything that
+    is not this machine. Read from Windows' own TCP table, no admin needed."""
+    wanted = set(pids)
+    if sys.platform != "win32" or not wanted:
+        return 0
+    import ctypes
+    from ctypes import wintypes
+
+    iphlp = ctypes.WinDLL("iphlpapi", use_last_error=True)
+    iphlp.GetExtendedTcpTable.argtypes = [ctypes.c_void_p, ctypes.POINTER(wintypes.DWORD),
+                                          wintypes.BOOL, wintypes.ULONG,
+                                          ctypes.c_int, wintypes.ULONG]
+    ESTABLISHED = 5
+    count = 0
+
+    def table(family: int) -> bytes:
+        size = wintypes.DWORD(0)
+        iphlp.GetExtendedTcpTable(None, ctypes.byref(size), False, family, 5, 0)
+        for _ in range(3):
+            buf = ctypes.create_string_buffer(size.value or 4)
+            if iphlp.GetExtendedTcpTable(buf, ctypes.byref(size), False, family, 5, 0) == 0:
+                return buf.raw
+        return b""
+
+    import struct
+
+    raw = table(2)                                   # IPv4, owner pid
+    if len(raw) >= 4:
+        rows = struct.unpack_from("<I", raw, 0)[0]
+        for i in range(rows):
+            off = 4 + i * 24
+            if off + 24 > len(raw):
+                break
+            state, _la, _lp, remote, _rp, pid = struct.unpack_from("<IIIIII", raw, off)
+            first = remote & 0xFF                    # network order: first octet
+            if state == ESTABLISHED and pid in wanted and first not in (127, 0):
+                count += 1
+    raw = table(23)                                  # IPv6, owner pid
+    if len(raw) >= 4:
+        rows = struct.unpack_from("<I", raw, 0)[0]
+        for i in range(rows):
+            off = 4 + i * 56
+            if off + 56 > len(raw):
+                break
+            remote = raw[off + 24:off + 40]
+            state, pid = struct.unpack_from("<II", raw, off + 48)
+            loop = remote == b"\0" * 15 + b"\1" or (
+                remote[:12] == b"\0" * 10 + b"\xff\xff" and remote[12] == 127)
+            if state == ESTABLISHED and pid in wanted and not loop and any(remote):
+                count += 1
+    return count
+
+
+# Windows FACEIT AC shows while it is still working: the transient "FACEIT AC"
+# window seen at startup, and anything announcing an update. Its main
+# "FACEIT Anti-cheat" window is deliberately not here (see above).
+_BUSY_TITLES = ("faceit ac",)
+_BUSY_WORDS = ("updat", "download", "install")
+
+
+def _is_busy_title(title: str) -> bool:
+    text = (title or "").strip().lower()
+    return text in _BUSY_TITLES or any(w in text for w in _BUSY_WORDS)
+
+
+def _visible_windows(pids: Iterable[int]) -> int:
+    """FACEIT AC's visible "still working" windows (see _BUSY_TITLES)."""
+    wanted = set(pids)
+    if sys.platform != "win32" or not wanted:
+        return 0
+    import ctypes
+    from ctypes import wintypes
+
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+    user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND,
+                                                ctypes.POINTER(wintypes.DWORD)]
+    user32.IsWindowVisible.argtypes = [wintypes.HWND]
+    user32.GetWindowTextLengthW.argtypes = [wintypes.HWND]
+    user32.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+    found = [0]
+
+    @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    def callback(hwnd, _lp):
+        if user32.IsWindowVisible(hwnd) and user32.GetWindowTextLengthW(hwnd):
+            pid = wintypes.DWORD()
+            user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+            if pid.value in wanted:
+                buf = ctypes.create_unicode_buffer(256)
+                user32.GetWindowTextW(hwnd, buf, 256)
+                if _is_busy_title(buf.value):
+                    found[0] += 1
+        return True
+
+    user32.EnumWindows(callback, 0)
+    return found[0]
+
+
+class AcReadiness:
+    """Answers "is FACEIT AC ready for CS2 yet?" from what FACEIT AC itself
+    shows -- see the notes above. No timers: on an update day it simply stays
+    not-ready for longer.
+
+    ``started_here`` is set by the launcher when this launch started the
+    anti-cheat (or found it still starting); then its startup window must have
+    closed as well.
     """
 
-    def __init__(self, clock=None, running=None, service=None):
-        import time as _time
-
-        self._clock = clock or _time.monotonic
-        self._running = running or (lambda: companions.running(AC_PROCESS))
+    def __init__(self, pids=None, service=None, online=None, windows=None):
+        self._pids = pids or (lambda: _pids(AC_PROCESS))
         self._service = service or ac_service_running
-        self._since: Optional[float] = None
+        self._online = online or _remote_connections
+        self._windows = windows or _visible_windows
+        self.started_here = False
+        self.last = ""           # what it is waiting on, for the status line
+
+    def _state(self, need_window_closed: bool) -> bool:
+        pids = self._pids()
+        if not pids:
+            self.last = "FACEIT AC is not running yet"
+            return False
+        if self._service() is False:
+            self.last = "FACEIT AC's service is starting"
+            return False
+        if self._online(pids) <= 0:
+            self.last = "FACEIT AC is connecting to FACEIT"
+            return False
+        if need_window_closed and self._windows(pids) > 0:
+            self.last = "FACEIT AC is still starting (or updating)"
+            return False
+        self.last = "ready"
+        return True
 
     def up_now(self) -> bool:
-        if not self._running():
-            return False
-        service = self._service()
-        return service is not False      # None = no service to check
+        """Already up before this launch touched it: running, service up,
+        connected. Its window may be open -- the player may have opened it."""
+        return self._state(need_window_closed=False)
 
     def __call__(self) -> bool:
-        if not self.up_now():
-            self._since = None
-            return False
-        now = self._clock()
-        if self._since is None:
-            self._since = now
-        return now - self._since >= AC_SETTLE
+        return self._state(need_window_closed=self.started_here)
 
 
 # --- finding them -----------------------------------------------------------
