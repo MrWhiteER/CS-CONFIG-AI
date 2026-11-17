@@ -166,6 +166,10 @@ class AutoHideState(unittest.TestCase):
             service.receive_gsi(payload())
         service._settings["overlay_enabled"] = True
         service._hud = mock.Mock()
+        # Default: pinned tools stay visible through a live round.
+        service.receive_gsi(payload(round={"phase": "live"}, player={"state": {"health": 100}}))
+        self.assertTrue(service._hud.configure.call_args.kwargs["auto_visible"])
+        service._settings["overlay_hide_in_rounds"] = True
         service.receive_gsi(payload(round={"phase": "freezetime"}))
         self.assertTrue(service._hud.configure.call_args.kwargs["auto_visible"])
         service.receive_gsi(payload(round={"phase": "live"}, player={"state": {"health": 100}}))
@@ -177,8 +181,10 @@ class CaptureSettings(unittest.TestCase):
         defaults = settings.read()
         self.assertFalse(defaults["overlay_enabled"])
         self.assertFalse(defaults["overlay_always_visible"])
-        for key in ("overlay_auto_hide", "overlay_hide_from_capture"):
-            self.assertTrue(defaults[key])
+        # Pinned tools stay up the whole match unless the player opts in.
+        self.assertFalse(defaults["overlay_hide_in_rounds"])
+        self.assertTrue(defaults["overlay_hide_from_capture"])
+        for key in ("overlay_hide_in_rounds", "overlay_hide_from_capture"):
             self.assertIn(key, profiles.MACHINE_KEYS)
             with self.assertRaises(ValueError):
                 settings.read({key: "yes"}, strict=True)

@@ -168,8 +168,8 @@ class ToolSources(unittest.TestCase):
     def test_settings_and_dismiss_delegate(self):
         self.assertEqual(settings_tool.data(self.state), {'settings': self.source['settings']})
         with mock.patch.object(webui, '_overlay_settings') as save:
-            settings_tool.save(self.state, {'overlay_auto_hide': False})
-            save.assert_called_with(self.state, {'overlay_auto_hide': False})
+            settings_tool.save(self.state, {'overlay_hide_in_rounds': False})
+            save.assert_called_with(self.state, {'overlay_hide_in_rounds': False})
             performance.dismiss(self.state, {})
             save.assert_called_with(self.state, {'overlay_sign_out_hint_dismissed': True})
 

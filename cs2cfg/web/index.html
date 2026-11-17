@@ -8736,7 +8736,7 @@ function overlaySettingsSample(mode) {
   const running = mode === 'live';
   return {settings: {overlay_enabled: mode !== 'off', overlay_corner: 'top_left',
     overlay_fields: ['fps', 'one_percent_low', 'frame_time_ms', 'cpu_percent', 'gpu_percent', 'gpu_temp_c'],
-    overlay_hotkey: 'Ctrl+Alt+O', overlay_panel_hotkey: 'Ctrl+Alt+P', overlay_auto_hide: true,
+    overlay_hotkey: 'Ctrl+Alt+O', overlay_panel_hotkey: 'Ctrl+Alt+P', overlay_hide_in_rounds: false,
     overlay_hide_from_capture: true, overlay_always_visible: false},
     status: mode === 'off' ? 'disabled' : running ? 'ok' : 'waiting_for_game', game_running: running,
     frame_capture_ready: running, frame_capture_hint: running ? '' : 'Sign out of Windows and back in once to enable frame stats',
@@ -8779,7 +8779,7 @@ function renderOverlay(d) {
     card('Panel', shortcut('overlay-panel-hotkey', 'Panel hotkey', s.overlay_panel_hotkey) +
       '<p class="sub2">Profiles, performance history and stutters. Opening the panel brings up the cursor; closing it returns to CS2.</p>') +
     card('Behaviour',
-      toggle('overlay_auto_hide', 'Auto hide', 'Show between rounds, in warmup and while dead.') +
+      toggle('overlay_hide_in_rounds', 'Hide during live rounds', 'Off: pinned tools stay on screen the whole match. On: they only show between rounds, in warmup and while dead.') +
       toggle('overlay_hide_from_capture', 'Hide from capture', 'Exclude the HUD and panel from supported capture tools.') +
       toggle('overlay_always_visible', 'Always visible', 'Override Auto hide while CS2 is focused.') +
       '<p class="sub2">Auto hide waits for game state if it is missing or out of date. Always visible still requires Fullscreen Windowed.</p>') +
@@ -8807,7 +8807,7 @@ document.addEventListener("click", async e => {
     else if (button.id === "overlay-save") {
       const answer = await api("/api/overlay/settings", {
         overlay_enabled: $("overlay-enabled").checked,
-        overlay_auto_hide: $("overlay-auto-hide").checked,
+        overlay_hide_in_rounds: $("overlay-hide-in-rounds").checked,
         overlay_hide_from_capture: $("overlay-hide-from-capture").checked,
         overlay_always_visible: $("overlay-always-visible").checked,
         overlay_corner: $("overlay-corner").value,
