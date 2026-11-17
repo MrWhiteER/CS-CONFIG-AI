@@ -13155,7 +13155,7 @@ document.addEventListener("click", async e => {
                           { provider: kind, link: pick.dataset.link === "1" });
       if (!r.ok) { status(esc(r.error), true); }
       else {
-        status(r.opened ? "Finish in your browser, then come back here."
+        status(r.opened ? "Finish signing in on Steam’s page, then come back here."
                         : "Open this to finish: " + esc(r.url));
         watchCloudLogin();
       }
@@ -13551,7 +13551,7 @@ function renderSetupSync(s) {
   else if (last.action === 'pull') setupSyncMessage(s,'Brought over your settings from ' + setupSource(last) + ': ' + setupFileCount(last) + ' files',true,'The game preset and theme are prefilled from your other PC.' + (last.waiting > 0 ? ' Your config files will wait for permission in the next step.' : ''));
   else if (signed && s.synced) setupSyncMessage(s,'Your Steam account is connected.',true,last.action === 'push' ? 'Your settings are saved and ready to follow you.' : 'This PC has your latest settings.');
   else if (signed) setupSyncMessage(s,'Your Steam account is connected.',true,'Ready to check for your settings.');
-  else setupSyncMessage(s,s.loginPending ? 'Finish signing in in your browser.' : 'Your settings. Every PC.',false,s.loginPending ? 'Come back here when Steam has signed you in.' : 'Sign in with Steam to bring your setup with you.');
+  else setupSyncMessage(s,s.loginPending ? 'Finish signing in on Steam’s page.' : 'Your settings. Every PC.',false,s.loginPending ? 'It closes by itself when Steam has signed you in.' : 'Sign in with Steam once. It brings your setup with you and your match history.');
 }
 async function setupSync(s) {
   if (!setupAlive(s) || s.syncBusy) return;

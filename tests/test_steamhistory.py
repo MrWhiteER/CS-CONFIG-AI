@@ -54,5 +54,31 @@ class Merging(unittest.TestCase):
         self.assertEqual(out["counts"]["cs2"], 2)
 
 
+class SharedSession(unittest.TestCase):
+    def test_sign_in_closes_itself_and_tells_the_app(self):
+        from unittest import mock
+        from cs2cfg import steamweb
+
+        urls = iter(["https://steamcommunity.com/openid/login?x", "https://cloud.example/callback"])
+        win = mock.Mock()
+        win.get_current_url.side_effect = lambda: next(urls, "https://cloud.example/callback")
+        heard = []
+        with mock.patch.object(steamweb, "mark") as mark, \
+             mock.patch.object(steamweb.time, "sleep"), \
+             mock.patch.object(steamweb, "on_signed_in", [lambda: heard.append(1)]):
+            steamweb._finished(win, steamweb._left_steam)
+        mark.assert_called_once()
+        self.assertTrue(mark.call_args[0][0]["linked"])
+        self.assertEqual(heard, [1])
+        win.destroy.assert_called_once()
+
+    def test_what_counts_as_finished(self):
+        from cs2cfg import steamweb
+        self.assertFalse(steamweb._signed_in_page("https://steamcommunity.com/login/home/?goto=my/"))
+        self.assertTrue(steamweb._signed_in_page("https://steamcommunity.com/id/edy/"))
+        self.assertFalse(steamweb._left_steam("https://steamcommunity.com/openid/login"))
+        self.assertTrue(steamweb._left_steam("https://cfg.example/auth/steam/callback"))
+
+
 if __name__ == "__main__":
     unittest.main()

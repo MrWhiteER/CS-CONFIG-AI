@@ -2,11 +2,9 @@
 
 Steam keeps every Premier, Competitive and Wingman match you played, with the
 ten-player scoreboard, at ``steamcommunity.com/profiles/<id>/gcpd/730``. The
-page is only shown to its owner, so it needs a steamcommunity.com sign-in. The
-Steam client on the PC does not share its session with other programs, so the
-app opens Steam's own login page once in its own window (pywebview keeps the
-cookie, so it is remembered); after that the history is read in a hidden
-window. The app never sees a password: it only reads the page Steam renders.
+page is only shown to its owner, so it is read with the app's one shared Steam
+sign-in (:mod:`steamweb`), in a hidden window. The app never sees a password:
+it only reads the page Steam renders.
 
 Reading happens in the page itself (``SCRAPER_JS``): it returns the scoreboard
 HTML of the first page plus every "load more" page Steam's own button would
@@ -30,7 +28,6 @@ TABS = {
     "matchhistorywingman": "Wingman",
 }
 PAGE = "https://steamcommunity.com/profiles/{steam64}/gcpd/730/?tab={tab}"
-LOGIN = "https://steamcommunity.com/login/home/?goto={goto}"
 MAX_PAGES = 40          # "load more" pages per tab; each is a handful of matches
 
 # Runs inside the gcpd page and leaves {signed_in, me, pages: [html, ...]} as
@@ -195,34 +192,22 @@ def parse(pages: List[str], steam64: str, mode: str, me: str = "") -> List[Dict[
 
 
 # ---------------------------------------------------------------------------
-# Driving the hidden window. ``window_factory`` is set by the desktop window
-# (pywebview); in a plain browser there is no way to read the page.
+# Reading it, in a hidden window that shares the app's Steam sign-in
+# (:mod:`steamweb`).
 
-window_factory: Optional[Callable[..., Any]] = None
 _lock = threading.Lock()
 status: Dict[str, Any] = {"state": "idle", "error": "", "updated": 0, "found": 0}
-
-
-def _wait_for(window, test: Callable[[str], bool], timeout: float) -> bool:
-    end = time.time() + timeout
-    while time.time() < end:
-        try:
-            if test(window.get_current_url() or ""):
-                time.sleep(1.5)  # let the page's own scripts set its globals
-                return True
-        except Exception:
-            pass
-        time.sleep(0.5)
-    return False
 
 
 def _read_tabs(window, steam64: str) -> Optional[List[Dict[str, Any]]]:
     import json
 
+    from . import steamweb
+
     rows: List[Dict[str, Any]] = []
     for tab, mode in TABS.items():
         window.load_url(PAGE.format(steam64=steam64, tab=tab))
-        if not _wait_for(window, lambda u: "gcpd/730" in u or "/login" in u, 30):
+        if not steamweb.wait_for(window, lambda u: "gcpd/730" in u or "/login" in u, 30):
             continue
         window.evaluate_js(SCRAPER_JS)
         raw, end = "", time.time() + 120
@@ -232,18 +217,20 @@ def _read_tabs(window, steam64: str) -> Optional[List[Dict[str, Any]]]:
         if not raw:
             continue  # this tab never answered; the others may
         try:
-            got = json.loads(raw) if raw else {}
+            got = json.loads(raw)
         except ValueError:
-            got = {}
+            continue
         if not got.get("signed_in"):
             return None
         rows += parse(got.get("pages") or [], steam64, mode, got.get("me") or "")
     return rows
 
 
-def sync(steam64: str, save: Callable[[Dict[str, Any]], None], sign_in: bool = False) -> None:
-    """Read the history in a window; ``sign_in`` shows Steam's login first."""
-    if window_factory is None:
+def sync(steam64: str, save: Callable[[Dict[str, Any]], None]) -> None:
+    """Read every tab and hand each match to ``save``. Never raises."""
+    from . import steamweb
+
+    if not steamweb.available():
         status.update(state="unavailable",
                       error="Open the app's own window (not a browser tab) to read Steam history.")
         return
@@ -251,19 +238,11 @@ def sync(steam64: str, save: Callable[[Dict[str, Any]], None], sign_in: bool = F
         return
     window = None
     try:
-        status.update(state="signing_in" if sign_in else "reading", error="")
-        first = PAGE.format(steam64=steam64, tab=next(iter(TABS)))
-        window = window_factory(
-            title="Sign in to Steam", url=LOGIN.format(goto=f"profiles/{steam64}/gcpd/730/")
-            if sign_in else first, width=900, height=760, hidden=not sign_in)
-        if sign_in and not _wait_for(window, lambda u: "gcpd/730" in u, 600):
-            status.update(state="signed_out", error="Steam sign-in was not finished.")
-            return
-        if sign_in:
-            window.hide()
-        status["state"] = "reading"
+        status.update(state="reading", error="")
+        window = steamweb.window(PAGE.format(steam64=steam64, tab=next(iter(TABS))))
         rows = _read_tabs(window, steam64)
         if rows is None:
+            steamweb.mark({"linked": False})
             status.update(state="signed_out", error="")
             return
         for row in rows:

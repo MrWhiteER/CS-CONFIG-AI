@@ -106,8 +106,8 @@ function fcRenderDashboard() {
   const head=showFaceit?'<div class="fc-player fc-surface fc-entry"><div class="fc-avatar"><span>'+esc(String(p.nickname||'?').slice(0,1).toUpperCase())+'</span>'+avatar+'</div><div class="fc-identity"><div class="fc-caption">'+fcSourceIcon('faceit')+' FACEIT'+(p.country?' · '+esc(p.country):'')+'</div><h3>'+esc(p.nickname||'FACEIT player')+'</h3></div>'+(level?'<span class="fc-level" title="FACEIT skill level '+level+'" aria-label="Skill level '+level+'">'+level+'</span>':'<span class="fc-caption">Unranked</span>')+'<div class="fc-rating">'+(faceitMatches.length?fcLineChart(faceitMatches,'elo',true):'')+'<div><span class="fc-label">Current ELO</span><strong>'+fcValue(fcNumber(p.elo)>0?p.elo:null)+'</strong></div></div><button class="btn small" id="fc-forget">Unfollow</button></div>':'';
   const follow=faceit.linked!==true?'<section class="fc-follow-card fc-surface"><div>'+fcSourceIcon('faceit')+'</div><div><h3>Add your FACEIT matches</h3><p>Follow a nickname to bring ELO and FACEIT history into this view.</p></div><div class="fc-follow"><input id="fc-nick" type="text" spellcheck="false" aria-label="FACEIT nickname" placeholder="FACEIT nickname" value="'+esc(draft)+'"><button class="btn small" id="fc-link">Follow</button></div></section>':'';
   // Past CS2 games live on Steam's website. One sign-in there, then it keeps itself up to date.
-  const steam=data.steam||{}, steamBusy=steam.state==='reading'||steam.state==='signing_in';
-  const steamCard=fcSource!=='faceit'&&(!steam.linked||steamBusy||steam.error)?'<section class="fc-follow-card fc-surface"><div>'+fcSourceIcon('cs2')+'</div><div><h3>'+(steamBusy?(steam.state==='signing_in'?'Sign in to Steam in the window that opened':'Reading your Steam match history…'):'Add your older CS2 matches')+'</h3><p>'+esc(steam.error||'Premier, Competitive and Wingman games from Steam. Sign in to Steam once; it updates by itself after that.')+'</p></div>'+(steamBusy?'':'<div class="fc-follow"><button class="btn" id="fc-steam-signin">Sign in to Steam</button></div>')+'</section>':'';
+  const steam=data.steam||{}, steamBusy=steam.state==='reading';
+  const steamCard=fcSource!=='faceit'&&(!steam.linked||steamBusy||steam.error)?'<section class="fc-follow-card fc-surface"><div>'+fcSourceIcon('cs2')+'</div><div><h3>'+(steamBusy?'Reading your Steam match history…':'Add your older CS2 matches')+'</h3><p>'+esc(steam.error||'Premier, Competitive and Wingman games from Steam. Sign in to Steam once on Steam’s own page; it updates by itself after that.')+'</p></div>'+(steamBusy?'':'<div class="fc-follow"><button class="btn" id="fc-steam-signin">Sign in to Steam</button></div>')+'</section>':'';
   const sourceLegend='<span class="fc-stat-sources" aria-label="Stats sources">'+(fcSource==='all'?[fcSourceIcon('faceit'),fcSourceIcon('cs2')].join(''):fcSourceIcon(fcSource))+'</span>';
   const form=matches.slice(0,5).map(m=>'<span class="fc-result '+fcOutcomeClass(m)+'" title="'+esc(fcSourceName(m.source)+' · '+fcMapName(m.map)+' · '+fcWhen(m,true))+'">'+fcSourceIcon(m.source)+fcOutcome(m)+'</span>').join('');
   const card=(label,value,caption)=>'<div class="fc-stat fc-surface"><span class="fc-label">'+label+sourceLegend+'</span><strong>'+value+'</strong><span class="fc-caption">'+caption+'</span></div>';
@@ -137,8 +137,9 @@ document.addEventListener('click', async e=>{
     try {await api('/api/stats/steam',{action:'signin'});} catch (_) {}
     await loadFaceit();
     // Keep the card current while Steam's window is open and the history is read.
+    const until=Date.now()+10*60*1000;
     const poll=setInterval(async()=>{let st={};try{st=await api('/api/stats/steam',{});}catch(_){}
-      if(st.state!=='reading'&&st.state!=='signing_in'){clearInterval(poll);await loadFaceit();}},3000);
+      if(st.state!=='reading'&&(st.linked||Date.now()>until)){clearInterval(poll);await loadFaceit();}},3000);
     return;
   }
   const source=e.target.closest('[data-fc-source]');

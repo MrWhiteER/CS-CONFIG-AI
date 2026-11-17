@@ -3798,30 +3798,10 @@ def _stats_receive(state: State, raw: bytes) -> None:
         state.stats_recorder.feed(payload)
 
 
-STEAM_HISTORY_FILE = "steam-history.json"
 STEAM_HISTORY_EVERY = 3600   # re-read Steam's history at most hourly
 
 
-def _steam_history_mark(update: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Whether Steam's history was linked on this PC, and when it was read."""
-    from .paths import user_data_dir
-
-    path = user_data_dir() / STEAM_HISTORY_FILE
-    try:
-        mark = json.loads(path.read_text(encoding="utf-8"))
-        mark = mark if isinstance(mark, dict) else {}
-    except (OSError, ValueError):
-        mark = {}
-    if update:
-        mark.update(update)
-        try:
-            path.write_text(json.dumps(mark), encoding="utf-8")
-        except OSError:
-            pass
-    return mark
-
-
-def _steam_history_start(state: State, sign_in: bool) -> bool:
+def _steam_history_start(state: State) -> bool:
     from . import matchlog, steamhistory
 
     account = _active_account(state)
@@ -3829,28 +3809,38 @@ def _steam_history_start(state: State, sign_in: bool) -> bool:
     if not steam64:
         return False
     store = _stats_store(state)
-
-    def run():
-        steamhistory.sync(steam64, store.add, sign_in=sign_in)
-        st = steamhistory.status
-        if st["state"] == "done":
-            _steam_history_mark({"linked": True, "updated": st["updated"]})
-        elif st["state"] == "signed_out":
-            _steam_history_mark({"linked": False})
-
-    threading.Thread(target=run, name="steam-history", daemon=True).start()
+    threading.Thread(target=steamhistory.sync, args=(steam64, store.add),
+                     name="steam-history", daemon=True).start()
     return True
+
+
+def _steam_hooks(state: State) -> None:
+    """After the shared Steam sign-in, read the match history straight away."""
+    from . import steamweb
+
+    steamweb.on_signed_in[:] = [lambda: _steam_history_start(state)]
+
+
+def _steam_state() -> Dict[str, Any]:
+    from . import steamhistory, steamweb
+
+    return {"linked": steamweb.linked(), "available": steamweb.available(),
+            **steamhistory.status}
 
 
 def _stats_steam(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     """Past CS2 matches from Steam. ``action``: signin, sync or status."""
-    from . import steamhistory
+    from . import steamweb
 
     action = str(body.get("action") or "status")
-    if action in ("signin", "sync"):
-        if not _steam_history_start(state, sign_in=action == "signin"):
-            return {"ok": False, "error": "Steam account not found"}
-    return {"ok": True, **_steam_history_mark(), **steamhistory.status}
+    if action == "signin":
+        _steam_hooks(state)
+        if not steamweb.sign_in():
+            return {"ok": False, "error": "Open the app's own window to sign in to Steam.",
+                    **_steam_state()}
+    elif action == "sync" and not _steam_history_start(state):
+        return {"ok": False, "error": "Steam account not found", **_steam_state()}
+    return {"ok": True, **_steam_state()}
 
 
 def _stats(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -3880,13 +3870,13 @@ def _stats(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
 
 def _stats_steam_auto(state: State) -> Dict[str, Any]:
     """Keep Steam's history fresh on its own once it has been linked."""
-    from . import steamhistory
+    from . import steamhistory, steamweb
 
-    mark = _steam_history_mark()
-    if mark.get("linked") and steamhistory.status["state"] not in ("reading", "signing_in") \
-            and time.time() - float(mark.get("updated") or 0) > STEAM_HISTORY_EVERY:
-        _steam_history_start(state, sign_in=False)
-    return {**mark, **steamhistory.status}
+    st = steamhistory.status
+    if steamweb.linked() and steamweb.available() and st["state"] != "reading" \
+            and time.time() - float(st.get("updated") or 0) > STEAM_HISTORY_EVERY:
+        _steam_history_start(state)
+    return _steam_state()
 
 
 def _faceit_forget(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
@@ -4851,6 +4841,15 @@ def _cloud_login(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         return {"ok": False, "error": str(exc)}
 
     state._login = started
+    # In the app window, Steam's OpenID page opens in the app's own Steam
+    # window, so this one sign-in also covers match history and anything else
+    # that reads Steam's site. A browser tab falls back to the browser.
+    from . import steamweb
+
+    if provider == "steam" and steamweb.available():
+        _steam_hooks(state)
+        if steamweb.sign_in(started["url"]):
+            return {"ok": True, "opened": True, "provider": provider, "link": link}
     if not _open_in_default_browser(started["url"]):
         return {"ok": True, "opened": False, "url": started["url"],
                 "detail": "Open this in your browser to finish signing in"}
