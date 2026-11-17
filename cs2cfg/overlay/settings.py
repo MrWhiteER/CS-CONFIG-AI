@@ -11,7 +11,7 @@ DEFAULTS = {
     "overlay_layout": {},
     "overlay_tools": list(IDS),
     "overlay_enabled": False,
-    "overlay_auto_hide": True,
+    "overlay_hide_in_rounds": False,
     "overlay_always_visible": False,
     "overlay_hide_from_capture": True,
     "overlay_corner": "top_left",

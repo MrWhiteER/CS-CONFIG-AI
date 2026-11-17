@@ -449,6 +449,8 @@ def _bring_up_companions(
     from . import companions as companions_mod
 
     pending: List[Tuple[str, Callable[[], bool]]] = []
+    required: set = set()       # waited for with no time limit
+    ac_checks: Dict[str, Any] = {}  # FACEIT AC readiness, for the status line
     wait = COMPANION_WAIT
 
     if start_crosshairx:
@@ -481,13 +483,15 @@ def _bring_up_companions(
             # *ready* -- not merely started: the tray program appears at once,
             # the service it needs a few seconds later. So readiness, not the
             # process, is what CS2 waits on, even when it was already open.
-            from .faceit_apps import AC_WAIT, AcReadiness
+            from .faceit_apps import AcReadiness
 
             ready = AcReadiness()
             if ready.up_now():
-                report(f"  {entry['name']} is already running", "dim")
+                report(f"  {entry['name']} is already running and ready", "dim")
                 continue
-            wait = max(wait, AC_WAIT)
+            ready.started_here = True
+            ac_checks[entry["name"]] = ready
+            required.add(entry["name"])
             if companions_mod.running(exe_name):
                 report(f"  waiting for {entry['name']} to finish starting...", "")
                 pending.append((entry["name"], ready))
@@ -500,6 +504,7 @@ def _bring_up_companions(
                     report(f"  {entry['name']} needs administrator rights: "
                            "accept the Windows prompt", "")
             else:
+                required.discard(entry["name"])
                 report(f"  could not start {entry['name']}: "
                       f"{result.get('error', 'unknown error')}", "warn")
             continue
@@ -525,18 +530,36 @@ def _bring_up_companions(
     if not pending:
         return
 
-    deadline = time.monotonic() + wait
+    # FACEIT AC has no time limit: a CS2 started before the anti-cheat is
+    # ready is a CS2 FACEIT makes you restart, so starting it "anyway" is never
+    # the better outcome. The wait ends when it is ready or when the player
+    # presses Stop. Everything else keeps the ordinary limit.
+    started = time.monotonic()
+    deadline = started + wait
     still = {name for name, _ in pending}
-    while still and time.monotonic() < deadline:
+    told = 0
+    while still:
         if should_stop and should_stop():
             return
         for name, is_up in pending:
             if name in still and is_up():
                 still.discard(name)
                 report(f"  {name} is up", "good")
-        if still:
-            time.sleep(0.5)
-    for name in still:
+        if not still:
+            break
+        now = time.monotonic()
+        blocking = still & required
+        if now >= deadline and not blocking:
+            break
+        waited = int(now - started)
+        if blocking and waited >= told + 10:
+            told = waited
+            for name in sorted(blocking):
+                why = getattr(ac_checks.get(name), "last", "") or "not ready yet"
+                report(f"  waiting for {name}: {why} ({waited}s) -- "
+                       "CS2 starts as soon as it is ready", "")
+        time.sleep(0.5)
+    for name in still - required:
         report(f"  {name} did not answer in time — starting CS2 anyway", "warn")
 
 
@@ -648,6 +671,12 @@ def play(
 
     # 4. Hand off to Steam.
     try:
+        # Stopped while waiting on a companion (FACEIT AC can be waited on
+        # indefinitely): leave without starting the game; the finally below
+        # still puts the desktop back.
+        if should_stop and should_stop():
+            report("  stopped before CS2 was started", "warn")
+            return 1
         mark("launching")
         report("  launching through Steam...", "")
         launch_via_steam(extra_args)

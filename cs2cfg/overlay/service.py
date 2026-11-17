@@ -112,7 +112,7 @@ class OverlayService:
             self._game_state.update(state)
             if self._hud:
                 self._configure_hud(self._settings)
-                if not self._game_state.visible(auto_hide=self._settings['overlay_auto_hide'],
+                if not self._game_state.visible(auto_hide=self._settings['overlay_hide_in_rounds'],
                                                 always_visible=self._settings['overlay_always_visible']):
                     self.suspend_pins()
 
@@ -385,7 +385,7 @@ class OverlayService:
                             panel_hotkey=wanted["overlay_panel_hotkey"],
                             exclude_from_capture=wanted["overlay_hide_from_capture"],
                             auto_visible=self._game_state.visible(
-                                auto_hide=wanted["overlay_auto_hide"],
+                                auto_hide=wanted["overlay_hide_in_rounds"],
                                 always_visible=wanted["overlay_always_visible"]))
 
     def suspend_pins(self):
@@ -406,7 +406,7 @@ class OverlayService:
                        for tool, row in layout.items())
         native_visible = (has_pins and allowed and self._hud.pin_requested() and not (self.panel and self.panel.visible)
                           and self._game_state.visible(
-                              auto_hide=self._settings['overlay_auto_hide'],
+                              auto_hide=self._settings['overlay_hide_in_rounds'],
                               always_visible=self._settings['overlay_always_visible']))
         # Only cheap read-only sources run here; never call tool dispatch or a WebView.
         try:

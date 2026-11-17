@@ -75,6 +75,9 @@ class State:
         self.updates: Optional[Any] = None   # updates.Checker, started on demand
         self.demo: Optional[Any] = None      # _DemoJob, while one is downloading
         self.faceit: Optional[Dict[str, Any]] = None  # cached profile + history
+        self.stats_token = ""                # secret for CS2's stats GSI feed
+        self.stats_recorder: Optional[Any] = None  # matchlog.Recorder, once set up
+        self.stats_store: Optional[Any] = None     # matchlog.Store
         self.sync: Optional[Any] = None      # autosync.Loop, once started
         self.server_ping: Optional[Any] = None  # on-demand Valve relay survey
         from .goxlr import Controller
@@ -808,7 +811,7 @@ def _save_prefs(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     allowed = (
         "intent", "target_fps", "account", "write_video", "write_cfg",
         "write_launch", "link_autoexec", "stretch_mode", "patch_video",
-        "cfg_folder", "tab", "favourites", "mouse_shape", "kb_layout", "kb_shown", "kb_focus",
+        "cfg_folder", "tab", "favourites", "mouse_shape", "kb_layout", "kb_shown", "kb_focus", "kb_profile_icons",
         "update_auto_download", "update_skip", "rail_width", "pinned_account",
         # Named setups are written through their own endpoint, but the page
         # also sends them back with everything else when preferences are
@@ -1869,8 +1872,17 @@ def _cfg_layouts_create(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     if not name:
         return {"ok": False, "error": "give the profile a name"}
 
+    # A new profile starts as an empty keyboard: every key the standard
+    # layout binds is cleared, or set to CS2's own default when asked. A
+    # blank file would leave every key on the old binds once switched to.
+    start = str(body.get("start") or "empty")
+    table = _defaults_table(state) if start == "defaults" else {}
+    note = ""
+    if start == "defaults" and not table:
+        note = "CS2's default binds could not be found, so the profile starts empty"
     relative = cfgscan.new_profile_path(result, name)
-    text = cfgscan.profile_blank_text(name)
+    text = (cfgscan.profile_blank_text(name) if start == "blank"
+            else cfgscan.profile_start_text(result, name, table))
     path = Path(result.cfg_root) / Path(relative)
 
     session = backup.BackupSession(note=f"new profile {relative} (web)")
@@ -1884,7 +1896,7 @@ def _cfg_layouts_create(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     registry = layouts.load_registry(result.root)
     pins = layouts.load_pins(result.root)
     current = layouts.load_current(result.root)
-    return {"ok": True, "file": relative,
+    return {"ok": True, "file": relative, "note": note,
             "profiles": _profile_selector_view(
                 state.cfg_scan, registry, pins, current, _defaults_table(state))}
 
@@ -2565,6 +2577,9 @@ def _cfg_keys(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         # The last bind to load is the one the engine keeps.
         winner = max(entries, key=lambda b: b.order)
         command = (winner.body or "").strip().strip('"')
+        if not command:
+            # bind "key" "" -- cleared, e.g. by a new empty profile. Free.
+            continue
         feature = features.get(command.lower())
         bound[key] = {
             "key": key,
@@ -2671,6 +2686,14 @@ def _cfg_keys(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _not_bindable(code: str) -> str:
+    """Why a control on the page cannot take a CS2 bind, in plain words."""
+    if code.lower() in ("mouse6", "mouse7"):
+        return ("CS2 can't bind Mouse " + code[5:] +
+                ". Map it to a key in your mouse app, then bind that key.")
+    return code + " can't be bound in CS2."
+
+
 def _cfg_key_options(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     """What one key could be set to, and what it is set to now.
 
@@ -2684,6 +2707,8 @@ def _cfg_key_options(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     binding = str(body.get("binding") or "").strip()
     if not binding and body.get("code"):
         binding = keys.from_code(str(body["code"])) or ""
+        if not binding:
+            return {"ok": False, "error": _not_bindable(str(body["code"]))}
     if not binding:
         return {"ok": False, "error": "no key given"}
 
@@ -3103,6 +3128,8 @@ def _cfg_bind(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     binding = str(body.get("binding") or "").strip()
     if not binding and body.get("code"):
         binding = keys.from_code(str(body["code"])) or ""
+        if not binding:
+            return {"ok": False, "error": _not_bindable(str(body["code"]))}
     if not binding:
         return {"ok": False, "error": "no key given"}
 
@@ -3119,7 +3146,8 @@ def _cfg_bind(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     if existing and not clearing and not body.get("force"):
         winner = max(existing, key=lambda b: b.order)
         already = (winner.body or "").strip().strip(chr(34))
-        if already.lower() != command.lower():
+        # An empty bind ("") is a key a fresh profile cleared: free to take.
+        if already and already.lower() != command.lower():
             return {"ok": False, "needs_confirm": True,
                     "taken": [{"file": winner.file, "line": winner.line,
                                "runs": already}],
@@ -3768,6 +3796,72 @@ def _faceit(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     data = {"player": me, "matches": matches}
     state.faceit = {"when": fresh, "data": data}
     return {"ok": True, "linked": True, "cached": False, **data}
+
+
+def _stats_store(state: State):
+    from . import matchlog
+    from .paths import user_data_dir
+
+    if state.stats_store is None:
+        state.stats_store = matchlog.Store(user_data_dir())
+    return state.stats_store
+
+
+def _stats_setup(state: State, install_finder, port: int) -> None:
+    """Point CS2's stats feed at this app. No admin: it is a file in CS2's cfg.
+
+    Rewritten only when it changed (a different port). CS2 reads it at start,
+    so a CS2 already running picks it up from its next launch.
+    """
+    from . import matchlog
+    from .cli import load_prefs
+    from .paths import user_data_dir
+
+    store = _stats_store(state)
+    state.stats_recorder = matchlog.Recorder(store.add)
+    try:
+        install = install_finder()
+        if not install:
+            return
+        if load_prefs().get("ui", {}).get("cs2_stats_record", True) is False:
+            matchlog.remove_cfg(install)
+            return
+        state.stats_token = matchlog.install_token(user_data_dir())
+        matchlog.write_cfg(install, port, state.stats_token)
+    except (OSError, ValueError):
+        pass
+
+
+def _stats_receive(state: State, raw: bytes) -> None:
+    from . import matchlog
+
+    payload = matchlog.parse_payload(raw, state.stats_token)
+    if state.stats_recorder is not None:
+        state.stats_recorder.feed(payload)
+
+
+def _stats(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """FACEIT and CS2 matches as one list, filtered by ``source``.
+
+    FACEIT comes through the same cached call the FACEIT tab already polls, so
+    asking for the combined list costs FACEIT nothing extra. CS2 matches are
+    the ones recorded on this PC for the account on screen.
+    """
+    from . import matchlog
+
+    source = str(body.get("source") or "all").lower()
+    faceit = _faceit(state, {"force": bool(body.get("force"))})
+    account = _active_account(state)
+    steam64 = matchlog.account_to_steam64(account) if account else ""
+    cs2 = _stats_store(state).matches(steam64) if steam64 else []
+    out = matchlog.combined(faceit.get("matches") or [], cs2, source)
+    return {
+        "ok": True,
+        **out,
+        "faceit": {k: faceit.get(k) for k in ("linked", "player", "error", "stale")
+                   if k in faceit},
+        "cs2": {"recording": bool(state.stats_token)},
+    }
 
 
 def _faceit_forget(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
@@ -5142,6 +5236,7 @@ def make_handler(state: State):
         "/api/demos/identities": _demo_identities,
         "/api/faceit": _faceit,
         "/api/faceit/forget": _faceit_forget,
+        "/api/stats": _stats,
         "/api/match/state": _match_state,
         "/api/match/accept": _match_accept,
         "/api/match/dismiss": _match_dismiss,
@@ -5547,6 +5642,32 @@ def make_handler(state: State):
             self._send_json({"error": "not found"}, 404)
 
         def do_POST(self) -> None:
+            if self.path.split("?", 1)[0] == "/api/stats/gsi":
+                from .matchlog import MAX_BODY as STATS_MAX
+
+                # Same rules as the overlay feed: CS2's cfg secret, loopback
+                # only, size checked before reading.
+                self.close_connection = True
+                if not self._host_ok() or self.client_address[0] != "127.0.0.1":
+                    self._send_json({"error": "host not allowed"}, 403)
+                    return
+                try:
+                    length = int(self.headers.get("Content-Length", "0"))
+                    if self.headers.get("Transfer-Encoding") or not 0 < length <= STATS_MAX:
+                        self._send_json({"error": "invalid body size"}, 413)
+                        return
+                    self.connection.settimeout(2)
+                    raw = self.rfile.read(length)
+                    if len(raw) != length:
+                        raise ValueError("Incomplete GSI body")
+                    _stats_receive(state, raw)
+                except PermissionError:
+                    self._send_json({"error": "invalid GSI token"}, 403)
+                except (ValueError, OSError):
+                    self._send_json({"error": "invalid GSI body"}, 400)
+                else:
+                    self._send_json({"ok": True})
+                return
             if self.path.split("?", 1)[0] == "/api/overlay/gsi":
                 from .overlay.gsi import MAX_BODY
 
@@ -5678,6 +5799,7 @@ def serve(port: int = 8765, cfg_folder: str = "mrwhiteer",
         return state.cs2_install
 
     state.overlay.bind_gsi(overlay_install, server.server_address[1])
+    _stats_setup(state, overlay_install, server.server_address[1])
     state.overlay.configure(overlay_settings(load_prefs().get("ui")))
     try:
         from .rgb import read_settings as rgb_settings
