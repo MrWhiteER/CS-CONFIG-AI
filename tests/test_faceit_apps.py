@@ -229,5 +229,52 @@ class LaunchWaitsForAntiCheatReadiness(unittest.TestCase):
         self.assertTrue(any("FACEIT AC is up" in t for t in said), said)
 
 
+class AntiCheatHasNoTimeLimit(unittest.TestCase):
+    """Edy, 2026-11-17: keep checking FACEIT AC and only start CS2 once it is
+    ready. Never 'did not answer in time, starting anyway' for the AC."""
+
+    def run_wait(self, ready_after, stop_after=None):
+        said = []
+        clock = {"t": 0.0}
+        checks = {"n": 0}
+
+        class FakeReady:
+            def up_now(self):
+                return False
+
+            def __call__(self):
+                checks["n"] += 1
+                return ready_after is not None and checks["n"] >= ready_after
+
+        def sleep(seconds):
+            clock["t"] += seconds
+
+        stop = (lambda: stop_after is not None and clock["t"] >= stop_after)
+        with mock.patch.object(faceit_apps, "AcReadiness", FakeReady), \
+             mock.patch.object(companions, "running", return_value=False), \
+             mock.patch.object(companions, "start",
+                               return_value={"ok": True, "already": False}), \
+             mock.patch.object(launcher.time, "monotonic", side_effect=lambda: clock["t"]), \
+             mock.patch.object(launcher.time, "sleep", side_effect=sleep):
+            launcher._bring_up_companions(
+                [{"name": "FACEIT AC", "exe": "C:/x/faceitclient.exe",
+                  "integration": "faceit-ac"}],
+                False, lambda text, tag="": said.append(text), stop)
+        return said, clock["t"]
+
+    def test_waits_past_any_old_limit_until_ready(self):
+        # Ready after ~5 minutes of checks: still waited for.
+        said, waited = self.run_wait(ready_after=600)
+        self.assertGreater(waited, 200)
+        self.assertTrue(any("FACEIT AC is up" in t for t in said))
+        self.assertFalse(any("starting CS2 anyway" in t for t in said), said)
+        self.assertTrue(any("still waiting for FACEIT AC" in t for t in said))
+
+    def test_stop_ends_the_wait(self):
+        said, waited = self.run_wait(ready_after=None, stop_after=30.0)
+        self.assertLess(waited, 31.0)
+        self.assertFalse(any("starting CS2 anyway" in t for t in said), said)
+
+
 if __name__ == "__main__":
     unittest.main()
