@@ -1,0 +1,1287 @@
+docs/redesign/profile-drop/preview/concept-A-framestrip.png
+docs/redesign/profile-drop/preview/concept-A-hover-dark.png
+docs/redesign/profile-drop/preview/concept-A-hover-daylight.png
+docs/redesign/profile-drop/preview/concept-A-idle-dark.png
+docs/redesign/profile-drop/preview/concept-A-idle-daylight.png
+docs/redesign/profile-drop/preview/concept-A-reduced-motion-dark-1100.png
+docs/redesign/profile-drop/preview/concept-A-switcher-dark-1100.png
+docs/redesign/profile-drop/preview/concept-A-switcher-dark-860.png
+docs/redesign/profile-drop/preview/concept-A-switcher-dark.png
+docs/redesign/profile-drop/preview/concept-A-switcher-daylight-1100.png
+docs/redesign/profile-drop/preview/concept-A-switcher-daylight.png
+docs/redesign/profile-drop/preview/concept-A-transition-dark.png
+docs/redesign/profile-drop/preview/concept-A-transition-daylight.png
+docs/redesign/profile-drop/preview/concept-B-framestrip.png
+docs/redesign/profile-drop/preview/concept-B-hover-dark.png
+docs/redesign/profile-drop/preview/concept-B-hover-daylight.png
+docs/redesign/profile-drop/preview/concept-B-idle-dark.png
+docs/redesign/profile-drop/preview/concept-B-idle-daylight.png
+docs/redesign/profile-drop/preview/concept-B-reduced-motion-dark-1100.png
+docs/redesign/profile-drop/preview/concept-B-switcher-dark-1100.png
+docs/redesign/profile-drop/preview/concept-B-switcher-dark-860.png
+docs/redesign/profile-drop/preview/concept-B-switcher-dark.png
+docs/redesign/profile-drop/preview/concept-B-switcher-daylight-1100.png
+docs/redesign/profile-drop/preview/concept-B-switcher-daylight.png
+docs/redesign/profile-drop/preview/concept-B-transition-dark.png
+docs/redesign/profile-drop/preview/concept-B-transition-daylight.png
+docs/redesign/profile-drop/preview/concepts.md
+docs/redesign/profile-drop/preview/created-files.txt
+docs/redesign/profile-drop/preview/render-report.json
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Crashpad/metadata
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Crashpad/reports/00038105-c41e-4061-ba34-fc69436bc63f.dmp
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Crashpad/reports/63dde55c-87f7-42c1-b157-becb81315b4f.dmp
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Crashpad/settings.dat
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Crashpad/temp/edge_shutdown_crash.txt
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Crashpad/throttle_store.dat
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Crashpad/watson_metadata
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/CrashpadMetrics-active.pma
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Affiliation Database
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Affiliation Database-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Cache/Cache_Data/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Cache/Cache_Data/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Cache/Cache_Data/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Cache/Cache_Data/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Cache/Cache_Data/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Cache/No_Vary_Search/journal.baj
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Cache/No_Vary_Search/snapshot.baf
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/ClientCertificates/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/ClientCertificates/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Code Cache/js/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Code Cache/js/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Code Cache/wasm/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Code Cache/wasm/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/DawnGraphiteCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/DawnGraphiteCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/DawnGraphiteCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/DawnGraphiteCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/DawnGraphiteCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/DawnWebGPUCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/DawnWebGPUCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/DawnWebGPUCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/DawnWebGPUCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/DawnWebGPUCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/EdgePushStorageWithConnectTokenAndKey/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/EdgePushStorageWithConnectTokenAndKey/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/EdgePushStorageWithConnectTokenAndKey/LOG.old
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Extension Rules/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Extension Rules/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Extension Rules/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Extension Rules/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Extension Rules/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Extension Scripts/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Extension Scripts/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Extension Scripts/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Extension Scripts/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Extension Scripts/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Extension State/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Extension State/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Extension State/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Extension State/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Extension State/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/ExtensionActivityEdge
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/ExtensionActivityEdge-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Favicons
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Favicons-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/GPUCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/GPUCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/GPUCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/GPUCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/GPUCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/History
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/History-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/HubApps Icons
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/HubApps Icons-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Login Data
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Login Data For Account
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Login Data For Account-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Login Data-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Network/Cookies
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Network/Cookies-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Network/Device Bound Sessions
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Network/Device Bound Sessions-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Network/NetworkDataMigrated
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Network/Reporting and NEL
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Network/Reporting and NEL-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Network/SCT Auditing Pending Reports
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Network/Trust Tokens
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Network/Trust Tokens-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Nurturing/campaign_history
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Nurturing/campaign_history-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/PersistentOriginTrials/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/PersistentOriginTrials/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/README
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/ServerCertificate
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/ServerCertificate-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Service Worker/Database/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Service Worker/Database/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Service Worker/Database/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Service Worker/Database/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Service Worker/Database/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Service Worker/ScriptCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Service Worker/ScriptCache/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Service Worker/ScriptCache/todelete_f1cdccba37924bda_0_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Shared Dictionary/cache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Shared Dictionary/cache/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Shared Dictionary/db
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Shared Dictionary/db-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Site Characteristics Database/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Site Characteristics Database/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Site Characteristics Database/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Site Characteristics Database/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Site Characteristics Database/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Code Cache/js/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Code Cache/js/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Code Cache/wasm/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Code Cache/wasm/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnGraphiteCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnGraphiteCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnGraphiteCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnGraphiteCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnGraphiteCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnWebGPUCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnWebGPUCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnWebGPUCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnWebGPUCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnWebGPUCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/GPUCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/GPUCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/GPUCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/GPUCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/GPUCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Device Bound Sessions
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Device Bound Sessions-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/NetworkDataMigrated
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Reporting and NEL
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Reporting and NEL-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/SCT Auditing Pending Reports
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Trust Tokens
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Trust Tokens-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Shared Dictionary/cache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Shared Dictionary/cache/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Shared Dictionary/db
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Shared Dictionary/db-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/declarative_performance_observer.db
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/declarative_performance_observer.db-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Sync Data/LevelDB/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Sync Data/LevelDB/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Sync Data/LevelDB/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Sync Data/LevelDB/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Sync Data/LevelDB/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Top Sites
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Top Sites-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Vpn Tokens
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Vpn Tokens-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Web Data
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/Web Data-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/WebStorage/QuotaManager
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/WebStorage/QuotaManager-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/arbitration_service_config.json
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/commerce_subscription_db/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/commerce_subscription_db/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/declarative_performance_observer.db
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/declarative_performance_observer.db-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/discount_infos_db/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/discount_infos_db/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/discounts_db/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/discounts_db/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/load_statistics.db
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/load_statistics.db-shm
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/load_statistics.db-wal
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/parcel_tracking_db/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/parcel_tracking_db/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/shared_proto_db/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/shared_proto_db/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/shared_proto_db/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/shared_proto_db/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/shared_proto_db/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/shared_proto_db/metadata/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/shared_proto_db/metadata/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/shared_proto_db/metadata/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/shared_proto_db/metadata/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Default/shared_proto_db/metadata/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/DevToolsActivePort
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/FirstLaunchAfterInstallation
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/GPUPersistentCache/DawnGraphiteCache/23IMHJGI2WIIJ3PDLCHAHUJAGHTLTEBB/cache.db
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/GPUPersistentCache/DawnGraphiteCache/23IMHJGI2WIIJ3PDLCHAHUJAGHTLTEBB/cache.db-wal
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/GPUPersistentCache/DawnGraphiteCache/23IMHJGI2WIIJ3PDLCHAHUJAGHTLTEBB/cache.journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Last Version
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Local State
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Nurturing/campaign_history
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Nurturing/campaign_history-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/ShaderCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/ShaderCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/ShaderCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/ShaderCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/ShaderCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/SmartScreen/RemoteData/customSettings
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/SmartScreen/RemoteData/customSettings_F95BA787499AB4FA9EFFF472CE383A14
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/SmartScreen/RemoteData/edgeSettings
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/SmartScreen/RemoteData/edgeSettings_2.0-0
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/Variations
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/VariationsRuntimeSeedV2
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/VariationsSafeSeedV2
+docs/redesign/profile-drop/proto/.edge-profile-1794903222799/VariationsSeedV2
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Breadcrumbs
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Crashpad/metadata
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Crashpad/reports/35c290e3-e5f7-4011-ad25-f2730a572b10.dmp
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Crashpad/settings.dat
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Crashpad/temp/edge_shutdown_crash.txt
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Crashpad/throttle_store.dat
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Crashpad/watson_metadata
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/CrashpadMetrics-active.pma
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Affiliation Database
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Affiliation Database-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/AutofillAiModelCache/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/AutofillAiModelCache/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/AutofillStrikeDatabase/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/AutofillStrikeDatabase/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/BookmarkMergedSurfaceOrdering
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/BudgetDatabase/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/BudgetDatabase/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Cache/Cache_Data/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Cache/Cache_Data/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Cache/Cache_Data/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Cache/Cache_Data/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Cache/Cache_Data/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Cache/No_Vary_Search/journal.baj
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Cache/No_Vary_Search/snapshot.baf
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/ClientCertificates/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/ClientCertificates/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Code Cache/js/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Code Cache/js/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Code Cache/wasm/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Code Cache/wasm/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/DIPS
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/DIPS-wal
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/DawnGraphiteCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/DawnGraphiteCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/DawnGraphiteCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/DawnGraphiteCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/DawnGraphiteCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/DawnWebGPUCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/DawnWebGPUCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/DawnWebGPUCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/DawnWebGPUCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/DawnWebGPUCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/DualEngine/SiteList-Consumer.json
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/DualEngine/SiteList-Enterprise.json
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/EdgeCoupons/coupons_data.db/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/EdgeCoupons/coupons_data.db/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/EdgeCoupons/coupons_data.db/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/EdgeCoupons/coupons_data.db/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/EdgeCoupons/coupons_data.db/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/EdgeHubAppUsage/EdgeHubAppUsageSQLite.db
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/EdgeHubAppUsage/EdgeHubAppUsageSQLite.db-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/EdgePushStorageWithConnectTokenAndKey/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/EdgePushStorageWithConnectTokenAndKey/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/EdgePushStorageWithConnectTokenAndKey/LOG.old
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/EdgeSessions/SessionRestoreLog
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Extension Rules/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Extension Rules/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Extension Rules/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Extension Rules/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Extension Rules/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Extension Scripts/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Extension Scripts/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Extension Scripts/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Extension Scripts/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Extension Scripts/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Extension State/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Extension State/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Extension State/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Extension State/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Extension State/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/ExtensionActivityEdge
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/ExtensionActivityEdge-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Favicons
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Favicons-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/GPUCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/GPUCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/GPUCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/GPUCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/GPUCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/History
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/History-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/HubApps Icons
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/HubApps Icons-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Login Data
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Login Data For Account
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Login Data For Account-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Login Data-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Network Action Predictor
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Network Action Predictor-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Network/Cookies
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Network/Cookies-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Network/Device Bound Sessions
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Network/Device Bound Sessions-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Network/Network Persistent State
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Network/NetworkDataMigrated
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Network/Reporting and NEL
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Network/Reporting and NEL-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Network/SCT Auditing Pending Reports
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Network/Sdch Dictionaries
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Network/Trust Tokens
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Network/Trust Tokens-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Nurturing/campaign_history
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Nurturing/campaign_history-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/PersistentOriginTrials/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/PersistentOriginTrials/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Preferences
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/PreferredApps
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/README
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Secure Preferences
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Segmentation Platform/SegmentInfoDB/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Segmentation Platform/SegmentInfoDB/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Segmentation Platform/SignalDB/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Segmentation Platform/SignalDB/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Segmentation Platform/SignalStorageConfigDB/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Segmentation Platform/SignalStorageConfigDB/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/ServerCertificate
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/ServerCertificate-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Service Worker/Database/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Service Worker/Database/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Service Worker/Database/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Service Worker/Database/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Service Worker/Database/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Service Worker/ScriptCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Service Worker/ScriptCache/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Sessions/Session_13439376851683169
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Shared Dictionary/cache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Shared Dictionary/cache/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Shared Dictionary/db
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Shared Dictionary/db-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Shortcuts
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Shortcuts-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Site Characteristics Database/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Site Characteristics Database/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Site Characteristics Database/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Site Characteristics Database/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Site Characteristics Database/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Code Cache/js/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Code Cache/js/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Code Cache/wasm/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Code Cache/wasm/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnGraphiteCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnGraphiteCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnGraphiteCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnGraphiteCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnGraphiteCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnWebGPUCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnWebGPUCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnWebGPUCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnWebGPUCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnWebGPUCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/GPUCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/GPUCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/GPUCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/GPUCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/GPUCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Device Bound Sessions
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Device Bound Sessions-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Network Persistent State
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/NetworkDataMigrated
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Reporting and NEL
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Reporting and NEL-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/SCT Auditing Pending Reports
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Sdch Dictionaries
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Trust Tokens
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Trust Tokens-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Shared Dictionary/cache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Shared Dictionary/cache/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Shared Dictionary/db
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Shared Dictionary/db-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/declarative_performance_observer.db
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/declarative_performance_observer.db-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Sync Data/LevelDB/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Sync Data/LevelDB/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Sync Data/LevelDB/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Sync Data/LevelDB/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Sync Data/LevelDB/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Sync Data/Logs/sync_diagnostic.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Top Sites
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Top Sites-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Vpn Tokens
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Vpn Tokens-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Web Data
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Web Data-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/WebStorage/QuotaManager
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/WebStorage/QuotaManager-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Workspaces/Logs/Workspaces Diagnostic Log
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/Workspaces/Logs/Workspaces Internals Logs
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/arbitration_service_config.json
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/commerce_subscription_db/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/commerce_subscription_db/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/declarative_performance_observer.db
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/declarative_performance_observer.db-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/discount_infos_db/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/discount_infos_db/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/discounts_db/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/discounts_db/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/favorites_diagnostic.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/heavy_ad_intervention_opt_out.db
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/heavy_ad_intervention_opt_out.db-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/load_statistics.db
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/load_statistics.db-shm
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/load_statistics.db-wal
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/optimization_guide_hint_cache_store/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/optimization_guide_hint_cache_store/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/parcel_tracking_db/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/parcel_tracking_db/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/settings_diagnostic.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/shared_proto_db/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/shared_proto_db/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/shared_proto_db/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/shared_proto_db/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/shared_proto_db/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/shared_proto_db/metadata/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/shared_proto_db/metadata/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/shared_proto_db/metadata/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/shared_proto_db/metadata/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Default/shared_proto_db/metadata/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/DevToolsActivePort
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/FirstLaunchAfterInstallation
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/GPUPersistentCache/DawnGraphiteCache/23IMHJGI2WIIJ3PDLCHAHUJAGHTLTEBB/cache.db
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/GPUPersistentCache/DawnGraphiteCache/23IMHJGI2WIIJ3PDLCHAHUJAGHTLTEBB/cache.db-wal
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/GPUPersistentCache/DawnGraphiteCache/23IMHJGI2WIIJ3PDLCHAHUJAGHTLTEBB/cache.journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/GrShaderCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/GrShaderCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/GrShaderCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/GrShaderCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/GrShaderCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Last Browser
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Last Version
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Local State
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Nurturing/campaign_history
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Nurturing/campaign_history-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/ShaderCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/ShaderCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/ShaderCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/ShaderCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/ShaderCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/SmartScreen/RemoteData/customSettings
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/SmartScreen/RemoteData/customSettings_F95BA787499AB4FA9EFFF472CE383A14
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/SmartScreen/RemoteData/edgeSettings
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/SmartScreen/RemoteData/edgeSettings_2.0-0
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/Variations
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/VariationsRuntimeSeedV2
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/VariationsSafeSeedV2
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/VariationsSeedV2
+docs/redesign/profile-drop/proto/.edge-profile-1794903243395/component_crx_cache/metadata.json
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Breadcrumbs
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Crashpad/metadata
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Crashpad/settings.dat
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Crashpad/throttle_store.dat
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/CrashpadMetrics-active.pma
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Affiliation Database
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Affiliation Database-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/AutofillAiModelCache/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/AutofillAiModelCache/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/AutofillStrikeDatabase/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/AutofillStrikeDatabase/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Blueprints/blueprint_presence_index.json
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/BookmarkMergedSurfaceOrdering
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/BudgetDatabase/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/BudgetDatabase/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Cache/Cache_Data/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Cache/Cache_Data/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Cache/Cache_Data/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Cache/Cache_Data/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Cache/Cache_Data/f_000032
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Cache/Cache_Data/f_000033
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Cache/Cache_Data/f_000034
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Cache/Cache_Data/f_000035
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Cache/Cache_Data/f_000036
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Cache/Cache_Data/f_000037
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Cache/Cache_Data/f_000038
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Cache/Cache_Data/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Cache/No_Vary_Search/journal.baj
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Cache/No_Vary_Search/snapshot.baf
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/ClientCertificates/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/ClientCertificates/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Code Cache/js/2a8a6f695a3ff316_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Code Cache/js/2cca9bc741a6516d_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Code Cache/js/39f8b0dfbd5c747a_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Code Cache/js/471d560b66e54396_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Code Cache/js/5cce1706364839f1_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Code Cache/js/5fbb54f36261c413_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Code Cache/js/6d35237f4fbd45c4_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Code Cache/js/7de0dc67a2b3a69c_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Code Cache/js/8020acacb3d13763_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Code Cache/js/8bb1867be67136eb_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Code Cache/js/8bf86662e2ee0ef2_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Code Cache/js/914b8d0a3281346f_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Code Cache/js/945cb8fb56d09a8e_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Code Cache/js/9a81b7286107ca1d_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Code Cache/js/abba97b2117839a0_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Code Cache/js/b21fb45197b9c728_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Code Cache/js/b7c84a1ee88132ef_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Code Cache/js/baded5730168391f_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Code Cache/js/d08970649158a5da_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Code Cache/js/d95ef2f9540eebdc_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Code Cache/js/e94999eac39dfd99_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Code Cache/js/e9a142a21b9ad9ef_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Code Cache/js/ebce9e52a869b921_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Code Cache/js/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Code Cache/js/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Code Cache/wasm/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Code Cache/wasm/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/DIPS
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/DIPS-wal
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/DawnGraphiteCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/DawnGraphiteCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/DawnGraphiteCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/DawnGraphiteCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/DawnGraphiteCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/DawnWebGPUCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/DawnWebGPUCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/DawnWebGPUCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/DawnWebGPUCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/DawnWebGPUCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/DualEngine/SiteList-Consumer.json
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/DualEngine/SiteList-Enterprise.json
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/EdgeCoupons/coupons_data.db/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/EdgeCoupons/coupons_data.db/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/EdgeCoupons/coupons_data.db/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/EdgeCoupons/coupons_data.db/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/EdgeCoupons/coupons_data.db/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/EdgeHubAppUsage/EdgeHubAppUsageSQLite.db
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/EdgeHubAppUsage/EdgeHubAppUsageSQLite.db-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/EdgePushStorageWithConnectTokenAndKey/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/EdgePushStorageWithConnectTokenAndKey/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/EdgePushStorageWithConnectTokenAndKey/LOG.old
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/EdgeSessions/SessionRestoreLog
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Extension Rules/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Extension Rules/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Extension Rules/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Extension Rules/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Extension Rules/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Extension Scripts/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Extension Scripts/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Extension Scripts/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Extension Scripts/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Extension Scripts/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Extension State/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Extension State/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Extension State/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Extension State/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Extension State/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/ExtensionActivityEdge
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/ExtensionActivityEdge-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Favicons
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Favicons-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/GPUCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/GPUCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/GPUCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/GPUCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/GPUCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/History
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/History-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/HubApps Icons
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/HubApps Icons-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Local Extension Settings/jdiccldimpdaibmpdkjnbmckianbfold/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Local Extension Settings/jdiccldimpdaibmpdkjnbmckianbfold/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Local Extension Settings/jdiccldimpdaibmpdkjnbmckianbfold/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Local Extension Settings/jdiccldimpdaibmpdkjnbmckianbfold/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Local Extension Settings/jdiccldimpdaibmpdkjnbmckianbfold/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Local Storage/leveldb/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Local Storage/leveldb/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Local Storage/leveldb/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Local Storage/leveldb/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Local Storage/leveldb/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Login Data
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Login Data For Account
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Login Data For Account-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Login Data-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Network Action Predictor
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Network Action Predictor-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Network/Cookies
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Network/Cookies-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Network/Device Bound Sessions
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Network/Device Bound Sessions-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Network/Network Persistent State
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Network/NetworkDataMigrated
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Network/Reporting and NEL
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Network/Reporting and NEL-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Network/SCT Auditing Pending Reports
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Network/Sdch Dictionaries
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Network/Trust Tokens
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Network/Trust Tokens-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Nurturing/campaign_history
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Nurturing/campaign_history-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/PersistentOriginTrials/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/PersistentOriginTrials/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Preferences
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/PreferredApps
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/README
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Secure Preferences
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Segmentation Platform/SegmentInfoDB/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Segmentation Platform/SegmentInfoDB/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Segmentation Platform/SignalDB/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Segmentation Platform/SignalDB/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Segmentation Platform/SignalStorageConfigDB/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Segmentation Platform/SignalStorageConfigDB/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/ServerCertificate
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/ServerCertificate-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Service Worker/Database/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Service Worker/Database/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Service Worker/Database/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Service Worker/Database/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Service Worker/Database/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Service Worker/ScriptCache/2cc80dabc69f58b6_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Service Worker/ScriptCache/2cc80dabc69f58b6_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Service Worker/ScriptCache/4cb013792b196a35_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Service Worker/ScriptCache/f1cdccba37924bda_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Service Worker/ScriptCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Service Worker/ScriptCache/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Session Storage/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Session Storage/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Session Storage/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Session Storage/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Session Storage/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Sessions/Session_13439376877343119
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Shared Dictionary/cache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Shared Dictionary/cache/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Shared Dictionary/db
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Shared Dictionary/db-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Shortcuts
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Shortcuts-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Site Characteristics Database/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Site Characteristics Database/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Site Characteristics Database/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Site Characteristics Database/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Site Characteristics Database/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Code Cache/js/6f3a0dc5e6916f1e_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Code Cache/js/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Code Cache/js/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Code Cache/wasm/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Code Cache/wasm/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnGraphiteCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnGraphiteCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnGraphiteCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnGraphiteCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnGraphiteCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnWebGPUCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnWebGPUCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnWebGPUCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnWebGPUCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnWebGPUCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/GPUCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/GPUCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/GPUCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/GPUCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/GPUCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Local Storage/leveldb/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Local Storage/leveldb/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Local Storage/leveldb/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Local Storage/leveldb/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Local Storage/leveldb/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Device Bound Sessions
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Device Bound Sessions-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Network Persistent State
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/NetworkDataMigrated
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Reporting and NEL
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Reporting and NEL-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/SCT Auditing Pending Reports
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Sdch Dictionaries
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Trust Tokens
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Trust Tokens-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Session Storage/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Session Storage/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Session Storage/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Session Storage/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Session Storage/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Shared Dictionary/cache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Shared Dictionary/cache/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Shared Dictionary/db
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Shared Dictionary/db-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/declarative_performance_observer.db
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/declarative_performance_observer.db-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Sync Data/LevelDB/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Sync Data/LevelDB/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Sync Data/LevelDB/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Sync Data/LevelDB/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Sync Data/LevelDB/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Sync Data/Logs/sync_diagnostic.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Top Sites
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Top Sites-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Vpn Tokens
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Vpn Tokens-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Web Data
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Web Data-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/WebStorage/QuotaManager
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/WebStorage/QuotaManager-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Workspaces/Logs/Workspaces Diagnostic Log
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/Workspaces/Logs/Workspaces Internals Logs
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/arbitration_service_config.json
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/commerce_subscription_db/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/commerce_subscription_db/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/declarative_performance_observer.db
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/declarative_performance_observer.db-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/discount_infos_db/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/discount_infos_db/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/discounts_db/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/discounts_db/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/favorites_diagnostic.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/heavy_ad_intervention_opt_out.db
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/heavy_ad_intervention_opt_out.db-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/load_statistics.db
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/load_statistics.db-shm
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/load_statistics.db-wal
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/optimization_guide_hint_cache_store/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/optimization_guide_hint_cache_store/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/parcel_tracking_db/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/parcel_tracking_db/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/settings_diagnostic.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/shared_proto_db/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/shared_proto_db/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/shared_proto_db/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/shared_proto_db/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/shared_proto_db/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/shared_proto_db/metadata/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/shared_proto_db/metadata/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/shared_proto_db/metadata/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/shared_proto_db/metadata/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Default/shared_proto_db/metadata/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/DevToolsActivePort
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/FirstLaunchAfterInstallation
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/GPUPersistentCache/DawnGraphiteCache/23IMHJGI2WIIJ3PDLCHAHUJAGHTLTEBB/cache.db
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/GPUPersistentCache/DawnGraphiteCache/23IMHJGI2WIIJ3PDLCHAHUJAGHTLTEBB/cache.db-wal
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/GPUPersistentCache/DawnGraphiteCache/23IMHJGI2WIIJ3PDLCHAHUJAGHTLTEBB/cache.journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/GrShaderCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/GrShaderCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/GrShaderCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/GrShaderCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/GrShaderCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Last Browser
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Last Version
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Local State
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Nurturing/campaign_history
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Nurturing/campaign_history-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/ShaderCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/ShaderCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/ShaderCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/ShaderCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/ShaderCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/SmartScreen/RemoteData/customSettings
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/SmartScreen/RemoteData/customSettings_F95BA787499AB4FA9EFFF472CE383A14
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/SmartScreen/RemoteData/edgeSettings
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/SmartScreen/RemoteData/edgeSettings_2.0-0
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/Variations
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/VariationsRuntimeSeedV2
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/VariationsSafeSeedV2
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/VariationsSeedV2
+docs/redesign/profile-drop/proto/.edge-profile-1794903274585/component_crx_cache/metadata.json
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Breadcrumbs
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Crashpad/metadata
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Crashpad/settings.dat
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Crashpad/throttle_store.dat
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/CrashpadMetrics-active.pma
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Affiliation Database
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Affiliation Database-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/AutofillAiModelCache/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/AutofillAiModelCache/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/AutofillStrikeDatabase/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/AutofillStrikeDatabase/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Blueprints/blueprint_presence_index.json
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/BookmarkMergedSurfaceOrdering
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/BudgetDatabase/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/BudgetDatabase/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Cache/Cache_Data/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Cache/Cache_Data/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Cache/Cache_Data/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Cache/Cache_Data/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Cache/Cache_Data/f_000032
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Cache/Cache_Data/f_000033
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Cache/Cache_Data/f_000034
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Cache/Cache_Data/f_000035
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Cache/Cache_Data/f_000036
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Cache/Cache_Data/f_000037
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Cache/Cache_Data/f_000038
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Cache/Cache_Data/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Cache/No_Vary_Search/journal.baj
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Cache/No_Vary_Search/snapshot.baf
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/ClientCertificates/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/ClientCertificates/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Code Cache/js/0cfd8ffeb2759087_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Code Cache/js/19de9d17c61637b9_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Code Cache/js/256109261cdadc0a_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Code Cache/js/2a8a6f695a3ff316_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Code Cache/js/2cca9bc741a6516d_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Code Cache/js/33131d3e923c3798_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Code Cache/js/43ce4c4e4a473dd0_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Code Cache/js/5cce1706364839f1_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Code Cache/js/5fbb54f36261c413_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Code Cache/js/79d41479c61606e2_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Code Cache/js/7c5272e5e7912487_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Code Cache/js/7de0dc67a2b3a69c_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Code Cache/js/8020acacb3d13763_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Code Cache/js/84d8627513392181_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Code Cache/js/8bb1867be67136eb_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Code Cache/js/8fefa28b2952b7d3_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Code Cache/js/945cb8fb56d09a8e_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Code Cache/js/b21fb45197b9c728_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Code Cache/js/baded5730168391f_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Code Cache/js/c3d0905fa7afc11f_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Code Cache/js/e94999eac39dfd99_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Code Cache/js/e9a142a21b9ad9ef_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Code Cache/js/ebce9e52a869b921_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Code Cache/js/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Code Cache/js/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Code Cache/wasm/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Code Cache/wasm/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/DIPS
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/DIPS-wal
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/DawnGraphiteCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/DawnGraphiteCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/DawnGraphiteCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/DawnGraphiteCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/DawnGraphiteCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/DawnWebGPUCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/DawnWebGPUCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/DawnWebGPUCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/DawnWebGPUCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/DawnWebGPUCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/DualEngine/SiteList-Consumer.json
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/DualEngine/SiteList-Enterprise.json
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/EdgeCoupons/coupons_data.db/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/EdgeCoupons/coupons_data.db/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/EdgeCoupons/coupons_data.db/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/EdgeCoupons/coupons_data.db/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/EdgeCoupons/coupons_data.db/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/EdgeHubAppUsage/EdgeHubAppUsageSQLite.db
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/EdgeHubAppUsage/EdgeHubAppUsageSQLite.db-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/EdgePushStorageWithConnectTokenAndKey/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/EdgePushStorageWithConnectTokenAndKey/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/EdgePushStorageWithConnectTokenAndKey/LOG.old
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/EdgeSessions/SessionRestoreLog
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Extension Rules/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Extension Rules/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Extension Rules/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Extension Rules/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Extension Rules/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Extension Scripts/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Extension Scripts/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Extension Scripts/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Extension Scripts/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Extension Scripts/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Extension State/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Extension State/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Extension State/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Extension State/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Extension State/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/ExtensionActivityEdge
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/ExtensionActivityEdge-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Favicons
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Favicons-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/GPUCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/GPUCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/GPUCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/GPUCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/GPUCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/History
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/History-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/HubApps Icons
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/HubApps Icons-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Local Extension Settings/jdiccldimpdaibmpdkjnbmckianbfold/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Local Extension Settings/jdiccldimpdaibmpdkjnbmckianbfold/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Local Extension Settings/jdiccldimpdaibmpdkjnbmckianbfold/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Local Extension Settings/jdiccldimpdaibmpdkjnbmckianbfold/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Local Extension Settings/jdiccldimpdaibmpdkjnbmckianbfold/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Local Storage/leveldb/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Local Storage/leveldb/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Local Storage/leveldb/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Local Storage/leveldb/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Local Storage/leveldb/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Login Data
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Login Data For Account
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Login Data For Account-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Login Data-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Network Action Predictor
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Network Action Predictor-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Network/Cookies
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Network/Cookies-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Network/Device Bound Sessions
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Network/Device Bound Sessions-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Network/Network Persistent State
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Network/NetworkDataMigrated
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Network/Reporting and NEL
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Network/Reporting and NEL-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Network/SCT Auditing Pending Reports
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Network/Sdch Dictionaries
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Network/Trust Tokens
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Network/Trust Tokens-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Nurturing/campaign_history
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Nurturing/campaign_history-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/PersistentOriginTrials/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/PersistentOriginTrials/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Preferences
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/PreferredApps
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/README
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Secure Preferences
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Segmentation Platform/SegmentInfoDB/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Segmentation Platform/SegmentInfoDB/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Segmentation Platform/SignalDB/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Segmentation Platform/SignalDB/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Segmentation Platform/SignalStorageConfigDB/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Segmentation Platform/SignalStorageConfigDB/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/ServerCertificate
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/ServerCertificate-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Service Worker/Database/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Service Worker/Database/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Service Worker/Database/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Service Worker/Database/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Service Worker/Database/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Service Worker/ScriptCache/2cc80dabc69f58b6_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Service Worker/ScriptCache/2cc80dabc69f58b6_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Service Worker/ScriptCache/4cb013792b196a35_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Service Worker/ScriptCache/f1cdccba37924bda_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Service Worker/ScriptCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Service Worker/ScriptCache/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Session Storage/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Session Storage/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Session Storage/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Session Storage/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Session Storage/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Sessions/Session_13439376968992189
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Shared Dictionary/cache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Shared Dictionary/cache/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Shared Dictionary/db
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Shared Dictionary/db-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Shortcuts
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Shortcuts-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Site Characteristics Database/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Site Characteristics Database/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Site Characteristics Database/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Site Characteristics Database/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Site Characteristics Database/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Code Cache/js/6f3a0dc5e6916f1e_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Code Cache/js/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Code Cache/js/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Code Cache/wasm/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Code Cache/wasm/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnGraphiteCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnGraphiteCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnGraphiteCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnGraphiteCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnGraphiteCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnWebGPUCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnWebGPUCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnWebGPUCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnWebGPUCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnWebGPUCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/GPUCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/GPUCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/GPUCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/GPUCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/GPUCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Local Storage/leveldb/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Local Storage/leveldb/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Local Storage/leveldb/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Local Storage/leveldb/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Local Storage/leveldb/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Device Bound Sessions
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Device Bound Sessions-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Network Persistent State
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/NetworkDataMigrated
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Reporting and NEL
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Reporting and NEL-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/SCT Auditing Pending Reports
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Sdch Dictionaries
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Trust Tokens
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Trust Tokens-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Session Storage/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Session Storage/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Session Storage/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Session Storage/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Session Storage/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Shared Dictionary/cache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Shared Dictionary/cache/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Shared Dictionary/db
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Shared Dictionary/db-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/declarative_performance_observer.db
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/declarative_performance_observer.db-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Sync Data/LevelDB/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Sync Data/LevelDB/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Sync Data/LevelDB/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Sync Data/LevelDB/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Sync Data/LevelDB/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Sync Data/Logs/sync_diagnostic.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Top Sites
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Top Sites-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Vpn Tokens
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Vpn Tokens-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Web Data
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Web Data-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/WebStorage/QuotaManager
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/WebStorage/QuotaManager-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Workspaces/Logs/Workspaces Diagnostic Log
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/Workspaces/Logs/Workspaces Internals Logs
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/arbitration_service_config.json
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/commerce_subscription_db/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/commerce_subscription_db/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/declarative_performance_observer.db
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/declarative_performance_observer.db-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/discount_infos_db/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/discount_infos_db/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/discounts_db/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/discounts_db/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/favorites_diagnostic.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/heavy_ad_intervention_opt_out.db
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/heavy_ad_intervention_opt_out.db-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/load_statistics.db
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/load_statistics.db-shm
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/load_statistics.db-wal
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/optimization_guide_hint_cache_store/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/optimization_guide_hint_cache_store/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/parcel_tracking_db/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/parcel_tracking_db/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/settings_diagnostic.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/shared_proto_db/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/shared_proto_db/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/shared_proto_db/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/shared_proto_db/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/shared_proto_db/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/shared_proto_db/metadata/000003.log
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/shared_proto_db/metadata/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/shared_proto_db/metadata/LOCK
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/shared_proto_db/metadata/LOG
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Default/shared_proto_db/metadata/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/DevToolsActivePort
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/FirstLaunchAfterInstallation
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/GPUPersistentCache/DawnGraphiteCache/23IMHJGI2WIIJ3PDLCHAHUJAGHTLTEBB/cache.db
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/GPUPersistentCache/DawnGraphiteCache/23IMHJGI2WIIJ3PDLCHAHUJAGHTLTEBB/cache.db-wal
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/GPUPersistentCache/DawnGraphiteCache/23IMHJGI2WIIJ3PDLCHAHUJAGHTLTEBB/cache.journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/GrShaderCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/GrShaderCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/GrShaderCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/GrShaderCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/GrShaderCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Last Browser
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Last Version
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Local State
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Nurturing/campaign_history
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Nurturing/campaign_history-journal
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/ShaderCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/ShaderCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/ShaderCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/ShaderCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/ShaderCache/index
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/SmartScreen/RemoteData/customSettings
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/SmartScreen/RemoteData/customSettings_F95BA787499AB4FA9EFFF472CE383A14
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/SmartScreen/RemoteData/edgeSettings
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/SmartScreen/RemoteData/edgeSettings_2.0-0
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/Variations
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/VariationsRuntimeSeedV2
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/VariationsSafeSeedV2
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/VariationsSeedV2
+docs/redesign/profile-drop/proto/.edge-profile-1794903366069/component_crx_cache/metadata.json
+docs/redesign/profile-drop/proto/.edge-profile/Crashpad/metadata
+docs/redesign/profile-drop/proto/.edge-profile/Crashpad/reports/63fb1e1c-1b08-4380-854f-b3a8a9be7300.dmp
+docs/redesign/profile-drop/proto/.edge-profile/Crashpad/reports/b7d93d17-ab29-49cf-aba1-4e14a500879c.dmp
+docs/redesign/profile-drop/proto/.edge-profile/Crashpad/settings.dat
+docs/redesign/profile-drop/proto/.edge-profile/Crashpad/temp/edge_shutdown_crash.txt
+docs/redesign/profile-drop/proto/.edge-profile/Crashpad/throttle_store.dat
+docs/redesign/profile-drop/proto/.edge-profile/Crashpad/watson_metadata
+docs/redesign/profile-drop/proto/.edge-profile/CrashpadMetrics-active.pma
+docs/redesign/profile-drop/proto/.edge-profile/Default/Affiliation Database
+docs/redesign/profile-drop/proto/.edge-profile/Default/Affiliation Database-journal
+docs/redesign/profile-drop/proto/.edge-profile/Default/Cache/Cache_Data/data_0
+docs/redesign/profile-drop/proto/.edge-profile/Default/Cache/Cache_Data/data_1
+docs/redesign/profile-drop/proto/.edge-profile/Default/Cache/Cache_Data/data_2
+docs/redesign/profile-drop/proto/.edge-profile/Default/Cache/Cache_Data/data_3
+docs/redesign/profile-drop/proto/.edge-profile/Default/Cache/Cache_Data/index
+docs/redesign/profile-drop/proto/.edge-profile/Default/Cache/No_Vary_Search/journal.baj
+docs/redesign/profile-drop/proto/.edge-profile/Default/Cache/No_Vary_Search/snapshot.baf
+docs/redesign/profile-drop/proto/.edge-profile/Default/ClientCertificates/LOCK
+docs/redesign/profile-drop/proto/.edge-profile/Default/ClientCertificates/LOG
+docs/redesign/profile-drop/proto/.edge-profile/Default/Code Cache/js/index
+docs/redesign/profile-drop/proto/.edge-profile/Default/Code Cache/js/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile/Default/Code Cache/wasm/index
+docs/redesign/profile-drop/proto/.edge-profile/Default/Code Cache/wasm/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile/Default/DawnGraphiteCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile/Default/DawnGraphiteCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile/Default/DawnGraphiteCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile/Default/DawnGraphiteCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile/Default/DawnGraphiteCache/index
+docs/redesign/profile-drop/proto/.edge-profile/Default/DawnWebGPUCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile/Default/DawnWebGPUCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile/Default/DawnWebGPUCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile/Default/DawnWebGPUCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile/Default/DawnWebGPUCache/index
+docs/redesign/profile-drop/proto/.edge-profile/Default/EdgePushStorageWithConnectTokenAndKey/LOCK
+docs/redesign/profile-drop/proto/.edge-profile/Default/EdgePushStorageWithConnectTokenAndKey/LOG
+docs/redesign/profile-drop/proto/.edge-profile/Default/EdgePushStorageWithConnectTokenAndKey/LOG.old
+docs/redesign/profile-drop/proto/.edge-profile/Default/Extension Rules/000003.log
+docs/redesign/profile-drop/proto/.edge-profile/Default/Extension Rules/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile/Default/Extension Rules/LOCK
+docs/redesign/profile-drop/proto/.edge-profile/Default/Extension Rules/LOG
+docs/redesign/profile-drop/proto/.edge-profile/Default/Extension Rules/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile/Default/Extension Scripts/000003.log
+docs/redesign/profile-drop/proto/.edge-profile/Default/Extension Scripts/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile/Default/Extension Scripts/LOCK
+docs/redesign/profile-drop/proto/.edge-profile/Default/Extension Scripts/LOG
+docs/redesign/profile-drop/proto/.edge-profile/Default/Extension Scripts/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile/Default/Extension State/000003.log
+docs/redesign/profile-drop/proto/.edge-profile/Default/Extension State/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile/Default/Extension State/LOCK
+docs/redesign/profile-drop/proto/.edge-profile/Default/Extension State/LOG
+docs/redesign/profile-drop/proto/.edge-profile/Default/Extension State/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile/Default/ExtensionActivityEdge
+docs/redesign/profile-drop/proto/.edge-profile/Default/ExtensionActivityEdge-journal
+docs/redesign/profile-drop/proto/.edge-profile/Default/Favicons
+docs/redesign/profile-drop/proto/.edge-profile/Default/Favicons-journal
+docs/redesign/profile-drop/proto/.edge-profile/Default/GPUCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile/Default/GPUCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile/Default/GPUCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile/Default/GPUCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile/Default/GPUCache/index
+docs/redesign/profile-drop/proto/.edge-profile/Default/History
+docs/redesign/profile-drop/proto/.edge-profile/Default/History-journal
+docs/redesign/profile-drop/proto/.edge-profile/Default/HubApps Icons
+docs/redesign/profile-drop/proto/.edge-profile/Default/HubApps Icons-journal
+docs/redesign/profile-drop/proto/.edge-profile/Default/LOCK
+docs/redesign/profile-drop/proto/.edge-profile/Default/LOG
+docs/redesign/profile-drop/proto/.edge-profile/Default/Login Data
+docs/redesign/profile-drop/proto/.edge-profile/Default/Login Data For Account
+docs/redesign/profile-drop/proto/.edge-profile/Default/Login Data For Account-journal
+docs/redesign/profile-drop/proto/.edge-profile/Default/Login Data-journal
+docs/redesign/profile-drop/proto/.edge-profile/Default/Network/Cookies
+docs/redesign/profile-drop/proto/.edge-profile/Default/Network/Cookies-journal
+docs/redesign/profile-drop/proto/.edge-profile/Default/Network/Device Bound Sessions
+docs/redesign/profile-drop/proto/.edge-profile/Default/Network/Device Bound Sessions-journal
+docs/redesign/profile-drop/proto/.edge-profile/Default/Network/NetworkDataMigrated
+docs/redesign/profile-drop/proto/.edge-profile/Default/Network/Reporting and NEL
+docs/redesign/profile-drop/proto/.edge-profile/Default/Network/Reporting and NEL-journal
+docs/redesign/profile-drop/proto/.edge-profile/Default/Network/SCT Auditing Pending Reports
+docs/redesign/profile-drop/proto/.edge-profile/Default/Network/Trust Tokens
+docs/redesign/profile-drop/proto/.edge-profile/Default/Network/Trust Tokens-journal
+docs/redesign/profile-drop/proto/.edge-profile/Default/Nurturing/campaign_history
+docs/redesign/profile-drop/proto/.edge-profile/Default/Nurturing/campaign_history-journal
+docs/redesign/profile-drop/proto/.edge-profile/Default/PersistentOriginTrials/LOCK
+docs/redesign/profile-drop/proto/.edge-profile/Default/PersistentOriginTrials/LOG
+docs/redesign/profile-drop/proto/.edge-profile/Default/README
+docs/redesign/profile-drop/proto/.edge-profile/Default/ServerCertificate
+docs/redesign/profile-drop/proto/.edge-profile/Default/ServerCertificate-journal
+docs/redesign/profile-drop/proto/.edge-profile/Default/Service Worker/Database/000003.log
+docs/redesign/profile-drop/proto/.edge-profile/Default/Service Worker/Database/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile/Default/Service Worker/Database/LOCK
+docs/redesign/profile-drop/proto/.edge-profile/Default/Service Worker/Database/LOG
+docs/redesign/profile-drop/proto/.edge-profile/Default/Service Worker/Database/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile/Default/Service Worker/ScriptCache/4cb013792b196a35_0
+docs/redesign/profile-drop/proto/.edge-profile/Default/Service Worker/ScriptCache/index
+docs/redesign/profile-drop/proto/.edge-profile/Default/Service Worker/ScriptCache/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile/Default/Shared Dictionary/cache/index
+docs/redesign/profile-drop/proto/.edge-profile/Default/Shared Dictionary/cache/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile/Default/Shared Dictionary/db
+docs/redesign/profile-drop/proto/.edge-profile/Default/Shared Dictionary/db-journal
+docs/redesign/profile-drop/proto/.edge-profile/Default/Site Characteristics Database/000003.log
+docs/redesign/profile-drop/proto/.edge-profile/Default/Site Characteristics Database/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile/Default/Site Characteristics Database/LOCK
+docs/redesign/profile-drop/proto/.edge-profile/Default/Site Characteristics Database/LOG
+docs/redesign/profile-drop/proto/.edge-profile/Default/Site Characteristics Database/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Code Cache/js/index
+docs/redesign/profile-drop/proto/.edge-profile/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Code Cache/js/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Code Cache/wasm/index
+docs/redesign/profile-drop/proto/.edge-profile/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Code Cache/wasm/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnGraphiteCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnGraphiteCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnGraphiteCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnGraphiteCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnGraphiteCache/index
+docs/redesign/profile-drop/proto/.edge-profile/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnWebGPUCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnWebGPUCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnWebGPUCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnWebGPUCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/DawnWebGPUCache/index
+docs/redesign/profile-drop/proto/.edge-profile/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/GPUCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/GPUCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/GPUCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/GPUCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/GPUCache/index
+docs/redesign/profile-drop/proto/.edge-profile/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Device Bound Sessions
+docs/redesign/profile-drop/proto/.edge-profile/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Device Bound Sessions-journal
+docs/redesign/profile-drop/proto/.edge-profile/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/NetworkDataMigrated
+docs/redesign/profile-drop/proto/.edge-profile/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Reporting and NEL
+docs/redesign/profile-drop/proto/.edge-profile/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Reporting and NEL-journal
+docs/redesign/profile-drop/proto/.edge-profile/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/SCT Auditing Pending Reports
+docs/redesign/profile-drop/proto/.edge-profile/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Trust Tokens
+docs/redesign/profile-drop/proto/.edge-profile/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Network/Trust Tokens-journal
+docs/redesign/profile-drop/proto/.edge-profile/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Shared Dictionary/cache/index
+docs/redesign/profile-drop/proto/.edge-profile/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Shared Dictionary/cache/index-dir/the-real-index
+docs/redesign/profile-drop/proto/.edge-profile/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Shared Dictionary/db
+docs/redesign/profile-drop/proto/.edge-profile/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/Shared Dictionary/db-journal
+docs/redesign/profile-drop/proto/.edge-profile/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/declarative_performance_observer.db
+docs/redesign/profile-drop/proto/.edge-profile/Default/Storage/ext/ihmafllikibpmigkcoadcmckbfhibefp/def/declarative_performance_observer.db-journal
+docs/redesign/profile-drop/proto/.edge-profile/Default/Sync Data/LevelDB/000003.log
+docs/redesign/profile-drop/proto/.edge-profile/Default/Sync Data/LevelDB/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile/Default/Sync Data/LevelDB/LOCK
+docs/redesign/profile-drop/proto/.edge-profile/Default/Sync Data/LevelDB/LOG
+docs/redesign/profile-drop/proto/.edge-profile/Default/Sync Data/LevelDB/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile/Default/Top Sites
+docs/redesign/profile-drop/proto/.edge-profile/Default/Top Sites-journal
+docs/redesign/profile-drop/proto/.edge-profile/Default/Vpn Tokens
+docs/redesign/profile-drop/proto/.edge-profile/Default/Vpn Tokens-journal
+docs/redesign/profile-drop/proto/.edge-profile/Default/Web Data
+docs/redesign/profile-drop/proto/.edge-profile/Default/Web Data-journal
+docs/redesign/profile-drop/proto/.edge-profile/Default/WebStorage/QuotaManager
+docs/redesign/profile-drop/proto/.edge-profile/Default/WebStorage/QuotaManager-journal
+docs/redesign/profile-drop/proto/.edge-profile/Default/arbitration_service_config.json
+docs/redesign/profile-drop/proto/.edge-profile/Default/commerce_subscription_db/LOCK
+docs/redesign/profile-drop/proto/.edge-profile/Default/commerce_subscription_db/LOG
+docs/redesign/profile-drop/proto/.edge-profile/Default/declarative_performance_observer.db
+docs/redesign/profile-drop/proto/.edge-profile/Default/declarative_performance_observer.db-journal
+docs/redesign/profile-drop/proto/.edge-profile/Default/discount_infos_db/LOCK
+docs/redesign/profile-drop/proto/.edge-profile/Default/discount_infos_db/LOG
+docs/redesign/profile-drop/proto/.edge-profile/Default/discounts_db/LOCK
+docs/redesign/profile-drop/proto/.edge-profile/Default/discounts_db/LOG
+docs/redesign/profile-drop/proto/.edge-profile/Default/load_statistics.db
+docs/redesign/profile-drop/proto/.edge-profile/Default/load_statistics.db-shm
+docs/redesign/profile-drop/proto/.edge-profile/Default/load_statistics.db-wal
+docs/redesign/profile-drop/proto/.edge-profile/Default/parcel_tracking_db/LOCK
+docs/redesign/profile-drop/proto/.edge-profile/Default/parcel_tracking_db/LOG
+docs/redesign/profile-drop/proto/.edge-profile/Default/shared_proto_db/000003.log
+docs/redesign/profile-drop/proto/.edge-profile/Default/shared_proto_db/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile/Default/shared_proto_db/LOCK
+docs/redesign/profile-drop/proto/.edge-profile/Default/shared_proto_db/LOG
+docs/redesign/profile-drop/proto/.edge-profile/Default/shared_proto_db/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile/Default/shared_proto_db/metadata/000003.log
+docs/redesign/profile-drop/proto/.edge-profile/Default/shared_proto_db/metadata/CURRENT
+docs/redesign/profile-drop/proto/.edge-profile/Default/shared_proto_db/metadata/LOCK
+docs/redesign/profile-drop/proto/.edge-profile/Default/shared_proto_db/metadata/LOG
+docs/redesign/profile-drop/proto/.edge-profile/Default/shared_proto_db/metadata/MANIFEST-000001
+docs/redesign/profile-drop/proto/.edge-profile/DevToolsActivePort
+docs/redesign/profile-drop/proto/.edge-profile/FirstLaunchAfterInstallation
+docs/redesign/profile-drop/proto/.edge-profile/GPUPersistentCache/DawnGraphiteCache/23IMHJGI2WIIJ3PDLCHAHUJAGHTLTEBB/cache.db
+docs/redesign/profile-drop/proto/.edge-profile/GPUPersistentCache/DawnGraphiteCache/23IMHJGI2WIIJ3PDLCHAHUJAGHTLTEBB/cache.db-wal
+docs/redesign/profile-drop/proto/.edge-profile/GPUPersistentCache/DawnGraphiteCache/23IMHJGI2WIIJ3PDLCHAHUJAGHTLTEBB/cache.journal
+docs/redesign/profile-drop/proto/.edge-profile/Last Version
+docs/redesign/profile-drop/proto/.edge-profile/Local State
+docs/redesign/profile-drop/proto/.edge-profile/Nurturing/campaign_history
+docs/redesign/profile-drop/proto/.edge-profile/Nurturing/campaign_history-journal
+docs/redesign/profile-drop/proto/.edge-profile/ShaderCache/data_0
+docs/redesign/profile-drop/proto/.edge-profile/ShaderCache/data_1
+docs/redesign/profile-drop/proto/.edge-profile/ShaderCache/data_2
+docs/redesign/profile-drop/proto/.edge-profile/ShaderCache/data_3
+docs/redesign/profile-drop/proto/.edge-profile/ShaderCache/index
+docs/redesign/profile-drop/proto/.edge-profile/SmartScreen/RemoteData/customSettings
+docs/redesign/profile-drop/proto/.edge-profile/SmartScreen/RemoteData/customSettings_F95BA787499AB4FA9EFFF472CE383A14
+docs/redesign/profile-drop/proto/.edge-profile/SmartScreen/RemoteData/edgeSettings
+docs/redesign/profile-drop/proto/.edge-profile/SmartScreen/RemoteData/edgeSettings_2.0-0
+docs/redesign/profile-drop/proto/.edge-profile/Variations
+docs/redesign/profile-drop/proto/.edge-profile/VariationsRuntimeSeedV2
+docs/redesign/profile-drop/proto/.edge-profile/VariationsSafeSeedV2
+docs/redesign/profile-drop/proto/.edge-profile/VariationsSeedV2
+docs/redesign/profile-drop/proto/.gitignore
+docs/redesign/profile-drop/proto/concepts.css
+docs/redesign/profile-drop/proto/concepts.js
+docs/redesign/profile-drop/proto/index.html
+docs/redesign/profile-drop/proto/render.mjs
+docs/redesign/profile-drop/proto/write-check.txt

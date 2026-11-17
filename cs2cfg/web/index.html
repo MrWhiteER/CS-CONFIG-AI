@@ -1355,97 +1355,326 @@
   @media (max-width: 860px) { .scorebar { display: none; } }
   @media (prefers-reduced-motion: reduce) { .score-fg { transition: none; } }
 
-  /* The tier, as a drop in the middle of the bar.
-
-     Centred on the bar rather than balanced between the chips and the scores:
-     the chips change width as their numbers move, so anything held in place by
-     the space either side of them would drift about while being watched.
-
-     It takes the profile colour, so the machine's grade and the profile it is
-     graded against are lit alike rather than the grade asserting a colour of
-     its own that then disagrees with the window around it. */
-  .modebadge {
-    position: absolute; left: 50%; top: 0; transform: translateX(-50%);
-    width: 360px; height: 58px;
-    display: grid; place-items: center;
+  .pd .pd-direct {
+    display:flex;
+    height:34px;
   }
-  /* The bar has the chips at one end of the title bar and the scores at the
-     other. When the window is not wide enough to keep clear of both, the runs
-     shorten rather than the whole thing shrinking -- the pod is the part that
-     has to stay readable. */
-  @media (max-width: 1280px) { .modebadge { width: 250px; } }
-  @media (max-width: 1100px) { .modebadge { width: 150px; } }
-  .modebadge:empty { display: none; }
-
-  /* The bar dipping into a pod, rather than a drop hanging off it.
-
-     One path, because the corners where the bar meets the pod are concave --
-     the edge curves away from the shape -- and nothing made of boxes and
-     border-radius can do that.
-
-     Cubics rather than quadratics, and the reason is the join. A quadratic has
-     one control point, so the tangent where two of them meet is whatever falls
-     out; the eye reads that as a crease even when the shape is continuous. A
-     cubic has one control point at each end, so each curve can be told to
-     leave along the tangent the last one arrived on. Every join here does
-     that -- horizontal into the fillet, vertical down the wall, horizontal
-     along the bottom -- which is the whole of why it looks poured rather than
-     assembled. */
-  .modenotch {
-    position: absolute; inset: 0; width: 100%; height: 100%;
-    overflow: visible;
-    /* The gradient's stops read these. Named here rather than written into the
-       stops because a stop cannot hold a color-mix() directly. */
-    --notch-hi: color-mix(in srgb, var(--mode-neon, var(--accent)) 46%, white);
-    --notch-lo: color-mix(in srgb, var(--mode-neon, var(--accent)) 72%, black);
-    filter:
-      drop-shadow(0 3px 7px rgba(0, 0, 0, .55))
-      drop-shadow(0 8px 20px rgba(0, 0, 0, .42));
-    transition: filter .3s ease;
+  .pd .pd-direct>button {
+    width:59px;
+    height:34px;
+    display:grid;
+    place-items:center;
+    position:relative;
+    color:var(--muted);
   }
-  .modenotch .fill {
-    fill: url(#notch-lit);
-    stroke: color-mix(in srgb, var(--mode-neon, var(--accent)) 55%, transparent);
-    stroke-width: 1;
+  .pd .pd-direct>button[aria-checked=true] {
+    color:var(--ink);
   }
-
-  @supports not (color: color-mix(in srgb, red 50%, blue)) {
-    .modenotch {
-      --notch-hi: var(--mode-neon, var(--accent));
-      --notch-lo: var(--mode-neon, var(--accent));
-      filter: drop-shadow(0 3px 7px rgba(0, 0, 0, .55));
+  @media(max-width:1200px) {
+    .pd .pd-direct>button {
+      width:47px;
     }
-    .modenotch .fill { stroke: none; }
   }
-  @media (prefers-reduced-motion: reduce) { .modenotch { transition: none; } }
-
-  /* The mark rides in the pod. Nudged down, because the pod's own middle is
-     lower than the badge's -- the lips take the top of the box. */
-  .modemark {
-    position: relative; z-index: 1;
-    margin-top: 9px;
-    width: 21px; height: 21px;
-    /* Ink on the lit drop: every profile colour is bright enough that dark
-       reads better on it, and a neon mark on a neon ground is the one
-       combination that does not work at all. */
-    color: #0b1017;
+  @media(max-width:900px) {
+    .pd .pd-direct>button {
+      width:41px;
+    }
   }
-  /* Drawn as outlines, not filled. SVG fills black by default, which turned
-     the gem into a solid lump with its own facet lines invisible on top of
-     it -- the shape was there and the drawing was not. */
-  .modemark path, .modemark circle {
-    fill: none; stroke: currentColor; stroke-width: 1.8;
-    stroke-linejoin: round; stroke-linecap: round;
+  @media(max-width:650px) {
+    .pd .pd-direct>button {
+      width:33px;
+    }
   }
-  /* Except where a mark is meant to be solid, which says so for itself. */
-  .modemark [fill="currentColor"] { fill: currentColor; stroke: none; }
-
-  /* The bar runs out of room before anything else. The scores go first, and
-     the grade goes with them rather than colliding with the chips. */
-  @media (max-width: 860px) { .modebadge { display: none; } }
-  @media (prefers-reduced-motion: reduce) { .modedrop { transition: none; } }
-  @supports not (color: color-mix(in srgb, red 50%, blue)) {
-    .modedrop { background: var(--mode-neon, var(--accent)); box-shadow: none; }
+  /* Profile Rail: direct selection and an accessible comparison shelf. */
+  #profile-rail {
+    display:block;
+    position:absolute;
+    left:50%;
+    top:10px;
+    width:240px;
+    height:46px;
+    transform:translateX(-50%);
+    z-index:35;
+    --tone:var(--neon-competitive);
+    --surface:var(--panel-2);
+  }
+  :root[data-theme="pro"] #profile-rail {
+    --surface:var(--glass-3);
+  }
+  #profile-rail[hidden] { display: none; }
+  .pd * {
+    box-sizing:border-box;
+  }
+  .pd button {
+    font:inherit;
+    cursor:pointer;
+    color:var(--ink);
+    border:0;
+    padding:0;
+    background:none;
+  }
+  .pd button:focus-visible {
+    outline:2px solid var(--accent);
+    outline-offset:4px;
+  }
+  .pd svg {
+    width:22px;
+    height:22px;
+    fill:none;
+    stroke:currentColor;
+    stroke-width:1.7;
+    stroke-linecap:round;
+    stroke-linejoin:round;
+    flex:none;
+  }
+  .pd [hidden] {
+    display:none!important;
+  }
+  .pd .pd-status {
+    display:flex;
+    align-items:center;
+    gap:7px;
+    font-size:11px;
+    color:var(--muted);
+  }
+  .pd .pd-status svg {
+    width:14px;
+    height:14px;
+    color:var(--good);
+  }
+  .pd[data-verify=changed] .pd-status svg {
+    color:var(--warn);
+  }
+  .pd[data-verify=failed] .pd-status svg {
+    color:var(--bad);
+  }
+  .pd .pd-pop {
+    position:absolute;
+    top:57px;
+    left:50%;
+    transform:translateX(-50%);
+    width:350px;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:18px;
+    box-shadow:0 18px 50px var(--sunk);
+    padding:18px;
+    backdrop-filter:blur(24px);
+  }
+  .pd .pd-head {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:16px;
+  }
+  .pd .pd-head b {
+    font-size:13px;
+    font-weight:600;
+  }
+  .pd .pd-foot {
+    margin:14px 0 0;
+    padding-top:12px;
+    border-top:1px solid var(--line-soft);
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    color:var(--muted);
+    font-size:10px;
+  }
+  .pd .pd-foot kbd {
+    font:10px var(--mono);
+  }
+  .pd .pd-live {
+    position:absolute;
+    width:1px;
+    height:1px;
+    overflow:hidden;
+    clip-path:inset(50%);
+  }
+  /* A: persistent direct access, horizontal travel */
+.pd .pd-rail {
+    position:relative;
+    height:44px;
+    padding:4px;
+    display:flex;
+    align-items:center;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:14px;
+    box-shadow:0 3px 12px var(--sunk);
+  }
+  .pd .pd-slider {
+    position:absolute;
+    left:4px;
+    top:4px;
+    width:59px;
+    height:34px;
+    border-radius:10px;
+    background:color-mix(in srgb,var(--tone) 16%,transparent);
+    border:1px solid color-mix(in srgb,var(--tone) 50%,transparent);
+    box-shadow:inset 0 -2px var(--tone);
+  }
+  .pd .pd-rail>button {
+    width:59px;
+    height:34px;
+    display:grid;
+    place-items:center;
+    position:relative;
+    color:var(--muted);
+  }
+  .pd .pd-rail>button[aria-checked=true] {
+    color:var(--ink);
+  }
+  .pd .pd-rail>.pd-more {
+    width:45px;
+    border-left:1px solid var(--line-soft);
+    margin-left:3px;
+    color:var(--ink-dim);
+  }
+  .pd .pd-more svg {
+    width:17px;
+  }
+  .pd .pd-caption {
+    position:absolute;
+    top:52px;
+    left:50%;
+    transform:translateX(-50%);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:12px;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:9px;
+    padding:8px 13px;
+    white-space:nowrap;
+    font-size:12px;
+    box-shadow:0 6px 20px var(--sunk);
+  }
+  .pd .pd-options {
+    display:flex;
+  }
+  .pd .pd-option {
+    width:33.333%;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:10px;
+    padding:14px 3px;
+    border-radius:10px;
+    color:var(--muted);
+  }
+  .pd .pd-option+.pd-option {
+    border-left:1px solid var(--line-soft);
+  }
+  .pd .pd-option b {
+    font-size:11px;
+    font-weight:500;
+    display:block;
+  }
+  .pd .pd-option small {
+    font-size:9px;
+    color:var(--muted);
+  }
+  .pd .pd-option[aria-checked=true] {
+    background:color-mix(in srgb,var(--tone) 10%,transparent);
+    color:var(--ink);
+  }
+  .pd .pd-option:hover {
+    background:var(--chip);
+  }
+  .pd .pd-transition {
+    position:absolute;
+    top:56px;
+    left:50%;
+    transform:translateX(-50%);
+    white-space:nowrap;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:9px 14px;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:10px;
+    font-size:11px;
+    box-shadow:0 6px 20px var(--sunk);
+  }
+  @media(max-width:1200px) {
+    #profile-rail {
+      width:199px;
+    }
+    .pd .pd-rail>button,.pd .pd-slider {
+      width:47px;
+    }
+    .pd .pd-rail>.pd-more {
+      width:43px;
+    }
+  }
+  @media(max-width:900px) {
+    .topbar .net-control {
+      display:none;
+    }
+    #profile-rail {
+      width:176px;
+    }
+    .pd .pd-rail>button,.pd .pd-slider {
+      width:41px;
+    }
+    .pd .pd-rail>.pd-more {
+      width:38px;
+    }
+  }
+  @media(max-width:650px) {
+    .topbar #chip-ram {
+      display:none;
+    }
+    #profile-rail {
+      width:149px;
+    }
+    .pd .pd-rail>button,.pd .pd-slider {
+      width:33px;
+    }
+    .pd .pd-rail>.pd-more {
+      width:36px;
+    }
+    .pd .pd-pop {
+      max-width:calc(100vw - 28px);
+    }
+  }
+  @media(prefers-reduced-motion:reduce) {
+    .pd *, .pd *::before {
+      animation:none!important;
+      transition:none!important;
+    }
+  }
+  .pd .pd-status svg {
+    color:var(--muted);
+  }
+  .pd[data-verify=verified] .pd-status svg {
+    color:var(--good);
+  }
+  .pd[data-verify=changed] .pd-status svg {
+    color:var(--warn);
+  }
+  .pd[data-verify=failed] .pd-status svg {
+    color:var(--bad);
+  }
+  .pd button:disabled {
+    cursor:wait;
+    opacity:.65;
+  }
+  .pd .pd-pop {
+    max-width:calc(100vw - 28px);
+  }
+  @media(max-width:650px) {
+    .topbar #sync-label,.topbar #chip-ram {
+      display:none;
+    }
+  }
+  @media(max-width:560px) {
+    .topbar #chip-gpu {
+      display:none;
+    }
   }
 
   /* The offer to read the privileged sensors: the last thing in the system
@@ -5992,7 +6221,7 @@ const startup = (() => {
         </section>
       </div>
       <span class="spacer"></span>
-      <div class="modebadge" id="mode-badge"></div>
+      <div class="pd" id="profile-rail"></div>
       <div class="scorebar" id="scorebar"></div>
       <div class="sync-control" id="sync-control">
         <button type="button" id="sync-indicator" class="sync-indicator" aria-expanded="false" aria-controls="sync-popover" title="Sync with your Steam account"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 3M4 15l2 3a7 7 0 0 0 12-1"/></svg><span id="sync-label">Sync</span></button>
@@ -7162,69 +7391,19 @@ const MODE_ART = {
     '<path d="M7.6 3.4 11 8.6l3.4-5.2M11 8.6v10.3"/>',
 };
 
-const MODE_WORD = {
-  competitive: "Competitive — frames and clarity first",
-  balanced: "Balanced — a comfortable margin over your refresh rate",
-  quality: "Quality — the best picture the hardware can carry",
-};
-
-/* The notch, as one path.
-
-   86 wide and 50 deep. A 14px lip at each end, a 14px concave fillet turning
-   the lip down into the pod wall, and a pod 58 across with its bottom corners
-   rounded by 18. Written out rather than computed: the numbers only mean
-   anything together, and a generator for one fixed shape is harder to read
-   than the shape.
-*/
-const NOTCH_PATH =
-  "M0 0" +
-  "H360" +                      // the bar itself, with height, so the runs
-  "V14" +                       // either side of the pod are something to see
-  "H231" +                      // rather than a line tapering to nothing
-  "C219 14 211 20 211 36" +     // horizontal in, vertical out: the fillet
-  "C211 50 203 58 189 58" +     // down the wall and round
-  "L171 58" +
-  "C157 58 149 50 149 36" +     // and back up the other side
-  "C149 20 141 14 129 14" +
-  "H0" +
-  "Z";
-
-function paintModeBadge(name) {
-  const badge = $("mode-badge");
-  if (!badge) return;
-  const art = MODE_ART[name] || MODE_ART.balanced;
-  badge.innerHTML =
-    '<svg class="modenotch" viewBox="0 0 360 58" preserveAspectRatio="xMidYMid slice"' +
-    ' aria-hidden="true">' +
-      "<defs>" +
-        "<radialGradient id=\"notch-lit\" cx=\"50%\" cy=\"96%\" r=\"92%\">" +
-          '<stop offset="0%" stop-color="var(--notch-hi)"/>' +
-          '<stop offset="58%" stop-color="var(--mode-neon, var(--accent))"/>' +
-          '<stop offset="100%" stop-color="var(--notch-lo)"/>' +
-        "</radialGradient>" +
-        // The bar does not reach the ends of the window, so it has to stop --
-        // and a stop is a cut edge. It fades out instead, which reads as the
-        // bar carrying on past what is lit rather than as a tab sitting there.
-        "<linearGradient id=\"notch-fade\" x1=\"0\" x2=\"1\">" +
-          '<stop offset="0" stop-color="#000"/>' +
-          '<stop offset="0.20" stop-color="#fff"/>' +
-          '<stop offset="0.80" stop-color="#fff"/>' +
-          '<stop offset="1" stop-color="#000"/>' +
-        "</linearGradient>" +
-        '<mask id="notch-ends">' +
-          '<rect x="0" y="0" width="360" height="58" fill="url(#notch-fade)"/>' +
-        "</mask>" +
-      "</defs>" +
-      '<g mask="url(#notch-ends)">' +
-        '<path class="fill" d="' + NOTCH_PATH + '"/>' +
-      "</g>" +
-    "</svg>" +
-    '<svg class="modemark" viewBox="0 0 22 22" aria-hidden="true">' + art + "</svg>";
-  badge.title = MODE_WORD[name] || name;
-}
-
 /* Launcher motion: one scheduler, persistent instruments, no synthetic readings. */
-const homeMotion = { jobs: new Map(), raf: 0, reduced: matchMedia('(prefers-reduced-motion: reduce)') };
+const homeMotion = { animations: new Set(), jobs: new Map(), raf: 0, reduced: matchMedia('(prefers-reduced-motion: reduce)') };
+// Finite control animations share the scheduler's preference and lifetime.
+function homeAnimate(el, frames, duration) {
+  if (document.hidden || !el.getClientRects().length) return;
+  const animation = el.animate(homeMotion.reduced.matches ? [{opacity:0}, {opacity:1}] : frames,
+    {duration:homeMotion.reduced.matches ? 80 : duration, easing:'cubic-bezier(.22,.82,.22,1)'});
+  homeMotion.animations.add(animation);
+  const release = () => homeMotion.animations.delete(animation);
+  animation.addEventListener('finish', release, {once:true});
+  animation.addEventListener('cancel', release, {once:true});
+  return animation;
+}
 function homeVisible() { return !document.hidden && document.querySelector('[data-panel="launcher"]')?.classList.contains('hidden') !== true; }
 function homeCancel(el) { homeMotion.jobs.delete(el); }
 function homeTween(el, key, target, paint, duration = 850) {
@@ -7254,6 +7433,9 @@ function homeFrame(now) {
   homeSchedule();
 }
 function homePause() {
+  if (document.hidden || homeMotion.reduced.matches) {
+    homeMotion.animations.forEach(a => a.cancel()); homeMotion.animations.clear();
+  }
   document.documentElement.classList.toggle('home-paused', !homeVisible());
   if (!homeVisible()) { cancelAnimationFrame(homeMotion.raf); homeMotion.raf = 0; }
   else homeSchedule();
@@ -8188,7 +8370,6 @@ function paintIntent(name) {
   const cards = $("intents");
   cards.dataset.intent = name;
   document.body.dataset.intent = name;
-  paintModeBadge(name);
   cards.querySelectorAll(".mode-card").forEach(el => {
     const selected = el.dataset.intent === name;
     el.setAttribute("aria-pressed", String(selected));
@@ -8197,15 +8378,18 @@ function paintIntent(name) {
 }
 
 function chooseIntent(name, quiet) {
+  if (profileApplyBusy) return;
   if (!INTENTS.includes(name) || name === intent) { paintIntent(name || intent); return; }
   const before = intent;
   intent = name;
+  ++planRevision;
+  ++verificationRevision;
   paintIntent(name);
   $("apply").disabled = true;
   planned = null;
   rememberPrefs();
   if (!quiet) {
-    noteChange("Optimise for → " + name, () => chooseIntent(before, true));
+    noteChange("Optimise for → " + name, () => { chooseIntent(before, true); previewPlan(); });
     presetBegin(name);
     $("preview").click();
   }
@@ -8302,7 +8486,7 @@ document.addEventListener('visibilitychange', () => {
 });
 setInterval(() => { if (!document.hidden && !$('verification').hidden) refreshVerification(); }, 15000);
 
-let planRevision = 0;
+let planRevision = 0, profileApplyBusy = false;
 async function previewPlan() {
   busy("Building plan…");
   $("preview").disabled = true;
@@ -8315,9 +8499,11 @@ async function previewPlan() {
 $("preview").addEventListener("click", previewPlan);
 
 $("apply").addEventListener("click", async () => {
-  if (!planned) return;
+  if (!planned || profileApplyBusy) return;
   if (!confirm("Apply the " + planned.intent +
                " profile?\n\nEverything changed is backed up first.")) return;
+  profileApplyBusy = true;
+  profileRail.syncStatus();
   verificationRevision++;
   verificationDirty = true;
   if (!$('verification').hidden) {
@@ -8363,7 +8549,137 @@ $("apply").addEventListener("click", async () => {
     }
     scan(true);
   } catch (e) { status("Apply failed: " + esc(e.message), true); $("apply").disabled = false; }
+  finally { profileApplyBusy = false; profileRail.syncStatus(); }
 });
+
+/* Profile Rail: selection is separate from Apply and verification is read-only. */
+const profileRail = (() => {
+  const root = $('profile-rail');
+  const names = INTENTS, labels = ['Competitive','Balanced','Quality'];
+  const taglines = ['Clear sightlines','Comfortable balance','Picture detail'];
+  const icon = n => `<svg viewBox="0 0 22 22" aria-hidden="true">${MODE_ART[n]}</svg>`;
+  let current = intent, open = false, hoverTimer, noteTimer;
+  const animations = new Set();
+  root.innerHTML = `<div class="pd-rail"><div class="pd-slider" aria-hidden="true"></div><div class="pd-direct" role="radiogroup" aria-label="Profile">${names.map((n,i) => `<button type="button" role="radio" data-pick="${n}" aria-label="${labels[i]}" aria-describedby="profile-caption">${icon(n)}</button>`).join('')}</div><button type="button" class="pd-more" aria-label="Profile details" aria-expanded="false" aria-controls="profile-shelf"><svg viewBox="0 0 22 22" aria-hidden="true"><path d="m7 9 4 4 4-4"/></svg></button></div>
+    <div class="pd-caption" id="profile-caption" hidden><b></b><span class="pd-status"></span></div>
+    <section class="pd-pop" id="profile-shelf" aria-label="Choose profile" hidden><div class="pd-head"><b>Choose profile</b><span class="pd-status"></span></div><div class="pd-options" role="radiogroup" aria-label="Profile choices">${names.map((n,i) => `<button type="button" class="pd-option" role="radio" data-pick="${n}">${icon(n)}<span><b>${labels[i]}</b><small>${taglines[i]}</small></span></button>`).join('')}</div><div class="pd-foot"><span>Selection needs Apply</span><kbd>← → choose · Enter select</kbd></div></section>
+    <div class="pd-transition" hidden></div><span class="pd-live" role="status" aria-live="polite" aria-atomic="true"></span>`;
+  const shelf = $('profile-shelf'), caption = $('profile-caption');
+  const more = root.querySelector('.pd-more'), seat = root.querySelector('.pd-slider');
+  const direct = root.querySelector('.pd-direct');
+  const radios = group => [...group.querySelectorAll('[role="radio"]')];
+  function animate(el, frames, duration) {
+    const a = homeAnimate(el, frames, duration);
+    if (a) { animations.add(a); const done = () => animations.delete(a); a.addEventListener('finish',done,{once:true}); a.addEventListener('cancel',done,{once:true}); }
+  }
+  function stop() {
+    clearTimeout(hoverTimer); clearTimeout(noteTimer);
+    animations.forEach(a => a.cancel()); animations.clear();
+    root.querySelector('.pd-transition').hidden = true;
+  }
+  function hideCaption() {
+    caption.hidden = true;
+    animations.forEach(a => { if (a.effect?.target === caption) a.cancel(); });
+  }
+  function resetTabs() {
+    [direct,shelf].forEach(group => radios(group).forEach(b => b.tabIndex = b.dataset.pick === current ? 0 : -1));
+  }
+  function syncStatus() {
+    const box = $('verification');
+    const state = profileApplyBusy ? 'applying' : box.hidden ? 'unknown' : box.dataset.state || 'unknown';
+    root.dataset.verify = state;
+    root.setAttribute('aria-busy', String(profileApplyBusy));
+    const words = {verified:'PC is set', changed:'Needs Apply', failed:'Review settings', unknown:'Not checked', applying:'Applying…'};
+    const glyphs = {verified:'<path d="m5 11 4 4 8-9"/>',changed:'<circle cx="11" cy="11" r="7"/><path d="M11 7v5m0 3v1"/>',failed:'<path d="m6 6 10 10m0-10L6 16"/>',unknown:'<circle cx="11" cy="11" r="7"/><path d="M8 8c0-4 8-3 6 1l-3 3m0 3v1"/>',applying:'<path d="M6 3h10M6 19h10M7 3v4l8 8v4M15 3v4l-8 8v4"/>'};
+    root.querySelectorAll('.pd-status').forEach(el => { el.innerHTML = `<svg viewBox="0 0 22 22" aria-hidden="true">${glyphs[state] || glyphs.unknown}</svg><span>${words[state] || words.unknown}</span>`; });
+    root.querySelectorAll('[data-pick]').forEach(b => b.disabled = profileApplyBusy);
+  }
+  function paint(announce = true) {
+    const next = document.body.dataset.intent || intent;
+    if (!names.includes(next)) return;
+    const before = current, oldTransform = seat.style.transform, oldTone = root.style.getPropertyValue('--tone');
+    stop(); current = next;
+    root.style.setProperty('--tone',`var(--neon-${current})`);
+    root.querySelectorAll('[data-pick]').forEach(b => b.setAttribute('aria-checked',String(b.dataset.pick === current)));
+    resetTabs();
+    const target = radios(direct)[names.indexOf(current)];
+    seat.style.width = target.offsetWidth + 'px';
+    seat.style.transform = `translateX(${target.offsetLeft - 4}px)`;
+    caption.querySelector('b').textContent = labels[names.indexOf(current)];
+    syncStatus();
+    if (before !== current && announce) {
+      animate(seat,[{transform:oldTransform,background:`color-mix(in srgb,${oldTone} 16%,transparent)`,borderColor:`color-mix(in srgb,${oldTone} 50%,transparent)`},{transform:seat.style.transform,background:`color-mix(in srgb,var(--tone) 16%,transparent)`,borderColor:'color-mix(in srgb,var(--tone) 50%,transparent)'}],560);
+      const message = `${labels[names.indexOf(before)]} → ${labels[names.indexOf(current)]} · Needs Apply`;
+      const note = root.querySelector('.pd-transition'); note.textContent = message; note.hidden = false;
+      hideCaption();
+      root.querySelector('.pd-live').textContent = message;
+      noteTimer = setTimeout(() => note.hidden = true, 1600);
+    }
+  }
+  function peek() {
+    if (!open && !document.hidden && caption.hidden) {
+      caption.hidden = false;
+      animate(caption,[{opacity:0},{opacity:1}],120);
+    }
+  }
+  function toggle(value, restore = false) {
+    clearTimeout(hoverTimer); open = value; shelf.hidden = !open; hideCaption();
+    more.setAttribute('aria-expanded',String(open));
+    resetTabs();
+    if (open) {
+      root.querySelector('.pd-transition').hidden = true;
+      animate(shelf,[{opacity:0,transform:'translateX(-50%) translateY(-7px) scale(.97)'},{opacity:1,transform:'translateX(-50%) translateY(0) scale(1)'}],240);
+      shelf.querySelector('[aria-checked="true"]').focus();
+    } else {
+      animations.forEach(a => { if (a.effect?.target === shelf) a.cancel(); });
+      if (restore) more.focus();
+    }
+  }
+  function select(name) {
+    if (profileApplyBusy || name === intent) { if (open) toggle(false,true); return; }
+    const before = intent;
+    if (homeVisible()) chooseIntent(name);
+    else {
+      chooseIntent(name, true);
+      noteChange('Optimise for → ' + name, () => { chooseIntent(before, true); previewPlan(); });
+      previewPlan();
+    }
+    if (open) toggle(false,true);
+  }
+  root.addEventListener('click',e => {
+    const button = e.target.closest('button');
+    if (button?.dataset.pick) select(button.dataset.pick);
+    else if (button === more) toggle(!open);
+  });
+  root.addEventListener('pointerenter',() => { clearTimeout(hoverTimer); hoverTimer = setTimeout(peek,120); });
+  root.addEventListener('pointerleave',() => { clearTimeout(hoverTimer); if (!root.contains(document.activeElement)) hideCaption(); });
+  root.addEventListener('focusin',peek);
+  root.addEventListener('focusout',e => { if (!root.contains(e.relatedTarget)) { toggle(false); resetTabs(); } });
+  root.addEventListener('keydown',e => {
+    if (e.key === 'Escape') { e.preventDefault(); toggle(false,true); hideCaption(); return; }
+    if (!e.target.matches('[role="radio"]')) return;
+    const group = e.target.closest('[role="radiogroup"]'), buttons = radios(group);
+    let at = buttons.indexOf(e.target);
+    if (e.key === 'Home') at = 0;
+    else if (e.key === 'End') at = 2;
+    else if (['ArrowLeft','ArrowUp','ArrowRight','ArrowDown'].includes(e.key)) at = (at + (['ArrowRight','ArrowDown'].includes(e.key) ? 1 : 2)) % 3;
+    else return;
+    e.preventDefault(); buttons.forEach((b,i) => b.tabIndex = i === at ? 0 : -1); buttons[at].focus();
+  });
+  document.addEventListener('pointerdown',e => { if (!root.contains(e.target)) { toggle(false); hideCaption(); } });
+  new MutationObserver(() => paint()).observe(document.body,{attributes:true,attributeFilter:['data-intent']});
+  new MutationObserver(syncStatus).observe($('verification'),{attributes:true,attributeFilter:['data-state','hidden']});
+  function pause() { stop(); toggle(false); hideCaption(); }
+  document.addEventListener('visibilitychange',() => { if (document.hidden) pause(); });
+  homeMotion.reduced.addEventListener('change',pause);
+  new MutationObserver(() => {
+    if (!root.getClientRects().length || getComputedStyle(root).visibility === 'hidden') pause();
+  }).observe(root,{attributes:true,attributeFilter:['hidden','style','class']});
+  new ResizeObserver(() => { if (!root.getClientRects().length) pause(); else paint(false); }).observe(root);
+  window.addEventListener('resize',() => paint(false));
+  paint(false);
+  return {syncStatus};
+})();
 
 $("revert").addEventListener("click", async () => {
   if (!confirm("Restore the most recent backup?")) return;
