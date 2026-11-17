@@ -84,6 +84,11 @@ class State:
 
         self.overlay = OverlayService()  # Inert until enabled in preferences.
         self.overlay.pinned_context = lambda: _overlay_pinned_context(self)
+        from .rgb import RgbSync
+
+        # Inert until switched on in preferences; remembers the last board so
+        # the lights come up at start without the keyboard tab being opened.
+        self.rgb = RgbSync(cache=user_data_dir() / "rgb-board.json")
 
     def refresh(self, rescan: bool = False) -> None:
         if self.machine is None or rescan:
@@ -886,6 +891,37 @@ def _overlay_settings(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     save_prefs(prefs)
     state.overlay.configure(wanted)
     return _overlay(state, {})
+
+
+def _rgb(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Keyboard/mouse lighting: the setting, and which lighting APIs are live."""
+    return {"ok": True, **state.rgb.status()}
+
+
+def _rgb_settings(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Change the lighting setting, remember it, and apply it now."""
+    from .cli import load_prefs, save_prefs
+    from .rgb import DEFAULTS, read_settings
+
+    prefs = load_prefs()
+    current = read_settings(prefs.get("ui"))
+    try:
+        wanted = read_settings({**current, **{k: body[k] for k in DEFAULTS if k in body}},
+                               strict=True)
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
+    profiles.remember(prefs, None, wanted)
+    save_prefs(prefs)
+    state.rgb.configure(wanted)
+    # Switched on before the keyboard tab was ever opened: read the board now
+    # rather than waiting for somebody to look at it.
+    if wanted["rgb_enabled"] and not state.rgb.status()["has_board"]:
+        try:
+            if getattr(state, "cfg_scan", None) is not None:
+                _cfg_keys(state, {})
+        except Exception:
+            pass
+    return _rgb(state, {})
 
 
 def _cfg_scan(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -2618,6 +2654,12 @@ def _cfg_keys(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
             stock = keydefaults.for_key(defaults_table, entry["key"])
             if stock:
                 entry["is_default"] = livecfg._same_command(entry["command"], stock)
+
+    # The lights on the desk follow this board. Never fatal to the board.
+    try:
+        state.rgb.update(bound)
+    except Exception:
+        pass
 
     return {
         "bound": bound,
@@ -4977,6 +5019,7 @@ def _quit(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     def bye() -> None:
         try:
             _state.overlay.stop()
+            _state.rgb.stop()       # hand the lights back before the process goes
         finally:
             os._exit(0)
 
@@ -5158,6 +5201,8 @@ def make_handler(state: State):
         "/api/overlay": _overlay,
         "/api/overlay/panel": _overlay_panel,
         "/api/overlay/settings": _overlay_settings,
+        "/api/rgb": _rgb,
+        "/api/rgb/settings": _rgb_settings,
     }
 
     class Handler(BaseHTTPRequestHandler):
@@ -5615,6 +5660,7 @@ def serve(port: int = 8765, cfg_folder: str = "mrwhiteer",
         def server_close(self) -> None:
             try:
                 state.overlay.stop()
+                state.rgb.stop()
             finally:
                 super().server_close()
 
@@ -5633,4 +5679,10 @@ def serve(port: int = 8765, cfg_folder: str = "mrwhiteer",
 
     state.overlay.bind_gsi(overlay_install, server.server_address[1])
     state.overlay.configure(overlay_settings(load_prefs().get("ui")))
+    try:
+        from .rgb import read_settings as rgb_settings
+
+        state.rgb.configure(rgb_settings(load_prefs().get("ui")))
+    except Exception:
+        pass                    # lighting is never worth failing to start over
     return server, state

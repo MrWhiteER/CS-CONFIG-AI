@@ -53,6 +53,9 @@ MACHINE_KEYS = frozenset({
     "overlay_sign_out_hint_dismissed",
     "overlay_panel_hotkey", "overlay_layout", "overlay_tools", "overlay_dim_game",
     "overlay_auto_hide", "overlay_always_visible", "overlay_hide_from_capture",
+    # Lighting belongs to the keyboard and mouse on this desk, like the sound
+    # devices above.
+    "rgb_enabled", "rgb_free", "rgb_brightness",
 })
 
 # The account whose settings are shown, which is itself machine-wide: it is a
