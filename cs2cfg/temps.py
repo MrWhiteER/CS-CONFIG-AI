@@ -399,8 +399,50 @@ def run_helper(parent_pid: int) -> int:
     return 0
 
 
+def _from_setup_helper() -> List[Reading]:
+    """Readings from the helper setup installed (``elevated.temps.watch``).
+
+    It publishes the raw sensor values; turning them into readings is done
+    here, with the same plausibility limits as reading them directly.
+    """
+    from . import elevated
+
+    payload = elevated.temps_published()
+    if not isinstance(payload, dict):
+        return []
+    if time.time() - float(payload.get("at") or 0) > HELPER_STALE:
+        return []
+    out: List[Reading] = []
+    zones = []
+    for raw in payload.get("zones") or []:
+        try:
+            celsius = float(raw) / 10.0 - 273.15
+        except (TypeError, ValueError):
+            continue
+        if 5 < celsius < 125:
+            zones.append(celsius)
+    system = Reading("system", "System")
+    if zones:
+        system.celsius = round(max(zones), 1)
+    else:
+        system.unavailable = "no thermal zone on this machine"
+    out.append(system)
+    for row in payload.get("drives") or []:
+        try:
+            celsius = float((row or {}).get("Temp"))
+        except (TypeError, ValueError):
+            continue
+        if 5 < celsius < 125:
+            out.append(Reading("drive", _short_drive(str(row.get("Name") or "drive")),
+                               celsius=round(celsius, 1)))
+    return out
+
+
 def _published() -> List[Reading]:
     """Readings from the elevated helper, if one is running and current."""
+    found = _from_setup_helper()
+    if found:
+        return found
     try:
         raw = helper_path().read_text(encoding="utf-8")
         payload = json.loads(raw)
@@ -431,6 +473,15 @@ def start_helper() -> dict:
         return {"ok": False, "error": "administrator rights are a Windows thing"}
     if helper_running():
         return {"ok": True, "already": True, "note": "already reading"}
+
+    # Through the helper setup installed: no prompt at all.
+    from . import elevated
+
+    if elevated.ready():
+        started = elevated.run("temps.watch", {"pid": os.getpid()}, wait=False)
+        if started.get("ok"):
+            return {"ok": True, "started": True, "note": "reading through the helper"}
+        return started
     if _elevated():
         # Already administrator, so no prompt is needed or wanted.
         threading.Thread(target=run_helper, args=(os.getpid(),), daemon=True).start()

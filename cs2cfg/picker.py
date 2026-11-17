@@ -20,6 +20,7 @@ application. It also means a dialog that hangs cannot take the server with it.
 from __future__ import annotations
 
 import subprocess
+import json
 import tempfile
 from pathlib import Path
 from typing import Optional
@@ -224,6 +225,24 @@ def _pick_file(filter_spec: str, initial: str, title: str) -> Optional[str]:
 def pick_file(initial: str = "", title: str = "Choose a configuration file") -> Optional[str]:
     """The Explorer file picker, filtered to configurations."""
     return _pick_file(CONFIG_FILTER, initial, title)
+
+
+def pick_files() -> list:
+    """The same native config picker with multiple selection enabled."""
+    result = _run(
+        "Add-Type -AssemblyName System.Windows.Forms\n"
+        "$d = New-Object System.Windows.Forms.OpenFileDialog\n"
+        "$d.Title = 'Bring your own configs'\n"
+        f"$d.Filter = {_literal(CONFIG_FILTER)}\n"
+        "$d.Multiselect = $true\n$d.CheckFileExists = $true\n"
+        "$d.RestoreDirectory = $true\n"
+        "$top = New-Object System.Windows.Forms.Form\n$top.TopMost = $true\n"
+        "if ($d.ShowDialog($top) -eq 'OK') { ConvertTo-Json -Compress -InputObject @($d.FileNames) }\n"
+        "$top.Dispose(); $d.Dispose()\n")
+    if not result:
+        return []
+    paths = json.loads(result)
+    return paths if isinstance(paths, list) else [paths]
 
 
 # What a companion is allowed to be. Restricted to .exe rather than offering

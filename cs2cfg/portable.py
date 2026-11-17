@@ -109,6 +109,10 @@ def write(target: Path, ui: Dict[str, Any], folder: Optional[Path],
             for path in sorted(root.rglob("*")):
                 if not path.is_file():
                     continue
+                # Local installation/source-protection records contain PC paths.
+                # They are app state, never part of a shareable config collection.
+                if path.parent == root and path.name in ("_import_sources.json", "_installed.json"):
+                    continue
                 if len(files) >= MAX_FILES:
                     skipped.append(str(path.relative_to(root)))
                     continue

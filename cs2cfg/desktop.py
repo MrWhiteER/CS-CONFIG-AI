@@ -310,7 +310,7 @@ def show_error(message: str, detail: str = "") -> None:
 # Window
 # ---------------------------------------------------------------------------
 
-def _launch_webview(url: str, icon: Optional[Path], on_closed: Callable[[], None]) -> bool:
+def _launch_webview(url: str, icon: Optional[Path], on_closed: Callable[[], None], overlay=None) -> bool:
     """Native window via pywebview. Returns False if unavailable."""
     try:
         import webview
@@ -327,7 +327,27 @@ def _launch_webview(url: str, icon: Optional[Path], on_closed: Callable[[], None
             confirm_close=False,
         )
         window.events.closed += on_closed
+        from .overlay.panel import Panel
+
+        service = overlay
+        if service is not None:
+            def open_tab(tab):
+                window.load_url(url + "?tab=" + tab)
+                window.show()
+
+            panel = Panel(service, lambda: webview.create_window(
+                "CS2 Auto Config — Overlay", url + "overlay-panel.html",
+                width=1280, height=800, min_size=(480, 400), on_top=True,
+                frameless=True, transparent=True, easy_drag=False,
+                focus=True, background_color="#0c0812", confirm_close=False),
+                keyboard=lambda: open_tab("keyboard"),
+                setup=lambda: open_tab("settings"))
+            service.panel = panel
+            if service._hud:
+                service._hud.on_panel = panel.toggle
+            window.events.closed += panel.destroy
         _keep_running_in_the_tray(window, icon)
+        _watch_for_matches(url)
 
         kwargs = {}
         if icon and icon.exists():
@@ -422,6 +442,116 @@ def _keep_running_in_the_tray(window, icon: Optional[Path]) -> bool:
 
     window.events.closing += on_closing
     return True
+
+
+ALERT_TITLE = f"{APP_NAME} - Match found"
+
+
+def _watch_for_matches(url: str) -> None:
+    """Pop a small always-on-top window on the main monitor when a match is
+    found in FACEIT or CS2. See cs2cfg/matchwatch.py for how it is noticed."""
+    if sys.platform != "win32":
+        return
+    try:
+        import webview
+
+        from . import matchwatch
+        from .cli import load_prefs
+    except Exception:
+        return
+
+    matchwatch.set_enabled(bool(load_prefs().get("match_alert", True)))
+    held = {"window": None}
+    lock = threading.Lock()
+
+    def close() -> None:
+        with lock:
+            win, held["window"] = held["window"], None
+        try:
+            from . import dimmer
+
+            dimmer.hide()
+        except Exception:
+            pass
+        if win is not None:
+            try:
+                win.destroy()
+            except Exception:
+                pass
+
+    def open_alert() -> None:
+        close()
+        options = load_prefs()
+        width, height = 460, 300
+        try:
+            user32 = ctypes.WinDLL("user32", use_last_error=True)
+            # The primary monitor always starts at 0,0.
+            screen_w = user32.GetSystemMetrics(0)
+            screen_h = user32.GetSystemMetrics(1)
+        except Exception:
+            screen_w, screen_h = 1920, 1080
+        x = max(0, (screen_w - width) // 2)
+        y = max(0, int(screen_h * 0.28))
+        # Every screen goes dark first; the alert then sits above the dim,
+        # the one bright thing on any monitor.
+        try:
+            from . import dimmer
+
+            dimmer.show()
+        except Exception:
+            pass
+        try:
+            win = webview.create_window(
+                ALERT_TITLE, url.rstrip("/") + "/alert.html",
+                width=width, height=height, x=x, y=y,
+                resizable=False, frameless=True, on_top=bool(options.get("match_alert_on_top", True)),
+                focus=True, confirm_close=False)
+        except Exception:
+            return
+        with lock:
+            held["window"] = win
+
+        def raise_it() -> None:
+            try:
+                focus_existing_window(ALERT_TITLE, same_process=True)
+            except Exception:
+                pass
+            # Above the dimming windows, which are topmost too.
+            try:
+                u32 = ctypes.WinDLL("user32", use_last_error=True)
+                u32.FindWindowW.restype = wintypes.HWND
+                u32.FindWindowW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR]
+                u32.SetWindowPos.argtypes = [wintypes.HWND, wintypes.HWND,
+                                             ctypes.c_int, ctypes.c_int,
+                                             ctypes.c_int, ctypes.c_int,
+                                             wintypes.UINT]
+                hwnd = u32.FindWindowW(None, ALERT_TITLE)
+                if hwnd:
+                    u32.SetWindowPos(hwnd, wintypes.HWND(-1), 0, 0, 0, 0,
+                                     0x0001 | 0x0002 | 0x0040)  # NOSIZE|NOMOVE|SHOWWINDOW
+            except Exception:
+                pass
+        try:
+            win.events.shown += lambda: threading.Timer(0.15, raise_it).start()
+        except Exception:
+            pass
+        try:
+            import winsound
+
+            if options.get("match_alert_sound", True):
+                winsound.PlaySound("SystemExclamation",
+                                   winsound.SND_ALIAS | winsound.SND_ASYNC)
+        except Exception:
+            pass
+
+    def on_event(what, _alert) -> None:
+        if what == "start":
+            threading.Thread(target=open_alert, daemon=True).start()
+        elif what == "end":
+            threading.Thread(target=close, daemon=True).start()
+
+    matchwatch.add_listener(on_event)
+    matchwatch.start()
 
 
 def _launch_browser_app_window(url: str) -> bool:
@@ -530,7 +660,7 @@ def run(
         def on_closed() -> None:
             closed.set()
 
-        opened = _launch_webview(server.url, icon, on_closed)
+        opened = _launch_webview(server.url, icon, on_closed, overlay=server.state.overlay)
 
         if not opened and fallback_to_browser:
             if _launch_browser_app_window(server.url):

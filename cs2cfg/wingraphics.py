@@ -81,8 +81,8 @@ def render(settings: Dict[str, str]) -> str:
     return "".join(f"{name}={value};" for name, value in settings.items())
 
 
-def read(exe: Optional[Path]) -> Dict[str, str]:
-    """What Windows currently has for this executable. Never raises."""
+def read(exe: Optional[Path], *, strict: bool = False) -> Dict[str, str]:
+    """Current settings. Strict receipts distinguish a missing value from denied access."""
     if sys.platform != "win32" or not exe:
         return {}
     try:
@@ -90,7 +90,11 @@ def read(exe: Optional[Path]) -> Dict[str, str]:
 
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, KEY) as key:
             value, _ = winreg.QueryValueEx(key, str(exe))
+    except FileNotFoundError:
+        return {}
     except OSError:
+        if strict:
+            raise
         return {}
     return parse(str(value))
 

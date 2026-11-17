@@ -38,8 +38,14 @@ way. Take whichever suits.
 Neither needs Python, an account, or a sign-in.
 
 Both keep their settings, backups and session history in a `cs2cfg-data`
-folder beside the executable, and uninstalling deliberately leaves that alone
-so a reinstall does not lose your work.
+folder beside the executable.
+
+**Uninstalling removes everything the app made:** the program, its settings,
+backups, caches and update downloads, and the one-time helper with its
+scheduled task, firewall rules and CS2 Defender exclusion -- without an
+administrator prompt. The only thing left behind is the configs it wrote into
+CS2's own cfg folder, so the game keeps playing the way you set it up. A
+reinstall starts again from the setup wizard.
 
 [releases]: ../../releases/latest
 
@@ -576,6 +582,24 @@ earns its place is `--watch`: switching the desktop mode on launch and back on
 exit, so the rest of Windows is not stuck at 4:3 while you are not playing.
 
 ---
+
+## First run, and a second PC
+
+A fresh install opens on a short setup before anything else: sign in with
+Steam to sync, allow the app to write into CS2's cfg folder, pick the default
+headset and microphone, choose Competitive, Balanced or Visual (each showing
+the frame rate this PC is estimated to reach), tick which companion apps start
+before the game (FACEIT, Crosshair X, Discord, whatever else is found), and
+pick a theme. Every step can be skipped and run again from Settings.
+
+Once signed in with Steam, settings follow the account between PCs on their
+own, every couple of minutes while the app is open. What travels is the
+account's preferences and its config files (the collection folder, the folder
+the app generates into, and `autoexec.cfg`). What stays is anything about the
+hardware: `cs2_video.txt` and the launch options are rebuilt for each PC from
+the preset that travelled, and sound devices and program paths belong to the
+PC they are on. Every pull is backed up first, and files only land once the
+app has been allowed to write to that PC's cfg folder. See `cs2cfg/autosync.py`.
 
 ## Backups
 

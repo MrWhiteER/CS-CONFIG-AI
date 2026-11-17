@@ -27,6 +27,8 @@ Nothing here writes. It measures, and says what it found.
 from __future__ import annotations
 
 import re
+import http.client
+import socket
 import statistics
 import subprocess
 import threading
@@ -70,6 +72,102 @@ JITTER_FINE = 5.0
 JITTER_POOR = 15.0
 
 _CREATE_NO_WINDOW = 0x08000000
+
+DOWNLOAD_SECONDS = 4.0
+DOWNLOAD_BYTES = 25_000_000
+DOWNLOAD_CHUNK = 64 * 1024
+
+
+def download_speed() -> dict:
+    """Bounded, single-stream HTTPS sample; no cookies, account or identifiers.
+
+    The outer deadline also bounds DNS/TLS stalls (socket timeouts alone do
+    not bound DNS). A stalled daemon cannot hold up the job or publish late.
+    Setup time is included, so this short sample is not an ISP line-rate claim.
+    """
+    unknown = {"mbps": None, "bytes": 0, "seconds": 0,
+               "source": "Cloudflare", "error": "Download unavailable. Try again."}
+    began = time.monotonic()
+    deadline = began + DOWNLOAD_SECONDS
+    stopped = threading.Event()
+    finished = threading.Event()
+    result = dict(unknown)
+    transport = []
+    connection = http.client.HTTPSConnection("speed.cloudflare.com",
+                                             timeout=DOWNLOAD_SECONDS)
+
+    def stream() -> None:
+        response = None
+        try:
+            connection.connect()
+            transport.append(connection.sock)
+            if stopped.is_set() or time.monotonic() >= deadline:
+                return
+            connection.sock.settimeout(max(.001, deadline - time.monotonic()))
+            connection.request("GET", f"/__down?bytes={DOWNLOAD_BYTES}", headers={
+                "User-Agent": "Mozilla/5.0", "Accept-Encoding": "identity",
+                "Cache-Control": "no-cache", "Connection": "close"})
+            response = connection.getresponse()
+            if response.status != 200 or response.getheader("Content-Encoding", "identity") != "identity":
+                return  # No redirects, login pages or compressed byte counts.
+            received = 0
+            while received < DOWNLOAD_BYTES and not stopped.is_set():
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                # read1 returns available data without waiting to fill a chunk.
+                if connection.sock is not None:
+                    connection.sock.settimeout(max(.001, remaining))
+                chunk = response.read1(min(DOWNLOAD_CHUNK, DOWNLOAD_BYTES - received))
+                if not chunk:
+                    if received < DOWNLOAD_BYTES:
+                        return  # Truncated or empty response is not a result.
+                    break
+                received += len(chunk)
+                result["bytes"] = received
+            elapsed = time.monotonic() - began
+            if received and elapsed > 0 and not stopped.is_set():
+                result.update(mbps=round(received * 8 / elapsed / 1_000_000, 2),
+                              bytes=received, seconds=round(elapsed, 3), error="")
+        except TimeoutError:
+            if result["bytes"] and time.monotonic() >= deadline - .02:
+                result.update(mbps=round(result["bytes"] * 8 / DOWNLOAD_SECONDS / 1_000_000, 2),
+                              seconds=DOWNLOAD_SECONDS, error="")
+            else:
+                result.update(unknown)
+        except (OSError, http.client.HTTPException):
+            result.update(unknown)
+        finally:
+            if response is not None:
+                response.close()
+            connection.close()
+            finished.set()
+
+    worker = threading.Thread(target=stream, daemon=True)
+    try:
+        try:
+            worker.start()
+        except RuntimeError:
+            return dict(unknown)
+        if not finished.wait(max(0, deadline - time.monotonic())):
+            stopped.set()
+            sample = dict(result)
+            if sample["bytes"]:
+                return {**unknown, "mbps": round(sample["bytes"] * 8 / DOWNLOAD_SECONDS / 1_000_000, 2),
+                        "bytes": sample["bytes"], "seconds": DOWNLOAD_SECONDS, "error": ""}
+            return dict(unknown)
+        return dict(result)
+    finally:
+        stopped.set()
+        # With Connection: close, HTTPResponse owns the socket and
+        # connection.sock becomes None. Interrupt its pending read too.
+        for wire in transport:
+            if wire is not None:
+                try:
+                    wire.shutdown(socket.SHUT_RDWR)
+                except OSError:
+                    pass
+        connection.close()
 
 
 def _hidden() -> dict:
@@ -409,6 +507,12 @@ def _ping_once(host: str) -> "Optional[float]":
     return None
 
 
+# Serialize whole measurements, including fallback probes. start_lock makes
+# reservation atomic with ServerPing.start; a waiting net check has priority.
+probe_lock = threading.Lock()
+start_lock = threading.Lock()
+
+
 class Run:
     """One measurement, readable while it is still going."""
 
@@ -418,6 +522,7 @@ class Run:
         self.gateway = Probe(host="", label="Your router")
         self.internet = Probe(host=ANCHOR, label="The internet")
         self.findings: List[Finding] = []
+        self.download = None
         self.error = ""
         self.done = False
         self.started = 0.0
@@ -429,10 +534,31 @@ class Run:
         if self.started:
             return
         self.started = time.time()
+        try:
+            threading.Thread(target=self._begin_serialized, daemon=True).start()
+        except Exception:
+            self.done = True
+            raise
+
+    def _begin_serialized(self) -> None:
+        probe_lock.acquire()
+        handed_off = False
+        try:
+            handed_off = bool(self._begin())
+        except Exception as exc:
+            for thread in self._threads:
+                thread.join()
+            self.error = str(exc)
+            self.done = True
+        finally:
+            if not handed_off:
+                probe_lock.release()
+
+    def _begin(self) -> bool:
         if sys.platform != "win32":
             self.error = "this check uses Windows networking tools"
             self.done = True
-            return
+            return False
 
         # Which adapter is in use only decorates the result, so it is fetched
         # alongside the probing rather than before it. Both of these are
@@ -444,6 +570,12 @@ class Run:
                 self.adapter = found
 
         threading.Thread(target=find_adapter, daemon=True).start()
+
+        # Already on the job's daemon thread. Finish the bounded download
+        # before ICMP so the test itself cannot inflate latency or jitter.
+        measured = download_speed()
+        with self._lock:
+            self.download = measured
 
         router = gateway_address()
         self.gateway.host = router
@@ -457,7 +589,18 @@ class Run:
             thread.start()
             self._threads.append(thread)
 
-        threading.Thread(target=self._finish, daemon=True).start()
+        threading.Thread(target=self._finish_serialized, daemon=True).start()
+        return True
+
+    def _finish_serialized(self) -> None:
+        try:
+            self._finish()
+        except Exception as exc:
+            with self._lock:
+                self.error = str(exc)
+                self.done = True
+        finally:
+            probe_lock.release()
 
     def _sweep(self, probe: Probe, host: str) -> None:
         if not host:
@@ -503,6 +646,7 @@ class Run:
                 "done": self.done,
                 "error": self.error,
                 "samples": self.samples,
+                "download": dict(self.download) if self.download else None,
                 "adapter": ({"name": self.adapter.name,
                              "description": self.adapter.description,
                              "speed": self.adapter.speed,
@@ -530,11 +674,12 @@ _run_now: "Optional[Run]" = None
 def start(samples: int = SAMPLES) -> Dict[str, Any]:
     """Begin a measurement, replacing any that has finished."""
     global _run_now
-    if _run_now is not None and not _run_now.done:
+    with start_lock:
+        if _run_now is not None and not _run_now.done:
+            return _run_now.snapshot()
+        _run_now = Run(samples)
+        _run_now.begin()
         return _run_now.snapshot()
-    _run_now = Run(samples)
-    _run_now.begin()
-    return _run_now.snapshot()
 
 
 def progress() -> Dict[str, Any]:

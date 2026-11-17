@@ -70,7 +70,9 @@ Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription
 ; The whole built folder. A folder build rather than one file, because the
 ; one-file bootloader validates its parent process and anti-cheat software
 ; blocks that query -- see cs2cfg.spec.
-Source: "dist\cs2-autoconfig\*"; DestDir: "{app}";   Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "dist\cs2-autoconfig\*"; DestDir: "{app}"; Excludes: "PresentMon-2.6.0-x64.exe"; Flags: ignoreversion recursesubdirs createallsubdirs
+; The portable build carries the same data file under _internal/tools/presentmon.
+Source: "tools\presentmon\PresentMon-2.6.0-x64.exe"; DestDir: "{app}\_internal\tools\presentmon"; Flags: ignoreversion
 
 [Icons]
 ; AppUserModelID has to match what the program sets on itself at startup --
@@ -87,8 +89,20 @@ Name: "{autodesktop}\{#AppName}";        Filename: "{app}\{#AppExe}"; Tasks: des
 Filename: "{app}\{#AppExe}"; Description: "Open {#AppName}"; \
   Flags: nowait postinstall skipifsilent
 
+[UninstallRun]
+; Before any file goes: ask the one-time helper to remove what it made --
+; the region-lock firewall rules, CS2 Defender exclusions, its scheduled task
+; and its Program Files / ProgramData folders. Runs through the helper, so
+; there is no administrator prompt. Always exits 0; never blocks uninstall.
+Filename: "{app}\cs2cfg.exe"; Parameters: "uninstall-cleanup"; \
+  Flags: runhidden waituntilterminated; RunOnceId: "HelperCleanup"
+
 [UninstallDelete]
-; Written by the updater while staging a download. Nothing here is the user's
-; own work -- their preferences and backups live in cs2cfg-data, which is
-; deliberately left alone so reinstalling does not lose them.
-Type: filesandordirs; Name: "{app}\cs2cfg-data\updates"
+; Everything the app made goes: preferences (including the "setup done"
+; flag, so a reinstall starts with the setup wizard), backups, caches, logs
+; and update downloads. The only things kept are the configs it wrote into
+; CS2's own cfg folder, which live outside all of these.
+Type: filesandordirs; Name: "{app}\cs2cfg-data"
+Type: filesandordirs; Name: "{app}"
+Type: filesandordirs; Name: "{userappdata}\cs2-autoconfig"
+Type: filesandordirs; Name: "{%TEMP}\cs2-autoconfig"

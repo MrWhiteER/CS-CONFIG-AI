@@ -19,6 +19,7 @@ import gzip
 import json
 import mimetypes
 import os
+import re
 import secrets
 import sys
 import threading
@@ -29,7 +30,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from urllib.parse import parse_qs
 
-from . import __version__, backup, cfglang, emit, profiles, steam, window
+from . import __version__, backup, cfglang, emit, profiles, steam, window, verification
 from .hardware import Machine, ProbeError, detect
 from .kb import KnowledgeBase
 from .profile import build_profile, plan_launch_options
@@ -55,6 +56,9 @@ class State:
     """
 
     def __init__(self, cfg_folder: str, cfg_name: str) -> None:
+        from .paths import user_data_dir
+        self.verification_path = user_data_dir() / "applied-verification.json"
+        self.verification_receipt = verification.load(self.verification_path)
         self.token = secrets.token_urlsafe(24)
         self.kb = KnowledgeBase()
         self.cfg_folder = cfg_folder
@@ -67,9 +71,19 @@ class State:
         self.launch: Optional[Any] = None   # launcher.LaunchSession, once one starts
         self.ingame: Optional[Any] = None   # gamewatch.Watcher, started on demand
         self.cfg_scan: Optional[Any] = None  # cfgscan.ScanResult of the last scan
+        self.config_import: Optional[Dict[str, Any]] = None  # bounded wizard snapshot
         self.updates: Optional[Any] = None   # updates.Checker, started on demand
         self.demo: Optional[Any] = None      # _DemoJob, while one is downloading
         self.faceit: Optional[Dict[str, Any]] = None  # cached profile + history
+        self.sync: Optional[Any] = None      # autosync.Loop, once started
+        self.server_ping: Optional[Any] = None  # on-demand Valve relay survey
+        from .goxlr import Controller
+        self.goxlr = Controller()            # no I/O or background work at startup
+        self.server_lock: Optional[Any] = None  # firewall + read-only console observer
+        from .overlay.service import OverlayService
+
+        self.overlay = OverlayService()  # Inert until enabled in preferences.
+        self.overlay.pinned_context = lambda: _overlay_pinned_context(self)
 
     def refresh(self, rescan: bool = False) -> None:
         if self.machine is None or rescan:
@@ -115,6 +129,7 @@ def _machine_payload(machine: Machine, state: State) -> Dict[str, Any]:
             for d in machine.displays
         ],
         "cs2_install": str(state.cs2_install) if state.cs2_install else None,
+        "steam_path": str(state.steam_root) if state.steam_root else None,
         "steam_running": steam.steam_running(),
         "accounts": [
             {"id": u.account_id, "label": u.label, "has_video": u.video_cfg.exists()}
@@ -227,17 +242,81 @@ def _scaling_step() -> Dict[str, Any]:
     except Exception as exc:                # never fail an apply over this
         return {"ok": False, "what": what, "detail": str(exc)}
 
+    expected = {"display_id": result.get("display_id"),
+                "expected": result.get("scaling", scaling.PREFERRED)}
     if result.get("already"):
         return {"ok": True, "what": what,
+                "verification": expected,
                 "detail": "already full-screen; a stretched mode fills the panel"}
     if not result.get("ok"):
         return {"ok": False, "what": what,
                 "detail": result.get("error", "could not be read")}
     if not result.get("changed"):
-        return {"ok": True, "what": what, "detail": result.get("note", "unchanged")}
+        return {"ok": True, "what": what, "verification": expected,
+                "detail": result.get("note", "unchanged")}
     return {"ok": True, "what": what,
+            "verification": expected,
             "detail": f"{result.get('was', 'letterboxed')} -> full-screen, "
                       f"so a stretched resolution has no black bars down the sides"}
+
+
+def _record_verification(state, user, profile, launch, body, steps, generated=None):
+    """Record intended values, never infer success from the write response."""
+    checks = []
+    by_name = {s["what"]: s for s in steps}
+    generated = generated or {}
+
+    def add(label, what, **spec):
+        step = by_name.get(what)
+        if step and step.get("skipped"):
+            spec = {"kind": "unavailable", "detail": "Not written: " + step["detail"]}
+        elif step and not step["ok"]:
+            spec["failed"] = step["detail"]
+        checks.append({"label": label, **spec})
+
+    if body.get("write_video", True):
+        for key, value in sorted(profile.video.items()):
+            add("CS2 · " + state.kb.ui_name(key), "cs2_video.txt", kind="video",
+                user=str(user.path), key=key, expected=str(value))
+    if body.get("write_cfg", True) and state.cs2_install:
+        root = steam.cfg_dir(state.cs2_install) / state.cfg_folder
+        add(state.cfg_name, state.cfg_name, kind="text", path=str(root / state.cfg_name),
+            expected=generated[state.cfg_name])
+        add("Launch options reference", "launch_options_generated.txt", kind="text",
+            path=str(root / "launch_options_generated.txt"),
+            expected=generated["launch_options_generated.txt"])
+        if body.get("link_autoexec"):
+            add("Autoexec link", "autoexec.vcfg", kind="exec", path=str(root / "autoexec.vcfg"),
+                expected=f"{state.cfg_folder}/{state.cfg_name}")
+    elif body.get("write_cfg", True):
+        checks.append({"label": "Config files", "kind": "unavailable",
+                       "detail": "Not written: CS2 install was not found."})
+    if body.get("write_launch", True):
+        add("Steam launch options", "Steam launch options", kind="launch",
+            user=str(user.path), expected=launch.line)
+    if body.get("fix_scaling", True):
+        add("Display scaling", "Display scaling", kind="scaling",
+            **by_name.get("Display scaling", {}).get("verification", {}))
+    checks.extend(verification.system_checks(state.cs2_install, state.verification_path.parent))
+    receipt = {"checks": checks, "account": user.account_id,
+               "intent": profile.intent, "applied_at": time.time(),
+               "selection": {"intent": profile.intent,
+                             "target_fps": body.get("target_fps") or None,
+                             "load_bias": body.get("load_bias") or "auto",
+                             "hide_crosshair": bool(body.get("hide_crosshair"))}}
+    state.verification_receipt = receipt
+    result = verification.check(receipt)
+    try:
+        verification.save(state.verification_path, receipt)
+    except OSError:
+        receipt["storage_warning"] = "Receipt could not be saved; available for this session only."
+        result["storage_warning"] = receipt["storage_warning"]
+    return result
+
+
+def _verification(state):
+    return verification.check(verification.with_system_checks(
+        state.verification_receipt, state.cs2_install, state.verification_path.parent))
 
 
 def _apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -245,6 +324,7 @@ def _apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     user = state.user_for(body.get("account"))
     kb = state.kb
     steps = []
+    generated = {}
 
     target = body.get("target_fps")
     profile = build_profile(
@@ -306,33 +386,39 @@ def _apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
             diff = steam.write_video_cfg(user, profile.video, session)
             steps.append({"ok": True, "what": "cs2_video.txt",
                           "detail": f"{len(diff)} setting(s) changed"})
-        except steam.SteamError as exc:
+        except (steam.SteamError, OSError) as exc:
             steps.append({"ok": False, "what": "cs2_video.txt", "detail": str(exc)})
 
     if body.get("write_cfg", True) and state.cs2_install:
         root = steam.cfg_dir(state.cs2_install)
         target_path = root / state.cfg_folder / state.cfg_name
-        emit.write_text_file(target_path, emit.render_cfg(profile, kb, state.cfg_name), session)
-        steps.append({"ok": True, "what": state.cfg_name, "detail": str(target_path)})
-
         notes = root / state.cfg_folder / "launch_options_generated.txt"
-        emit.write_text_file(
-            notes, emit.render_launch_notes(profile, launch.line, launch.removed, launch.added), session
-        )
-        steps.append({"ok": True, "what": "launch_options_generated.txt", "detail": str(notes)})
+        for path, content in (
+            (target_path, emit.render_cfg(profile, kb, state.cfg_name)),
+            (notes, emit.render_launch_notes(profile, launch.line, launch.removed, launch.added)),
+        ):
+            generated[path.name] = content
+            try:
+                emit.write_text_file(path, content, session)
+                steps.append({"ok": True, "what": path.name, "detail": str(path)})
+            except OSError as exc:
+                steps.append({"ok": False, "what": path.name, "detail": str(exc)})
 
         if body.get("link_autoexec"):
-            result = emit.ensure_exec_line(
-                root / state.cfg_folder / "autoexec.vcfg",
-                f"{state.cfg_folder}/{state.cfg_name}", session
-            )
-            steps.append({"ok": True, "what": "autoexec.vcfg", "detail": result})
+            try:
+                result = emit.ensure_exec_line(
+                    root / state.cfg_folder / "autoexec.vcfg",
+                    f"{state.cfg_folder}/{state.cfg_name}", session
+                )
+                steps.append({"ok": True, "what": "autoexec.vcfg", "detail": result})
+            except OSError as exc:
+                steps.append({"ok": False, "what": "autoexec.vcfg", "detail": str(exc)})
 
     if write_launch:
         try:
             action = steam.write_launch_options(user, launch.line, session)
             steps.append({"ok": True, "what": "Steam launch options", "detail": action})
-        except steam.SteamError as exc:
+        except (steam.SteamError, OSError) as exc:
             steps.append({"ok": False, "what": "Steam launch options", "detail": str(exc)})
 
     if body.get("fix_scaling", True):
@@ -344,7 +430,8 @@ def _apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         steps.append({"ok": False, "skipped": True, **stood_down})
 
     backup.prune()
-    return {"ok": True, "steps": steps, "skipped": skipped,
+    verified = _record_verification(state, user, profile, launch, body, steps, generated)
+    return {"ok": True, "steps": steps, "skipped": skipped, "verification": verified,
             "backup": None if session.empty else session.stamp}
 
 
@@ -436,6 +523,13 @@ def _play(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
 
     ui = profiles.ui_for(load_prefs(), _active_account(state))
     companions_before = [c for c in companions.listed(ui) if c["with_game"]]
+    from . import apps
+    ts_server = ui.get("teamspeak_server", {})
+    if isinstance(ts_server, dict) and ts_server.get("enabled"):
+        try:
+            companions_before.append({"name": "TeamSpeak server", "url": apps.join_url(ts_server)})
+        except ValueError:
+            pass  # Invalid old preferences must never prevent CS2 starting.
 
     state.launch = LaunchSession(user, width, height, refresh, stretch_mode,
                                  patch_video=bool(body.get("patch_video", True)),
@@ -709,7 +803,7 @@ def _save_prefs(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     allowed = (
         "intent", "target_fps", "account", "write_video", "write_cfg",
         "write_launch", "link_autoexec", "stretch_mode", "patch_video",
-        "cfg_folder", "tab", "favourites", "mouse_shape", "kb_layout", "kb_shown",
+        "cfg_folder", "tab", "favourites", "mouse_shape", "kb_layout", "kb_shown", "kb_focus",
         "update_auto_download", "update_skip", "rail_width", "pinned_account",
         # Named setups are written through their own endpoint, but the page
         # also sends them back with everything else when preferences are
@@ -744,6 +838,54 @@ def _history(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
 
     sessions = telemetry.load_sessions(int(body.get("limit") or 25))
     return {"ok": True, "sessions": sessions, "summary": telemetry.summarise(sessions)}
+
+
+def _overlay_tools(state, body):
+    from .overlay.tools import listing
+    return listing(state)
+
+
+def _overlay_tool(state, body):
+    from .overlay.tools import dispatch
+    return dispatch(state, body)
+
+
+def _overlay(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    return {"ok": True, **state.overlay.snapshot(int(body.get("seconds") or 600))}
+
+
+def _overlay_panel(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    panel = state.overlay.panel
+    if panel is None:
+        return {"ok": False, "error": "Panel requires the desktop app"}
+    action = str(body.get("action") or "poll")
+    if action == "region-close":
+        panel.regions.close()
+        return {"ok": True}
+    if action == "close":
+        panel.hide()
+        return {"ok": True}
+    if action in ("keyboard", "setup"):
+        navigate = getattr(panel, action)
+        if panel.visible and navigate:
+            panel.hide(restore=False)
+            navigate()
+        return {"ok": True}
+    return {"ok": True, **panel.data(action, body.get("code"))}
+
+
+def _overlay_settings(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    from .cli import load_prefs, save_prefs
+    from .overlay import settings
+
+    prefs = load_prefs()
+    current = settings.read(prefs.get("ui"))
+    wanted = settings.read({**current, **{k: body[k] for k in settings.DEFAULTS if k in body}},
+                           strict=True)
+    profiles.remember(prefs, None, wanted)
+    save_prefs(prefs)
+    state.overlay.configure(wanted)
+    return _overlay(state, {})
 
 
 def _cfg_scan(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -1520,7 +1662,9 @@ def _cfg_layouts_apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
 
     if not applied:
         empty = not cfgscan._profile_own_binds(result, profile_file)
+        apply_info = cfgscan.existing_apply_script(result)
         return {"ok": True, "changed": False, "empty": empty, "file": profile_file,
+                "apply_keys": sorted((apply_info or {}).get("bound_to") or []),
                 "label": label, "applied": [], "skipped": [keys.label(k) for k in skipped]}
 
     # The first time any of these keys is ever overridden, remember what it
@@ -2552,6 +2696,80 @@ def _audio(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     return audio.summary()
 
 
+def _goxlr_context(state: State, ui: Optional[Dict[str, Any]] = None,
+                   account: Optional[str] = None) -> Dict[str, Any]:
+    from . import goxlr, setups
+    from .cli import load_prefs
+    if ui is None:
+        account = _active_account(state)
+        ui = profiles.ui_for(load_prefs(), account)
+    names = [s["name"] for s in setups.listing(ui)["setups"]]
+    return {"setup_names": names, "bindings": goxlr.bindings(ui, account, names)}
+
+
+def _goxlr(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import goxlr
+    return {"ok": True, **goxlr.detect(str(body.get("serial") or "")), **_goxlr_context(state)}
+
+
+def _goxlr_switch(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import goxlr
+    kind = str(body.get("kind") or "")
+    if kind not in ("device", "mic"):
+        return {"ok": False, "error": "Choose a device or mic profile."}
+    try:
+        result = state.goxlr.switch(str(body.get("backend") or ""),
+                                    str(body.get("serial") or ""),
+                                    {kind: str(body.get("profile") or "")})
+        return {"ok": True, **result, **_goxlr_context(state)}
+    except goxlr.GoXLRError as exc:
+        return {"ok": False, "error": str(exc), "needs_refresh": True}
+
+
+def _goxlr_bind(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import goxlr
+    from .cli import load_prefs, save_prefs
+    account = _active_account(state)
+    prefs = load_prefs()
+    ui = profiles.ui_for(prefs, account)
+    name = str(body.get("setup") or "")
+    context = _goxlr_context(state, ui, account)
+    if name not in context["setup_names"]:
+        return {"ok": False, "error": "Save that Setup in Settings > Apply first."}
+    value = None
+    if not body.get("remove"):
+        current = goxlr.detect(str(body.get("serial") or ""))
+        if current["backend"] != "utility" or not current["can_switch"]:
+            return {"ok": False, "error": "Connect a GoXLR through Utility before linking."}
+        choices = {k: v for k, v in current["current"].items() if v}
+        if not choices:
+            return {"ok": False, "error": "Refresh GoXLR profiles before linking."}
+        value = {"backend": "utility", "serial": current["serial"], "profiles": choices}
+    profiles.remember(prefs, account, goxlr.update_binding(ui, account, name, value))
+    save_prefs(prefs)
+    return {"ok": True, **_goxlr_context(state)}
+
+
+def _goxlr_setup_use(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import goxlr
+    from .cli import load_prefs
+    name = str(body.get("setup") or "")
+    account = _active_account(state)
+    ui = profiles.ui_for(load_prefs(), account)
+    context = _goxlr_context(state, ui, account)
+    if name != ui.get("setup_live"):
+        return {"ok": False, "error": "That Setup is no longer selected."}
+    binding = context["bindings"].get(name)
+    if not binding:
+        return {"ok": True, "skipped": True}
+    try:
+        result = state.goxlr.switch(binding.get("backend"), binding.get("serial"),
+                                    binding.get("profiles") or {})
+        return {"ok": True, **result, **context}
+    except goxlr.GoXLRError as exc:
+        return {"ok": False, "error": str(exc), "needs_refresh": True}
+
+
 def _audio_pin(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     """Save the choice, apply it now, and keep it there.
 
@@ -2618,6 +2836,81 @@ def _net(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     return netcheck.progress()
 
 
+def _servers_ping(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import serverping
+    if state.server_ping is None:
+        return {"running": False, "updated_at": None, "regions": [],
+                "completed": 0, "total": 0, "max_ping": None,
+                "preferred_code": "dxb", "source": "fallback", "error": ""}
+    result = state.server_ping.snapshot()
+    result.update(max_ping=None, preferred_code="dxb")
+    try:
+        user = state.user_for(_active_account(state))
+        result["max_ping"] = serverping.read_max_ping(
+            user.video_cfg.parent / "cs2_user_convars_0_slot0.vcfg")
+    except steam.SteamError:
+        pass
+    return result
+
+
+def _servers_ping_start(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import serverping
+    from .paths import user_data_dir
+    if state.server_ping is None:
+        state.server_ping = serverping.ServerPing(user_data_dir() / "sdr-relays.json")
+    state.server_ping.start()
+    return _servers_ping(state, body)
+
+
+def _server_lock_service(state: State):
+    from . import serverlock, serverping
+    from .paths import user_data_dir
+    if getattr(state, "server_lock", None) is None:
+        root = user_data_dir()
+        cached = serverping.ServerPing(root / "sdr-relays.json")
+
+        def context():
+            return serverlock.discover_context(state)
+
+        def directory():
+            survey = state.server_ping or cached
+            return survey.directory_snapshot()
+
+        def survey():
+            return state.server_ping.snapshot() if state.server_ping else {}
+
+        state.server_lock = serverlock.shared(context, directory, survey)
+    return state.server_lock
+
+
+def _servers_lock(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    return _server_lock_service(state).snapshot()
+
+
+def _servers_lock_prepare(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    return _server_lock_service(state).prepare(str(body.get("code", "")))
+
+
+def _servers_lock_change(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    if body.get("confirmed") is not True:
+        raise ValueError("Review the region lock warning first.")
+    return _server_lock_service(state).begin(body.get("action"), body.get("plan_id"))
+
+
+def _servers_lock_cancel(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    return _server_lock_service(state).cancel()
+
+
+def _servers_log_enable(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Use the existing safe, backed-up launch-options writer; Steam must be closed."""
+    user = state.user_for(_active_account(state))
+    options = steam.read_launch_options(user)
+    if not re.search(r"(?:^|\s)-condebug(?=\s|$)", options, re.I):
+        session = backup.BackupSession(note="enable read-only CS2 server detection (-condebug)")
+        steam.write_launch_options(user, (options.rstrip() + " -condebug").strip(), session)
+    return {"detail": "Console logging enabled for this account. Start Steam and CS2, then join a match."}
+
+
 def _temps_elevate(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     """Raise the one prompt, and start the privileged reader behind it.
 
@@ -2676,6 +2969,8 @@ def _cfg_starter(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     folder = str(body.get("folder") or state.cfg_folder).strip().strip("/\\")
     if not folder:
         return {"ok": False, "error": "no folder name given"}
+    from .configbundle import safe_relative
+    folder = safe_relative(folder)
 
     outcome = starter.plan(cfg_root, folder)
     shape = {
@@ -2691,6 +2986,13 @@ def _cfg_starter(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     }
     if not body.get("create"):
         return shape
+
+    from . import firstrun
+    from .cli import load_prefs
+    if profiles.ui_for(load_prefs(), _active_account(state)).get(firstrun.CFG_WRITE_KEY) is not True:
+        return {"ok": False, "error": "Allow config files in Setup first."}
+    if steam.cs2_running():
+        return {"ok": False, "error": "Close CS2 before creating config files."}
 
     session = backup.BackupSession(note=f"starter config in {folder}")
     try:
@@ -3827,6 +4129,125 @@ def _companions_act(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     return {"ok": True, "companions": companions.survey(fresh)}
 
 
+def _apps(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import apps, profiles
+    from .cli import load_prefs
+    ui = profiles.ui_for(load_prefs(), _active_account(state))
+    return {"ok": True, "apps": apps.survey(ui),
+            "teamspeak": ui.get("teamspeak_server", {})}
+
+
+def _apps_set(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import apps, profiles
+    from .cli import load_prefs, save_prefs
+    account = _active_account(state)
+    prefs = load_prefs()
+    ui = profiles.ui_for(prefs, account)
+    try:
+        if "server" in body:
+            changes = {"teamspeak_server": apps.server(body["server"])}
+        else:
+            changes = apps.configure(ui, str(body.get("app") or ""), body)
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
+    profiles.remember(prefs, account, changes)
+    save_prefs(prefs)
+    return _apps(state, {})
+
+
+def _apps_launch(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import apps, profiles
+    from .cli import load_prefs
+    ui = profiles.ui_for(load_prefs(), _active_account(state))
+    kind = str(body.get("app") or "")
+    if kind == "gamebar":
+        return apps.open_url("ms-gamebar:")
+    if kind == "teamspeak-join":
+        try:
+            return apps.open_url(apps.join_url(ui.get("teamspeak_server", {})))
+        except ValueError as exc:
+            return {"ok": False, "error": str(exc)}
+    return apps.launch(ui, kind)
+
+
+def _faceit_apps(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """The FACEIT client and FACEIT AC: installed, running, start with game."""
+    from . import faceit_apps, profiles
+    from .cli import load_prefs
+
+    ui = profiles.ui_for(load_prefs(), _active_account(state))
+    return {"ok": True, "apps": faceit_apps.survey(ui)}
+
+
+def _faceit_apps_set(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Turn 'start with the game' on or off for one of them."""
+    from . import companions, faceit_apps, profiles
+    from .cli import load_prefs, save_prefs
+
+    account = _active_account(state)
+    prefs = load_prefs()
+    ui = profiles.ui_for(prefs, account)
+    try:
+        changes = faceit_apps.set_with_game(
+            ui, str(body.get("app") or ""), bool(body.get("with_game")),
+            str(body.get("exe") or ""))
+    except companions.CompanionError as exc:
+        return {"ok": False, "error": str(exc)}
+    profiles.remember(prefs, account, changes)
+    save_prefs(prefs)
+    return {"ok": True, "apps": faceit_apps.survey(profiles.ui_for(prefs, account))}
+
+
+def _faceit_apps_launch(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Start the FACEIT client or FACEIT AC now."""
+    from . import faceit_apps, profiles
+    from .cli import load_prefs
+
+    ui = profiles.ui_for(load_prefs(), _active_account(state))
+    return faceit_apps.launch(ui, str(body.get("app") or ""))
+
+
+def _match_state(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """The match waiting to be accepted, if any, and whether alerts are on."""
+    from . import matchwatch
+
+    return {"ok": True, "alert": matchwatch.current(),
+            "enabled": matchwatch.enabled()}
+
+
+def _match_accept(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """The alert's Accept: CS2 is clicked, FACEIT is only brought forward."""
+    from . import matchwatch
+
+    return matchwatch.accept()
+
+
+def _match_dismiss(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import matchwatch
+
+    matchwatch.dismiss()
+    return {"ok": True}
+
+
+def _match_settings(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Turn the match-found alert on or off. App-wide, not per account."""
+    from . import matchwatch
+    from .cli import load_prefs, save_prefs
+
+    prefs = load_prefs()
+    if "enabled" in body:
+        prefs["match_alert"] = bool(body.get("enabled"))
+        matchwatch.set_enabled(prefs["match_alert"])
+    for key in ("sound", "on_top"):
+        if key in body:
+            prefs["match_alert_" + key] = bool(body[key])
+    if any(key in body for key in ("enabled", "sound", "on_top")):
+        save_prefs(prefs)
+    return {"ok": True, "enabled": bool(prefs.get("match_alert", True)),
+            "sound": bool(prefs.get("match_alert_sound", True)),
+            "on_top": bool(prefs.get("match_alert_on_top", True))}
+
+
 def _companions_start(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     """Start one companion, by the id its tile was drawn with."""
     from . import companions, profiles
@@ -3913,6 +4334,329 @@ def _settle_win_graphics(state: State, wanted: bool) -> Dict[str, Any]:
         return wingraphics.apply(state.cs2_install)
     except Exception as exc:          # never stop a launch over this
         return {"ok": False, "error": str(exc)}
+
+
+
+# --- first-run setup and automatic sync -------------------------------------
+
+def _configs_prepare(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Local startup work. Never invokes the helper or edits Steam preferences."""
+    from . import configbundle, firstrun
+    from .cli import load_prefs
+
+    state.refresh()
+    account = _active_account(state)
+    ui = profiles.ui_for(load_prefs(), account)
+    user = next((u for u in state.users if u.account_id == account), None)
+    target = ui.get("target_fps")
+    profile = build_profile(state.machine, state.kb,
+                            intent=ui.get("intent") or "balanced",
+                            target_fps=int(target) if target else None,
+                            current_video=steam.read_video_cfg(user) if user else {},
+                            hide_crosshair=bool(ui.get("hide_crosshair")),
+                            load_bias=str(ui.get("load_bias") or "auto"))
+    launch = plan_launch_options("", state.machine, state.kb,
+                                exec_path=f"{state.cfg_folder}\\autoexec.vcfg")
+    result = configbundle.prepare(account, state.cfg_folder, state.cfg_name,
+                                 emit.render_cfg(profile, state.kb, state.cfg_name),
+                                 emit.render_launch_notes(profile, launch.line, launch.removed, launch.added))
+    result.update(ok=True, state="ready", installed=False, reason="Ready in the app. Allow config files to send them to CS2.")
+    if not state.cs2_install:
+        result.update(state="no_game", reason="Ready in the app. CS2 is not installed on this PC.")
+    if ui.get(firstrun.CFG_WRITE_KEY) is True:
+        if steam.cs2_running():
+            result.update(state="waiting", reason="Ready in the app. Close CS2, then refresh to send them.")
+        elif not state.cs2_install:
+            result.update(state="no_game", reason="Ready in the app. CS2 is not installed on this PC.")
+        else:
+            try:
+                written = configbundle.install(Path(result["root"]), steam.cfg_dir(state.cs2_install), state.cfg_folder)
+                result.update(installed=True, state="installed", installation=written,
+                              reason="Ready in CS2. Existing files were backed up before changes.")
+                if written.get("preserved"):
+                    result["reason"] += " Your edits to the imported file were kept."
+            except (OSError, ValueError) as exc:
+                result.update(state="waiting", reason=str(exc))
+    result["folder"] = str(steam.cfg_dir(state.cs2_install) / state.cfg_folder) if result["installed"] else result["root"]
+    return result
+
+
+def _configs_import_pick(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import cfgscan, configbundle, picker
+    account = _active_account(state)
+    folder = body.get("kind") == "folder"
+    paths = [picker.pick_folder(title="Bring your own configs")] if folder else picker.pick_files()
+    if not paths or not paths[0]:
+        return {"ok": True, "cancelled": True}
+    texts = configbundle.snapshot(paths, folder=folder)
+    if account != _active_account(state):
+        raise ValueError("The Steam account changed. Choose your files again.")
+    scope = Path(paths[0]) if folder else Path(os.path.commonpath([str(Path(p).parent) for p in paths]))
+    root = cfgscan.find_cfg_root(scope)
+    app_root = configbundle.storage(account, state.cfg_folder).resolve()
+    if any(app_root == (root / r).resolve() or app_root in (root / r).resolve().parents for r in texts):
+        raise ValueError("These are already the app's prepared files. Choose your original config folder.")
+    token = secrets.token_urlsafe(24)
+    state.config_import = {"token": token, "account": account, "texts": texts,
+                           "sources": [str((root / r).resolve()).casefold() for r in texts]}
+    return {"ok": True, "token": token, "files": list(texts), "selected": [] if folder else list(texts)}
+
+
+def _configs_import_preview(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import configbundle
+    held = state.config_import
+    if not held or body.get("token") != held["token"] or held["account"] != _active_account(state):
+        raise ValueError("Choose your files again; this import has expired.")
+    entries = body.get("entries")
+    if not isinstance(entries, list):
+        raise ValueError("Choose the files to load.")
+    result = configbundle.rebuild(held["texts"], entries, state.cfg_folder)
+    held["result"] = result
+    held["preview"] = secrets.token_urlsafe(24)
+    return {"ok": True, "token": held["preview"], **{k: v for k, v in result.items() if k not in ("text", "profile_files")}}
+
+def _game_cfg_root(state: State) -> Optional[Path]:
+    state.refresh()
+    return steam.cfg_dir(state.cs2_install) if state.cs2_install else None
+
+
+def _sync_round(state: State, force: bool = False) -> Dict[str, Any]:
+    """One automatic sync round for the account this window is showing."""
+    from . import autosync, cloud
+    from .cli import load_prefs, save_prefs
+
+    # Checked before anything touches Steam or the hardware: a PC that is not
+    # signed in pays nothing for this running in the background.
+    if not cloud.signed_in():
+        return {"ok": False, "action": "none", "at": time.time(),
+                "reason": "sign in with Steam to sync"}
+    return autosync.run(_active_account(state), _game_cfg_root(state),
+                        state.cfg_folder, load_prefs=load_prefs,
+                        save_prefs=save_prefs, force=force)
+
+
+def _sync_loop(state: State):
+    from . import autosync
+
+    loop = getattr(state, "sync", None)
+    if loop is None:
+        loop = autosync.Loop(lambda force=False: _sync_round(state, force))
+        state.sync = loop
+    return loop
+
+
+def _sync_status(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """What the last automatic round did, and whether rounds are running."""
+    from . import autosync, profiles
+    from .cli import load_prefs
+
+    ui = profiles.ui_for(load_prefs(), _active_account(state))
+    return {"ok": True, "auto": ui.get(autosync.AUTO_KEY) is not False,
+            "last": _sync_loop(state).last}
+
+
+def _sync_now(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    return {"ok": True, "last": _sync_loop(state).once(force=True)}
+
+
+def _sync_auto(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import autosync
+    from .cli import load_prefs, save_prefs
+
+    prefs = load_prefs()
+    prefs.setdefault("ui", {})[autosync.AUTO_KEY] = bool(body.get("on", True))
+    save_prefs(prefs)
+    if body.get("on", True):
+        _sync_loop(state).nudge()
+    return {"ok": True, "auto": bool(body.get("on", True))}
+
+
+def _setup_regions(state: Optional[State] = None) -> List[Dict[str, Any]]:
+    """Regions for the wizard's optional lock step, once the lock exists.
+
+    Empty -- which keeps the step hidden -- whenever the region lock is not
+    in this build or the helper it needs is not installed yet.
+    """
+    from . import elevated
+
+    try:
+        from . import serverlock  # type: ignore[attr-defined]
+    except ImportError:
+        return []
+    if not elevated.ready():
+        return []
+    if state is not None:
+        # A first run has no Valve directory cached yet: start the same ping
+        # sweep the Play tab uses, so the list fills in and the lock can apply.
+        try:
+            _servers_ping_start(state, {})
+            _server_lock_service(state)
+        except Exception:
+            pass
+    try:
+        regions = serverlock.list_regions()
+    except Exception:
+        regions = []
+    if not regions:
+        from . import serverping
+        regions = [r | {"ping_ms": None} for r in serverping.parse_regions(serverping.FALLBACK)]
+    out = []
+    for r in regions or []:
+        code = str((r or {}).get("code") or "")
+        if not code or r.get("partner"):
+            continue  # partner relays carry routes, not CS2 game servers
+        ping = r.get("ping_ms")
+        place = ", ".join(x for x in (str(r.get("city") or ""), str(r.get("country") or "")) if x)
+        out.append({"id": code, "label": place or code.upper(),
+                    "blurb": (f"About {round(ping)} ms from here. " if ping is not None else "")
+                             + "Play here. Block every other region for CS2.",
+                    "ping_ms": ping})
+    out.sort(key=lambda x: (x["ping_ms"] is None, x["ping_ms"] or 0))
+    return out
+
+
+def _setup_region_lock(code: Any, state: Optional[State] = None) -> Dict[str, Any]:
+    """Apply the wizard's region choice through the region lock, if present."""
+    try:
+        from . import serverlock  # type: ignore[attr-defined]
+    except ImportError:
+        return {}
+    try:
+        if code:
+            # The lock needs Valve's full directory; on a first run the sweep
+            # started by the wizard may still be fetching it. Wait briefly.
+            survey = getattr(state, "server_ping", None) if state is not None else None
+            deadline = time.monotonic() + 20
+            while survey is not None and survey.directory_snapshot() is None and time.monotonic() < deadline:
+                time.sleep(0.5)
+            serverlock.request_lock(str(code))
+        return {"ok": True, "region": code or None}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+
+def _firstrun(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Everything the setup wizard shows, in one call. Reads only."""
+    from . import audio, cloud, elevated, firstrun, profiles
+    from .cli import load_prefs
+
+    state.refresh()
+    prefs = load_prefs()
+    account = _active_account(state)
+    ui = profiles.ui_for(prefs, account)
+    libraries = steam.find_libraries(state.steam_root) if state.steam_root else []
+
+    try:
+        sound = audio.summary()
+    except Exception as exc:          # no audio stack is not a reason to fail
+        sound = {"error": str(exc)}
+
+    return {
+        "ok": True,
+        "needed": firstrun.needed(prefs),
+        "steps": list(firstrun.STEPS),
+        "account": account,
+        "cloud": cloud.status(),
+        "sync": _sync_loop(state).last,
+        "cfg": firstrun.cfg_access(_game_cfg_root(state), probe=False),
+        "helper": elevated.status(),
+        "sound": sound,
+        "presets": firstrun.presets(state.machine, state.kb),
+        "apps": firstrun.known_apps(libraries, ui),
+        "themes": list(firstrun.THEMES),
+        "regions": _setup_regions(state),
+        "current": {k: ui.get(k) for k in ("intent", "theme", "audio_output",
+                                           "audio_input", "cfg_write_ok", "sync_auto")},
+    }
+
+
+def _helper_status(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Whether the one-time administrator helper is in place."""
+    from . import elevated
+
+    return {"ok": True, **elevated.status()}
+
+
+def _helper_install(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """The one administrator prompt: put the helper in place.
+
+    Also makes this PC's CS2 cfg folder writable and joins Performance Log
+    Users, so nothing later has to ask again. See cs2cfg/elevated.py.
+    """
+    from . import elevated, temps
+
+    result = elevated.install(_game_cfg_root(state))
+    if result.get("ok"):
+        try:
+            temps.start_helper()      # sensors behind administrator, no prompt now
+        except Exception:
+            pass
+    return {**result, **elevated.status()}
+
+
+def _firstrun_finish(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Save the wizard's answers, put the sound devices in place, then sync."""
+    from . import firstrun, profiles
+    from .cli import load_prefs, save_prefs
+
+    state.refresh()
+    account = _active_account(state)
+    prefs = load_prefs()
+    ui = profiles.ui_for(prefs, account)
+    libraries = steam.find_libraries(state.steam_root) if state.steam_root else []
+    answers = body.get("answers") if isinstance(body.get("answers"), dict) else body
+
+    imported = answers.get("import")
+    held = state.config_import
+    if imported:
+        from . import configbundle, layouts
+        if not held or imported != held.get("preview") or held["account"] != account:
+            raise ValueError("Choose your files again; this import has expired.")
+        app_root = configbundle.storage(account, state.cfg_folder)
+        source_file = app_root / "_import_sources.json"
+        sources = json.loads(source_file.read_text(encoding="utf-8")) if source_file.exists() else []
+        configbundle.write_changed(app_root, {
+            configbundle.IMPORTED: held["result"]["text"],
+            **held["result"]["profile_files"],
+            "_import_sources.json": json.dumps(sorted(set(sources) | set(held["sources"]))),
+        }, "accept wizard import")
+        # The rebuilt stream is the new standard layout, not a previously
+        # selected match profile. Keep pins/registry but clear that UI pointer.
+        pointer = layouts._current_path(app_root)
+        if layouts.load_current(app_root) is not None:
+            backup.BackupSession("import: standard layout pointer").add(pointer)
+            layouts.save_current(app_root, None)
+
+    # Permission given but the helper not put in place yet (the page normally
+    # does that on the permission step itself): this is the one prompt.
+    helper: Dict[str, Any] = {}
+    if answers.get("cfg_write"):
+        from . import elevated
+
+        if not elevated.ready() and sys.platform == "win32":
+            helper = elevated.install(_game_cfg_root(state))
+
+    changes = firstrun.answers_to_changes(answers, ui,
+                                          firstrun.known_apps(libraries, ui))
+    if imported:
+        changes["cfg_folder"] = str(configbundle.storage(account, state.cfg_folder))
+    profiles.remember(prefs, account, changes)
+    save_prefs(prefs)
+
+    sound = answers.get("sound")
+    if isinstance(sound, dict) and (sound.get("output") or sound.get("input")):
+        try:
+            _audio_pin(state, {"output": sound.get("output") or "",
+                               "input": sound.get("input") or "", "enforce": True})
+        except Exception:
+            pass                       # saved anyway; the keeper retries
+
+    region = _setup_region_lock(answers.get("region_lock"), state) if answers.get("region_lock") else {}
+
+    # Permission may just have been given: files waiting on it can land now.
+    _sync_loop(state).nudge()
+    return {"ok": True, "saved": sorted(changes), "helper": helper, "region": region,
+            "ui": profiles.ui_for(load_prefs(), account)}
 
 
 # --- the cloud account ------------------------------------------------------
@@ -4002,6 +4746,21 @@ def _cloud_logout(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     return cloud.sign_out()
 
 
+def _overlay_pinned_context(state):
+    """Read saved profile names without rescanning configs or invoking web APIs."""
+    from . import profiles, setups, layouts
+    from .cli import load_prefs
+    prefs = load_prefs()
+    account = prefs.get('ui', {}).get('pinned_account')
+    if not account and state.steam_root:
+        from . import whoami
+        account, _ = whoami.current(state.steam_root, [u.account_id for u in state.users])
+    ui = profiles.ui_for(prefs, account)
+    current = layouts.load_current(state.cfg_scan.root) if state.cfg_scan else None
+    return {'theme': ui.get('theme', 'violet'),
+            'profiles': {'setup': setups.listing(ui).get('live'), 'layout': current}}
+
+
 def _setups(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     """Every named setup this account has, and which one it is following."""
     from . import profiles, setups
@@ -4041,6 +4800,10 @@ def _setups_act(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     except setups.SetupError as exc:
         return {"ok": False, "error": str(exc)}
 
+    if what in ("rename", "delete"):
+        from . import goxlr
+        changes.update(goxlr.update_binding(ui, account, setups.clean_name(name),
+                       rename=setups.clean_name(str(body.get("to") or "")) if what == "rename" else ""))
     profiles.remember(prefs, account, changes)
     save_prefs(prefs)
     fresh = profiles.ui_for(prefs, account)
@@ -4212,7 +4975,10 @@ def _quit(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     import os
 
     def bye() -> None:
-        os._exit(0)
+        try:
+            _state.overlay.stop()
+        finally:
+            os._exit(0)
 
     threading.Timer(0.6, bye).start()
     return {"ok": True, "closing": True}
@@ -4254,6 +5020,9 @@ def make_handler(state: State):
     routes_get: Dict[str, Callable[[], Dict[str, Any]]] = {}
     routes_post: Dict[str, Callable[[State, Dict[str, Any]], Dict[str, Any]]] = {
         "/api/plan": _plan_payload,
+        "/api/configs/prepare": _configs_prepare,
+        "/api/configs/import/pick": _configs_import_pick,
+        "/api/configs/import/preview": _configs_import_preview,
         "/api/apply": _apply,
         "/api/revert": _revert,
         "/api/backups": _backups,
@@ -4298,8 +5067,17 @@ def make_handler(state: State):
         "/api/focus": _focus,
         "/api/net": _net,
         "/api/net/start": _net_start,
+        "/api/servers/ping/start": _servers_ping_start,
+        "/api/servers/lock/prepare": _servers_lock_prepare,
+        "/api/servers/lock/change": _servers_lock_change,
+        "/api/servers/lock/cancel": _servers_lock_cancel,
+        "/api/servers/log/enable": _servers_log_enable,
         "/api/audio": _audio,
         "/api/audio/pin": _audio_pin,
+        "/api/goxlr": _goxlr,
+        "/api/goxlr/switch": _goxlr_switch,
+        "/api/goxlr/bind": _goxlr_bind,
+        "/api/goxlr/setup/use": _goxlr_setup_use,
         "/api/fix/survey": _fix_survey,
         "/api/fix/run": _fix_run,
         "/api/temps/elevate": _temps_elevate,
@@ -4321,11 +5099,28 @@ def make_handler(state: State):
         "/api/demos/identities": _demo_identities,
         "/api/faceit": _faceit,
         "/api/faceit/forget": _faceit_forget,
+        "/api/match/state": _match_state,
+        "/api/match/accept": _match_accept,
+        "/api/match/dismiss": _match_dismiss,
+        "/api/match/settings": _match_settings,
+        "/api/faceit/apps": _faceit_apps,
+        "/api/apps": _apps,
+        "/api/apps/set": _apps_set,
+        "/api/apps/launch": _apps_launch,
+        "/api/faceit/apps/set": _faceit_apps_set,
+        "/api/faceit/apps/launch": _faceit_apps_launch,
         "/api/demos/get": _demo_get,
         "/api/demos/cancel": _demo_cancel,
         "/api/demos/waiting": _demo_waiting,
         "/api/demos/page": _demo_page,
         "/api/demos/pick": _demo_pick,
+        "/api/firstrun": _firstrun,
+        "/api/firstrun/finish": _firstrun_finish,
+        "/api/helper": _helper_status,
+        "/api/helper/install": _helper_install,
+        "/api/sync": _sync_status,
+        "/api/sync/now": _sync_now,
+        "/api/sync/auto": _sync_auto,
         "/api/cloud": _cloud,
         "/api/cloud/login": _cloud_login,
         "/api/cloud/poll": _cloud_poll,
@@ -4358,6 +5153,11 @@ def make_handler(state: State):
         "/api/update/settings": _update_settings,
         "/api/quit": _quit,
         "/api/history": _history,
+        "/api/overlay/tools": _overlay_tools,
+        "/api/overlay/tool": _overlay_tool,
+        "/api/overlay": _overlay,
+        "/api/overlay/panel": _overlay_panel,
+        "/api/overlay/settings": _overlay_settings,
     }
 
     class Handler(BaseHTTPRequestHandler):
@@ -4413,6 +5213,13 @@ def make_handler(state: State):
                 return
 
             path = self.path.split("?", 1)[0]
+            if path == "/api/overlay/tools":
+                if self.headers.get("X-CS2CFG-Token") != state.token:
+                    self._send_json({"error": "bad or missing token"}, 403)
+                    return
+                with state.lock:
+                    self._send_json({"ok": True, **_overlay_tools(state, {})})
+                return
             if path in ("/", "/index.html"):
                 self._send_file(WEB_ROOT / "index.html")
                 return
@@ -4673,6 +5480,21 @@ def make_handler(state: State):
                     self._send_json({"ok": False, "error": str(exc)}, 500)
                 return
 
+            if path == "/api/verification":
+                with state.lock:
+                    self._send_json(_verification(state))
+                return
+
+            if path == "/api/servers/ping":
+                with state.lock:
+                    self._send_json({"ok": True, **_servers_ping(state, {})})
+                return
+
+            if path == "/api/servers/lock":
+                with state.lock:
+                    self._send_json({"ok": True, **_servers_lock(state, {})})
+                return
+
             candidate = (WEB_ROOT / path.lstrip("/")).resolve()
             if WEB_ROOT.resolve() in candidate.parents:
                 self._send_file(candidate)
@@ -4680,6 +5502,32 @@ def make_handler(state: State):
             self._send_json({"error": "not found"}, 404)
 
         def do_POST(self) -> None:
+            if self.path.split("?", 1)[0] == "/api/overlay/gsi":
+                from .overlay.gsi import MAX_BODY
+
+                # Valve uses its cfg secret rather than the browser API token.
+                # Reject before reading, then close so excess bytes cannot be reused.
+                self.close_connection = True
+                if not self._host_ok() or self.client_address[0] != "127.0.0.1":
+                    self._send_json({"error": "host not allowed"}, 403)
+                    return
+                try:
+                    length = int(self.headers.get("Content-Length", "0"))
+                    if self.headers.get("Transfer-Encoding") or not 0 < length <= MAX_BODY:
+                        self._send_json({"error": "invalid body size"}, 413)
+                        return
+                    self.connection.settimeout(2)
+                    raw = self.rfile.read(length)
+                    if len(raw) != length:
+                        raise ValueError("Incomplete GSI body")
+                    state.overlay.receive_gsi(raw)
+                except PermissionError:
+                    self._send_json({"error": "invalid GSI token"}, 403)
+                except (ValueError, OSError):
+                    self._send_json({"error": "invalid GSI body"}, 400)
+                else:
+                    self._send_json({"ok": True})
+                return
             # Drain the body first, before any check that might reject the
             # request. On a keep-alive connection an unread body stays in the
             # socket and gets parsed as the start of the next request, which
@@ -4709,8 +5557,13 @@ def make_handler(state: State):
                 return
 
             try:
-                with state.lock:
+                # Local GoXLR I/O has its own nonblocking operation lock. A
+                # disconnected mixer must not hold up other UI requests.
+                if handler in (_goxlr, _goxlr_switch, _goxlr_setup_use, _configs_import_pick):
                     self._send_json({"ok": True, **handler(state, body)})
+                else:
+                    with state.lock:
+                        self._send_json({"ok": True, **handler(state, body)})
             except (ProbeError, steam.SteamError, ValueError) as exc:
                 self._send_json({"ok": False, "error": str(exc)}, 400)
             except Exception as exc:  # surfaced in the page, not swallowed
@@ -4726,6 +5579,9 @@ def make_handler(state: State):
 def serve(port: int = 8765, cfg_folder: str = "mrwhiteer",
           cfg_name: str = "autoperf.vcfg") -> Tuple[ThreadingHTTPServer, State]:
     state = State(cfg_folder, cfg_name)
+    # Read real firewall state at startup, even if the Play tab is never opened.
+    # This worker reads local state and drains explicitly queued changes after CS2 closes.
+    _server_lock_service(state)
 
     # Pick the sound pin up now rather than when somebody first opens the page.
     # The whole promise is that the devices stay put; a keeper that only starts
@@ -4738,6 +5594,43 @@ def serve(port: int = 8765, cfg_folder: str = "mrwhiteer",
     except Exception:
         pass                    # never let a sound preference stop the app
 
-    server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(state))
+    # Sensors that need administrator, read through the helper setup put in
+    # place. Started here because it no longer costs a prompt.
+    try:
+        from . import elevated, temps
+
+        if elevated.ready():
+            temps.start_helper()
+    except Exception:
+        pass
+
+    # Settings follow the Steam account between PCs without a button. The
+    # loop does nothing until somebody is signed in, and never raises.
+    try:
+        _sync_loop(state).start()
+    except Exception:
+        pass
+
+    class AppServer(ThreadingHTTPServer):
+        def server_close(self) -> None:
+            try:
+                state.overlay.stop()
+            finally:
+                super().server_close()
+
+    server = AppServer(("127.0.0.1", port), make_handler(state))
     server.daemon_threads = True
+    from .cli import load_prefs
+    from .overlay.settings import read as overlay_settings
+
+    def overlay_install():
+        if state.cs2_install is None:
+            try:
+                state.cs2_install = steam.find_cs2_install(state.steam_root or steam.find_steam_root())
+            except steam.SteamError:
+                return None
+        return state.cs2_install
+
+    state.overlay.bind_gsi(overlay_install, server.server_address[1])
+    state.overlay.configure(overlay_settings(load_prefs().get("ui")))
     return server, state

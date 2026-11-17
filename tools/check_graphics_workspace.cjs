@@ -8,7 +8,7 @@ const html=fs.readFileSync(path.join(root,'cs2cfg/web/index.html'),'utf8');
 for(const s of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new vm.Script(s[1]);
 const slice=(a,b)=>html.slice(html.indexOf(a),html.indexOf(b,html.indexOf(a)));
 const themes=vm.runInNewContext(slice('const THEMES = [','function applyTheme(').replace('const THEMES =','')).map(t=>t[0]);
-let code=`
+let code=fs.readFileSync(path.join(root,'cs2cfg/web/assets/hardware/icons.js'),'utf8')+'\n'+fs.readFileSync(path.join(root,'cs2cfg/web/assets/fixit/icons.js'),'utf8')+'\n'+`
 const $=id=>document.getElementById(id), esc=x=>String(x??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
 const checks=[],calls=[],messages=[]; const check=(name,ok)=>{checks.push({name,ok:!!ok});if(!ok)throw Error(name)};
 const settle=()=>new Promise(r=>setTimeout(r,40));function status(message,error){messages.push({message,error})}

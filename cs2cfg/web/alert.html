@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Match found</title>
+<!-- The match-found alert. A small always-on-top window the app opens on the
+     main monitor when FACEIT or CS2 finds a match (cs2cfg/matchwatch.py).
+     Functional first version; the redesign styles it. -->
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; height: 100%; background: #101114; color: #f2f2f2;
+    font-family: "Segoe UI", system-ui, sans-serif; overflow: hidden; user-select: none; }
+  .card { box-sizing: border-box; height: 100%; padding: 22px 26px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    border: 2px solid var(--accent, #ff5500); border-radius: 10px; gap: 10px;
+    animation: pulse 1.2s ease-in-out infinite; -webkit-app-region: drag; }
+  @keyframes pulse { 50% { box-shadow: inset 0 0 40px color-mix(in srgb, var(--accent, #ff5500) 35%, transparent); } }
+  .src { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; opacity: .7; }
+  h1 { margin: 0; font-size: 30px; }
+  .left { font-size: 44px; font-weight: 700; color: var(--accent, #ff5500); line-height: 1; }
+  .row { display: flex; gap: 10px; margin-top: 6px; -webkit-app-region: no-drag; }
+  button { font: inherit; font-weight: 700; border: 0; border-radius: 6px; padding: 10px 22px;
+    cursor: pointer; }
+  #accept { background: var(--accent, #ff5500); color: #fff; min-width: 170px; }
+  #later { background: #2a2c31; color: #ddd; }
+  .note { font-size: 12px; opacity: .65; min-height: 16px; text-align: center; }
+  body.cs2 { --accent: #3fb950; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="src" id="src">Match found</div>
+  <h1>Match found</h1>
+  <div class="left" id="left">--</div>
+  <div class="row">
+    <button id="accept">Accept</button>
+    <button id="later">Dismiss</button>
+  </div>
+  <div class="note" id="note"></div>
+</div>
+<script>
+const TOKEN = "__CS2CFG_TOKEN__";
+const $ = (id) => document.getElementById(id);
+async function post(path, body) {
+  const res = await fetch(path, { method: "POST",
+    headers: { "Content-Type": "application/json", "X-CS2CFG-Token": TOKEN },
+    body: JSON.stringify(body || {}) });
+  return res.json().catch(() => ({ ok: false }));
+}
+let source = "";
+async function refresh() {
+  const data = await post("/api/match/state");
+  const alert = data && data.alert;
+  if (!alert) { $("left").textContent = "--"; return; }
+  source = alert.source;
+  document.body.classList.toggle("cs2", source === "cs2");
+  $("src").textContent = source === "cs2" ? "Counter-Strike 2" : "FACEIT";
+  $("left").textContent = alert.seconds_left;
+  $("accept").textContent = source === "cs2" ? "Accept" : "Open FACEIT";
+  $("note").textContent = source === "cs2"
+    ? "Accept clicks the button in CS2 for you."
+    : "Opens FACEIT. Press Accept there.";
+}
+$("accept").onclick = async () => {
+  $("accept").disabled = true;
+  const r = await post("/api/match/accept");
+  $("note").textContent = (r && (r.detail || r.error)) || "";
+};
+$("later").onclick = () => post("/api/match/dismiss");
+refresh();
+setInterval(refresh, 500);
+</script>
+</body>
+</html>

@@ -667,6 +667,23 @@ def cmd_temp_helper(ctx: Context) -> int:
     return temps.run_helper(int(ctx.args.parent or 0))
 
 
+def cmd_uninstall_cleanup(ctx: Context) -> int:
+    """Run by the uninstaller before it deletes files. Never prompts.
+
+    Asks the one-time helper to remove what it made (firewall rules, CS2
+    Defender exclusions, its task and folders). Always exits 0 so a helper
+    problem can never block an uninstall.
+    """
+    from . import elevated
+
+    try:
+        result = elevated.uninstall_cleanup()
+        print(result.get("detail") or result.get("error") or "")
+    except Exception as exc:  # never block the uninstaller
+        print(f"helper cleanup skipped: {exc}")
+    return 0
+
+
 def cmd_net(ctx: Context) -> int:
     """Measure the connection the way sub-tick cares about."""
     from . import netcheck
@@ -1336,6 +1353,16 @@ def cmd_gui(ctx: Context) -> int:
     return launch_gui(ctx.args)
 
 
+def cmd_overlay_probe(ctx: Context) -> int:
+    from .overlay.probe import run
+
+    try:
+        return run(ctx.args.seconds, ctx.args.no_hud, ctx.args.exclude_from_capture)
+    except (OSError, RuntimeError) as exc:
+        print(ctx.out.red(f"  Overlay probe: {exc}"))
+        return 1
+
+
 # ---------------------------------------------------------------------------
 # Argument parsing
 # ---------------------------------------------------------------------------
@@ -1472,6 +1499,12 @@ def build_parser() -> argparse.ArgumentParser:
     stretch.add_argument("--list", action="store_true",
                          help="list matching windows ('--process *' for all)")
 
+    sub.add_parser(
+        "uninstall-cleanup", parents=[shared],
+        help=argparse.SUPPRESS,
+        description="Run by the uninstaller. Removes what the one-time helper made.",
+    )
+
     helper = sub.add_parser(
         "temp-helper", parents=[shared],
         help=argparse.SUPPRESS,
@@ -1578,12 +1611,21 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("gui", parents=[shared], help="open the graphical interface")
 
+    overlay = sub.add_parser("overlay-probe", parents=[shared],
+                             help="measure the external PresentMon overlay prototype")
+    overlay.add_argument("--seconds", type=int, help="stop after N seconds (positive integer)")
+    overlay.add_argument("--no-hud", action="store_true", help="capture without a HUD window")
+    overlay.add_argument("--exclude-from-capture", action="store_true",
+                         help="ask Windows to exclude the HUD from screen capture")
+
     return parser
 
 
 def main(argv: Optional[List[str]] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.command == "overlay-probe" and args.seconds is not None and args.seconds <= 0:
+        parser.error("--seconds must be a positive integer")
 
     if not args.command:
         args.command = "gui" if os.environ.get("CS2CFG_DEFAULT_GUI") else "scan"
@@ -1630,11 +1672,13 @@ def main(argv: Optional[List[str]] = None) -> int:
         "scaling": cmd_scaling,
         "net": cmd_net,
         "temp-helper": cmd_temp_helper,
+        "uninstall-cleanup": cmd_uninstall_cleanup,
         "web": cmd_web,
         "desktop": cmd_desktop,
         "cfg": cmd_cfg,
         "cfg-rename": cmd_cfg_rename,
         "gui": cmd_gui,
+        "overlay-probe": cmd_overlay_probe,
     }
 
     try:

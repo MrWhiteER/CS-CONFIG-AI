@@ -19,7 +19,25 @@ from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from cs2cfg import quickfix  # noqa: E402
+from cs2cfg import elevated, quickfix  # noqa: E402
+
+# "Every privileged call is stubbed" includes the one-time helper. On a PC
+# where setup installed it, quickfix hands these jobs to it for real -- before
+# this guard, running the suite restarted a real Ethernet adapter.
+_NO_REAL_HELPER = [
+    mock.patch.object(elevated, "ready", return_value=False),
+    mock.patch.object(elevated, "run", side_effect=AssertionError("the real helper was called")),
+]
+
+
+def setUpModule():
+    for patch in _NO_REAL_HELPER:
+        patch.start()
+
+
+def tearDownModule():
+    for patch in _NO_REAL_HELPER:
+        patch.stop()
 
 
 class WhileTheGameIsUp(unittest.TestCase):
