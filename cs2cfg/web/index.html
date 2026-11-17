@@ -4044,6 +4044,23 @@
     justify-content: center; margin-top: 10px; padding: 10px 12px;
     background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px;
   }
+  .kbsw-icon { width: 16px; height: 16px; flex: none; }
+  .kbsw-icon-grid {
+    display: grid; grid-template-columns: repeat(5, 36px); gap: 6px;
+    flex-basis: 100%; justify-content: center; margin: 4px 0 8px;
+  }
+  .kbsw-icon-grid button {
+    display: grid; place-items: center; width: 36px; height: 36px;
+    border: 1px solid var(--line); border-radius: 7px; cursor: pointer;
+    background: var(--panel); color: var(--ink);
+  }
+  .kbsw-icon-grid .kbsw-icon { width: 24px; height: 24px; }
+  .kbsw-icon-grid button:hover { background: var(--panel-2); border-color: var(--muted); }
+  .kbsw-icon-grid button[aria-pressed="true"] {
+    border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 1px var(--accent);
+  }
+  .kbsw-icon-grid button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
   .kbsw-popover-label { font-size: 12px; color: var(--muted); }
   .kbsw-popover input {
     font: inherit; font-size: 12.5px; padding: 6px 10px; border-radius: 8px;
@@ -11054,6 +11071,67 @@ let kbSwitchBusy = null;
 // existing tab opens Copy/Cut/Export/Delete. "Default" always comes first:
 // the one way back to how things were once a profile has been applied,
 // since without it a key a profile took over stayed that way for good.
+// Original profile emblems, separate from command and hardware art.
+const KB_PROFILE_ICONS = {
+  crosshair: {"name":"Crosshair","art":"<path d=\"M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5M12 8v8M8 12h8\"/>"},
+  headset: {"name":"Headset","art":"<path d=\"M4 14v-3a8 8 0 0116 0v6a3 3 0 01-3 3h-3\"/><rect x=\"3\" y=\"11\" width=\"4\" height=\"7\" rx=\"2\"/><rect x=\"17\" y=\"11\" width=\"4\" height=\"7\" rx=\"2\"/>"},
+  trophy: {"name":"Trophy","art":"<path d=\"M7 3h10v6a5 5 0 01-10 0zM7 5H3v3a4 4 0 004 4M17 5h4v3a4 4 0 01-4 4M12 14v5M8 21h8M10 19h4\"/>"},
+  skull: {"name":"Skull","art":"<path d=\"M8 17H5v-6a7 7 0 0114 0v6h-3v4H8zM12 18v3\"/><circle cx=\"8.5\" cy=\"11.5\" r=\"1.5\"/><circle cx=\"15.5\" cy=\"11.5\" r=\"1.5\"/><path d=\"M11 16l1-2 1 2\"/>"},
+  c4: {"name":"C4","art":"<rect x=\"4\" y=\"7\" width=\"16\" height=\"14\" rx=\"2\"/><path d=\"M8 7V4h8v3M9 4V2M15 4V2M7 15h2m3 0h1m3 0h1M7 18h2m3 0h1m3 0h1\"/><rect x=\"7\" y=\"10\" width=\"10\" height=\"2\" rx=\".5\"/>"},
+  smoke: {"name":"Smoke","art":"<rect x=\"7\" y=\"10\" width=\"10\" height=\"11\" rx=\"3\"/><path d=\"M10 10V7h4v3M14 7h4v5M9 15h6M8 5c-3-3 3-2 1-4M13 4c3-3 5 1 4 2\"/>"},
+  flash: {"name":"Flashbang","art":"<path d=\"M10 8h4v3h-4zM14 8l3-2 2 3M12 2v2M4 6l2 2M20 14h2M2 14h2\"/><rect x=\"8\" y=\"11\" width=\"8\" height=\"10\" rx=\"2\"/><path d=\"M8 15h8M8 18h8\"/>"},
+  knife: {"name":"Knife","art":"<path d=\"M10 15L20 3c1 6-2 10-7 14M8 13l7 7M10 16l-6 6-2-2 6-6M5 17l2 2\"/>"},
+  scope: {"name":"Scope","art":"<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 3v6M12 15v6M3 12h6M15 12h6M10 12h4M12 10v4\"/>"},
+  pistol: {"name":"Pistol","art":"<path d=\"M3 6h18v5h-8l-2 9H6l2-9H3zM14 11v4h-3M18 6V4M4 9h4\"/>"},
+  rifle: {"name":"Rifle","art":"<path d=\"M2 11h5V8h11v2h4M18 13h4M7 13h10l1-3M2 11v7l5-5M9 13l-1 6h3l1-6M14 13v4h3l-1-4M10 8V5h5v3\"/>"},
+  armor: {"name":"Armor","art":"<path d=\"M8 3l4 3 4-3 5 4-3 4v10H6V11L3 7zM9 11h6M9 15h6M9 18h6\"/>"},
+  pin: {"name":"Map pin","art":"<path d=\"M19 9c0 5-7 12-7 12S5 14 5 9a7 7 0 0114 0z\"/><path d=\"M9 9l2 2 4-4\"/>"},
+  entry: {"name":"Entry","art":"<path d=\"M14 2L4 13h7l-1 9 10-12h-7z\"/>"},
+  crown: {"name":"Crown","art":"<path d=\"M3 6l5 4 4-7 4 7 5-4-2 12H5zM6 21h12M5 14h14\"/>"},
+  flame: {"name":"Flame","art":"<path d=\"M13 2c2 6-4 7-1 10 2 0 4-3 4-5 7 7 4 15-4 15S1 14 7 8c0 3 1 4 2 5-1-5 4-6 4-11z\"/>"},
+  target: {"name":"Bullseye","art":"<circle cx=\"12\" cy=\"12\" r=\"9\"/><circle cx=\"12\" cy=\"12\" r=\"5\"/><circle cx=\"12\" cy=\"12\" r=\"1\"/>"},
+  controller: {"name":"Controller","art":"<path d=\"M7 7h10c3 0 4 3 5 11 0 3-3 3-6-1H8c-3 4-6 4-6 1C3 10 4 7 7 7zM6 10v5M3.5 12.5h5M15 11h.1M18 14h.1M10 7V4h4\"/>"},
+  keyboard: {"name":"Keyboard","art":"<rect x=\"2\" y=\"6\" width=\"20\" height=\"14\" rx=\"2\"/><path d=\"M6 10h.1M10 10h.1M14 10h.1M18 10h.1M6 13h.1M10 13h.1M14 13h.1M18 13h.1M7 17h10M12 6V3h4\"/>"},
+  practice: {"name":"Practice","art":"<path d=\"M10 3h4l6 17H4zM8 9h8M6 15h12M2 21h20\"/>"}
+};
+let kbProfileIcons = Object.create(null);
+function kbLoadProfileIcons(ui) {
+  kbProfileIcons = Object.create(null);
+  const saved = ui.kb_profile_icons;
+  if (saved && typeof saved === 'object' && !Array.isArray(saved)) {
+    for (const [file, id] of Object.entries(saved)) {
+      if (Object.hasOwn(KB_PROFILE_ICONS, id)) kbProfileIcons[file] = id;
+    }
+  }
+}
+function kbProfileDefault(file) {
+  let hash = 2166136261;
+  for (const char of file.replace(/\\/g, '/').split('/').pop()) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
+  return Object.keys(KB_PROFILE_ICONS)[(hash >>> 0) % 20];
+}
+function kbProfileCreateDefault(name) {
+  const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'profile';
+  const files = new Set((profileData?.profiles || []).map(p => p.file.split('/').pop().toLowerCase()));
+  let file = slug + '.vcfg', n = 2;
+  while (files.has(file)) file = slug + '_' + n++ + '.vcfg';
+  return kbProfileDefault(file);
+}
+function kbProfileIconId(file) { return kbProfileIcons[file] || kbProfileDefault(file); }
+function kbProfileIcon(id) {
+  const art = id === 'home' ? '<path d="M3 11l9-8 9 8M5 10v11h5v-7h4v7h5V10"/>' : KB_PROFILE_ICONS[id].art;
+  return '<svg class="kbsw-icon" data-profile-icon="' + id + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + art + '</svg>';
+}
+async function saveKbProfileIcons() {
+  try { await api('/api/prefs', {kb_profile_icons: {...kbProfileIcons}}); }
+  catch (err) { status('Could not save profile icons: ' + String(err.message || err), true); }
+}
+function renderKbswIconPicker(selected) {
+  return '<div class="kbsw-icon-grid" role="group" aria-label="Profile icon">' +
+    Object.entries(KB_PROFILE_ICONS).map(([id, icon]) =>
+      '<button type="button" data-kbsw-icon="' + id + '" aria-label="' + icon.name +
+      '" title="' + icon.name + '" aria-pressed="' + (id === selected) + '">' + kbProfileIcon(id) + '</button>').join('') + '</div>';
+}
+
 function renderKbSwitcher() {
   const box = $("kb-switcher");
   if (!box) return;
@@ -11065,7 +11143,7 @@ function renderKbSwitcher() {
     '<button class="kbsw-tab kbsw-default' + (defaultActive ? " active" : "") +
     (defaultBusy ? " busy" : "") + '" data-kbsw-default ' +
     'title="Put every key back to what it was before any profile touched it">' +
-    kbIcon("crosshair") + '<span class="kbsw-label">Default</span></button>';
+    kbProfileIcon("home") + '<span class="kbsw-label">Default</span></button>';
 
   const profileTabs = profiles.map(p => {
     const busy = kbSwitchBusy === p.file;
@@ -11077,7 +11155,7 @@ function renderKbSwitcher() {
     return '<button class="kbsw-tab' + (p.active ? " active" : "") +
       (busy ? " busy" : "") + '" data-kbsw="' + esc(p.file) +
       '" data-kbsw-label="' + esc(p.label) + '" title="' + esc(title) + '">' +
-      kbIcon(/warm|practice/i.test(p.label) ? 'zap' : 'board') +
+      kbProfileIcon(kbProfileIconId(p.file)) +
       '<span class="kbsw-label">' + esc(p.label) + "</span>" +
       (p.override_count
         ? '<span class="kbsw-count">' + p.override_count + "</span>" : "") +
@@ -11106,11 +11184,16 @@ function renderKbSwitcher() {
 // an existing one, or (from the "+" tab) a pick between those and Import.
 function renderKbswPopover() {
   if (!kbswPopover) return "";
+  if (kbswPopover.mode === 'icon') return '<div class="kbsw-popover">' +
+    '<span class="kbsw-popover-label">Icon for ' + esc(kbswPopover.sourceLabel) + '</span>' +
+    renderKbswIconPicker(kbProfileIconId(kbswPopover.source)) +
+    '<button class="btn small ghost" id="kbsw-name-cancel">Done</button></div>';
   const isCopy = kbswPopover.mode === "copy";
   return '<div class="kbsw-popover">' +
     (isCopy ? '<span class="kbsw-popover-label">Copy ' +
       esc(kbswPopover.sourceLabel) + ' as</span>' : "") +
-    '<input id="kbsw-name" placeholder="' + esc(kbswPopover.defaultName) +
+    (isCopy ? '' : renderKbswIconPicker(kbswPopover.icon)) +
+    '<input id="kbsw-name" value="' + esc(kbswPopover.name || '') + '" placeholder="' + esc(kbswPopover.defaultName) +
     '" maxlength="40" aria-label="Profile name">' +
     '<button class="btn small" id="kbsw-name-go">' +
     (isCopy ? "Copy" : "Create") + "</button>" +
@@ -11124,9 +11207,10 @@ function renderKbswPopover() {
 function renderKbswMenu() {
   if (!kbswMenu) return "";
   const x = Math.min(kbswMenu.x, window.innerWidth - 190);
-  const y = Math.min(kbswMenu.y, window.innerHeight - 180);
+  const y = Math.min(kbswMenu.y, window.innerHeight - 225);
   return '<div class="kbsw-menu" style="left:' + x + 'px; top:' + y + 'px;">' +
     '<div class="kbsw-menu-label">' + esc(kbswMenu.label) + "</div>" +
+    '<button data-kbsw-menu="icon">Change icon</button>' +
     '<button data-kbsw-menu="copy">Copy</button>' +
     '<button data-kbsw-menu="cut">Cut</button>' +
     '<button data-kbsw-menu="export">Export…</button>' +
@@ -11139,7 +11223,7 @@ function closeKbswPopover() { kbswPopover = null; renderKbSwitcher(); }
 function openKbswCreatePopover() {
   kbswMenu = null;
   kbswPopover = (kbswPopover && kbswPopover.mode === "create") ? null :
-    { mode: "create", defaultName: "e.g. Competitive" };
+    { mode: "create", defaultName: "e.g. Competitive", icon: kbProfileCreateDefault("e.g. Competitive"), iconChosen: false };
   renderKbSwitcher();
 }
 
@@ -11255,6 +11339,12 @@ document.addEventListener("click", async e => {
     kbswMenu = null;
     if (!file) { renderKbSwitcher(); return; }
 
+    if (action === "icon") {
+      kbswPopover = {mode: 'icon', source: file, sourceLabel: label};
+      renderKbSwitcher();
+      document.querySelector('[data-kbsw-icon][aria-pressed="true"]')?.focus();
+      return;
+    }
     if (action === "copy") { openKbswCopyPopover(file, label); return; }
     renderKbSwitcher();
 
@@ -11274,6 +11364,8 @@ document.addEventListener("click", async e => {
         if (!confirm("Saved a copy of “" + label + "” to " + r.path +
             ". Remove it from here now?")) return;
         await api("/api/cfg/layouts/delete", { file });
+        delete kbProfileIcons[file];
+        await saveKbProfileIcons();
         status("Cut " + label + " — saved to " + r.path + " and removed from here.");
         await refreshKbSwitcher();
         layoutData = await api("/api/cfg/layouts/status", {});
@@ -11288,6 +11380,8 @@ document.addEventListener("click", async e => {
           "for good (backed up first, so it can still be restored from Backups).")) return;
       try {
         await api("/api/cfg/layouts/delete", { file });
+        delete kbProfileIcons[file];
+        await saveKbProfileIcons();
         status("Deleted " + label + ".");
         await refreshKbSwitcher();
         layoutData = await api("/api/cfg/layouts/status", {});
@@ -11296,6 +11390,22 @@ document.addEventListener("click", async e => {
         status("Could not delete: " + String(err && err.message || err), true);
       }
       return;
+    }
+    return;
+  }
+
+  const iconButton = e.target.closest('[data-kbsw-icon]');
+  if (iconButton && kbswPopover) {
+    const id = iconButton.dataset.kbswIcon;
+    if (kbswPopover.mode === 'icon') kbProfileIcons[kbswPopover.source] = id;
+    else { kbswPopover.icon = id; kbswPopover.iconChosen = true; }
+    // Update in place to preserve typing and keyboard focus.
+    document.querySelectorAll('[data-kbsw-icon]').forEach(button =>
+      button.setAttribute('aria-pressed', String(button.dataset.kbswIcon === id)));
+    if (kbswPopover.mode === 'icon') {
+      const tab = [...document.querySelectorAll('[data-kbsw]')].find(tab => tab.dataset.kbsw === kbswPopover.source);
+      if (tab) tab.querySelector('.kbsw-icon').outerHTML = kbProfileIcon(id);
+      await saveKbProfileIcons();
     }
     return;
   }
@@ -11315,6 +11425,9 @@ document.addEventListener("click", async e => {
       const r = popover.mode === "copy"
         ? await api("/api/cfg/layouts/copy", { file: popover.source, name })
         : await api("/api/cfg/layouts/create", { name, start });
+      kbProfileIcons[r.file] = popover.mode === 'copy' ? kbProfileIconId(popover.source)
+        : popover.icon;
+      await saveKbProfileIcons();
       status((popover.mode === "copy" ? "Copied to " : "Created ") +
         r.file.split("/").pop() + (r.note ? ". " + r.note : "") + ".");
       kbswPopover = null;
@@ -11375,9 +11488,23 @@ document.addEventListener("click", async e => {
   }
 });
 
+document.addEventListener('input', e => {
+  if (e.target.id !== 'kbsw-name' || !kbswPopover) return;
+  kbswPopover.name = e.target.value;
+  if (kbswPopover.mode === 'create' && !kbswPopover.iconChosen) {
+    kbswPopover.icon = kbProfileCreateDefault(e.target.value || e.target.placeholder);
+    document.querySelectorAll('[data-kbsw-icon]').forEach(button =>
+      button.setAttribute('aria-pressed', String(button.dataset.kbswIcon === kbswPopover.icon)));
+  }
+});
+
 document.addEventListener("keydown", e => {
   if (e.key === "Escape" && (kbswMenu || kbswPopover)) {
+    const source = kbswPopover?.source || kbswMenu?.file;
     kbswMenu = null; kbswPopover = null; renderKbSwitcher();
+    ([...document.querySelectorAll('[data-kbsw]')].find(tab => tab.dataset.kbsw === source)
+      || document.querySelector('[data-kbsw-add]'))?.focus();
+    e.preventDefault();
     return;
   }
   if (e.key === "Enter" && kbswPopover && e.target.id === "kbsw-name") {
@@ -15760,6 +15887,8 @@ function applyPrefs(ui) {
     mouseShape = ui.mouse_shape;
   }
   kbLoadFocus(ui);
+  kbLoadProfileIcons(ui);
+  renderKbSwitcher();
   if (typeof ui.rail_width === "number" && ui.rail_width > 0) {
     railWidth = Math.max(RAIL_MIN, Math.min(RAIL_MAX, ui.rail_width));
     if (!railFolded()) railOpen = railWidth;
