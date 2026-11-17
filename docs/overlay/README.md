@@ -229,7 +229,7 @@ Machine-wide preferences under `ui` in `config.json`:
 | `overlay_fields` | `["fps", "one_percent_low", "frame_time_ms", "cpu_percent", "gpu_percent", "gpu_temp_c"]` |
 | `overlay_hotkey` | `"Ctrl+Alt+O"` |
 | `overlay_panel_hotkey` | `"Ctrl+Alt+P"` |
-| `overlay_auto_hide` | `true` |
+| `overlay_hide_in_rounds` | `false` |
 | `overlay_always_visible` | `false` |
 | `overlay_hide_from_capture` | `true` |
 | `overlay_sign_out_hint_dismissed` | `false` |
