@@ -1833,8 +1833,17 @@ def _cfg_layouts_create(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     if not name:
         return {"ok": False, "error": "give the profile a name"}
 
+    # A new profile starts as an empty keyboard: every key the standard
+    # layout binds is cleared, or set to CS2's own default when asked. A
+    # blank file would leave every key on the old binds once switched to.
+    start = str(body.get("start") or "empty")
+    table = _defaults_table(state) if start == "defaults" else {}
+    note = ""
+    if start == "defaults" and not table:
+        note = "CS2's default binds could not be found, so the profile starts empty"
     relative = cfgscan.new_profile_path(result, name)
-    text = cfgscan.profile_blank_text(name)
+    text = (cfgscan.profile_blank_text(name) if start == "blank"
+            else cfgscan.profile_start_text(result, name, table))
     path = Path(result.cfg_root) / Path(relative)
 
     session = backup.BackupSession(note=f"new profile {relative} (web)")
@@ -1848,7 +1857,7 @@ def _cfg_layouts_create(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     registry = layouts.load_registry(result.root)
     pins = layouts.load_pins(result.root)
     current = layouts.load_current(result.root)
-    return {"ok": True, "file": relative,
+    return {"ok": True, "file": relative, "note": note,
             "profiles": _profile_selector_view(
                 state.cfg_scan, registry, pins, current, _defaults_table(state))}
 
@@ -2529,6 +2538,9 @@ def _cfg_keys(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         # The last bind to load is the one the engine keeps.
         winner = max(entries, key=lambda b: b.order)
         command = (winner.body or "").strip().strip('"')
+        if not command:
+            # bind "key" "" -- cleared, e.g. by a new empty profile. Free.
+            continue
         feature = features.get(command.lower())
         bound[key] = {
             "key": key,
@@ -3089,7 +3101,8 @@ def _cfg_bind(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     if existing and not clearing and not body.get("force"):
         winner = max(existing, key=lambda b: b.order)
         already = (winner.body or "").strip().strip(chr(34))
-        if already.lower() != command.lower():
+        # An empty bind ("") is a key a fresh profile cleared: free to take.
+        if already and already.lower() != command.lower():
             return {"ok": False, "needs_confirm": True,
                     "taken": [{"file": winner.file, "line": winner.line,
                                "runs": already}],

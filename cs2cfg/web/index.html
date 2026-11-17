@@ -11307,12 +11307,16 @@ document.addEventListener("click", async e => {
     const name = (field.value || field.placeholder || "").trim();
     if (!name) { status("Give the profile a name first.", true); return; }
     const popover = kbswPopover;
+    // A new profile starts as an empty keyboard. Copy keeps the source's binds.
+    const start = popover.mode === "copy" ? null
+      : (confirm("Start with CS2's default binds?\n\nOK: CS2 defaults\nCancel: empty keyboard")
+        ? "defaults" : "empty");
     try {
       const r = popover.mode === "copy"
         ? await api("/api/cfg/layouts/copy", { file: popover.source, name })
-        : await api("/api/cfg/layouts/create", { name });
+        : await api("/api/cfg/layouts/create", { name, start });
       status((popover.mode === "copy" ? "Copied to " : "Created ") +
-        r.file.split("/").pop() + ".");
+        r.file.split("/").pop() + (r.note ? ". " + r.note : "") + ".");
       kbswPopover = null;
       profileData = { ...r, default_active: profileData ? profileData.default_active : true };
       renderKbSwitcher();
