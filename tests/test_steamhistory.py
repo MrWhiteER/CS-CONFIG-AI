@@ -1,0 +1,58 @@
+"""Steam's Personal Game Data page -> match rows, and merging with recordings."""
+
+import unittest
+from pathlib import Path
+
+from cs2cfg import matchlog, steamhistory
+
+ME = "76561198000000001"  # account id 39734273
+PAGE = (Path(__file__).parent / "fixtures" / "steam_gcpd_premier.html").read_text(encoding="utf-8")
+
+
+class Parsing(unittest.TestCase):
+    def setUp(self):
+        self.rows = steamhistory.parse([PAGE], ME, "Premier")
+
+    def test_every_match_with_you_in_it(self):
+        self.assertEqual([r["map"] for r in self.rows], ["de_mirage", "de_anubis"])
+        self.assertTrue(all(r["source"] == "cs2" and r["origin"] == "steam" for r in self.rows))
+
+    def test_your_line_and_side(self):
+        win, loss = self.rows
+        self.assertEqual((win["kills"], win["assists"], win["deaths"], win["mvps"], win["hs_percent"]),
+                         (24, 5, 14, 4, 50))
+        self.assertTrue(win["won"])
+        self.assertEqual(win["score"], "13 / 9")
+        self.assertEqual(win["rounds"], 22)
+        # Bottom team: the score reads the other way round.
+        self.assertFalse(loss["won"])
+        self.assertEqual(loss["score"], "11 / 13")
+        self.assertIsNone(win["adr"])
+        self.assertEqual(win["played_at"], 1794336151)
+        self.assertEqual(len(win["players"]), 10)
+
+    def test_found_by_profile_link_without_avatar_id(self):
+        page = PAGE.replace('data-miniprofile="39734273"', 'data-miniprofile="1"')
+        rows = steamhistory.parse([page], ME, "Premier", me="https://steamcommunity.com/id/edyvanity/")
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(steamhistory.parse([page], ME, "Premier"), [])
+
+    def test_map_names(self):
+        self.assertEqual(steamhistory.map_id("Dust II"), "de_dustii")
+        self.assertEqual(steamhistory.map_id("cs_office"), "cs_office")
+
+
+class Merging(unittest.TestCase):
+    def test_a_match_recorded_here_is_listed_once(self):
+        steam = steamhistory.parse([PAGE], ME, "Premier")
+        local = {"source": "cs2", "match_id": "cs2-x", "map": "de_mirage",
+                 "started_at": 1794336151 + 120, "played_at": 1794336151 + 2400,
+                 "kills": 24, "deaths": 14, "rounds": 22, "adr": 91.0, "won": True}
+        out = matchlog.combined([], steam + [local], "cs2")
+        self.assertEqual([r["match_id"] for r in out["matches"]],
+                         ["cs2-x", f"steam-{ME}-1794168000"])
+        self.assertEqual(out["counts"]["cs2"], 2)
+
+
+if __name__ == "__main__":
+    unittest.main()

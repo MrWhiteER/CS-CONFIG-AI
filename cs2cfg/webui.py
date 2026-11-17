@@ -3798,6 +3798,61 @@ def _stats_receive(state: State, raw: bytes) -> None:
         state.stats_recorder.feed(payload)
 
 
+STEAM_HISTORY_FILE = "steam-history.json"
+STEAM_HISTORY_EVERY = 3600   # re-read Steam's history at most hourly
+
+
+def _steam_history_mark(update: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Whether Steam's history was linked on this PC, and when it was read."""
+    from .paths import user_data_dir
+
+    path = user_data_dir() / STEAM_HISTORY_FILE
+    try:
+        mark = json.loads(path.read_text(encoding="utf-8"))
+        mark = mark if isinstance(mark, dict) else {}
+    except (OSError, ValueError):
+        mark = {}
+    if update:
+        mark.update(update)
+        try:
+            path.write_text(json.dumps(mark), encoding="utf-8")
+        except OSError:
+            pass
+    return mark
+
+
+def _steam_history_start(state: State, sign_in: bool) -> bool:
+    from . import matchlog, steamhistory
+
+    account = _active_account(state)
+    steam64 = matchlog.account_to_steam64(account) if account else ""
+    if not steam64:
+        return False
+    store = _stats_store(state)
+
+    def run():
+        steamhistory.sync(steam64, store.add, sign_in=sign_in)
+        st = steamhistory.status
+        if st["state"] == "done":
+            _steam_history_mark({"linked": True, "updated": st["updated"]})
+        elif st["state"] == "signed_out":
+            _steam_history_mark({"linked": False})
+
+    threading.Thread(target=run, name="steam-history", daemon=True).start()
+    return True
+
+
+def _stats_steam(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Past CS2 matches from Steam. ``action``: signin, sync or status."""
+    from . import steamhistory
+
+    action = str(body.get("action") or "status")
+    if action in ("signin", "sync"):
+        if not _steam_history_start(state, sign_in=action == "signin"):
+            return {"ok": False, "error": "Steam account not found"}
+    return {"ok": True, **_steam_history_mark(), **steamhistory.status}
+
+
 def _stats(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     """FACEIT and CS2 matches as one list, filtered by ``source``.
 
@@ -3819,7 +3874,19 @@ def _stats(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         "faceit": {k: faceit.get(k) for k in ("linked", "player", "error", "stale")
                    if k in faceit},
         "cs2": {"recording": bool(state.stats_token)},
+        "steam": _stats_steam_auto(state),
     }
+
+
+def _stats_steam_auto(state: State) -> Dict[str, Any]:
+    """Keep Steam's history fresh on its own once it has been linked."""
+    from . import steamhistory
+
+    mark = _steam_history_mark()
+    if mark.get("linked") and steamhistory.status["state"] not in ("reading", "signing_in") \
+            and time.time() - float(mark.get("updated") or 0) > STEAM_HISTORY_EVERY:
+        _steam_history_start(state, sign_in=False)
+    return {**mark, **steamhistory.status}
 
 
 def _faceit_forget(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
@@ -5194,6 +5261,7 @@ def make_handler(state: State):
         "/api/faceit": _faceit,
         "/api/faceit/forget": _faceit_forget,
         "/api/stats": _stats,
+        "/api/stats/steam": _stats_steam,
         "/api/match/state": _match_state,
         "/api/match/accept": _match_accept,
         "/api/match/dismiss": _match_dismiss,

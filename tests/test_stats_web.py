@@ -32,7 +32,8 @@ class Endpoint(unittest.TestCase):
 
     def _stats(self, body):
         with mock.patch.object(webui, "_faceit", return_value=self.faceit), \
-             mock.patch.object(webui, "_active_account", return_value="39734273"):
+             mock.patch.object(webui, "_active_account", return_value="39734273"), \
+             mock.patch.object(webui, "_steam_history_mark", return_value={}):
             return webui._stats(self.state, body)
 
     def test_both_sources(self):
@@ -52,6 +53,20 @@ class Endpoint(unittest.TestCase):
         out = self._stats({})
         self.assertEqual([m["source"] for m in out["matches"]], ["cs2"])
         self.assertFalse(out["faceit"]["linked"])
+
+    def test_steam_history_status_without_a_window(self):
+        from cs2cfg import steamhistory
+        with mock.patch.object(webui, "_active_account", return_value="39734273"), \
+             mock.patch.object(webui, "_steam_history_mark", return_value={}), \
+             mock.patch.object(steamhistory, "window_factory", None), \
+             mock.patch.dict(steamhistory.status, {"state": "idle", "error": ""}):
+            out = webui._stats_steam(self.state, {"action": "signin"})
+            for _ in range(50):
+                if steamhistory.status["state"] != "idle":
+                    break
+                import time; time.sleep(0.02)
+            self.assertTrue(out["ok"])
+            self.assertEqual(steamhistory.status["state"], "unavailable")
 
     def test_feed_reaches_the_recorder(self):
         seen = []

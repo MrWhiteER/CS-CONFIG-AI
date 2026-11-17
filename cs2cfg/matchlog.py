@@ -374,6 +374,19 @@ def _is_faceit(cs2: Dict[str, Any], faceit: List[Dict[str, Any]]) -> bool:
     return False
 
 
+def _recorded(steam: Dict[str, Any], local: List[Dict[str, Any]]) -> bool:
+    """Steam's copy of a match this PC also recorded. The local one wins: it has ADR.
+
+    Steam stamps a match when it starts; the recorder when warm-up ends.
+    """
+    when = int(steam.get("played_at") or 0)
+    for r in local:
+        start = int(r.get("started_at") or r.get("played_at") or 0)
+        if r.get("map") == steam.get("map") and start - FACEIT_WINDOW <= when <= int(r.get("played_at") or 0):
+            return True
+    return False
+
+
 def summary(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Totals over a list, worked out the same way for both sources."""
     n = len(rows)
@@ -404,7 +417,9 @@ def combined(faceit: List[Dict[str, Any]], cs2: List[Dict[str, Any]],
     so the filter can show them.
     """
     f_rows = [_faceit_row(r) for r in faceit or []]
-    c_rows = [dict(r, source="cs2") for r in cs2 or [] if not _is_faceit(r, f_rows)]
+    local = [r for r in cs2 or [] if r.get("origin") != "steam"]
+    steam = [r for r in cs2 or [] if r.get("origin") == "steam" and not _recorded(r, local)]
+    c_rows = [dict(r, source="cs2") for r in local + steam if not _is_faceit(r, f_rows)]
     pick = {"faceit": f_rows, "cs2": c_rows}.get(source, f_rows + c_rows)
     rows = sorted(pick, key=lambda r: int(r.get("played_at") or 0), reverse=True)
     return {
