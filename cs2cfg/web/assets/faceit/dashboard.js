@@ -1,10 +1,10 @@
-/* FACEIT presentation only. Existing API and scoreboard handlers stay in index.html. */
+/* Combined stats presentation. API and FACEIT scoreboard handlers stay in index.html. */
 let fcMetric = 'kd';
 const FC_MAPS = ['dust2','mirage','inferno','nuke','ancient','anubis','vertigo','overpass','train','cache'];
 const FC_LEVEL_COLORS = ['', '#eeeeee', '#1ce400', '#1ce400', '#ffc800', '#ffc800', '#ffc800', '#ffc800', '#ff6309', '#ff6309', '#ff1f00'];
 const fcNumber = v => typeof v === 'number' && Number.isFinite(v) ? v : null;
 const fcValue = (v, digits=0) => fcNumber(v) === null ? '—' : v.toFixed(digits);
-const fcKD = m => fcNumber(m.kills) !== null && fcNumber(m.deaths) > 0 ? m.kills / m.deaths : null;
+const fcKD = m => fcNumber(m.kd);
 const fcMapName = m => String(m || 'Unknown map').replace(/^de_/i,'').replace(/^./, c=>c.toUpperCase());
 function fcMapAsset(map) {
   const key = String(map || '').toLowerCase().replace(/^de_/, '');
@@ -16,6 +16,13 @@ function fcWhen(m, full=false) {
 function fcDelta(v) {
   return fcNumber(v) === null ? '—' : (v>0?'+':'') + v;
 }
+function fcChartWidth(metric) {
+  const width=document.querySelector('[data-panel="faceit"]').clientWidth;
+  const elo=statsData?.faceit?.linked===true && fcSource!=='cs2';
+  if(width<=700) return Math.max(240,width-36);
+  if(width<=900) return metric!=='elo' && elo ? width-36 : (width-14)/2-36;
+  return elo ? (width-28)*1.2/3.4-36 : (width-14)*1.6/2.6-36;
+}
 /* Values stay at their chronological index. A missing ELO breaks the path;
    it is never reconstructed from today's rating or joined across a gap. */
 function fcLineChart(matches, metric, mini=false) {
@@ -23,7 +30,7 @@ function fcLineChart(matches, metric, mini=false) {
     metric==='elo' ? (fcNumber(m.elo)>0 ? m.elo : null) : fcNumber(m.adr));
   const valid = values.filter(v=>v!==null);
   if (!valid.length) return '<p class="fc-caption">No '+(metric==='elo'?'ELO':metric.toUpperCase())+' readings in these matches.</p>';
-  const w=mini||metric==='elo'?600:1000, h=mini?100:metric==='elo'?170:130, left=mini?5:48, right=mini?5:15, top=14, bottom=mini?5:29;
+  const w=mini?600:Math.round(fcChartWidth(metric)), h=mini?100:170, left=mini?5:40, right=mini?5:15, top=14, bottom=mini?5:29;
   let lo=Math.min(...valid), hi=Math.max(...valid);
   const pad = Math.max((hi-lo)*.15, metric==='elo'?10:metric==='kd'?.1:5);
   lo=Math.max(0,lo-pad); hi+=pad;
@@ -53,45 +60,92 @@ function fcMapBars(matches) {
 function fcRenderTrend(matches) {
   return fcLineChart(matches,fcMetric)+fcChartTable(matches,fcMetric);
 }
+/* The list and headline values come from /api/stats. FACEIT's separate
+   payload is retained only for profile identity and ELO history. */
+let statsData = null;
+let fcSource = 'all';
+let fcAccount = null;
+let fcLoading = false;
+let fcLoadError = '';
+const fcSources = ['all','faceit','cs2'];
+const fcSourceName = source => source === 'faceit' ? 'FACEIT' : source === 'cs2' ? 'CS2' : 'All';
+function fcSourceIcon(source) {
+  return '<span class="fc-source-icon '+(source==='cs2'?'fc-cs2-logo':'fc-logo')+'" role="img" aria-label="'+fcSourceName(source)+'"></span>';
+}
+function fcSyncAccount() {
+  const key = String((whoData && whoData.accounts || []).find(a=>a.active)?.account || 'session');
+  if (key === fcAccount) return key;
+  fcAccount = key;
+  try { const saved=sessionStorage.getItem('stats-source:'+key); fcSource=fcSources.includes(saved)?saved:'all'; } catch (_) { fcSource='all'; }
+  statsData=null;
+  fcData=null;
+  fcSeen={};
+  // Drafts and expanded rows belong to the account that was on screen.
+  if($('fc-wrap')) $('fc-wrap').innerHTML='';
+  return key;
+}
+function fcOutcome(m) { return m.tied ? 'D' : m.won===true ? 'W' : m.won===false ? 'L' : '—'; }
+function fcOutcomeClass(m) { return m.tied || typeof m.won!=='boolean' ? 'fc-draw-result' : m.won ? 'fc-win' : 'fc-loss'; }
+function fcPercent(v) { return fcNumber(v)===null ? '—' : fcValue(v)+'%'; }
 function fcRenderDashboard() {
   const wrap=$('fc-wrap'); if(!wrap) return;
   const expanded=new Set([...wrap.querySelectorAll('[data-fc-expand][aria-expanded="true"]')].map(b=>b.dataset.fcExpand));
-  if(fcData && (fcData.ok===false || (!fcData.player && fcData.error))) {
-    wrap.innerHTML='<div class="fc-empty fc-surface"><h3>Could not load your FACEIT account</h3><p role="alert">'+esc(fcData.error||'FACEIT is unavailable. Try again shortly.')+'</p><div class="actions"><button class="btn small" id="fc-refresh">Try again</button><button class="btn small" id="fc-forget">Use another name</button></div></div>';
-    return;
-  }
-  if(!fcData || fcData.linked===false) {
-    if($('fc-nick')) return; // Polling never discards a half-entered nickname.
-    wrap.innerHTML='<div class="fc-empty fc-surface"><h3>Bring your matches into focus</h3><p>Follow a FACEIT nickname to see recent form, ELO and match stats. No FACEIT sign-in needed. Your replay library works without a followed account.</p><div class="fc-follow"><input id="fc-nick" type="text" spellcheck="false" aria-label="FACEIT nickname" placeholder="FACEIT nickname"><button class="btn" id="fc-link">Follow</button></div></div>';
-    return;
-  }
-  const p=fcData.player||{}, matches=Array.isArray(fcData.matches)?fcData.matches:[];
+  const draft=$('fc-nick')?.value || '', focused=document.activeElement?.id==='fc-nick';
+  const selection=focused?[$('fc-nick').selectionStart,$('fc-nick').selectionEnd]:null;
+  const data=statsData||{}, faceit=data.faceit||{}, p=faceit.player||{};
+  const matches=Array.isArray(data.matches)?data.matches:[], summary=data.summary||{};
   const chronological=[...matches].reverse();
-  const have=new Set((demoData&&demoData.demos||[]).map(d=>d.name));
-  const wins=matches.filter(m=>m.won).length;
-  const total=key=>matches.reduce((sum,m)=>sum+(fcNumber(m[key])??0),0);
-  const kd=matches.length && total('deaths')>0 ? total('kills')/total('deaths') : null;
-  const adrs=matches.map(m=>fcNumber(m.adr)).filter(v=>v!==null);
-  const adr=adrs.length?adrs.reduce((a,b)=>a+b,0)/adrs.length:null;
+  const faceitMatches=(fcData?.matches||[]).filter(m=>m.source!=='cs2').slice().reverse();
+  const showFaceit=faceit.linked===true && fcSource!=='cs2';
+  const sample=fcValue(summary.matches)+' '+(summary.matches===1?'match':'matches');
+  const filters='<div class="fc-toolbar"><div class="fc-sources" role="group" aria-label="Match source">'+fcSources.map(source=>
+    '<button type="button" data-fc-source="'+source+'" aria-pressed="'+(fcSource===source)+'">'+(source==='all'?'':fcSourceIcon(source))+'<span>'+fcSourceName(source)+'</span><span class="fc-count">'+fcValue(data.counts?.[source])+'</span></button>').join('')+
+    '</div><div class="fc-toolbar-end"><span class="fc-caption" role="status">'+(fcLoading?'Updating stats…':fcSource==='cs2'?(data.cs2?.recording?'Recording on this PC':'Local match history'):'One record. Every match.')+'</span><button class="btn small" id="fc-refresh"'+(fcLoading?' disabled':'')+'>Refresh</button></div></div>';
   const level=Number.isInteger(p.level)&&p.level>=1&&p.level<=10?p.level:null;
-  const sample=matches.length+' recent '+(matches.length===1?'match':'matches');
   const avatar=p.avatar && /^https?:\/\//i.test(p.avatar) ? '<img src="'+esc(p.avatar)+'" alt="" onerror="this.remove()">' : '';
-  const head='<div class="fc-player fc-surface fc-entry"><div class="fc-avatar"><span>'+esc(String(p.nickname||'?').slice(0,1).toUpperCase())+'</span>'+avatar+'</div><div class="fc-identity"><div class="fc-caption">CS2'+(p.country?' · '+esc(p.country):'')+'</div><h3>'+esc(p.nickname||'FACEIT player')+'</h3><span class="fc-caption">'+esc(sample)+'</span></div>'+(level?'<span class="fc-level" style="--level:'+FC_LEVEL_COLORS[level]+'" title="FACEIT skill level '+level+'" aria-label="Skill level '+level+'">'+level+'</span>':'<span class="fc-caption">Unranked</span>')+'<div class="fc-rating">'+(matches.length?fcLineChart(chronological,'elo',true):'')+'<div><span class="fc-label">Current ELO</span><strong>'+fcValue(fcNumber(p.elo)>0?p.elo:null)+'</strong></div></div><div class="actions"><button class="btn small" id="fc-refresh">Refresh</button><button class="btn small" id="fc-forget">Unfollow</button></div></div>';
-  const form=matches.slice(0,5).map(m=>'<span class="fc-result '+(m.won?'fc-win':'fc-loss')+'" title="'+esc(fcMapName(m.map)+' · '+fcWhen(m,true))+'">'+(m.won?'W':'L')+'</span>').join('');
-  const stats='<div class="fc-stats fc-entry"><div class="fc-stat fc-surface"><span class="fc-label">K/D ratio</span><strong>'+fcValue(kd,2)+'</strong><span class="fc-caption">Total kills ÷ deaths</span></div><div class="fc-stat fc-surface"><span class="fc-label">Average ADR</span><strong>'+fcValue(adr,1)+'</strong><span class="fc-caption">Mean of match ADR</span></div><div class="fc-stat fc-surface"><span class="fc-label">Win rate</span><strong>'+(matches.length?Math.round(wins/matches.length*100)+'%':'—')+'</strong><span class="fc-caption">'+wins+' wins / '+matches.length+' matches</span></div><div class="fc-stat fc-surface"><span class="fc-label">Recent form</span><div class="fc-form">'+(form||'<span class="fc-caption">No matches yet</span>')+'</div><span class="fc-caption">Latest first</span></div></div>';
-  const charts=matches.length?'<div class="fc-charts fc-entry"><section class="fc-chart fc-surface"><div class="fc-chart-head"><h3>ELO history</h3><span class="fc-caption">'+esc(sample)+' · after each match</span></div>'+fcLineChart(chronological,'elo')+fcChartTable(chronological,'elo')+'</section><section class="fc-chart fc-surface"><div class="fc-chart-head"><h3>Performance by map</h3><span class="fc-caption">Win rate · wins / played</span></div>'+fcMapBars(matches)+'</section></div><section class="fc-chart fc-surface fc-trend fc-entry"><div class="fc-chart-head"><h3>Performance trend</h3><div class="fc-metric" role="group" aria-label="Trend metric"><button class="btn small" data-fc-metric="kd" aria-pressed="'+(fcMetric==='kd')+'">K/D</button><button class="btn small" data-fc-metric="adr" aria-pressed="'+(fcMetric==='adr')+'">ADR</button></div></div><div id="fc-trend-plot">'+fcRenderTrend(chronological)+'</div></section>':'';
+  const head=showFaceit?'<div class="fc-player fc-surface fc-entry"><div class="fc-avatar"><span>'+esc(String(p.nickname||'?').slice(0,1).toUpperCase())+'</span>'+avatar+'</div><div class="fc-identity"><div class="fc-caption">'+fcSourceIcon('faceit')+' FACEIT'+(p.country?' · '+esc(p.country):'')+'</div><h3>'+esc(p.nickname||'FACEIT player')+'</h3></div>'+(level?'<span class="fc-level" title="FACEIT skill level '+level+'" aria-label="Skill level '+level+'">'+level+'</span>':'<span class="fc-caption">Unranked</span>')+'<div class="fc-rating">'+(faceitMatches.length?fcLineChart(faceitMatches,'elo',true):'')+'<div><span class="fc-label">Current ELO</span><strong>'+fcValue(fcNumber(p.elo)>0?p.elo:null)+'</strong></div></div><button class="btn small" id="fc-forget">Unfollow</button></div>':'';
+  const follow=faceit.linked!==true?'<section class="fc-follow-card fc-surface"><div>'+fcSourceIcon('faceit')+'</div><div><h3>Add your FACEIT matches</h3><p>Follow a nickname to bring ELO and FACEIT history into this view.</p></div><div class="fc-follow"><input id="fc-nick" type="text" spellcheck="false" aria-label="FACEIT nickname" placeholder="FACEIT nickname" value="'+esc(draft)+'"><button class="btn small" id="fc-link">Follow</button></div></section>':'';
+  const sourceLegend='<span class="fc-stat-sources" aria-label="Stats sources">'+(fcSource==='all'?[fcSourceIcon('faceit'),fcSourceIcon('cs2')].join(''):fcSourceIcon(fcSource))+'</span>';
+  const form=matches.slice(0,5).map(m=>'<span class="fc-result '+fcOutcomeClass(m)+'" title="'+esc(fcSourceName(m.source)+' · '+fcMapName(m.map)+' · '+fcWhen(m,true))+'">'+fcSourceIcon(m.source)+fcOutcome(m)+'</span>').join('');
+  const card=(label,value,caption)=>'<div class="fc-stat fc-surface"><span class="fc-label">'+label+sourceLegend+'</span><strong>'+value+'</strong><span class="fc-caption">'+caption+'</span></div>';
+  const stats='<div class="fc-stats fc-entry">'+card('K/D ratio',fcValue(summary.kd,2),'Total kills ÷ deaths')+card('Average ADR',fcValue(summary.adr,1),'Damage per round')+card('Win rate',fcPercent(summary.win_rate),fcValue(summary.wins)+' wins / '+sample)+card('Headshots',fcPercent(summary.hs_percent),'Average HS%')+'<div class="fc-stat fc-surface"><span class="fc-label">Recent form</span><div class="fc-form">'+(form||'<span class="fc-caption">No matches yet</span>')+'</div><span class="fc-caption">Latest first</span></div></div>';
+  const elo=showFaceit?'<section class="fc-chart fc-surface"><div class="fc-chart-head"><h3>'+fcSourceIcon('faceit')+' ELO history</h3><span class="fc-caption">FACEIT · after each match</span></div>'+fcLineChart(faceitMatches,'elo')+fcChartTable(faceitMatches,'elo')+'</section>':'';
+  const charts=matches.length?'<div class="fc-charts fc-entry '+(showFaceit?'':'fc-charts-solo')+'">'+elo+'<section class="fc-chart fc-surface"><div class="fc-chart-head"><h3>Performance by map</h3><span class="fc-caption">Win rate · wins / played</span></div>'+fcMapBars(matches)+'</section><section class="fc-chart fc-surface fc-trend"><div class="fc-chart-head"><h3>Performance trend</h3><div class="fc-metric" role="group" aria-label="Trend metric"><button class="btn small" data-fc-metric="kd" aria-pressed="'+(fcMetric==='kd')+'">K/D</button><button class="btn small" data-fc-metric="adr" aria-pressed="'+(fcMetric==='adr')+'">ADR</button></div></div><div id="fc-trend-plot">'+fcRenderTrend(chronological)+'</div></section></div>':'';
+  const have=new Set((demoData?.demos||[]).map(d=>d.name));
   const rows=matches.map((m,i)=>{
-    const id='fc-detail-'+i, open=expanded.has(m.match_id), got=have.has(demoNameFor(m));
-    const detail=[['Team',m.team||'Unavailable'],['Rounds',fcValue(m.rounds)],['K/D',fcValue(fcKD(m),2)],['ELO after match',fcValue(fcNumber(m.elo)>0?m.elo:null)],['Played',fcWhen(m,true)]];
-    return '<article class="fc-match fc-surface '+(m.won?'won':'lost')+'"><div class="fc-match-row"><button class="fc-match-toggle" data-fc-expand="'+esc(m.match_id)+'" aria-expanded="'+open+'" aria-controls="'+id+'"><img class="fc-map-art" src="'+fcMapAsset(m.map)+'" alt="" loading="lazy" onerror="this.onerror=null;this.src=\'assets/maps/fallback.webp\'"><span class="fc-match-map"><b>'+esc(fcMapName(m.map))+'</b><small>'+esc(fcWhen(m))+(got?' · Downloaded':'')+'</small></span><span class="fc-result '+(m.won?'fc-win':'fc-loss')+'">'+(m.won?'W':'L')+'</span><span class="fc-match-value"><small>Score</small>'+esc(m.score||'—')+'</span><span class="fc-match-value"><small>K / D / A</small>'+[m.kills,m.deaths,m.assists].map(v=>fcValue(v)).join(' / ')+'</span><span class="fc-match-value"><small>ADR</small>'+fcValue(m.adr,1)+'</span><span class="fc-match-value fc-delta '+(m.elo_delta>0?'up':m.elo_delta<0?'down':'')+'"><small>ELO</small>'+fcDelta(m.elo_delta)+'<span class="fc-chevron" aria-hidden="true">⌄</span></span></button><div class="fc-match-actions"><button class="btn small" data-match="'+esc(m.match_id)+'" aria-label="Stats for '+esc(fcMapName(m.map)+' '+fcWhen(m,true))+'">Stats</button></div></div><div class="fc-match-detail" id="'+id+'"'+(open?'':' hidden')+'>'+detail.map(([k,v])=>'<div><small>'+k+'</small><b>'+esc(v)+'</b></div>').join('')+'</div></article>';
+    const id='fc-detail-'+i, key=m.source+':'+m.match_id, open=expanded.has(key), local=m.source==='cs2';
+    const detail=local?[['MVPs',fcValue(m.mvps)],['HS%',fcPercent(m.hs_percent)],['K/R',fcValue(m.kr,2)],['2K',fcValue(m.double)],['3K',fcValue(m.triple)],['4K',fcValue(m.quadro)],['5K',fcValue(m.penta)]]:
+      [['Team',m.team||'Unavailable'],['ELO after match',fcValue(fcNumber(m.elo)>0?m.elo:null)]];
+    detail.unshift(['Rounds',fcValue(m.rounds)],['K/D',fcValue(m.kd,2)]);
+    detail.push(['Played',fcWhen(m,true)]);
+    const toggleAttrs=' data-fc-expand="'+esc(key)+'" aria-expanded="'+open+'" aria-controls="'+id+'"';
+    return '<article class="fc-match fc-surface '+(m.tied?'tied':m.won===true?'won':m.won===false?'lost':'unknown')+'"><div class="fc-match-row"><button class="fc-match-toggle"'+toggleAttrs+'><img class="fc-map-art" src="'+fcMapAsset(m.map)+'" alt="" loading="lazy" onerror="this.onerror=null;this.src=\'assets/maps/fallback.webp\'"><span class="fc-match-map"><b>'+esc(fcMapName(m.map))+'</b><span class="fc-match-source">'+fcSourceIcon(m.source)+fcSourceName(m.source)+'</span><small>'+esc(fcWhen(m))+(!local&&have.has(demoNameFor(m))?' · Downloaded':'')+'</small></span><span class="fc-result '+fcOutcomeClass(m)+'">'+fcOutcome(m)+'</span><span class="fc-match-value"><small>Score</small>'+esc(m.score||'—')+'</span><span class="fc-match-value"><small>K / D / A</small>'+[m.kills,m.deaths,m.assists].map(v=>fcValue(v)).join(' / ')+'</span><span class="fc-match-value"><small>ADR</small>'+fcValue(m.adr,1)+'</span><span class="fc-match-value fc-mode '+(!local?(m.elo_delta>0?'up':m.elo_delta<0?'down':''):'')+'"><small>'+ (local?'Mode':'ELO')+'</small>'+(local?esc(m.mode||'—'):fcDelta(m.elo_delta))+'<span class="fc-chevron" aria-hidden="true">⌄</span></span></button><div class="fc-match-actions"><button class="btn small"'+(local?toggleAttrs:' data-match="'+esc(m.match_id)+'"')+' aria-label="'+(local?'Your stats':'Scoreboard')+' for '+esc(fcMapName(m.map)+' '+fcWhen(m,true))+'">Stats</button></div></div><div class="fc-match-detail" id="'+id+'"'+(open?'':' hidden')+'>'+(local?'<p class="fc-own-line">Your match stats <span>CS2 records your own line on this PC.</span></p>':'')+detail.map(([k,v])=>'<div><small>'+k+'</small><b>'+esc(v)+'</b></div>').join('')+'</div></article>';
   }).join('');
-  wrap.innerHTML=head+(fcData.stale?'<p class="fc-warning" role="status">Offline / last good read. '+esc(fcData.error||'Refresh to try again.')+'</p>':'')+stats+charts+'<div class="fc-section-head"><h3>Match history</h3><span class="fc-caption">'+esc(sample)+' · latest first</span></div><div class="fc-history">'+(rows||'<div class="fc-empty fc-surface">No CS2 matches on that account yet. Your matches will appear here after you play.</div>')+'</div>';
+  const empty=fcSource==='faceit'?'<h3>No FACEIT matches yet</h3><p>'+(faceit.linked===true?'Your recent FACEIT matches will appear here when available.':'Follow a nickname above to see FACEIT matches. Your local CS2 history is available under All or CS2.')+'</p>':
+    '<h3>Your next match starts the story</h3><p>CS2 matches appear here after your next Competitive, Premier or Wingman game. Local history starts with games played on this PC after this update; older games are not imported.</p>'+(data.cs2?.recording?'<p class="fc-restart">Restart CS2 once after this update to activate match recording.</p>':'');
+  const warning=fcLoadError?'<p class="fc-warning" role="alert">'+esc(fcLoadError)+(statsData?' Your last loaded stats remain below.':'')+' Use Refresh to try again.</p>':
+    faceit.error?'<p class="fc-warning" role="status">FACEIT'+(faceit.stale?' · last good read':'')+': '+esc(faceit.error)+'</p>':'';
+  wrap.setAttribute('aria-busy',String(fcLoading));
+  wrap.innerHTML=filters+warning+head+follow+stats+charts+'<div class="fc-section-head"><h3>Match history <span class="fc-caption">'+sample+'</span></h3><span class="fc-caption">'+fcSourceName(fcSource)+' · latest first</span></div><div class="fc-history">'+(rows||'<div class="fc-empty fc-surface">'+(fcLoading?'Loading your stats…':empty)+'</div>')+'</div>';
+  if(focused && $('fc-nick')) {$('fc-nick').focus();$('fc-nick').setSelectionRange(...selection);}
 }
-document.addEventListener('click', e=>{
+document.addEventListener('click', async e=>{
+  const source=e.target.closest('[data-fc-source]');
+  if(source && source.dataset.fcSource!==fcSource) {
+    fcSource=source.dataset.fcSource;
+    try {sessionStorage.setItem('stats-source:'+fcAccount,fcSource);} catch (_) {}
+    // Clear the previous filter's rows while its replacement is loading.
+    statsData=statsData?{...statsData,matches:[],summary:{}}:null;
+    await loadFaceit();
+  }
   const toggle=e.target.closest('[data-fc-expand]');
-  if(toggle) {const open=toggle.getAttribute('aria-expanded')!=='true';toggle.setAttribute('aria-expanded',String(open));document.getElementById(toggle.getAttribute('aria-controls')).hidden=!open;}
+  if(toggle) {
+    const open=toggle.getAttribute('aria-expanded')!=='true';
+    document.querySelectorAll('[data-fc-expand]').forEach(b=>{if(b.dataset.fcExpand===toggle.dataset.fcExpand)b.setAttribute('aria-expanded',String(open));});
+    document.getElementById(toggle.getAttribute('aria-controls')).hidden=!open;
+  }
   const metric=e.target.closest('[data-fc-metric]');
-  if(metric) {fcMetric=metric.dataset.fcMetric;document.querySelectorAll('[data-fc-metric]').forEach(b=>b.setAttribute('aria-pressed',String(b===metric)));$('fc-trend-plot').innerHTML=fcRenderTrend([...(fcData.matches||[])].reverse());}
+  if(metric) {fcMetric=metric.dataset.fcMetric;document.querySelectorAll('[data-fc-metric]').forEach(b=>b.setAttribute('aria-pressed',String(b===metric)));$('fc-trend-plot').innerHTML=fcRenderTrend([...(statsData?.matches||[])].reverse());}
 });
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='fc-nick') $('fc-link').click();});
 function fcPauseMotion() {
@@ -99,4 +153,17 @@ function fcPauseMotion() {
   document.documentElement.classList.toggle('fc-paused',document.hidden||!pane||pane.classList.contains('hidden'));
 }
 document.addEventListener('visibilitychange',fcPauseMotion);
-document.addEventListener('DOMContentLoaded',()=>{const pane=document.querySelector('[data-panel="faceit"]');if(pane)new MutationObserver(fcPauseMotion).observe(pane,{attributes:true,attributeFilter:['class']});fcPauseMotion();});
+document.addEventListener('DOMContentLoaded',()=>{
+  const pane=document.querySelector('[data-panel="faceit"]');
+  if(pane) {
+    new MutationObserver(fcPauseMotion).observe(pane,{attributes:true,attributeFilter:['class']});
+    let width=0;
+    new ResizeObserver(()=>{
+      if(pane.clientWidth && pane.clientWidth!==width) {
+        width=pane.clientWidth;
+        if(statsData) fcRenderDashboard();
+      }
+    }).observe(pane);
+  }
+  fcPauseMotion();
+});

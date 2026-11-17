@@ -5915,9 +5915,9 @@ const startup = (() => {
     <div class="tabs" role="tablist" aria-label="Main navigation" aria-orientation="vertical">
       <button class="tab" data-tab="launcher" role="tab" aria-selected="true" title="Launcher">
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg></i><span class="tx">Launcher</span></button>
-      <!-- Stable brand asset slot; see assets/faceit/README.txt before release. -->
-      <button class="tab" data-tab="faceit" role="tab" aria-selected="false" title="FACEIT">
-        <i class="ic"><span class="fc-logo" aria-hidden="true"></span></i><span class="tx">FACEIT</span></button>
+      <!-- Combined FACEIT and local CS2 stats retain the original tab position. -->
+      <button class="tab" data-tab="faceit" role="tab" aria-selected="false" title="Stats">
+        <i class="ic"><span class="fc-stats-logo" aria-hidden="true"></span></i><span class="tx">Stats</span></button>
       <!-- A crate, for what is in it. -->
       <button class="tab" data-tab="inventory" role="tab" aria-selected="false" title="Inventory">
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8l9-4.5L21 8v8l-9 4.5L3 16z"/><path d="M3 8l9 4.5L21 8M12 12.5V21"/></svg></i><span class="tx">Inventory</span></button>
@@ -6121,14 +6121,14 @@ const startup = (() => {
 
     </div>
 
-    <!-- FACEIT account, recent performance, match scoreboards and local replays. -->
+    <!-- Shared stats, FACEIT account and scoreboards, and local replays. -->
     <div class="tab-panel hidden" data-panel="faceit">
       <div class="fc-top">
-        <span class="fc-logo" aria-hidden="true"></span>
-        <div><div class="eyebrow">Your competitive record</div><h2>FACEIT</h2>
-        <p>Your form. Your matches. Your next review.</p></div>
+        <span class="fc-stats-logo" aria-hidden="true"></span>
+        <div><div class="eyebrow">Your competitive record</div><h2>Stats</h2>
+        <p>Your game, across FACEIT and CS2.</p></div>
       </div>
-      <div id="fc-wrap" aria-live="polite"><div class="fc-empty fc-surface">Loading your account&hellip;</div></div>
+      <div id="fc-wrap" aria-live="polite"><div class="fc-empty fc-surface">Loading your stats&hellip;</div></div>
       <section class="panel" id="demo-card">
         <h3>Replay library</h3>
         <p>Watch starts CS2 with your demo playing. Choose saves it for your next launch. Paste a match link to get another replay.</p>
@@ -11816,7 +11816,7 @@ function ago(seconds) {
   return Math.round(mins / 1440) + "d ago";
 }
 
-/* Following a FACEIT account.
+/* Combined competitive stats and the followed FACEIT account.
 
    Polled while the launcher is on screen, so a match finished a minute ago
    turns up without anyone pasting anything. The server keeps the answer warm
@@ -11824,30 +11824,55 @@ function ago(seconds) {
    to FACEIT a minute however many times the page asks. */
 let fcData = null;
 let fcTimer = null;
-let fcSeen = "";   // the newest match id already shown, to notice arrivals
+let fcSeen = {};   // newest observed match per source; changing filters is not a new match
+let fcRequest = 0;
 
 async function loadFaceit(opts) {
-  const body = Object.assign({}, opts || {});
-  try {
-    fcData = await api("/api/faceit", body);
-  } catch (err) {
-    fcData = { ok: false, error: String(err && err.message || err) };
-  }
+  const account = fcSyncAccount(), source = fcSource, request = ++fcRequest;
+  fcLoading = true;
+  fcLoadError = '';
   renderFaceit();
-  if (fcData && fcData.matches && fcData.matches.length) {
-    const newest = fcData.matches[0].match_id;
-    if (fcSeen && newest !== fcSeen) {
-      status("New match: " + esc(fcData.matches[0].map) + " — " +
-             (fcData.matches[0].won ? "win" : "loss"));
+  try {
+    // Following still belongs to FACEIT. Stats must read after the follow is saved.
+    let profile;
+    if (opts && opts.nickname) profile = await api('/api/faceit', opts);
+    const combined = await api('/api/stats', {source, force: !!(opts && opts.force)});
+    // /api/stats warms FACEIT's cache. Read its ELO history afterwards so
+    // Refresh performs one forced upstream read and both views agree.
+    const faceit = profile || await api('/api/faceit', {})
+      .catch(err=>({error: String(err.message || err)}));
+    if (request !== fcRequest || account !== fcAccount) return;
+    if (combined.ok === false) throw Error(combined.error || 'Stats are unavailable.');
+    statsData = combined;
+    fcData = faceit;
+    if (opts && opts.nickname) delete fcSeen.faceit;
+    if (faceit.error && !statsData.faceit?.error) statsData.faceit = {...statsData.faceit, error:faceit.error};
+    for (const name of ['faceit','cs2']) {
+      const newest = (combined.matches || []).find(m=>m.source===name);
+      if (!newest) {
+        if (source === 'all' || source === name) fcSeen[name] ||= {match_id:'', played_at:0};
+        continue;
+      }
+      const previous = fcSeen[name];
+      if (previous && newest.match_id !== previous.match_id && newest.played_at > previous.played_at) {
+        status('New match: ' + fcSourceName(name) + ' · ' + esc(fcMapName(newest.map)) + ' — ' +
+          (newest.tied ? 'draw' : newest.won ? 'win' : 'loss'));
+      }
+      fcSeen[name] = {match_id:newest.match_id, played_at:newest.played_at};
     }
-    fcSeen = newest;
+  } catch (err) {
+    if (request !== fcRequest || account !== fcAccount) return;
+    fcLoadError = String(err && err.message || err);
   }
+  if (request !== fcRequest) return;
+  fcLoading = false;
+  renderFaceit();
 }
 
 function startFaceitWatch() {
   if (fcTimer) return;
   fcTimer = setInterval(() => {
-    // Only while the FACEIT tab is actually on screen. Polling a tab nobody
+    // Only while the Stats tab is actually on screen. Polling a tab nobody
     // is looking at is just someone else's bandwidth.
     const pane = document.querySelector('.tab-panel[data-panel="faceit"]');
     if (!document.hidden && pane && !pane.classList.contains("hidden")) loadFaceit();
@@ -12238,7 +12263,7 @@ document.addEventListener("click", async e => {
   }
   if (forget) {
     try { await api("/api/faceit/forget", {}); } catch (err) {}
-    fcData = null; fcSeen = "";
+    fcData = null;
     await loadFaceit();
     return;
   }
