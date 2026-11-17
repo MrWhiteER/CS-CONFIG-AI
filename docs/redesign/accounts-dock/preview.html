@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Accounts dock preview</title></head>
+<body>
+<script>
+/* Offline fixtures only. Serve the repository root (capture.cjs does this),
+   then open this file with ?state=ember|violet|reading|collapsed|daylight.
+   The actual app HTML, CSS, dock and Stats renderer are used, without booting
+   the backend or reading any Steam/config folders. */
+(async()=>{
+  const base='/cs2cfg/web/';
+  const source=await (await fetch(base+'index.html')).text();
+  const doc=new DOMParser().parseFromString(source,'text/html');
+  for(const script of doc.querySelectorAll('script')) script.remove();
+  doc.querySelector('.boot-screen')?.remove();
+  const baseTag=document.createElement('base'); baseTag.href=base;
+  document.head.append(baseTag);
+  for(const style of doc.head.querySelectorAll('style,link[rel="stylesheet"]')) document.head.append(style.cloneNode(true));
+  // The dock stylesheet is next to the script near the end of the app body.
+  const css=document.createElement('link');css.rel='stylesheet';css.href=base+'assets/accounts/dock.css';document.head.append(css);
+  document.body.replaceChildren(...doc.body.childNodes);
+  window.$=id=>document.getElementById(id);
+  window.esc=x=>String(x??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
+  window.ago=()=> '2 hours ago';
+  window.previewCalls=[];
+  window.setSettingsSub=name=>previewCalls.push(['settings',name]);
+  window.whoOpen=open=>previewCalls.push(['switcher',open]);
+  window.setTab=name=>{
+    previewCalls.push(['tab',name]);
+    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('hidden',p.dataset.panel!==name));
+    document.querySelectorAll('.tabs .tab').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===name)));
+  };
+  window.paintFace=(frame,account)=>{frame.replaceChildren();if(account?.picture){const img=new Image();img.src=account.picture;img.alt='';img.onerror=()=>img.remove();frame.append(img);}};
+  window.whoData=null;window.cloudData=null;window.fcData=null;window.fcSeen={};window.demoData={demos:[]};
+  window.fcSteamReply={linked:false,available:true,state:'idle',found:0};
+  window.api=async(route,body)=>{previewCalls.push([route,body]);return fcSteamReply;};
+  window.loadFaceit=async()=>{previewCalls.push(['refresh-stats']);};
+  window.demoNameFor=()=>'';
+  window.renderFaceit=()=>{renderAccountsDock();fcRenderDashboard();};
+  for(const file of ['assets/faceit/dashboard.js','assets/accounts/dock.js']){
+    const script=document.createElement('script');script.src=base+file;
+    await new Promise((resolve,reject)=>{script.onload=resolve;script.onerror=reject;document.body.append(script);});
+  }
+  // Include the real existing outside-click handler as well: opening from the
+  // dock must survive the Settings switcher's click-away behavior.
+  const clickStart=source.indexOf('document.addEventListener("click", async e => {',source.indexOf('function whoOpen('));
+  const clickHandler=document.createElement('script');
+  clickHandler.textContent=source.slice(clickStart,source.indexOf('\n});',clickStart)+4);
+  document.body.append(clickHandler);
+  const init=document.createElement('script');
+  init.textContent=`
+    const avatar=(letter)=>'data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" rx="12" fill="'+getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()+'"/><text x="40" y="53" text-anchor="middle" font-family="Arial" font-size="40" fill="'+getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()+'">'+letter+'</text></svg>');
+    window.previewState=async(state)=>{
+      document.documentElement.dataset.theme=state==='violet'?'violet':state==='daylight'?'daylight':'ember';
+      const empty=state==='violet';
+      const app=document.querySelector('.app');app.classList.toggle('rail-tight',state==='collapsed');
+      app.style.setProperty('--rail',state==='collapsed'?'64px':'232px');app.style.setProperty('--rail-text',state==='collapsed'?'0':'1');
+      whoData={ok:true,steam:!empty,following:true,accounts:empty?[]:[{active:true,name:'Edy',picture:avatar('E')}]};
+      cloudData=empty?{configured:true,signed_in:false}:{configured:true,signed_in:true,name:'Edy',avatar:avatar('E')};
+      fcData=empty?{linked:false}:{linked:true,player:{nickname:'edy',level:9,country:'AE',elo:2100,avatar:avatar('e')},matches:[]};
+      dockSteamWaiting=0;dockSteamNotice='';
+      dockSteam=empty?{linked:false,available:true,state:'idle'}:{linked:true,available:true,state:state==='reading'?'reading':'done',found:128,updated:1794902400};
+      fcSteamReply=structuredClone(dockSteam);
+      statsData={faceit:{linked:!empty,player:fcData.player},cs2:{recording:true},counts:{all:24,cs2:16,faceit:8},summary:{matches:24,wins:16,win_rate:67,kd:1.24,adr:86.4,hs_percent:52},matches:Array.from({length:4},(_,i)=>({source:i%2?'cs2':'faceit',match_id:'preview-'+i,map:['mirage','inferno','nuke','ancient'][i],won:i!==2,score:i===2?'9 / 13':'13 / 8',rounds:21,kills:23,deaths:16,assists:5,kd:1.44,adr:89.2,hs_percent:52,elo_delta:25,mode:'Premier',played_at:1794902400-i*86400}))};
+      setTab('faceit');
+      $('status').style.display='none';
+      document.querySelector('.rail-end .ver').textContent='preview';
+      $('updc').querySelector('.updc-sub').textContent='You’re up to date';
+      document.querySelector('.topbar').style.display='none';
+      renderFaceit();dockPauseMotion();
+      await document.fonts.ready;
+    };
+    previewState(new URLSearchParams(location.search).get('state')||'ember').then(()=>document.documentElement.dataset.previewReady='true');
+  `;
+  document.body.append(init);
+})().catch(error=>{document.body.textContent=error.stack;});
+</script>
+</body></html>
