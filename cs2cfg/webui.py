@@ -2629,6 +2629,14 @@ def _cfg_keys(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _not_bindable(code: str) -> str:
+    """Why a control on the page cannot take a CS2 bind, in plain words."""
+    if code.lower() in ("mouse6", "mouse7"):
+        return ("CS2 can't bind Mouse " + code[5:] +
+                ". Map it to a key in your mouse app, then bind that key.")
+    return code + " can't be bound in CS2."
+
+
 def _cfg_key_options(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     """What one key could be set to, and what it is set to now.
 
@@ -2642,6 +2650,8 @@ def _cfg_key_options(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     binding = str(body.get("binding") or "").strip()
     if not binding and body.get("code"):
         binding = keys.from_code(str(body["code"])) or ""
+        if not binding:
+            return {"ok": False, "error": _not_bindable(str(body["code"]))}
     if not binding:
         return {"ok": False, "error": "no key given"}
 
@@ -3061,6 +3071,8 @@ def _cfg_bind(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     binding = str(body.get("binding") or "").strip()
     if not binding and body.get("code"):
         binding = keys.from_code(str(body["code"])) or ""
+        if not binding:
+            return {"ok": False, "error": _not_bindable(str(body["code"]))}
     if not binding:
         return {"ok": False, "error": "no key given"}
 

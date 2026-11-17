@@ -69,7 +69,15 @@ DIRECT = {"mouse1", "mouse2", "mouse3", "mouse4", "mouse5",
 
 
 def from_code(code: str) -> Optional[str]:
-    """A browser KeyboardEvent.code as this collection would write the bind."""
+    """A browser KeyboardEvent.code as this collection would write the bind.
+
+    The page also names mouse buttons and the wheel by their CS2 bind names
+    ("mouse4", "mwheelup"). Those are written as they are; without this every
+    mouse button was refused as "no key given".
+    """
+    name = str(code or "").strip().lower()
+    if name in DIRECT:
+        return name
     usage = _CODES.get(code)
     return f"scancode{usage}" if usage else None
 
