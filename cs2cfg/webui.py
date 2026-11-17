@@ -803,7 +803,7 @@ def _save_prefs(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     allowed = (
         "intent", "target_fps", "account", "write_video", "write_cfg",
         "write_launch", "link_autoexec", "stretch_mode", "patch_video",
-        "cfg_folder", "tab", "favourites", "mouse_shape", "kb_layout", "kb_shown", "kb_focus",
+        "cfg_folder", "tab", "favourites", "mouse_shape", "kb_layout", "kb_shown", "kb_focus", "kb_profile_icons",
         "update_auto_download", "update_skip", "rail_width", "pinned_account",
         # Named setups are written through their own endpoint, but the page
         # also sends them back with everything else when preferences are
@@ -1833,8 +1833,17 @@ def _cfg_layouts_create(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     if not name:
         return {"ok": False, "error": "give the profile a name"}
 
+    # A new profile starts as an empty keyboard: every key the standard
+    # layout binds is cleared, or set to CS2's own default when asked. A
+    # blank file would leave every key on the old binds once switched to.
+    start = str(body.get("start") or "empty")
+    table = _defaults_table(state) if start == "defaults" else {}
+    note = ""
+    if start == "defaults" and not table:
+        note = "CS2's default binds could not be found, so the profile starts empty"
     relative = cfgscan.new_profile_path(result, name)
-    text = cfgscan.profile_blank_text(name)
+    text = (cfgscan.profile_blank_text(name) if start == "blank"
+            else cfgscan.profile_start_text(result, name, table))
     path = Path(result.cfg_root) / Path(relative)
 
     session = backup.BackupSession(note=f"new profile {relative} (web)")
@@ -1848,7 +1857,7 @@ def _cfg_layouts_create(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     registry = layouts.load_registry(result.root)
     pins = layouts.load_pins(result.root)
     current = layouts.load_current(result.root)
-    return {"ok": True, "file": relative,
+    return {"ok": True, "file": relative, "note": note,
             "profiles": _profile_selector_view(
                 state.cfg_scan, registry, pins, current, _defaults_table(state))}
 
@@ -2529,6 +2538,9 @@ def _cfg_keys(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         # The last bind to load is the one the engine keeps.
         winner = max(entries, key=lambda b: b.order)
         command = (winner.body or "").strip().strip('"')
+        if not command:
+            # bind "key" "" -- cleared, e.g. by a new empty profile. Free.
+            continue
         feature = features.get(command.lower())
         bound[key] = {
             "key": key,
@@ -2629,6 +2641,14 @@ def _cfg_keys(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _not_bindable(code: str) -> str:
+    """Why a control on the page cannot take a CS2 bind, in plain words."""
+    if code.lower() in ("mouse6", "mouse7"):
+        return ("CS2 can't bind Mouse " + code[5:] +
+                ". Map it to a key in your mouse app, then bind that key.")
+    return code + " can't be bound in CS2."
+
+
 def _cfg_key_options(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     """What one key could be set to, and what it is set to now.
 
@@ -2642,6 +2662,8 @@ def _cfg_key_options(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     binding = str(body.get("binding") or "").strip()
     if not binding and body.get("code"):
         binding = keys.from_code(str(body["code"])) or ""
+        if not binding:
+            return {"ok": False, "error": _not_bindable(str(body["code"]))}
     if not binding:
         return {"ok": False, "error": "no key given"}
 
@@ -3061,6 +3083,8 @@ def _cfg_bind(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     binding = str(body.get("binding") or "").strip()
     if not binding and body.get("code"):
         binding = keys.from_code(str(body["code"])) or ""
+        if not binding:
+            return {"ok": False, "error": _not_bindable(str(body["code"]))}
     if not binding:
         return {"ok": False, "error": "no key given"}
 
@@ -3077,7 +3101,8 @@ def _cfg_bind(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     if existing and not clearing and not body.get("force"):
         winner = max(existing, key=lambda b: b.order)
         already = (winner.body or "").strip().strip(chr(34))
-        if already.lower() != command.lower():
+        # An empty bind ("") is a key a fresh profile cleared: free to take.
+        if already and already.lower() != command.lower():
             return {"ok": False, "needs_confirm": True,
                     "taken": [{"file": winner.file, "line": winner.line,
                                "runs": already}],

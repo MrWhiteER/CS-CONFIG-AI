@@ -21,7 +21,9 @@ if(route==='/api/cfg/key/options')return {groups,stock:'+forward',current:{comma
 if(route==='/api/cfg/bind')return {ok:true,command:body.command||''};
 if(route==='/api/cfg/layouts/apply'){profileData.default_active=false;profileData.profiles[0].active=true;return {changed:false,label:'Warmup'}};
 if(route==='/api/cfg/layouts/default'){profileData.default_active=true;profileData.profiles[0].active=false;return {changed:false}};
-if(route==='/api/cfg/layouts/copy'||route==='/api/cfg/layouts/create')return {file:'new.cfg',profiles:profileData.profiles};return {ok:true};}
+if(route==='/api/cfg/layouts/copy'||route==='/api/cfg/layouts/create'){
+ const file=route.endsWith('/copy')?'copy.cfg':'new.cfg';profileData.profiles.push({file,label:body.name,active:false,override_count:0,missing_defaults:[]});return {file,profiles:profileData.profiles};}
+if(route==='/api/cfg/layouts/delete'){profileData.profiles=profileData.profiles.filter(p=>p.file!==body.file);return {ok:true};}return {ok:true};}
 `;
 code+=slice('/* --- the keyboard','/* Match demos.');
 code+=slice('async function loadKeyboard(force)','$("plug-reload").addEventListener');
@@ -140,12 +142,43 @@ check('one focus control only',document.querySelectorAll('[data-kbghost],[data-k
 check('one shape picker only',document.querySelectorAll('.ms-pick').length===1&&!document.querySelector('.kb-piece .ms-pick'));
 document.querySelector('[data-kbfocus="mouse"]').click();check('toggle ghosts keyboard',kbFocus==='mouse');kbSetFocus('both');
 check('focus preference persisted',calls.some(c=>c.route==='/api/prefs'&&c.body.kb_focus==='mouse'));
-document.querySelector('[data-kbsw]').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}));check('profile context menu retained',document.querySelectorAll('[data-kbsw-menu]').length===4);kbswMenu=null;renderKbSwitcher();
+document.querySelector('[data-kbsw]').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}));check('profile context menu retained',document.querySelectorAll('[data-kbsw-menu]').length===5);kbswMenu=null;renderKbSwitcher();
 document.querySelector('[data-kbsw]').click();await settle();check('profile switch API preserved',calls.some(c=>c.route==='/api/cfg/layouts/apply'));
 profileData.profiles[0].missing_defaults=Array.from({length:6},(_,i)=>({key:'scancode'+(4+i),label:'Key '+i,command:'+jump'}));renderKeyboard();check('missing list and count retained',document.querySelectorAll('.kb-missing-row').length===6&&document.querySelector('.kb-missing-count').textContent==='6');
 document.querySelector('[data-kbsw-default]').click();await settle();check('default profile API preserved',calls.some(c=>c.route==='/api/cfg/layouts/default'));
-document.querySelector('[data-kbsw-add]').click();check('profile create opens naming control',!!$('kbsw-name'));$('kbsw-name').value='Test';$('kbsw-name-go').click();await settle();check('profile create API preserved',calls.some(c=>c.route==='/api/cfg/layouts/create'&&c.body.name==='Test'));
+check('all profile tabs have icon SVGs',[...document.querySelectorAll('[data-kbsw], [data-kbsw-default]')].every(tab=>tab.querySelector('svg[data-profile-icon]')));
+check('Default uses a house',document.querySelector('[data-kbsw-default] svg').dataset.profileIcon==='home');
+check('filename hash is stable',kbProfileDefault('warmup.cfg')===kbProfileDefault('warmup.cfg'));
+kbLoadProfileIcons({kb_profile_icons:{'warmup.cfg':'crown','invalid.cfg':'no-such-icon'}});renderKbSwitcher();
+check('saved icons load and invalid ids are ignored',kbProfileIconId('warmup.cfg')==='crown'&&!kbProfileIcons['invalid.cfg']);
+document.querySelector('[data-kbsw-add]').click();check('profile create opens naming control',!!$('kbsw-name'));
+check('create has twenty accessible icon buttons',document.querySelectorAll('button[data-kbsw-icon][aria-label][aria-pressed]').length===20);
+check('create preselects one icon',document.querySelectorAll('[data-kbsw-icon][aria-pressed="true"]').length===1);
+for(const theme of ['carbon','violet','daylight','paper']){
+ document.documentElement.dataset.theme=theme;
+ const selected=document.querySelector('[data-kbsw-icon][aria-pressed="true"]'),style=getComputedStyle(selected),grid=getComputedStyle(selected.parentElement);
+ check(theme+' profile picker contrast and ring',style.color!==style.backgroundColor&&style.boxShadow!=='none');
+ check(theme+' profile picker five columns',grid.gridTemplateColumns.split(' ').length===5);
+}
+delete document.documentElement.dataset.theme;
+$('kbsw-name').value='Test';$('kbsw-name').dispatchEvent(new Event('input',{bubbles:true}));
+check('create default follows filename',document.querySelector('[data-kbsw-icon][aria-pressed="true"]').dataset.kbswIcon===kbProfileDefault('test.vcfg'));
+document.querySelector('[data-kbsw-icon="skull"]').focus();document.querySelector('[data-kbsw-icon="skull"]').click();
+check('picking retains name and focus',$('kbsw-name').value==='Test'&&document.activeElement.dataset.kbswIcon==='skull');
+$('kbsw-name-go').click();await settle();check('profile create API preserved',calls.some(c=>c.route==='/api/cfg/layouts/create'&&c.body.name==='Test'&&c.body.start==='defaults'));
+check('created profile saves chosen icon',calls.some(c=>c.route==='/api/prefs'&&c.body.kb_profile_icons?.['new.cfg']==='skull'));
+document.querySelector('[data-kbsw="warmup.cfg"]').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}));
+document.querySelector('[data-kbsw-menu="icon"]').click();
+check('Change icon opens grid and focuses selected button',document.querySelectorAll('[data-kbsw-icon]').length===20&&document.activeElement.dataset.kbswIcon==='crown');
+document.querySelector('[data-kbsw-icon="scope"]').click();await settle();
+check('Change icon updates tab',document.querySelector('[data-kbsw="warmup.cfg"] svg').dataset.profileIcon==='scope');
+check('Change icon saves prefs',calls.some(c=>c.route==='/api/prefs'&&c.body.kb_profile_icons?.['warmup.cfg']==='scope'));
+document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
+check('Escape closes picker and restores tab focus',!document.querySelector('.kbsw-popover')&&document.activeElement.dataset.kbsw==='warmup.cfg');
 openKbswCopyPopover('warmup.cfg','Warmup');$('kbsw-name').value='Warmup copy';$('kbsw-name-go').click();await settle();check('profile copy API preserved',calls.some(c=>c.route==='/api/cfg/layouts/copy'&&c.body.name==='Warmup copy'));
+check('copy inherits source icon',kbProfileIcons['copy.cfg']==='scope'&&calls.some(c=>c.route==='/api/prefs'&&c.body.kb_profile_icons?.['copy.cfg']==='scope'));
+document.querySelector('[data-kbsw="copy.cfg"]').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}));document.querySelector('[data-kbsw-menu="delete"]').click();await settle();
+check('delete removes saved icon',!Object.hasOwn(kbProfileIcons,'copy.cfg')&&calls.filter(c=>c.route==='/api/prefs'&&c.body.kb_profile_icons).at(-1).body.kb_profile_icons['copy.cfg']===undefined);
 const reloads=calls.filter(c=>c.route==='/api/cfg/keys').length;$('kb-reload').click();await settle();check('re-read reloads keys',calls.filter(c=>c.route==='/api/cfg/keys').length>reloads);
 mouseShape='two';kbSetFocus('both');renderKeyboard();checkLayout('final');
 check('removed layout UI absent',!document.querySelector('.kb-grip,.kb-edge,#kb-reset,[data-kbshow]'));
@@ -211,6 +244,15 @@ if(process.env.KEYBOARD_REDUCED)args.unshift('--force-prefers-reduced-motion');
     const themed=await command('Page.captureScreenshot',{format:'png'});
     fs.writeFileSync(path.join(work,theme+'.png'),Buffer.from(themed.data,'base64'));
    }
+  }
+  if(process.env.KEYBOARD_PROFILE_PREVIEWS){
+   const out=path.join(root,'docs/redesign/preview');fs.mkdirSync(out,{recursive:true});
+   await command('Emulation.setDeviceMetricsOverride',{width:1440,height:1100,deviceScaleFactor:2,mobile:false});
+   await command('Runtime.evaluate',{expression:`document.documentElement.dataset.theme='carbon';profileData.default_active=false;profileData.profiles=[{file:'warmup.cfg',label:'Warmup',override_count:2,active:true},{file:'competitive.cfg',label:'Competitive',override_count:8},{file:'practice.cfg',label:'Practice',override_count:4},{file:'entry.cfg',label:'Entry',override_count:3}];kbProfileIcons={'warmup.cfg':'flame','competitive.cfg':'trophy','practice.cfg':'target','entry.cfg':'entry'};renderKeyboard();pickedKey=null;openKbswCreatePopover();document.querySelector('.scroll').scrollTop=0;new Promise(r=>setTimeout(r,450))`,awaitPromise:true});
+   let shot=await command('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(out,'profile-icons-switcher.png'),Buffer.from(shot.data,'base64'));
+   await command('Emulation.setDeviceMetricsOverride',{width:1000,height:820,deviceScaleFactor:2,mobile:false});
+   await command('Runtime.evaluate',{expression:`document.head.innerHTML='<style>*{box-sizing:border-box}html,body{margin:0;background:#12151d}</style>';document.body.innerHTML='<main style="padding:44px 56px;background:#12151d;color:#eef0f6;min-height:100vh;font:16px system-ui"><div style="color:#a2aabe;font-size:12px;letter-spacing:2px">KEYBOARD / PROFILE EMBLEMS</div><h1 style="font-size:30px;margin:10px 0 6px">Choose your signature</h1><p style="color:#a2aabe;margin:0 0 30px">20 original icons · 24 × 24 stroked artwork</p><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px">'+Object.entries(KB_PROFILE_ICONS).map(([id,icon])=>'<div style="height:132px;border:1px solid #303647;background:#1c202b;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px">'+kbProfileIcon(id).replace('class="kbsw-icon"','style="width:42px;height:42px;color:#c3adff"')+'<span>'+icon.name+'</span></div>').join('')+'</div></main>';new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))`,awaitPromise:true});
+   shot=await command('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(out,'profile-icons-set.png'),Buffer.from(shot.data,'base64'));
   }
   const failures=results.filter(c=>c.ok===false||c.error||c.geometry);
   console.log(JSON.stringify({viewport,scale,checks:results.length,failures,preview:path.join(work,'preview.png')}));

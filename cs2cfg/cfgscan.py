@@ -1394,6 +1394,42 @@ def profile_blank_text(label: str) -> str:
     )
 
 
+def profile_start_text(
+    result: ScanResult, label: str, defaults_table: Dict[str, str],
+) -> str:
+    """A new profile that starts as an empty keyboard.
+
+    Profiles only change the keys they bind, so a blank file would leave every
+    key on the standard layout's binds once switched to. Instead every key the
+    standard layout binds is written here too: cleared (``""``), or set to
+    CS2's own stock command when ``defaults_table`` (``defaults.load``) has
+    one. Keys CS2 binds that the standard layout does not are added as well,
+    so the file is the whole stock layout when defaults were asked for.
+    """
+    from . import defaults as keydefaults
+
+    chain = startup_chain(result)
+    lines = [f"// {label} -- created in cs2-autoconfig",
+             "// Starts " + ("with CS2's default binds." if defaults_table
+                             else "with every key cleared.")]
+    seen = set()
+    for key in sorted(result.binds, key=str.lower):
+        standard = _effective_bind(result, chain, key)
+        if standard is None:
+            continue
+        name = keydefaults.normalise(key)
+        seen.add(name)
+        # A key that execs a config is how profiles get switched in game.
+        # Clearing it would leave no way back, so it keeps its standard bind.
+        if "exec" in (standard.body or "").lower():
+            continue
+        lines.append(f'bind "{key}" "{defaults_table.get(name, "")}"')
+    for name, command in sorted(defaults_table.items()):
+        if name not in seen:
+            lines.append(f'bind "{name}" "{command}"')
+    return "\n".join(lines) + "\n"
+
+
 def disable_line(result: ScanResult, file: str, line: int, reason: str) -> Tuple[str, str]:
     """Comment out one line, verbatim, so it stops taking effect.
 

@@ -67,8 +67,10 @@ class LayoutsWebCase(unittest.TestCase):
     def profiles(self):
         return webui._cfg_layouts_profiles(self.state, {})
 
-    def create(self, name):
-        return webui._cfg_layouts_create(self.state, {"name": name})
+    def create(self, name, start="blank"):
+        # "blank" is the old banner-only file these tests were written for.
+        # New profiles from the page start empty; see test_new_profile.py.
+        return webui._cfg_layouts_create(self.state, {"name": name, "start": start})
 
     def copy(self, file, name):
         return webui._cfg_layouts_copy(self.state, {"file": file, "name": name})
