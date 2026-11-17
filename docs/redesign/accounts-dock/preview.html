@@ -32,7 +32,10 @@
   window.paintFace=(frame,account)=>{frame.replaceChildren();if(account?.picture){const img=new Image();img.src=account.picture;img.alt='';img.onerror=()=>img.remove();frame.append(img);}};
   window.whoData=null;window.cloudData=null;window.fcData=null;window.fcSeen={};window.demoData={demos:[]};
   window.fcSteamReply={linked:false,available:true,state:'idle',found:0};
-  window.api=async(route,body)=>{previewCalls.push([route,body]);return fcSteamReply;};
+  window.api=async(route,body)=>{previewCalls.push([route,body]);if(route==='/api/profile/use')return {...whoData,following:!!body.follow,accounts:whoData.accounts.map(a=>({...a,active:body.follow?!!a.signed_in:a.account===body.account}))};return fcSteamReply;};
+  window.renderWho=()=>renderAccountsDock();
+  window.reloadForAccount=async()=>previewCalls.push(['reload-account']);
+  window.status=()=>{}; window.toggleUpdCentre=()=>{};
   window.loadFaceit=async()=>{previewCalls.push(['refresh-stats']);};
   window.demoNameFor=()=>'';
   window.renderFaceit=()=>{renderAccountsDock();fcRenderDashboard();};
@@ -50,11 +53,12 @@
   init.textContent=`
     const avatar=(letter)=>'data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" rx="12" fill="'+getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()+'"/><text x="40" y="53" text-anchor="middle" font-family="Arial" font-size="40" fill="'+getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()+'">'+letter+'</text></svg>');
     window.previewState=async(state)=>{
+      dockToggle(false);
       document.documentElement.dataset.theme=state==='violet'?'violet':state==='daylight'?'daylight':'ember';
       const empty=state==='violet';
       const app=document.querySelector('.app');app.classList.toggle('rail-tight',state==='collapsed');
       app.style.setProperty('--rail',state==='collapsed'?'64px':'232px');app.style.setProperty('--rail-text',state==='collapsed'?'0':'1');
-      whoData={ok:true,steam:!empty,following:true,accounts:empty?[]:[{active:true,name:'Edy',picture:avatar('E')}]};
+      whoData={ok:true,steam:!empty,following:true,accounts:empty?[]:[{account:'100',active:true,signed_in:true,name:'Edy',picture:avatar('E')},{account:'200',active:false,signed_in:false,name:'Edy practice',picture:avatar('P')},{account:'300',active:false,signed_in:false,name:'Night shift',picture:avatar('N')}]};
       cloudData=empty?{configured:true,signed_in:false}:{configured:true,signed_in:true,name:'Edy',avatar:avatar('E')};
       fcData=empty?{linked:false}:{linked:true,player:{nickname:'edy',level:9,country:'AE',elo:2100,avatar:avatar('e')},matches:[]};
       dockSteamWaiting=0;dockSteamNotice='';

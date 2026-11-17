@@ -5940,12 +5940,14 @@ const startup = (() => {
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1z"/><circle cx="12" cy="12" r="3"/></svg></i><span class="tx">Settings</span></button>
     </div>
 
-    <!-- Connected accounts live above updates; Steam selection still uses
-         the existing switcher in Settings > Steam. -->
+    <!-- Main identity expands into connected accounts and Steam switching. -->
     <div class="rail-foot">
       <section class="accounts-dock" id="accounts-dock" aria-label="Connected accounts">
-        <div class="dock-heading">Accounts<span class="dock-summary" id="dock-summary"></span></div>
-        <div id="dock-rows"></div>
+        <button type="button" class="dock-row dock-main" id="dock-main" aria-expanded="false" aria-controls="dock-panel" aria-haspopup="dialog"></button>
+        <div id="dock-panel" class="dock-panel" popover="manual" role="dialog" aria-label="Accounts" inert>
+          <div class="dock-heading">Your accounts<span class="dock-summary" id="dock-summary"></span></div>
+          <div id="dock-rows"></div>
+        </div>
       </section>
       <button class="updc" id="updc" aria-haspopup="dialog" aria-expanded="false"
               aria-controls="updc-pop" title="Update centre">

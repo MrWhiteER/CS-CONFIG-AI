@@ -5,6 +5,8 @@ let dockSteamOpening = false;
 let dockSteamTimer = null;
 let dockSteamRequest = null;
 let dockSteamNotice = '';
+let dockExpanded = false;
+let dockCloseTimer;
 const DOCK_ICONS = {
   steam:'<circle cx="15.5" cy="8" r="4"/><circle cx="15.5" cy="8" r="2"/><circle cx="6.5" cy="16" r="3"/><path d="m2 13 5 2m2 3 7-6M8 13l4-5"/>',
   web:'<circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/>',
@@ -21,21 +23,34 @@ function renderAccountsDock() {
   const player = fcData?.player;
   const pcError = whoData?.ok === false;
   const rows = [
-    {id:'steam', label:'Steam (this PC)', name:pc?.name, detail:pc ? (whoData.following?'Following Steam':'Pinned account') : whoData ? (pcError?'Could not read account':'No Steam account') : 'Checking account…', state:pc?'linked':pcError?'error':'idle', action:pc?'':'Open', picture:pc?.picture, error:whoData?.error},
+    {id:'steam', label:'Steam (this PC)', name:pc?.name, detail:pc ? (whoData.following?'Following Steam':'Pinned account') : whoData ? (pcError?'Could not read account':'No Steam account') : 'Checking account…', state:pc?'linked':pcError?'error':'idle', action:pc?'Manage':'Open', picture:pc?.picture, error:whoData?.error},
     {id:'web', label:'Steam web', detail:dockSteamNotice || (dockSteamWaiting?'Finish sign-in in Steam':!web?'Checking session…':web.state==='reading'?'Reading match history':web.error?web.error:web.state==='unavailable'||web.available===false?'Open in the desktop app':web.state==='signed_out'?'Session expired':web.linked?'Match history · '+(web.found ?? 0)+' matches':'Older CS2 match history'), state:dockSteamWaiting?'waiting':web?.state==='reading'?'reading':web?.error||web?.state==='error'?'error':web?.linked&&web.state!=='signed_out'?'linked':'idle', action:dockSteamWaiting?'':web?.state==='reading'?'':web?.state==='error'&&web.linked?'Retry':web && (!web.linked||web.state==='signed_out')?'Connect':'', disabled:!web||web.available===false||web.state==='unavailable'||dockSteamOpening, updated:web?.updated},
     {id:'cloud', label:'Cloud sync', name:cloud?.signed_in?(cloud.name||cloud.display_name||cloud.email||'Signed in'):null, detail:!cloud?'Checking account…':cloud.error?'Cloud unavailable':cloud.signed_in?'Signed in':cloud.configured===false?'Cloud not configured':'Settings across PCs', state:cloud?.error?'error':cloud?.signed_in?'linked':'idle', action:cloud&&!cloud.signed_in&&cloud.configured!==false?'Sign in':'', picture:cloud?.signed_in?(cloud.avatar||cloud.avatar_url):null, error:cloud?.error},
     {id:'faceit', label:'FACEIT', name:player?.nickname, detail:player?(player.level?'Following · Level '+player.level:'Following player'):fcData?.error?'Could not read player':fcData?'ELO & match history':'Checking player…', state:fcData?.error?'error':player?'linked':'idle', action:fcData&&!player?'Follow':'', picture:player?.avatar, error:fcData?.error}
   ];
-  for (const row of rows) {
+  const others = (whoData?.accounts || []).filter(a=>!a.active).map((a,i)=>({
+    id:'local-'+i, label:'Steam account', name:a.name || a.login || a.account,
+    detail:a.signed_in?'Signed in to Steam':'Available on this PC', state:a.signed_in?'linked':'idle',
+    picture:a.picture, action:'Switch', account:a.account
+  }));
+  rows.splice(1,0,...others);
+  const wanted = new Set(rows.map(r=>'dock-'+r.id));
+  for (const old of [...box.children]) if (!wanted.has(old.id)) old.remove();
+  for (const [index,row] of rows.entries()) {
     let button = $('dock-'+row.id);
     if (!button) {
       button = document.createElement('button');
       button.type = 'button'; button.id = 'dock-'+row.id; button.className = 'dock-row';
-      button.dataset.dock = row.id;
+      if (row.account == null) button.dataset.dock = row.id;
       box.appendChild(button);
     }
+    if (box.children[index] !== button) box.insertBefore(button,box.children[index] || null);
+    button.style.setProperty('--dock-i',index);
+    button.style.setProperty('--dock-close-i',rows.length-1-index);
+    if (row.account != null) button.dataset.use = row.account;
+    button.setAttribute('aria-current',String(row.id==='steam'));
     // Preserve the focused button and the animation clock across status polls.
-    const content = '<span class="dock-face" aria-hidden="true"><svg viewBox="0 0 24 24">'+DOCK_ICONS[row.id]+'</svg><span class="dock-picture"></span><i class="dock-dot"></i></span><span class="dock-copy"><span class="dock-name">'+esc(row.name||row.label)+'</span><span class="dock-detail">'+esc(row.name?row.label+' · '+row.detail:row.detail)+'</span></span><span class="dock-action">'+esc(row.action||'')+'</span>';
+    const content = '<span class="dock-face" aria-hidden="true"><svg viewBox="0 0 24 24">'+(DOCK_ICONS[row.id] || DOCK_ICONS.steam)+'</svg><span class="dock-picture"></span><i class="dock-dot"></i></span><span class="dock-copy"><span class="dock-name">'+esc(row.name||row.label)+'</span><span class="dock-detail">'+esc(row.name?row.label+' · '+row.detail:row.detail)+'</span></span><span class="dock-action">'+esc(row.action||'')+'</span>';
     const signature = content+'|'+(row.picture||'');
     if (button._dockContent !== signature) {
       button.innerHTML = content;
@@ -48,8 +63,51 @@ function renderAccountsDock() {
     button.title = row.label+(row.name?' · '+row.name:'')+' · '+(row.error||row.detail)+updated+(row.action?' · '+row.action:'');
     button.setAttribute('aria-label',button.title);
   }
-  $('dock-summary').textContent = [!!pc, !!web?.linked && web.state!=='signed_out', !!cloud?.signed_in, !!player].filter(Boolean).length+' / 4';
+  const main = $('dock-main');
+  const mainContent = $('dock-steam').innerHTML.replace(/<img[^>]*>/g,'').replace(/<span class="dock-action">.*?<\/span>/,'').replace(/(<span class="dock-detail">).*?(<\/span>)/,'$1'+esc(rows[0].detail)+'$2') +
+    '<span class="dock-cluster" aria-hidden="true">'+rows.slice(1,6).map(r=>'<i data-state="'+r.state+'"></i>').join('')+'</span><svg class="dock-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m5 10 3-3 3 3"/></svg>';
+  const mainSignature = mainContent+'|'+(pc?.picture || '');
+  if (main._dockContent !== mainSignature) {
+    main.innerHTML = mainContent;
+    if (pc?.picture && /^(https?:|data:image\/|\/)/i.test(pc.picture)) paintFace(main.querySelector('.dock-picture'),pc);
+    main._dockContent = mainSignature;
+  }
+  main.dataset.state = rows[0].state;
+  main.setAttribute('aria-label',(pc?.name || 'Steam (this PC)')+' \u00b7 '+rows[0].detail+' \u00b7 '+rows.length+' accounts');
+  main.title = dockExpanded?'Hide accounts':'Show accounts';
+  if (dockExpanded) dockPosition();
+  $('dock-summary').textContent = rows.filter(r=>r.state==='linked'||r.state==='reading').length+' / '+rows.length;
 }
+
+function dockPosition() {
+  const anchor = $('dock-main').getBoundingClientRect(), panel = $('dock-panel');
+  const tight = !!document.querySelector('.app.rail-tight');
+  panel.style.width = Math.min(tight?304:320,window.innerWidth-24)+'px';
+  panel.style.left = Math.max(12,Math.min(tight?anchor.right+12:anchor.left,window.innerWidth-parseFloat(panel.style.width)-12))+'px';
+  panel.style.bottom = Math.max(12,window.innerHeight-(tight?anchor.bottom:anchor.top)+(tight?0:10))+'px';
+  panel.style.maxHeight = Math.max(120,(tight?anchor.bottom:anchor.top)-24)+'px';
+}
+function dockToggle(open, returnFocus = true) {
+  const panel = $('dock-panel'), main = $('dock-main');
+  if (!panel || dockExpanded === open) return;
+  clearTimeout(dockCloseTimer);
+  dockExpanded = open;
+  main.setAttribute('aria-expanded',String(open));
+  main.title = open?'Hide accounts':'Show accounts';
+  if (open) {
+    dockPosition(); panel.showPopover(); panel.inert = false;
+    panel.getBoundingClientRect(); panel.classList.add('is-open');
+    panel.querySelector('button:not(:disabled)')?.focus({preventScroll:true});
+  } else {
+    panel.classList.remove('is-open'); panel.inert = true;
+    if (returnFocus) main.focus({preventScroll:true});
+    dockCloseTimer = setTimeout(()=>{if (!dockExpanded) panel.hidePopover();},matchMedia('(prefers-reduced-motion: reduce)').matches?0:760);
+  }
+}
+window.addEventListener('resize',()=>{if (dockExpanded) dockPosition();});
+document.addEventListener('keydown',e=>{
+  if (e.key==='Escape' && dockExpanded) { e.preventDefault(); e.stopImmediatePropagation(); dockToggle(false); }
+},true);
 
 function dockPauseMotion() {
   document.documentElement.classList.toggle('dock-paused', document.hidden);
@@ -87,8 +145,12 @@ function loadDockSteam() {
 }
 
 document.addEventListener('click',async e=>{
+  if (e.target.closest('#dock-main')) { dockToggle(!dockExpanded); return; }
+  if (dockExpanded && !e.target.closest('#dock-panel')) dockToggle(false);
+  if (e.target.closest('#dock-panel [data-use]')) { dockToggle(false); return; }
   const button = e.target.closest('[data-dock]');
   if (!button) return;
+  if (button.dataset.dock!=='web') dockToggle(false);
   if (button.dataset.dock==='steam') {
     setTab('settings'); setSettingsSub('steam'); whoOpen(true); $('who')?.focus();
   } else if (button.dataset.dock==='cloud') {

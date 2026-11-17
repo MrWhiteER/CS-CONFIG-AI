@@ -28,3 +28,29 @@
 .app.rail-tight .accounts-dock { padding-top:4px; }
 .dock-paused .accounts-dock::before, .dock-paused .accounts-dock * { animation-play-state:paused !important; }
 @media (prefers-reduced-motion:reduce) { .accounts-dock::before, .accounts-dock * { animation:none !important; transition:none !important; } }
+/* The main identity stays in flow; the account list lives in the top layer. */
+.dock-main { min-height:52px; }
+.dock-main .dock-detail { max-width:130px; }
+.dock-cluster { display:flex; flex:none; padding-left:3px; }
+.dock-cluster i { width:6px; height:6px; margin-left:-2px; border:2px solid var(--rail-bg); border-radius:50%; background:var(--faint); }
+.dock-cluster i[data-state="linked"] { background:var(--good); }
+.dock-cluster i[data-state="reading"], .dock-cluster i[data-state="waiting"] { background:var(--accent); }
+.dock-cluster i[data-state="error"] { background:var(--warn); }
+.dock-chevron { flex:none; width:12px; height:12px; fill:none; stroke:var(--muted); stroke-width:1.5; transition:transform 600ms ease; }
+.dock-main[aria-expanded="true"] { background:var(--nav-selected); }
+.dock-main[aria-expanded="true"] .dock-chevron { transform:rotate(180deg); }
+.dock-panel { position:fixed; inset:auto; margin:0; padding:10px; box-sizing:border-box; overflow:auto; border:1px solid var(--line); border-radius:var(--component-radius,8px); background:linear-gradient(var(--rail-bg),var(--rail-bg)),var(--bg); color:var(--ink); box-shadow:0 18px 50px color-mix(in srgb,var(--bg) 75%,transparent); opacity:0; transform:translateY(16px) scale(.97); transform-origin:bottom left; transition:opacity 480ms ease,transform 680ms cubic-bezier(.22,1,.36,1); }
+.dock-panel.is-open { opacity:1; transform:translateY(0) scale(1); }
+.dock-panel .dock-heading { padding:5px 9px 12px; border-bottom:1px solid var(--line-soft); margin-bottom:5px; }
+.dock-panel .dock-row { min-height:54px; opacity:0; transform:translateY(18px) translateX(-6px) scale(.97); transition:opacity 360ms ease,transform 520ms cubic-bezier(.22,1,.36,1),background 400ms ease; transition-delay:calc(min(var(--dock-close-i),8) * 22ms); }
+.dock-panel.is-open .dock-row { opacity:1; transform:translate(0) scale(1); transition-duration:480ms,720ms,400ms; transition-delay:calc(min(var(--dock-i),8) * 65ms); }
+.dock-panel .dock-face { width:32px; height:32px; }
+.dock-panel .dock-row:nth-child(2), .dock-panel .dock-row[data-dock="web"] { border-top:1px solid var(--line-soft); border-top-left-radius:0; border-top-right-radius:0; }
+.dock-panel .dock-row:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
+.app.rail-tight .dock-main .dock-cluster, .app.rail-tight .dock-main .dock-chevron { display:none; }
+.app.rail-tight .dock-panel .dock-heading { display:flex; }
+.app.rail-tight .dock-panel .dock-copy { display:flex; }
+.app.rail-tight .dock-panel .dock-action { display:block; }
+.app.rail-tight .dock-panel .dock-row { justify-content:flex-start; padding:6px 9px; }
+.dock-paused .dock-panel, .dock-paused .dock-panel * { transition:none !important; }
+@media (prefers-reduced-motion:reduce) { .dock-panel, .dock-panel * { animation:none !important; transition:none !important; transform:none !important; } }
