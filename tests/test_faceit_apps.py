@@ -149,5 +149,81 @@ class LaunchWaitsForTheAntiCheat(unittest.TestCase):
         seen["ok"] = True
 
 
+class AntiCheatReadiness(unittest.TestCase):
+    """CS2 waits until FACEIT AC is ready, not merely started: the tray
+    program appears at once, its service seconds later (2026-11-17 report:
+    the game started first and FACEIT demanded a restart)."""
+
+    def make(self, running, service):
+        t = {"now": 0.0}
+        r = faceit_apps.AcReadiness(clock=lambda: t["now"],
+                                    running=lambda: running["v"],
+                                    service=lambda: service["v"])
+        return r, t
+
+    def test_process_without_service_is_not_ready(self):
+        r, t = self.make({"v": True}, {"v": False})
+        for second in range(20):
+            t["now"] = float(second)
+            self.assertFalse(r())
+
+    def test_ready_only_after_settling(self):
+        running, service = {"v": True}, {"v": True}
+        r, t = self.make(running, service)
+        self.assertFalse(r())
+        t["now"] = faceit_apps.AC_SETTLE - 0.5
+        self.assertFalse(r())
+        t["now"] = faceit_apps.AC_SETTLE
+        self.assertTrue(r())
+
+    def test_a_drop_restarts_the_settle(self):
+        running, service = {"v": True}, {"v": True}
+        r, t = self.make(running, service)
+        r()
+        t["now"] = 3.0
+        service["v"] = False
+        self.assertFalse(r())
+        service["v"] = True
+        t["now"] = 4.0
+        self.assertFalse(r())
+        t["now"] = 4.0 + faceit_apps.AC_SETTLE
+        self.assertTrue(r())
+
+    def test_no_service_found_falls_back_to_the_process(self):
+        r, t = self.make({"v": True}, {"v": None})
+        r()
+        t["now"] = faceit_apps.AC_SETTLE
+        self.assertTrue(r())
+
+
+class LaunchWaitsForAntiCheatReadiness(unittest.TestCase):
+    def test_already_open_but_not_ready_is_waited_for(self):
+        said = []
+        calls = {"n": 0}
+
+        class FakeReady:
+            def __init__(self):
+                pass
+
+            def up_now(self):
+                return False
+
+            def __call__(self):
+                calls["n"] += 1
+                return calls["n"] > 3
+
+        with mock.patch.object(faceit_apps, "AcReadiness", FakeReady), \
+             mock.patch.object(companions, "running", return_value=True), \
+             mock.patch.object(companions, "start") as start, \
+             mock.patch.object(launcher.time, "sleep"):
+            launcher._bring_up_companions(
+                [{"name": "FACEIT AC", "exe": "C:/x/faceitclient.exe",
+                  "integration": "faceit-ac"}],
+                False, lambda text, tag="": said.append(text))
+        start.assert_not_called()
+        self.assertTrue(any("waiting for FACEIT AC" in t for t in said), said)
+        self.assertTrue(any("FACEIT AC is up" in t for t in said), said)
+
+
 if __name__ == "__main__":
     unittest.main()

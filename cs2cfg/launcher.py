@@ -476,6 +476,33 @@ def _bring_up_companions(
         if not exe_name:
             continue
         kind = entry.get("integration")
+        if kind == "faceit-ac":
+            # FACEIT refuses a game that started before its anti-cheat was
+            # *ready* -- not merely started: the tray program appears at once,
+            # the service it needs a few seconds later. So readiness, not the
+            # process, is what CS2 waits on, even when it was already open.
+            from .faceit_apps import AC_WAIT, AcReadiness
+
+            ready = AcReadiness()
+            if ready.up_now():
+                report(f"  {entry['name']} is already running", "dim")
+                continue
+            wait = max(wait, AC_WAIT)
+            if companions_mod.running(exe_name):
+                report(f"  waiting for {entry['name']} to finish starting...", "")
+                pending.append((entry["name"], ready))
+                continue
+            result = companions_mod.start(entry)
+            if result.get("ok"):
+                report(f"  starting {entry['name']}...", "")
+                pending.append((entry["name"], ready))
+                if result.get("elevated"):
+                    report(f"  {entry['name']} needs administrator rights: "
+                           "accept the Windows prompt", "")
+            else:
+                report(f"  could not start {entry['name']}: "
+                      f"{result.get('error', 'unknown error')}", "warn")
+            continue
         if kind in ("discord", "teamspeak"):
             from . import apps
             is_running = lambda k=kind: apps.running(k)
@@ -488,12 +515,6 @@ def _bring_up_companions(
         if result.get("ok") and not result.get("already"):
             report(f"  starting {entry['name']}...", "")
             pending.append((entry["name"], is_running))
-            if entry.get("integration") == "faceit-ac":
-                # FACEIT refuses a game that started before its anti-cheat,
-                # and the anti-cheat waits on a UAC prompt a person answers.
-                from .faceit_apps import AC_WAIT
-
-                wait = max(wait, AC_WAIT)
             if result.get("elevated"):
                 report(f"  {entry['name']} needs administrator rights: "
                        "accept the Windows prompt", "")

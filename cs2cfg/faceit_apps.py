@@ -62,6 +62,106 @@ APPS: Dict[str, Dict[str, Any]] = {
 AC_WAIT = 90.0
 
 
+# What "the anti-cheat is ready" means. The tray program (faceitclient.exe)
+# appears the moment it is started, but FACEIT AC is only protecting anything
+# once its Windows service is running -- and a CS2 started in that gap is the
+# one FACEIT tells you to restart. So the launch waits for the service, then a
+# few seconds more for it to settle.
+AC_PROCESS = "faceitclient.exe"
+# Not "FACEIT": that name is the kernel driver, which runs from boot and so
+# says nothing about whether the anti-cheat has been started. Confirmed on the
+# player's PC: FACEITService, demand-start, binary faceitservice.exe.
+AC_SERVICES = ("FACEITService",)
+AC_SETTLE = 5.0
+
+_SERVICE_RUNNING = 4      # SERVICE_RUNNING, the same in every Windows language
+
+
+def _service_state(name: str) -> Optional[int]:
+    """The state of a Windows service, read without administrator rights.
+    None when there is no such service (or this is not Windows)."""
+    if sys.platform != "win32":
+        return None
+    import ctypes
+    from ctypes import wintypes
+
+    advapi = ctypes.WinDLL("advapi32", use_last_error=True)
+    advapi.OpenSCManagerW.restype = wintypes.HANDLE
+    advapi.OpenSCManagerW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.DWORD]
+    advapi.OpenServiceW.restype = wintypes.HANDLE
+    advapi.OpenServiceW.argtypes = [wintypes.HANDLE, wintypes.LPCWSTR, wintypes.DWORD]
+    advapi.CloseServiceHandle.argtypes = [wintypes.HANDLE]
+
+    class STATUS(ctypes.Structure):
+        _fields_ = [("type", wintypes.DWORD), ("state", wintypes.DWORD),
+                    ("accepted", wintypes.DWORD), ("exit", wintypes.DWORD),
+                    ("specific", wintypes.DWORD), ("checkpoint", wintypes.DWORD),
+                    ("hint", wintypes.DWORD)]
+
+    advapi.QueryServiceStatus.argtypes = [wintypes.HANDLE, ctypes.POINTER(STATUS)]
+    manager = advapi.OpenSCManagerW(None, None, 0x0001)        # CONNECT
+    if not manager:
+        return None
+    try:
+        service = advapi.OpenServiceW(manager, name, 0x0004)     # QUERY_STATUS
+        if not service:
+            return None
+        try:
+            status = STATUS()
+            if not advapi.QueryServiceStatus(service, ctypes.byref(status)):
+                return None
+            return int(status.state)
+        finally:
+            advapi.CloseServiceHandle(service)
+    finally:
+        advapi.CloseServiceHandle(manager)
+
+
+def ac_service_running() -> Optional[bool]:
+    """True/False for the anti-cheat's service; None if no such service was
+    found under any known name, in which case the process alone has to do."""
+    seen = False
+    for name in AC_SERVICES:
+        state = _service_state(name)
+        if state is None:
+            continue
+        seen = True
+        if state == _SERVICE_RUNNING:
+            return True
+    return False if seen else None
+
+
+class AcReadiness:
+    """Answers "is FACEIT AC ready for CS2 yet?" for the launcher's wait loop.
+
+    Ready = the tray program is running, the service is running (when there
+    is one to check), and both have stayed that way for AC_SETTLE seconds.
+    """
+
+    def __init__(self, clock=None, running=None, service=None):
+        import time as _time
+
+        self._clock = clock or _time.monotonic
+        self._running = running or (lambda: companions.running(AC_PROCESS))
+        self._service = service or ac_service_running
+        self._since: Optional[float] = None
+
+    def up_now(self) -> bool:
+        if not self._running():
+            return False
+        service = self._service()
+        return service is not False      # None = no service to check
+
+    def __call__(self) -> bool:
+        if not self.up_now():
+            self._since = None
+            return False
+        now = self._clock()
+        if self._since is None:
+            self._since = now
+        return now - self._since >= AC_SETTLE
+
+
 # --- finding them -----------------------------------------------------------
 
 def _known_places(kind: str) -> Iterable[Path]:
