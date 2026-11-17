@@ -162,10 +162,17 @@ class AntiCheatReadiness(unittest.TestCase):
     def make(self, **state):
         st = {"pids": [11], "service": True, "online": 1, "windows": 0}
         st.update(state)
+        st.setdefault("service_online", 0)
+
+        def online(pids):
+            # Service pid 99 carries the lasting connection.
+            return st["online"] + (st["service_online"] if 99 in pids else 0)
+
         r = faceit_apps.AcReadiness(pids=lambda: st["pids"],
                                     service=lambda: st["service"],
-                                    online=lambda p: st["online"],
-                                    windows=lambda p: st["windows"])
+                                    online=online,
+                                    windows=lambda p: st["windows"],
+                                    service_pids=lambda: [99])
         return r, st
 
     def test_the_recorded_good_launch(self):
@@ -205,10 +212,20 @@ class AntiCheatReadiness(unittest.TestCase):
         r, st = self.make(service=False)
         self.assertFalse(r())
 
-    def test_already_up_with_its_window_open_counts_as_ready(self):
-        # The player opened FACEIT AC's window themselves; it is connected.
-        r, st = self.make(windows=1)
+    def test_already_up_long_ago_is_ready_through_the_service(self):
+        # Checked on Edy's PC: the client's own connection had closed two
+        # minutes after start; the service's stays up.
+        r, st = self.make(online=0, service_online=1)
         self.assertTrue(r.up_now())
+
+    def test_while_starting_the_client_itself_must_get_through(self):
+        r, st = self.make(online=0, service_online=1)
+        r.started_here = True
+        self.assertFalse(r())
+        st["online"] = 1
+        self.assertTrue(r())
+        st["online"] = 0                 # closes later: stays ready
+        self.assertTrue(r())
 
 
 class LaunchWaitsForAntiCheatReadiness(unittest.TestCase):

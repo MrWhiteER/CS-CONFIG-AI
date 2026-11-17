@@ -81,14 +81,17 @@ AC_WAIT = 90.0
 # FACEIT asks you to restart. So readiness is the end state, checked live:
 #
 #   1. faceitclient.exe running and FACEITService RUNNING
-#   2. faceitclient.exe has its own connection to FACEIT's servers
-#      (an ESTABLISHED TCP connection to anything that is not this machine)
+#   2. online: while starting, faceitclient.exe's own connection to FACEIT's
+#      servers (an ESTABLISHED TCP connection to anything not this machine);
+#      when it was already up before Play, the service's lasting connection
+#      counts too -- the client's own closes a couple of minutes after start.
 #   3. no FACEIT AC working window open ("FACEIT AC", or anything saying it
 #      is updating). Only required when this launch saw the anti-cheat start;
 #      an AC that was already up and connected is ready as it is.
 #
 # All three are read without administrator rights.
 AC_PROCESS = "faceitclient.exe"
+AC_SERVICE_PROCESS = "faceitservice.exe"
 # Not "FACEIT": that name is the kernel driver, which runs from boot and so
 # says nothing about whether the anti-cheat has been started. Confirmed on the
 # player's PC: FACEITService, demand-start, binary faceitservice.exe.
@@ -299,15 +302,18 @@ class AcReadiness:
     closed as well.
     """
 
-    def __init__(self, pids=None, service=None, online=None, windows=None):
+    def __init__(self, pids=None, service=None, online=None, windows=None,
+                 service_pids=None):
         self._pids = pids or (lambda: _pids(AC_PROCESS))
+        self._service_pids = service_pids or (lambda: _pids(AC_SERVICE_PROCESS))
         self._service = service or ac_service_running
         self._online = online or _remote_connections
         self._windows = windows or _visible_windows
         self.started_here = False
+        self._reached = False
         self.last = ""           # what it is waiting on, for the status line
 
-    def _state(self, need_window_closed: bool) -> bool:
+    def _state(self, starting: bool) -> bool:
         pids = self._pids()
         if not pids:
             self.last = "FACEIT AC is not running yet"
@@ -315,22 +321,34 @@ class AcReadiness:
         if self._service() is False:
             self.last = "FACEIT AC's service is starting"
             return False
-        if self._online(pids) <= 0:
+        if starting:
+            # Starting now: the moment the client itself gets through to
+            # FACEIT is the moment it is ready. That connection is closed
+            # again a couple of minutes later, which is fine -- it only has to
+            # be seen once (and the game is up by then).
+            online = self._online(pids)
+        else:
+            # Already up before Play: the client's own connection may long be
+            # closed; the service's lasting one says it is online.
+            online = self._online(list(pids) + list(self._service_pids()))
+        if online <= 0:
             self.last = "FACEIT AC is connecting to FACEIT"
             return False
-        if need_window_closed and self._windows(pids) > 0:
+        if self._windows(pids) > 0:
             self.last = "FACEIT AC is still starting (or updating)"
             return False
         self.last = "ready"
         return True
 
     def up_now(self) -> bool:
-        """Already up before this launch touched it: running, service up,
-        connected. Its window may be open -- the player may have opened it."""
-        return self._state(need_window_closed=False)
+        """Already up before this launch touched it."""
+        return self._state(starting=False)
 
     def __call__(self) -> bool:
-        return self._state(need_window_closed=self.started_here)
+        if self._reached:
+            return True
+        self._reached = self._state(starting=self.started_here)
+        return self._reached
 
 
 # --- finding them -----------------------------------------------------------
