@@ -3990,6 +3990,12 @@
     margin-top: 18px; font-size: 11px; color: var(--muted);
   }
   .kb-legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .kb-lighting { display: flex; flex-direction: column; gap: 3px; }
+  .kb-lighting label.opt { margin: 0; padding: 0; font-size: 11px; }
+  .kb-lighting .sub2 { margin: 0; max-width: 280px; overflow-wrap: anywhere; }
+  #rgb-out .seg button { flex: 0 1 auto; }
+  .rgb-brightness { display: flex; align-items: center; gap: 12px; }
+  .rgb-brightness input { min-width: 80px; width: 160px; max-width: 100%; }
   .kb-legend .dot { width: 9px; height: 9px; border-radius: 3px; }
   .kb-legend .dot.script { background: #a3286c; box-shadow: 0 0 9px rgba(255, 45, 149, .8); }
   .kb-legend .dot.bound { background: #2b4d75; box-shadow: 0 0 9px rgba(61, 139, 253, .6); }
@@ -6488,6 +6494,7 @@ const startup = (() => {
             Frame rate, frame time and freezes are saved with your session history.
             The app keeps running in the notification area when you close its window.</p>
           <div id="overlay-out"></div>
+          <div id="rgb-out"></div>
         </div>
       </div>
 
@@ -8723,6 +8730,7 @@ document.addEventListener("click", e => {
 // Read on entry or explicit refresh only. There are no overlay timers in the
 // app page, including when it is hidden in the notification area.
 async function loadOverlay() {
+  if (!new URLSearchParams(location.search).has('overlayPreview')) loadRgb();
   const box = $("overlay-out");
   try {
     const preview = new URLSearchParams(location.search).get('overlayPreview');
@@ -8730,6 +8738,114 @@ async function loadOverlay() {
   }
   catch (err) { box.innerHTML = '<p class="sub warn">' + esc(err.message || String(err)) + '</p>'; }
 }
+
+// Both lighting entry points display the same confirmed server snapshot.
+let rgbData = null;
+let rgbError = '';
+let rgbBusy = false;
+let rgbRequest = 0;
+let rgbRefreshTimer = null;
+
+function rgbToggle(id) {
+  return '<label class="opt"><input type="checkbox" id="' + id + '" data-rgb-enabled' +
+    (rgbData?.enabled ? ' checked' : '') + (!rgbData || rgbBusy ? ' disabled' : '') +
+    '><span>Light my keyboard</span></label>';
+}
+
+function rgbStatus() {
+  if (rgbError) return rgbError;
+  if (!rgbData) return 'Reading lighting status…';
+  if (rgbData.error) return rgbData.error;
+  if (!rgbData.enabled) return 'Off';
+  const providers = rgbData.providers || [];
+  const live = providers.filter(p => p.active);
+  return live.length ? live.map(p => p.name + ' · live').join(', ') :
+    (providers.find(p => p.why)?.why || 'Waiting for lighting');
+}
+
+function renderRgb() {
+  const s = rgbData?.settings;
+  const box = $('rgb-out');
+  if (box) {
+    const disabled = !s || rgbBusy ? ' disabled' : '';
+    box.innerHTML = '<section class="panel"><h2>Lighting</h2>' + rgbToggle('rgb-enabled') +
+      '<p class="sub2" role="status">' + esc(rgbStatus()) + '</p>' +
+      '<div class="row"><span class="k" id="rgb-free-label">Free keys</span>' +
+      '<div class="seg" role="group" aria-labelledby="rgb-free-label">' +
+      [['dim', 'Dim'], ['off', 'Off']].map(([value, label]) =>
+        '<button type="button" data-rgb-free="' + value + '" aria-pressed="' +
+        (s?.rgb_free === value) + '"' + disabled + '>' + label + '</button>').join('') + '</div></div>' +
+      '<div class="row"><label class="k" for="rgb-brightness">Brightness</label>' +
+      '<div class="rgb-brightness"><input type="range" id="rgb-brightness" min="0" max="100" step="1" value="' +
+      (s?.rgb_brightness ?? 100) + '"' + disabled + '>' +
+      '<output id="rgb-brightness-value" for="rgb-brightness">' + (s?.rgb_brightness ?? 100) + '%</output></div></div>' +
+      (rgbData?.providers || []).map(p => '<div class="row"><span class="k">' + esc(p.name) +
+        '</span><span class="v">' + (p.active ? 'live' : 'not found') +
+        (p.why ? '<br><span class="sub2">' + esc(p.why) + '</span>' : '') + '</span></div>').join('') + '</section>';
+  }
+  const keyboard = $('kb-rgb-enabled');
+  if (keyboard) {
+    keyboard.checked = !!rgbData?.enabled;
+    keyboard.disabled = !rgbData || rgbBusy;
+  }
+  const status = $('kb-rgb-status');
+  if (status) status.textContent = rgbStatus();
+}
+
+async function requestRgb(path, body) {
+  const d = await api(path, body);
+  if (!d || d.ok === false || !d.settings || typeof d.enabled !== 'boolean') {
+    throw new Error(d?.error || 'Lighting status unavailable');
+  }
+  return d;
+}
+
+async function loadRgb() {
+  if (rgbBusy) return;
+  const request = ++rgbRequest;
+  try {
+    const d = await requestRgb('/api/rgb', {});
+    if (request !== rgbRequest) return;
+    rgbData = d;
+    rgbError = '';
+  } catch (err) {
+    if (request !== rgbRequest) return;
+    rgbError = err.message || String(err);
+  }
+  renderRgb();
+}
+
+async function saveRgb(settings) {
+  if (rgbBusy || !rgbData) { renderRgb(); return; }
+  clearTimeout(rgbRefreshTimer);
+  ++rgbRequest;
+  rgbBusy = true;
+  rgbError = '';
+  renderRgb();
+  try {
+    rgbData = await requestRgb('/api/rgb/settings', settings);
+    rgbRefreshTimer = setTimeout(loadRgb, 2000);
+  } catch (err) {
+    rgbError = err.message || String(err);
+    // A lost response may still have saved. Reconcile before the next edit.
+    try { rgbData = await requestRgb('/api/rgb', {}); } catch (_) {}
+  } finally {
+    rgbBusy = false;
+    renderRgb();
+  }
+}
+
+document.addEventListener('change', e => {
+  if (e.target.matches('[data-rgb-enabled]')) saveRgb({rgb_enabled: e.target.checked});
+  if (e.target.id === 'rgb-brightness') saveRgb({rgb_brightness: Number(e.target.value)});
+});
+document.addEventListener('input', e => {
+  if (e.target.id === 'rgb-brightness') $('rgb-brightness-value').textContent = e.target.value + '%';
+});
+document.addEventListener('click', e => {
+  const button = e.target.closest('[data-rgb-free]');
+  if (button && !button.disabled) saveRgb({rgb_free: button.dataset.rgbFree});
+});
 
 // Read-only screenshot fixtures use the production renderer and no extra timers.
 function overlaySettingsSample(mode) {
@@ -11022,7 +11138,9 @@ function renderKeyboard() {
     '<span><i class="dot selected"></i>selected</span>' +
     (keyData.live?.available ? '<span class="kb-live"><i class="dot adrift"></i>' +
       keyData.live.differences.length + ' differ from game</span>' : '') +
-    kbMissingLegend(activeProfile, missingList, showPanel) + '</div><div class="kb-rig">' +
+    kbMissingLegend(activeProfile, missingList, showPanel) +
+    '<div class="kb-lighting">' + rgbToggle('kb-rgb-enabled') +
+    '<p class="sub2" id="kb-rgb-status" role="status">' + esc(rgbStatus()) + '</p></div></div><div class="kb-rig">' +
     kbPiece('board', '<div class="kb-stage"><div class="kb-board">' + rows + '</div></div>') +
     kbPiece('mouse', '<div class="kb-mouse">' + mouseModel() + '</div>') +
     '</div></div><div class="kb-focus-row"><div id="kb-focus" class="kb-mode" role="group" aria-label="Device focus"></div>' +
@@ -13997,6 +14115,7 @@ document.addEventListener("click", e => {
 });
 
 async function loadKeyboard(force) {
+  loadRgb();
   const box = $("kb-out");
   if (keyData && !force) { renderKeyboard(); renderKbLayouts(); renderKbProfiles(); return; }
   if (box) box.innerHTML = '<span class="sub"><span class="spin"></span> Reading&hellip;</span>';
