@@ -34,7 +34,7 @@ const context = {console,document:{activeElement:null,hidden:false,addEventListe
   fcData:{player:{player_id:'owner',nickname:'DifferentName'}},whoData:null,
   FC_LEVEL_COLORS:['','#eee','#1ce400','#1ce400','#ffc800','#ffc800','#ffc800','#ffc800','#ff6309','#ff6309','#ff1f00'],
   esc:s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;'),
-  fcMapAsset:()=> 'assets/maps/dust2.webp',fcMapName:()=> 'Dust2',
+  fcMapAsset:()=> '/map-art/de_dust2.png',fcMapName:()=> 'Dust2',fcModeName:m=>m,fcMapFallback(){},
   paintGetRow(){},checkWaiting(){},stopWaitingWatch(){},
   statsShown:null,statsWaiting:null,
   api:(url,body)=>{calls.push([url,body]);return replies.shift().promise;}

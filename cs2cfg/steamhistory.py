@@ -22,6 +22,8 @@ import time
 from html.parser import HTMLParser
 from typing import Any, Callable, Dict, List, Optional
 
+from . import maps
+
 TABS = {
     "matchhistorypremier": "Premier",
     "matchhistorycompetitivepermap": "Competitive",
@@ -66,11 +68,30 @@ def _int(text: str) -> int:
 
 
 def map_id(name: str) -> str:
-    """'Mirage' -> 'de_mirage', so map art and FACEIT names line up."""
-    name = re.sub(r"\s+", "", (name or "").strip().lower())
-    if not name:
-        return ""
-    return name if "_" in name else "de_" + name
+    """'Mirage' -> 'de_mirage', 'Dust II' -> 'de_dust2', so map pictures and
+    FACEIT names line up."""
+    return maps.from_name(name)
+
+
+_MODE_WORDS = re.compile(r"^(premier|competitive|wingman)\b[\s:\-]*", re.I)
+_NOT_A_MAP = re.compile(r"\d{4}-\d\d-\d\d|wait time|match duration|replay|ranked|:", re.I)
+
+
+def _map_from_left(left: List[str], images: List[str]) -> str:
+    """The map's id from the left-hand column of one match.
+
+    Steam writes "Premier Mirage" (mode, then map) on the first line. The
+    map's picture on that page is named after the map too, which covers a
+    first line that is only the mode."""
+    for line in left[:2]:
+        name = _MODE_WORDS.sub("", line).strip()
+        if name and not _NOT_A_MAP.search(name):
+            return map_id(name)
+    for src in images:
+        m = re.search(r"((?:de|cs|ar)_[a-z0-9_]+?)(?:_png)?\.(?:png|jpg|webp)", src or "", re.I)
+        if m:
+            return maps.canonical(m.group(1))
+    return ""
 
 
 def when(text: str) -> int:
@@ -98,20 +119,25 @@ class _Tables(HTMLParser):
             if self.side:
                 self.depth += 1
             elif "csgo_scoreboard_inner_left" in cls:
-                self.matches.append({"left": [], "rows": []})
+                self.matches.append({"left": [], "rows": [], "images": []})
                 self.side, self.depth = "left", 1
             elif "csgo_scoreboard_inner_right" in cls and self.matches:
                 self.side, self.depth = "right", 1
         elif not self.side:
             return
         elif tag == "tr":
-            self.row = {"cells": [], "links": [], "ids": []}
+            self.row = {"cells": [], "links": [], "ids": [], "avatar": ""}
         elif tag in ("td", "th") and self.row is not None:
             self.cell = []
         elif tag == "a" and self.row is not None and a.get("href"):
             self.row["links"].append(a["href"].rstrip("/"))
         if self.row is not None and a.get("data-miniprofile"):
             self.row["ids"].append(a["data-miniprofile"])
+        if tag == "img" and a.get("src"):
+            if self.side == "left":
+                self.matches[-1]["images"].append(a["src"])
+            elif self.row is not None and not self.row["avatar"]:
+                self.row["avatar"] = a["src"]
 
     def handle_endtag(self, tag):
         if not self.side:
@@ -152,8 +178,6 @@ def parse(pages: List[str], steam64: str, mode: str, me: str = "") -> List[Dict[
         for m in p.matches:
             left = m["left"]
             stamp = next((when(t) for t in left if when(t)), 0)
-            title = left[0] if left else ""
-            map_name = re.sub(r"^(premier|competitive|wingman)\s+", "", title, flags=re.I)
             players, score_at, score = [], -1, (0, 0)
             for row in m["rows"]:
                 cells = row["cells"]
@@ -165,6 +189,8 @@ def parse(pages: List[str], steam64: str, mode: str, me: str = "") -> List[Dict[
                         "name": cells[0], "kills": _int(cells[2]), "assists": _int(cells[3]),
                         "deaths": _int(cells[4]), "mvps": _int(cells[5]) if cells[5] else 0,
                         "hs_percent": _int(cells[6]), "score": _int(cells[7]),
+                        "ping": _int(cells[1]), "team": 0 if score_at < 0 else 1,
+                        "avatar": row["avatar"] if row["avatar"].startswith("https://") else "",
                         "you": _is_me(row, steam64, me)})
             mine = next((i for i, pl in enumerate(players) if pl["you"]), -1)
             if not stamp or mine < 0 or score_at < 0:
@@ -176,7 +202,7 @@ def parse(pages: List[str], steam64: str, mode: str, me: str = "") -> List[Dict[
             out.append({
                 "source": "cs2", "origin": "steam",
                 "match_id": f"steam-{steam64}-{stamp}",
-                "steamid": steam64, "map": map_id(map_name), "mode": mode,
+                "steamid": steam64, "map": _map_from_left(left, m["images"]), "mode": mode,
                 "won": ours > theirs, "tied": ours == theirs,
                 "score": f"{ours} / {theirs}", "rounds": rounds,
                 "started_at": stamp, "played_at": stamp,

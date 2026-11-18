@@ -5456,6 +5456,55 @@ def make_handler(state: State):
                 self.end_headers()
                 self.wfile.write(data)
                 return
+            if path.startswith("/map-art/"):
+                # A map's real loading-screen picture, cut out of the player's
+                # own CS2 files (cs2cfg.mapart). The id is checked against a
+                # plain [a-z0-9_] pattern there, so no path can be asked for.
+                # 404 when CS2 is not here: the page shows its plain card.
+                from . import mapart
+                from .paths import user_data_dir
+
+                wanted = path[len("/map-art/"):].removesuffix(".png")
+                try:
+                    dir_vpk = _skins_vpk(state)
+                except Exception:
+                    dir_vpk = None
+                art = mapart.picture(dir_vpk, user_data_dir(), wanted)
+                if art is None:
+                    self._send_json({"error": "no picture"}, 404)
+                    return
+                data = art.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "image/png")
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Cache-Control", "max-age=86400")
+                self.end_headers()
+                self.wfile.write(data)
+                return
+            if path.startswith("/mode-icon/"):
+                # A game mode's own icon from the player's CS2 files
+                # (cs2cfg.mapart.mode_icon); only a fixed list of modes.
+                from . import mapart
+                from .paths import user_data_dir
+
+                wanted = path[len("/mode-icon/"):].removesuffix(".svg")
+                try:
+                    dir_vpk = _skins_vpk(state)
+                except Exception:
+                    dir_vpk = None
+                icon = mapart.mode_icon(dir_vpk, user_data_dir(), wanted)
+                if icon is None:
+                    self._send_json({"error": "no icon"}, 404)
+                    return
+                data = icon.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "image/svg+xml")
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Cache-Control", "max-age=86400")
+                self.send_header("Content-Security-Policy", "script-src 'none'")
+                self.end_headers()
+                self.wfile.write(data)
+                return
             if path.startswith("/companion-icon/"):
                 # A companion's own icon, pulled out of its executable and
                 # cached. Matched against this account's own companions

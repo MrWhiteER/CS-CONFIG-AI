@@ -189,3 +189,8 @@
  [data-panel="faceit"] .fc-player { gap:10px; }
  [data-panel="faceit"] .fc-rating { margin-left:0; }
 }
+/* Mode icons come from the player's CS2 files; Premier's is a wordmark. */
+.fc-mode-label { display:inline-flex; align-items:center; gap:6px; }
+.fc-mode-icon { height:16px; width:auto; flex:none; }
+.fc-mode-label.fc-wordmark .fc-mode-icon { height:13px; max-width:84px; }
+.fc-mode-label.fc-wordmark .fc-mode-name { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }

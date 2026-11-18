@@ -12360,6 +12360,7 @@ function demoNameFor(m) {
 let statsRequest = 0;
 let statsFocus = null;
 function statsIsYou(p) {
+  if (typeof p.you === 'boolean') return p.you;
   const profile = fcData && fcData.player;
   if (profile && profile.player_id && p.player_id) return profile.player_id === p.player_id;
   const plain = t => String(t || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -12374,7 +12375,9 @@ function statsBadge(name, avatar, cls) {
     (safe ? '<img src="'+esc(safe)+'" alt="" referrerpolicy="no-referrer" onerror="this.remove()">' : '')+'</span>';
 }
 function renderStatsTeams(s) {
-  const cols = [['K','kills'],['D','deaths'],['A','assists'],['ADR','adr'],['K/D','kd'],['K/R','kr'],['HS','headshots'],['HS%','hs_percent'],['5K','penta'],['4K','quadro'],['3K','triple'],['2K','double'],['MVP','mvps']];
+  const cs2 = s.source === 'cs2';
+  // CS2's own Tab screen order. Steam's history has no ADR or multi-kills.
+  const cols = cs2 ? [['Ping','ping'],['K','kills'],['A','assists'],['D','deaths'],['MVP','mvps'],['HS%','hs_percent'],['Score','score'],['K/D','kd']] : [['K','kills'],['D','deaths'],['A','assists'],['ADR','adr'],['K/D','kd'],['K/R','kr'],['HS','headshots'],['HS%','hs_percent'],['5K','penta'],['4K','quadro'],['3K','triple'],['2K','double'],['MVP','mvps']];
   const multi = new Set(['penta','quadro','triple','double']);
   const all = s.teams.flatMap(t => t.players);
   const numeric = v => typeof v === 'number' && Number.isFinite(v);
@@ -12384,17 +12387,17 @@ function renderStatsTeams(s) {
   }));
   let index=0;
   return s.teams.map(t => '<section class="mstat-side" aria-label="'+esc(t.name)+'">'+
-    '<div class="mstat-team '+(t.won?'won':'lost')+'">'+statsBadge(t.name,t.avatar,'team-avatar')+
-    '<b>'+esc(t.name)+'</b><span class="score">'+t.score+'</span><span class="halves">First half <strong>'+t.first_half+'</strong><span> / </span>Second half <strong>'+t.second_half+'</strong></span></div>'+
+    '<div class="mstat-team '+(s.tied?'':t.won?'won':'lost')+'">'+(cs2?'':statsBadge(t.name,t.avatar,'team-avatar'))+
+    '<b>'+esc(String(t.name||'').replace(/^team_/i,''))+'</b><span class="score">'+t.score+'</span>'+(cs2?'':'<span class="halves">First half <strong>'+t.first_half+'</strong><span> / </span>Second half <strong>'+t.second_half+'</strong></span>')+'</div>'+
     '<div class="mstat-scroll" tabindex="0" role="region" aria-label="'+esc(t.name)+' player statistics"><table class="mstat-grid"><thead><tr><th scope="col">Player</th>'+cols.map(([label])=>'<th scope="col">'+label+'</th>').join('')+'</tr></thead><tbody>'+
     t.players.map(p=>{
       const you=statsIsYou(p), level=Number(p.level), known=Number.isInteger(level)&&level>=1&&level<=10;
       return '<tr class="'+(you?'is-you':'')+'" style="--row:'+index+++'"><th scope="row"><span class="mstat-who">'+statsBadge(p.nickname,p.avatar,'player-avatar')+
         '<span class="mstat-name">'+esc(p.nickname)+'</span>'+(you?'<span class="mstat-you">YOU</span>':'')+
-        '<span class="mstat-level" style="--level:'+(known?FC_LEVEL_COLORS[level]:'var(--faint)')+'" title="'+(known?'FACEIT level '+level:'FACEIT level unavailable')+'">'+(known?level:'?')+'</span></span></th>'+
+        (cs2?'':'<span class="mstat-level" style="--level:'+(known?FC_LEVEL_COLORS[level]:'var(--faint)')+'" title="'+(known?'FACEIT level '+level:'FACEIT level unavailable')+'">'+(known?level:'?')+'</span>')+'</span></th>'+
       cols.map(([,key])=>{
         const v=p[key], valid=numeric(v);
-        const leader=valid && v===best[key];
+        const leader=valid && v===best[key] && key!=='ping';
         let shown=!valid?'—':key==='kd'||key==='kr'?v.toFixed(2):key==='adr'?v.toFixed(1):key==='hs_percent'?Math.round(v)+'%':String(Math.round(v));
         if(multi.has(key)) shown=valid&&v>0?'<span class="mstat-kill">'+shown+'</span>':'<span class="mstat-empty" aria-label="0">—</span>';
         if(key==='mvps' && valid) shown=v>0?'<span aria-label="'+v+' MVP stars">★ '+shown+'</span>':'<span aria-label="0 MVP stars">—</span>';
@@ -12405,17 +12408,27 @@ function renderStatsTeams(s) {
 }
 function paintStatsHeader(s) {
   const team=s.teams.find(t=>t.players.some(statsIsYou));
+  $('mstat-map').onerror=()=>fcMapFallback($('mstat-map'));
   $('mstat-map').src=fcMapAsset(s.map);
   $('mstat-title').textContent=fcMapName(s.map)+'  '+(team?[team.score,...s.teams.filter(t=>t!==team).map(t=>t.score)].join(' : '):s.score||'');
-  $('mstat-result').textContent=team?(team.won?'WIN':'LOSS'):'MATCH';
-  $('mstat-result').className='mstat-result '+(team?(team.won?'won':'lost'):'');
-  $('mstat-when').textContent=[s.mode,s.region,s.rounds?s.rounds+' rounds':'',s.played_at?new Date(s.played_at*1000).toLocaleString():''].filter(Boolean).join(' · ');
+  $('mstat-result').textContent=s.tied?'DRAW':team?(team.won?'WIN':'LOSS'):'MATCH';
+  $('mstat-result').className='mstat-result '+(s.tied?'':team?(team.won?'won':'lost'):'');
+  $('mstat-back').classList.toggle('mstat-cs2', s.source==='cs2');
+  $('mstat-when').textContent=[fcModeName(s.mode),s.region,s.rounds?s.rounds+' rounds':'',s.played_at?new Date(s.played_at*1000).toLocaleString():''].filter(Boolean).join(' · ');
   $('mstat-page').href=s.page||'#';
   $('mstat-page').hidden=!s.page;
 }
 function showStats(s) {
   if(!s) return;
   paintStatsHeader(s);
+  if (s.source === 'cs2') {
+    // Steam's match history: no demo download row, no FACEIT wording.
+    $('mstat-body').innerHTML='<div id="mstat-teams">'+renderStatsTeams(s)+'</div>'+
+      '<p class="mstat-note"><span class="mstat-gold-key">✦ Gold = match best, ties included.</span> From your Steam match history. Steam does not keep damage per round or multi-kills for past matches.</p>';
+    statsShown=s; statsWaiting=null;
+    $('mstat-back').classList.remove('hidden');
+    return;
+  }
   $('mstat-body').innerHTML='<div id="mstat-teams">'+renderStatsTeams(s)+'</div><div class="mstat-get" id="mstat-get"></div>'+
     '<p class="mstat-note"><span class="mstat-gold-key">✦ Gold = match best, ties included.</span> FACEIT scoreboard data; ADR may differ slightly from their newer stats tab.</p>';
   statsShown=s; statsWaiting=null;

@@ -38,8 +38,23 @@ class Parsing(unittest.TestCase):
         self.assertEqual(steamhistory.parse([page], ME, "Premier"), [])
 
     def test_map_names(self):
-        self.assertEqual(steamhistory.map_id("Dust II"), "de_dustii")
+        self.assertEqual(steamhistory.map_id("Dust II"), "de_dust2")
+        self.assertEqual(steamhistory.map_id("Ancient Night"), "de_ancient_night")
+        self.assertEqual(steamhistory.map_id("Office"), "cs_office")
         self.assertEqual(steamhistory.map_id("cs_office"), "cs_office")
+
+    def test_title_that_is_only_the_mode(self):
+        page = PAGE.replace("<td>Premier Mirage</td>", "<td>Premier</td>", 1)
+        page = page.replace("<td>Wait Time", '<td><img src="https://cdn/maps/de_mirage.png"></td></tr><tr><td>Wait Time', 1)
+        self.assertEqual(steamhistory.parse([page], ME, "Premier")[0]["map"], "de_mirage")
+
+    def test_tab_scoreboard_fields(self):
+        players = self.rows[0]["players"]
+        self.assertEqual([p["team"] for p in players], [0] * 5 + [1] * 5)
+        you = next(p for p in players if p["you"])
+        self.assertEqual(you["ping"], 48)
+        # Only https pictures are kept; the fixture's are relative.
+        self.assertEqual(you["avatar"], "")
 
 
 class Merging(unittest.TestCase):
