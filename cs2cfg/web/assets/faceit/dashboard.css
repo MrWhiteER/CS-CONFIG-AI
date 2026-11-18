@@ -194,3 +194,8 @@
 .fc-mode-icon { height:16px; width:auto; flex:none; }
 .fc-mode-label.fc-wordmark .fc-mode-icon { height:13px; max-width:84px; }
 .fc-mode-label.fc-wordmark .fc-mode-name { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+/* FACEIT's wordmark as a badge, beside the ELO change. */
+.fc-faceit-badge { display:inline-flex; align-items:center; height:15px; padding:0 5px; margin-right:6px; vertical-align:-3px; background:#ff5500; border-radius:2px; transform:skewX(-8deg); }
+.fc-faceit-badge i { display:block; width:60px; height:11px; background:#0d0d0d; transform:skewX(8deg);
+  mask:url('faceit-logo.svg') center/contain no-repeat; -webkit-mask:url('faceit-logo.svg') center/contain no-repeat; }
+.fc-mode .fc-elo-delta { vertical-align:middle; }
