@@ -386,8 +386,8 @@ def _is_faceit(cs2: Dict[str, Any], faceit: List[Dict[str, Any]]) -> bool:
     return False
 
 
-def _recorded(steam: Dict[str, Any], local: List[Dict[str, Any]]) -> bool:
-    """Steam's copy of a match this PC also recorded. The local one wins: it has ADR.
+def _recorded(steam: Dict[str, Any], local: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """The match this PC recorded that Steam also lists, if any.
 
     Steam stamps a match when it starts; the recorder when warm-up ends.
     """
@@ -395,8 +395,28 @@ def _recorded(steam: Dict[str, Any], local: List[Dict[str, Any]]) -> bool:
     for r in local:
         start = int(r.get("started_at") or r.get("played_at") or 0)
         if r.get("map") == steam.get("map") and start - FACEIT_WINDOW <= when <= int(r.get("played_at") or 0):
-            return True
-    return False
+            return r
+    return None
+
+
+def _join(local: List[Dict[str, Any]], steam_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Steam's rows, minus the matches this PC recorded too.
+
+    The recording stays (it has ADR and multi-kills), but takes the mode and
+    the ten-player scoreboard from Steam: CS2's live feed reports a Premier
+    match as "competitive", while Steam lists it under Premier.
+    """
+    out = []
+    for row in steam_rows:
+        mine = _recorded(row, local)
+        if mine is None:
+            out.append(row)
+            continue
+        if row.get("mode"):
+            mine["mode"] = row["mode"]
+        if row.get("players") and not mine.get("players"):
+            mine["players"] = row["players"]
+    return out
 
 
 def summary(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -431,7 +451,7 @@ def combined(faceit: List[Dict[str, Any]], cs2: List[Dict[str, Any]],
     f_rows = [_faceit_row(r) for r in faceit or []]
     cs2 = [_plain(r) for r in cs2 or []]
     local = [r for r in cs2 if r.get("origin") != "steam"]
-    steam = [r for r in cs2 if r.get("origin") == "steam" and not _recorded(r, local)]
+    steam = _join(local, [r for r in cs2 if r.get("origin") == "steam"])
     c_rows = [dict(r, source="cs2") for r in local + steam if not _is_faceit(r, f_rows)]
     pick = {"faceit": f_rows, "cs2": c_rows}.get(source, f_rows + c_rows)
     rows = sorted(pick, key=lambda r: int(r.get("played_at") or 0), reverse=True)

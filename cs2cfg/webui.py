@@ -3818,7 +3818,22 @@ def _stats_setup(state: State, install_finder, port: int) -> None:
     from .paths import user_data_dir
 
     store = _stats_store(state)
-    state.stats_recorder = matchlog.Recorder(store.add)
+
+    def save(row: Dict[str, Any]) -> None:
+        store.add(row)
+        # CS2's live feed cannot tell Premier from Competitive. Steam's match
+        # history can, and lists a match a minute or two after it ends, so
+        # read it again shortly after each recorded match.
+        from . import steamweb
+
+        if not steamweb.linked():
+            return
+        for delay in (120, 600):
+            timer = threading.Timer(delay, lambda: _steam_history_start(state))
+            timer.daemon = True
+            timer.start()
+
+    state.stats_recorder = matchlog.Recorder(save)
     try:
         install = install_finder()
         if not install:
