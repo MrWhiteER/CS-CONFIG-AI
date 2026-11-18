@@ -11,7 +11,8 @@ const elements = Object.fromEntries(['rgb-out', 'kb-rgb-enabled', 'kb-rgb-status
 const handlers = {}, calls = [], timers = [];
 const snapshot = (enabled = false) => ({ok: true, enabled,
   settings: {rgb_enabled: enabled, rgb_free: 'dim', rgb_brightness: 100},
-  providers: [{name: 'Razer Chroma', active: enabled, why: enabled ? '' : '<not running>'}]});
+  providers: [{name: 'Razer Chroma', active: enabled, devices: enabled ? ['Huntsman V3 Pro'] : [],
+    why: enabled ? '' : '<not running>'}]});
 let response = snapshot();
 const context = vm.createContext({
   $: id => elements[id], esc: x => String(x).replaceAll('<', '&lt;'),
@@ -29,14 +30,16 @@ const run = source => vm.runInContext(source, context);
   assert.equal(calls[0].path, '/api/rgb');
   assert.equal(elements['kb-rgb-enabled'].checked, false);
   assert.equal(elements['kb-rgb-enabled'].disabled, false);
-  assert(elements['rgb-out'].innerHTML.includes('not found'));
-  assert(elements['rgb-out'].innerHTML.includes('&lt;not running>'));
+  // A route with no device is not listed at all.
+  assert(!elements['rgb-out'].innerHTML.includes('Razer Chroma'));
+  assert(!elements['rgb-out'].innerHTML.includes('&lt;not running>'));
   response = snapshot(true);
   await run('saveRgb({rgb_enabled: true})');
   assert.equal(calls.at(-1).path, '/api/rgb/settings');
   assert.equal(calls.at(-1).body.rgb_enabled, true);
   assert.equal(elements['kb-rgb-enabled'].checked, true);
   assert.equal(elements['kb-rgb-status'].textContent, 'Razer Chroma · live');
+  assert(elements['rgb-out'].innerHTML.includes('Huntsman V3 Pro · live'));
   assert.equal(timers.at(-1).delay, 2000);
   await timers.at(-1).fn();
   assert.equal(calls.at(-1).path, '/api/rgb');
@@ -71,6 +74,12 @@ const run = source => vm.runInContext(source, context);
   response = snapshot(true);
   response.providers = [{name: 'SteelSeries GG', active: false, why: 'Start GG'}];
   await run('loadRgb()');
-  assert.equal(elements['kb-rgb-status'].textContent, 'Start GG');
+  assert.equal(elements['kb-rgb-status'].textContent, 'No lighting device found yet');
+  assert(!elements['rgb-out'].innerHTML.includes('SteelSeries'));
+  response = snapshot(true);
+  response.providers = [{name: 'Razer USB', active: false, devices: ['Cobra'], why: 'USB <lost>'}];
+  await run('loadRgb()');
+  assert.equal(elements['kb-rgb-status'].textContent, 'USB <lost>');
+  assert(elements['rgb-out'].innerHTML.includes('Cobra · stopped · USB &lt;lost>'));
   console.log('Lighting: shared state, saves, delayed refresh, slider release, errors and stale reads passed');
 })().catch(err => { console.error(err); process.exitCode = 1; });

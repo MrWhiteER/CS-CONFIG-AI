@@ -4223,6 +4223,10 @@
   .kb-lighting label.opt { margin: 0; padding: 0; font-size: 11px; }
   .kb-lighting .sub2 { margin: 0; max-width: 280px; overflow-wrap: anywhere; }
   #rgb-out .seg button { flex: 0 1 auto; }
+  /* Plain text, not readouts: the status lines are sentences. */
+  #rgb-out .row .v { font-family: inherit; font-variant-numeric: normal; font-size: 12px; color: var(--muted); }
+  #rgb-out .row .v.live { color: var(--good); }
+  #rgb-out > .sub2 { margin: 2px 0 8px; color: var(--muted); font-size: 12px; }
   .rgb-brightness { display: flex; align-items: center; gap: 12px; }
   .rgb-brightness input { min-width: 80px; width: 160px; max-width: 100%; }
   .kb-legend .dot { width: 9px; height: 9px; border-radius: 3px; }
@@ -6694,6 +6698,12 @@ const startup = (() => {
                rather than in a card of its own further down the page. -->
           <div id="assessment-out"></div>
         </section>
+        <!-- Keyboard and mouse lights. Hardware, so it lives with the PC,
+             not with the performance overlay. -->
+        <section class="panel" id="rgb-card">
+          <h2>Lighting</h2>
+          <div id="rgb-out"></div>
+        </section>
       </div>
 
       <div class="subpane" data-sub="apply">
@@ -6746,7 +6756,6 @@ const startup = (() => {
             Frame rate, frame time and freezes are saved with your session history.
             The app keeps running in the notification area when you close its window.</p>
           <div id="overlay-out"></div>
-          <div id="rgb-out"></div>
         </div>
       </div>
 
@@ -9053,6 +9062,7 @@ function setSettingsSub(name, restoring) {
   // Preference restoration only selects the pane. Startup owns its first loads.
   if (prefsReady && startup.finished) {
     if (name === "overlay") loadOverlay();
+    if (name === "this-pc") loadRgb();
     if (name === "sound") { loadAudio(false); loadGoxlr(true); }
     if (name === "logs") loadHistory();
     if (name === "config" || name === "editing") ensureScan(false);
@@ -9071,7 +9081,6 @@ document.addEventListener("click", e => {
 // Read on entry or explicit refresh only. There are no overlay timers in the
 // app page, including when it is hidden in the notification area.
 async function loadOverlay() {
-  if (!new URLSearchParams(location.search).has('overlayPreview')) loadRgb();
   const box = $("overlay-out");
   try {
     const preview = new URLSearchParams(location.search).get('overlayPreview');
@@ -9093,15 +9102,21 @@ function rgbToggle(id) {
     '><span>Light my keyboard</span></label>';
 }
 
+// Only routes that actually reached a device. A lighting app that is
+// installed, or merely looked for, with nothing plugged in is not news.
+function rgbFound() {
+  return (rgbData?.providers || []).filter(p => p.active || (p.devices || []).length);
+}
+
 function rgbStatus() {
   if (rgbError) return rgbError;
   if (!rgbData) return 'Reading lighting status…';
   if (rgbData.error) return rgbData.error;
   if (!rgbData.enabled) return 'Off';
-  const providers = rgbData.providers || [];
-  const live = providers.filter(p => p.active);
+  const found = rgbFound();
+  const live = found.filter(p => p.active);
   return live.length ? live.map(p => p.name + ' · live').join(', ') :
-    (providers.find(p => p.why)?.why || 'Waiting for lighting');
+    (found.find(p => p.why)?.why || 'No lighting device found yet');
 }
 
 function renderRgb() {
@@ -9109,7 +9124,8 @@ function renderRgb() {
   const box = $('rgb-out');
   if (box) {
     const disabled = !s || rgbBusy ? ' disabled' : '';
-    box.innerHTML = '<section class="panel"><h2>Lighting</h2>' + rgbToggle('rgb-enabled') +
+    const found = rgbFound();
+    box.innerHTML = rgbToggle('rgb-enabled') +
       '<p class="sub2" role="status">' + esc(rgbStatus()) + '</p>' +
       '<div class="row"><span class="k" id="rgb-free-label">Free keys</span>' +
       '<div class="seg" role="group" aria-labelledby="rgb-free-label">' +
@@ -9120,9 +9136,10 @@ function renderRgb() {
       '<div class="rgb-brightness"><input type="range" id="rgb-brightness" min="0" max="100" step="1" value="' +
       (s?.rgb_brightness ?? 100) + '"' + disabled + '>' +
       '<output id="rgb-brightness-value" for="rgb-brightness">' + (s?.rgb_brightness ?? 100) + '%</output></div></div>' +
-      (rgbData?.providers || []).map(p => '<div class="row"><span class="k">' + esc(p.name) +
-        '</span><span class="v">' + (p.active ? 'live' : 'not found') +
-        (p.why ? '<br><span class="sub2">' + esc(p.why) + '</span>' : '') + '</span></div>').join('') + '</section>';
+      found.map(p => '<div class="row"><span class="k">' + esc(p.name) +
+        '</span><span class="v' + (p.active ? ' live' : '') + '">' +
+        esc((p.devices || []).join(', ') || p.name) + (p.active ? ' · live' : ' · stopped') +
+        (p.why ? ' · ' + esc(p.why) : '') + '</span></div>').join('');
   }
   const keyboard = $('kb-rgb-enabled');
   if (keyboard) {
