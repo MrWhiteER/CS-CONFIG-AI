@@ -5,6 +5,8 @@ of that server: the requests are the contract.
 """
 
 import json
+import shutil
+import subprocess
 import socket
 import struct
 import tempfile
@@ -512,3 +514,20 @@ class RazerUsbPacing(unittest.TestCase):
         dev.send(razer_usb.spectrum())
         self.assertEqual(handle.get_feature.call_count, 3)
         self.assertEqual(handle.set_feature.call_count, 1)
+
+
+class LightingCard(unittest.TestCase):
+    page = (Path(__file__).resolve().parents[1] / "cs2cfg" / "web" / "index.html").read_text(encoding="utf-8")
+
+    def test_card_lives_in_this_pc_not_overlay(self):
+        overlay = self.page.split('data-sub="overlay">', 1)[1].split('<div class="subpane', 1)[0]
+        this_pc = self.page.split('data-sub="this-pc">', 1)[1].split('<div class="subpane', 1)[0]
+        self.assertNotIn('id="rgb-out"', overlay)
+        self.assertIn('id="rgb-out"', this_pc)
+
+    @unittest.skipUnless(shutil.which("node"), "optional Node runtime for browser-script checks")
+    def test_settings_ui_harness(self):
+        result = subprocess.run([shutil.which("node"), "tests/rgb_settings_harness.js"],
+            cwd=Path(__file__).resolve().parents[1], capture_output=True,
+            text=True, encoding="utf-8", timeout=15)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
