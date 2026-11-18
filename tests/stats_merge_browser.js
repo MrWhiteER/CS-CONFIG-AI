@@ -9,6 +9,9 @@ function status(s){toasts.push(s);} function noteChange(){} async function loadW
 const fixture={ok:true,linked:true,player:{player_id:'p1',nickname:'Edy',avatar:'',country:'AE',elo:2100,level:9},matches:Array.from({length:12},(_,i)=>({source:i%3===2?'cs2':'faceit',match_id:'match-'+i,map:'de_'+['mirage','inferno','nuke','ancient','anubis','dust2'][i%6],mode:i%2?'Competitive':'Premier',won:i%3!==1,tied:i===5,score:i===5?'13 / 13':i%3===1?'9 / 13':'13 / 9',rounds:22,elo:i%3===2?null:2100-i*5,elo_delta:i%3===2?null:i%3===1?-25:25,played_at:1794902400-i*86400,kills:20+i%6,deaths:14+i%4,assists:6,kd:1.43,kr:.91,adr:85.2+i%9,hs_percent:47,mvps:3,double:2,triple:1,quadro:0,penta:0,team:'team_Edy'}))};
 // Deliberately distinctive server summaries: the UI must not recompute these.
 const summaries={all:{matches:12,wins:7,win_rate:58,kd:1.17,adr:84.2,hs_percent:47},faceit:{matches:8,wins:5,win_rate:63,kd:1.29,adr:88.6,hs_percent:51},cs2:{matches:4,wins:2,win_rate:50,kd:1.04,adr:75.4,hs_percent:39}};
+// CS2 rows from Steam's history carry the ten-player Tab screen. The first is a
+// recording made on this PC: own line only, and GSI's raw mode id.
+fixture.matches.forEach((m,i)=>{if(m.source!=='cs2')return;m.mode=i===2?'scrimcomp2v2':'Premier';m.map=i===2?'de_dustii':m.map;if(i===2)return;m.players=Array.from({length:10},(_,k)=>({name:k===2?'Edy':'Player '+k,kills:10+k,assists:3,deaths:12,mvps:k%3,hs_percent:40,score:20+k,ping:30+k,team:k<5?0:1,avatar:'',you:k===2}));});
 let answer=structuredClone(fixture),recording=true,failStats=false,deferStats=null,failProfile=false;
 let disk={ok:true,folder:'C:/CS2/replays',demos:[{name:'faceit_tch-0_demirage.dem',size:184549376,when:1794902400}],picked:'',key:'F9',job:null};
 const scoreboard={match_id:'match-0',map:'de_mirage',score:'13 / 9',rounds:22,played_at:1794902400,mode:'5v5',region:'EU',teams:[{name:'team_Edy',score:13,won:true,players:Array.from({length:5},(_,i)=>({nickname:i?'Player '+i:'Edy',kills:20,deaths:14,assists:6,adr:85.2,kd:1.43,kr:.91,hs_percent:50,mvps:3}))},{name:'Opponents',score:9,won:false,players:Array.from({length:5},(_,i)=>({nickname:'Rival '+i,kills:14,deaths:20,assists:3,adr:70,kd:.7,kr:.64,hs_percent:40,mvps:1}))}]};
@@ -47,7 +50,8 @@ async function setStatsPreview(name){
   sessionStorage.setItem('stats-source:test',fcSource);
   document.documentElement.dataset.theme=name==='daylight'?'daylight':'violet';
   await loadFaceit();
-  if(name==='cs2')document.querySelector('.fc-match-actions [data-fc-expand]').click();
+  if(name==='cs2')document.querySelector('.fc-match-actions [data-fc-board]').click();
+  if(name!=='cs2')$('mstat-back').classList.add('hidden');
   document.querySelector('.scroll').scrollTop=0;
   await new Promise(r=>setTimeout(r,750));
 }
@@ -67,6 +71,16 @@ async function runStatsChecks(){
   check('source mark on form',document.querySelectorAll('.fc-form .fc-source-icon').length===5);
   check('source marks on summary',document.querySelectorAll('.fc-stat-sources .fc-source-icon').length===8);
   check('ELO chart excludes CS2',document.querySelector('.fc-chart .fc-plot').getAttribute('aria-label').includes('8 matches'));
+  check('no map or mode ids on screen',!/\b(de|cs|ar)_[a-z]|scrimcomp|premier-/.test($('fc-wrap').textContent));
+  check('Dust II by its name',$('fc-wrap').textContent.includes('Dust II')&&$('fc-wrap').textContent.includes('Wingman'));
+  check('map picture from the game',document.querySelector('.fc-map-art').getAttribute('src').startsWith('/map-art/de_'));
+  document.querySelector('[data-fc-board]').click();
+  check('CS2 Tab scoreboard opens',!$('mstat-back').classList.contains('hidden')&&document.querySelectorAll('#mstat-teams tbody tr').length===10);
+  check('CS2 scoreboard columns',[...document.querySelectorAll('#mstat-teams thead th')].slice(0,9).map(e=>e.textContent).join('|')==='Player|Ping|K|A|D|MVP|HS%|Score|K/D');
+  check('CS2 scoreboard marks you',document.querySelectorAll('#mstat-teams tr.is-you').length===1&&$('mstat-teams').textContent.includes('Your team'));
+  check('CS2 scoreboard has no FACEIT parts',!document.querySelector('#mstat-teams .mstat-level')&&!$('mstat-get')&&!$('mstat-body').textContent.includes('FACEIT'));
+  check('CS2 scoreboard plain header',!/\b(de|cs)_|scrimcomp/.test($('mstat-title').textContent+$('mstat-when').textContent));
+  $('mstat-back').classList.add('hidden');statsShown=null;
   check('draw has D',document.querySelectorAll('.fc-match')[5].querySelector('.fc-result').textContent==='D');
   document.querySelector('[data-fc-expand]').click();await loadFaceit();
   check('expanded row survives refresh',!$('fc-detail-0').hidden);
@@ -87,7 +101,7 @@ async function runStatsChecks(){
   check('CS2 summary from server',document.querySelector('.fc-stat strong').textContent==='1.04');
   check('CS2 hides profile',!document.querySelector('.fc-player'));
   check('CS2 hides ELO',!$('fc-wrap').textContent.includes('ELO history'));
-  check('CS2 mode column',document.querySelector('.fc-mode').textContent.includes('Premier'));
+  check('CS2 mode column',document.querySelector('.fc-mode').textContent.includes('Wingman'));
   const before=calls.filter(c=>c.route==='/api/demos/stats').length;
   document.querySelector('.fc-match-actions button').click();
   check('CS2 Stats expands own line',!$('fc-detail-0').hidden&&$('fc-detail-0').textContent.includes('MVPs')&&$('fc-detail-0').textContent.includes('5K'));

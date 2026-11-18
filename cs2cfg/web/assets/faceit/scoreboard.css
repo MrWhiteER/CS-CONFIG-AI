@@ -70,3 +70,6 @@
   #mstat-back *, #mstat-back *::after { animation:none !important; transition:none !important; }
   #mstat-back .mstat-best::after { opacity:0; }
 }
+/* A CS2 match from Steam's history: the CS2 mark instead of FACEIT's. */
+#mstat-back.mstat-cs2 .mstat-mark { background:var(--ink, #fff); opacity:.18; mask-image:url('cs2-mark.svg'); -webkit-mask-image:url('cs2-mark.svg'); }
+#mstat-back #mstat-page[hidden] { display:none; }

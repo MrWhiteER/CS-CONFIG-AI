@@ -35,6 +35,8 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
+from . import maps
+
 CFG_NAME = "gamestate_integration_cs2cfg_stats.cfg"
 ENDPOINT = "/api/stats/gsi"
 MAX_BODY = 64 * 1024
@@ -357,10 +359,20 @@ class Store:
 SUMMED = ("kills", "deaths", "assists", "rounds")
 
 
-def _faceit_row(row: Dict[str, Any]) -> Dict[str, Any]:
+def _plain(row: Dict[str, Any]) -> Dict[str, Any]:
+    """One spelling per map, and names a person reads: ``map_name`` "Dust II",
+    ``mode`` "Wingman" -- never ``de_dust2`` or ``scrimcomp2v2``."""
     out = dict(row)
+    out["map"] = maps.canonical(out.get("map") or "")
+    out["map_name"] = maps.display(out["map"])
+    out["mode"] = maps.mode(out.get("mode") or "")
+    return out
+
+
+def _faceit_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    out = _plain(row)
     out["source"] = "faceit"
-    out.setdefault("mode", "FACEIT")
+    out["mode"] = out["mode"] or "FACEIT"
     return out
 
 
@@ -417,8 +429,9 @@ def combined(faceit: List[Dict[str, Any]], cs2: List[Dict[str, Any]],
     so the filter can show them.
     """
     f_rows = [_faceit_row(r) for r in faceit or []]
-    local = [r for r in cs2 or [] if r.get("origin") != "steam"]
-    steam = [r for r in cs2 or [] if r.get("origin") == "steam" and not _recorded(r, local)]
+    cs2 = [_plain(r) for r in cs2 or []]
+    local = [r for r in cs2 if r.get("origin") != "steam"]
+    steam = [r for r in cs2 if r.get("origin") == "steam" and not _recorded(r, local)]
     c_rows = [dict(r, source="cs2") for r in local + steam if not _is_faceit(r, f_rows)]
     pick = {"faceit": f_rows, "cs2": c_rows}.get(source, f_rows + c_rows)
     rows = sorted(pick, key=lambda r: int(r.get("played_at") or 0), reverse=True)

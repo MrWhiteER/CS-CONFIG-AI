@@ -1,14 +1,48 @@
 /* Combined stats presentation. API and FACEIT scoreboard handlers stay in index.html. */
 let fcMetric = 'kd';
-const FC_MAPS = ['dust2','mirage','inferno','nuke','ancient','anubis','vertigo','overpass','train','cache'];
 const FC_LEVEL_COLORS = ['', '#eeeeee', '#1ce400', '#1ce400', '#ffc800', '#ffc800', '#ffc800', '#ffc800', '#ff6309', '#ff6309', '#ff1f00'];
 const fcNumber = v => typeof v === 'number' && Number.isFinite(v) ? v : null;
 const fcValue = (v, digits=0) => fcNumber(v) === null ? '—' : v.toFixed(digits);
 const fcKD = m => fcNumber(m.kd);
-const fcMapName = m => String(m || 'Unknown map').replace(/^de_/i,'').replace(/^./, c=>c.toUpperCase());
+/* Plain names only: nothing on screen reads like de_dust2 or scrimcomp2v2.
+   Mirrors cs2cfg/maps.py (tests/test_maps.py keeps the two in step). */
+const FC_MAP_NAMES = {"de_dust2": "Dust II", "de_mirage": "Mirage", "de_inferno": "Inferno", "de_nuke": "Nuke", "de_ancient": "Ancient", "de_ancient_night": "Ancient Night", "de_anubis": "Anubis", "de_vertigo": "Vertigo", "de_overpass": "Overpass", "de_train": "Train", "de_cache": "Cache", "de_cbble": "Cobblestone", "de_tuscan": "Tuscan", "de_basalt": "Basalt", "de_edin": "Edin", "de_palais": "Palais", "de_whistle": "Whistle", "de_thera": "Thera", "de_mills": "Mills", "de_memento": "Memento", "de_assembly": "Assembly", "de_jura": "Jura", "de_grail": "Grail", "de_brewery": "Brewery", "de_dogtown": "Dogtown", "de_golden": "Golden", "de_rooftop": "Rooftop", "de_palacio": "Palacio", "de_shortdust": "Shortdust", "de_lake": "Lake", "de_bank": "Bank", "de_safehouse": "Safehouse", "de_sanctum": "Sanctum", "de_poseidon": "Poseidon", "de_stronghold": "Stronghold", "de_vineyard": "Vineyard", "de_overpass_night": "Overpass Night", "cs_italy": "Italy", "cs_office": "Office", "cs_agency": "Agency", "cs_militia": "Militia", "cs_assault": "Assault", "ar_baggage": "Baggage", "ar_shoots": "Shoots", "ar_shoots_night": "Shoots Night", "ar_pool_day": "Pool Day", "ar_lunacy": "Lunacy", "ar_monastery": "Monastery"};
+const FC_MAP_ALIASES = {"de_dustii": "de_dust2", "de_dust_ii": "de_dust2", "de_dust": "de_dust2", "de_cobblestone": "de_cbble", "de_italy": "cs_italy", "de_office": "cs_office", "de_agency": "cs_agency", "de_militia": "cs_militia", "de_baggage": "ar_baggage", "de_shoots": "ar_shoots", "de_pool_day": "ar_pool_day", "de_poolday": "ar_pool_day"};
+const FC_MODE_NAMES = {"premier": "Premier", "competitive": "Competitive", "scrimcomp2v2": "Wingman", "wingman": "Wingman", "casual": "Casual", "deathmatch": "Deathmatch", "gungameprogressive": "Arms Race", "armsrace": "Arms Race", "gungametrbomb": "Demolition", "survival": "Danger Zone", "cooperative": "Co-op", "coopmission": "Co-op Strike", "training": "Training", "custom": "Custom", "retakes": "Retakes", "skirmish": "War Games", "faceit": "FACEIT", "5v5": "5v5"};
+const FC_MAP_PREFIX = /^(de|cs|ar|dz|gd|aim|fy|awp|mg|wp|coop|lobby)_/i;
+const fcFlat = t => String(t || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+const FC_MAP_BY_NAME = Object.fromEntries(Object.entries(FC_MAP_NAMES).map(([k,v]) => [fcFlat(v), k]));
+function fcMapId(map) {
+  const key = String(map || '').trim().toLowerCase().replace(/\\/g,'/').split('/').pop().replace(/\s+/g,'_');
+  if (!key) return '';
+  if (FC_MAP_NAMES[key]) return key;
+  if (FC_MAP_ALIASES[key]) return FC_MAP_ALIASES[key];
+  const flat = fcFlat(key.replace(FC_MAP_PREFIX, ''));
+  if (FC_MAP_BY_NAME[flat]) return FC_MAP_BY_NAME[flat];
+  return FC_MAP_PREFIX.test(key) || key.includes('_') ? key : 'de_' + key;
+}
+function fcMapName(map) {
+  const key = fcMapId(map);
+  if (!key) return 'Unknown map';
+  if (FC_MAP_NAMES[key]) return FC_MAP_NAMES[key];
+  return key.replace(FC_MAP_PREFIX, '').split(/[_-]+/).filter(Boolean).map(w => w[0].toUpperCase() + w.slice(1)).join(' ') || 'Unknown map';
+}
+function fcModeName(mode) {
+  const text = String(mode || '').trim();
+  if (!text) return '';
+  return FC_MODE_NAMES[text.toLowerCase().replace(/[\s_-]/g, '')] ||
+    text.split(/[\s_-]+/).filter(Boolean).map(w => w[0].toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+}
+/* The real picture from the player's own CS2 install, cut out of the game's
+   files by the app (/map-art/). No CS2 on this PC: a plain card instead. */
+const FC_MAP_PLAIN = 'assets/maps/fallback.webp';
 function fcMapAsset(map) {
-  const key = String(map || '').toLowerCase().replace(/^de_/, '');
-  return 'assets/maps/' + (FC_MAPS.includes(key) ? key : 'fallback') + '.webp';
+  const key = fcMapId(map);
+  return key ? '/map-art/' + encodeURIComponent(key) + '.png' : FC_MAP_PLAIN;
+}
+function fcMapFallback(img) {
+  img.onerror = null;
+  img.src = FC_MAP_PLAIN;
 }
 function fcWhen(m, full=false) {
   return fcNumber(m.played_at) > 0 ? (full || m.played_at>Date.now()/1000 ? new Date(m.played_at*1000).toLocaleString() : ago(m.played_at)) : 'Time unavailable';
@@ -84,6 +118,23 @@ function fcSyncAccount() {
   if($('fc-wrap')) $('fc-wrap').innerHTML='';
   return key;
 }
+/* A CS2 match from Steam's history, shaped for the same scoreboard window the
+   FACEIT matches use, laid out like CS2's own Tab screen. Steam's page has no
+   ADR, multi-kills or halves, so those columns are left out for CS2. */
+function fcCs2Scoreboard(m) {
+  const players=(m.players||[]).map(p=>({...p,nickname:p.name||'Player',
+    kd:fcNumber(p.kills)!==null&&fcNumber(p.deaths)!==null?(p.deaths?p.kills/p.deaths:p.kills):null}));
+  const hasTeams=players.some(p=>p.team===1);
+  const half=Math.ceil(players.length/2);
+  const sides=[0,1].map(t=>players.filter((p,i)=>hasTeams?(p.team||0)===t:(t===0?i<half:i>=half)));
+  const [ours,theirs]=String(m.score||'').split('/').map(v=>parseInt(v,10));
+  const mine=Math.max(0,sides.findIndex(side=>side.some(p=>p.you)));
+  const score=side=>side===mine?ours:theirs;
+  const teams=sides.map((side,t)=>({name:t===mine?'Your team':'Opponents',score:Number.isFinite(score(t))?score(t):'—',
+    won:t===mine?m.won===true:m.won===false&&!m.tied,players:side.sort((a,b)=>(b.score||0)-(a.score||0))}));
+  if(mine===1) teams.reverse();
+  return {source:'cs2',tied:!!m.tied,match_id:m.match_id,map:m.map,mode:m.mode,rounds:m.rounds,played_at:m.played_at,teams,score:m.score};
+}
 function fcOutcome(m) { return m.tied ? 'D' : m.won===true ? 'W' : m.won===false ? 'L' : '—'; }
 function fcOutcomeClass(m) { return m.tied || typeof m.won!=='boolean' ? 'fc-draw-result' : m.won ? 'fc-win' : 'fc-loss'; }
 function fcPercent(v) { return fcNumber(v)===null ? '—' : fcValue(v)+'%'; }
@@ -115,11 +166,11 @@ function fcRenderDashboard() {
   const rows=matches.map((m,i)=>{
     const id='fc-detail-'+i, key=m.source+':'+m.match_id, open=expanded.has(key), local=m.source==='cs2';
     const detail=local?[['MVPs',fcValue(m.mvps)],['HS%',fcPercent(m.hs_percent)],['K/R',fcValue(m.kr,2)],['2K',fcValue(m.double)],['3K',fcValue(m.triple)],['4K',fcValue(m.quadro)],['5K',fcValue(m.penta)]]:
-      [['Team',m.team||'Unavailable'],['ELO after match',fcValue(fcNumber(m.elo)>0?m.elo:null)]];
+      [['Team',String(m.team||'').replace(/^team_/i,'')||'Unavailable'],['ELO after match',fcValue(fcNumber(m.elo)>0?m.elo:null)]];
     detail.unshift(['Rounds',fcValue(m.rounds)],['K/D',fcValue(m.kd,2)]);
     detail.push(['Played',fcWhen(m,true)]);
     const toggleAttrs=' data-fc-expand="'+esc(key)+'" aria-expanded="'+open+'" aria-controls="'+id+'"';
-    return '<article class="fc-match fc-surface '+(m.tied?'tied':m.won===true?'won':m.won===false?'lost':'unknown')+'"><div class="fc-match-row"><button class="fc-match-toggle"'+toggleAttrs+'><img class="fc-map-art" src="'+fcMapAsset(m.map)+'" alt="" loading="lazy" onerror="this.onerror=null;this.src=\'assets/maps/fallback.webp\'"><span class="fc-match-map"><b>'+esc(fcMapName(m.map))+'</b><span class="fc-match-source">'+fcSourceIcon(m.source)+fcSourceName(m.source)+'</span><small>'+esc(fcWhen(m))+(!local&&have.has(demoNameFor(m))?' · Downloaded':'')+'</small></span><span class="fc-result '+fcOutcomeClass(m)+'">'+fcOutcome(m)+'</span><span class="fc-match-value"><small>Score</small>'+esc(m.score||'—')+'</span><span class="fc-match-value"><small>K / D / A</small>'+[m.kills,m.deaths,m.assists].map(v=>fcValue(v)).join(' / ')+'</span><span class="fc-match-value"><small>ADR</small>'+fcValue(m.adr,1)+'</span><span class="fc-match-value fc-mode '+(!local?(m.elo_delta>0?'up':m.elo_delta<0?'down':''):'')+'"><small>'+ (local?'Mode':'ELO')+'</small>'+(local?esc(m.mode||'—'):fcDelta(m.elo_delta))+'<span class="fc-chevron" aria-hidden="true">⌄</span></span></button><div class="fc-match-actions"><button class="btn small"'+(local?toggleAttrs:' data-match="'+esc(m.match_id)+'"')+' aria-label="'+(local?'Your stats':'Scoreboard')+' for '+esc(fcMapName(m.map)+' '+fcWhen(m,true))+'">Stats</button></div></div><div class="fc-match-detail" id="'+id+'"'+(open?'':' hidden')+'>'+(local?'<p class="fc-own-line">Your match stats <span>CS2 records your own line on this PC.</span></p>':'')+detail.map(([k,v])=>'<div><small>'+k+'</small><b>'+esc(v)+'</b></div>').join('')+'</div></article>';
+    return '<article class="fc-match fc-surface '+(m.tied?'tied':m.won===true?'won':m.won===false?'lost':'unknown')+'"><div class="fc-match-row"><button class="fc-match-toggle"'+toggleAttrs+'><img class="fc-map-art" src="'+fcMapAsset(m.map)+'" alt="" loading="lazy" onerror="fcMapFallback(this)"><span class="fc-match-map"><b>'+esc(fcMapName(m.map))+'</b><span class="fc-match-source">'+fcSourceIcon(m.source)+fcSourceName(m.source)+'</span><small>'+esc(fcWhen(m))+(!local&&have.has(demoNameFor(m))?' · Downloaded':'')+'</small></span><span class="fc-result '+fcOutcomeClass(m)+'">'+fcOutcome(m)+'</span><span class="fc-match-value"><small>Score</small>'+esc(m.score||'—')+'</span><span class="fc-match-value"><small>K / D / A</small>'+[m.kills,m.deaths,m.assists].map(v=>fcValue(v)).join(' / ')+'</span><span class="fc-match-value"><small>ADR</small>'+fcValue(m.adr,1)+'</span><span class="fc-match-value fc-mode '+(!local?(m.elo_delta>0?'up':m.elo_delta<0?'down':''):'')+'"><small>'+ (local?'Mode':'ELO')+'</small>'+(local?esc(fcModeName(m.mode)||'—'):fcDelta(m.elo_delta))+'<span class="fc-chevron" aria-hidden="true">⌄</span></span></button><div class="fc-match-actions"><button class="btn small"'+(local?(local&&Array.isArray(m.players)&&m.players.length)?' data-fc-board="'+esc(m.match_id)+'"':toggleAttrs:' data-match="'+esc(m.match_id)+'"')+' aria-label="'+(local&&!(local&&Array.isArray(m.players)&&m.players.length)?'Your stats':'Scoreboard')+' for '+esc(fcMapName(m.map)+' '+fcWhen(m,true))+'">Stats</button></div></div><div class="fc-match-detail" id="'+id+'"'+(open?'':' hidden')+'>'+(local?'<p class="fc-own-line">Your match stats <span>CS2 records your own line on this PC.</span></p>':'')+detail.map(([k,v])=>'<div><small>'+k+'</small><b>'+esc(v)+'</b></div>').join('')+'</div></article>';
   }).join('');
   const empty=fcSource==='faceit'?'<h3>No FACEIT matches yet</h3><p>'+(faceit.linked===true?'Your recent FACEIT matches will appear here when available.':'Follow a nickname above to see FACEIT matches. Your local CS2 history is available under All or CS2.')+'</p>':
     '<h3>Your next match starts the story</h3><p>CS2 matches appear here after your next Competitive, Premier or Wingman game. Connect Steam web in Accounts in the left rail to bring in your older games too.</p>'+(data.cs2?.recording?'<p class="fc-restart">Restart CS2 once after this update to activate match recording.</p>':'');
@@ -137,6 +188,12 @@ document.addEventListener('click', async e=>{
     // Clear the previous filter's rows while its replacement is loading.
     statsData=statsData?{...statsData,matches:[],summary:{}}:null;
     await loadFaceit();
+  }
+  const board=e.target.closest('[data-fc-board]');
+  if(board) {
+    const m=(statsData?.matches||[]).find(r=>r.source==='cs2'&&r.match_id===board.dataset.fcBoard);
+    if(m) {statsFocus=board;showStats(fcCs2Scoreboard(m));$('mstat-close').focus();}
+    return;
   }
   const toggle=e.target.closest('[data-fc-expand]');
   if(toggle) {
