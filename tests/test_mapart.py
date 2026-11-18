@@ -41,5 +41,20 @@ class Pictures(unittest.TestCase):
         self.assertIsNone(mapart.picture(None, self.tmp / "data", "de_dust2"))
 
 
+class ModeIcons(unittest.TestCase):
+    def test_game_icon_for_a_plain_mode_name(self):
+        tmp = Path(tempfile.mkdtemp())
+        vpk_path = tmp / "pak01_dir.vpk"
+        vpk_path.write_bytes(b"x")
+        index = {mapart.ICON_FOLDER + "scrimcomp2v2.vsvg_c": "w"}
+        svg = b'<svg viewBox="0 0 32 32"><path d="M0 0h1"/></svg>'
+        with mock.patch.object(mapart.vpk, "read_index", return_value=index), \
+             mock.patch.object(mapart.vpk, "read_file", return_value=b"RED2..." + svg + b"\0tail"):
+            out = mapart.mode_icon(vpk_path, tmp / "data", "scrimcomp2v2")
+            self.assertEqual(out.read_bytes(), svg.replace(b"<svg", b'<svg xmlns="http://www.w3.org/2000/svg"'))
+            self.assertIsNone(mapart.mode_icon(vpk_path, tmp / "data", "something else"))
+        self.assertIsNone(mapart.mode_icon(None, tmp / "other", "Premier"))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -83,3 +83,64 @@ def picture(dir_vpk: Optional[Path], cache_dir: Path, map_id: str) -> Optional[P
             return out
         except (OSError, vpk.VpkError):
             return None
+
+
+# Game-mode icons, from the same files: each ``.vsvg_c`` holds plain SVG text.
+ICON_FOLDER = "panorama/images/icons/ui/"
+MODE_ICONS = {
+    "premier": "premier",            # a wide "Premier" wordmark, not a square
+    "competitive": "competitive",
+    "wingman": "scrimcomp2v2",
+    "casual": "casual",
+    "deathmatch": "deathmatch",
+    "retakes": "retakes",
+    "arms-race": "gungameprogressive",
+}
+
+
+def cut_svg(data: bytes) -> Optional[bytes]:
+    start = data.find(b"<svg")
+    end = data.rfind(b"</svg>")
+    if start < 0 or end < start:
+        return None
+    svg = data[start:end + len(b"</svg>")]
+    if b"xmlns=" not in svg[:300]:
+        # A picture in an <img> only draws with the SVG namespace stated.
+        svg = b'<svg xmlns="http://www.w3.org/2000/svg"' + svg[4:]
+    return svg
+
+
+def mode_icon(dir_vpk: Optional[Path], cache_dir: Path, mode: str) -> Optional[Path]:
+    """The game's own SVG icon for a mode ("Premier", "Wingman"...), or None."""
+    key = re.sub(r"[^a-z]+", "-", maps.mode(mode).lower()).strip("-")
+    name = MODE_ICONS.get(key)
+    if not name:
+        return None
+    cache = Path(cache_dir) / "map-art"
+    out = cache / f"mode-{key}.svg"
+    try:
+        stamp = dir_vpk.stat().st_mtime if dir_vpk is not None else 0
+    except OSError:
+        stamp = 0
+    with _lock:
+        try:
+            if out.is_file() and (not stamp or out.stat().st_mtime >= stamp):
+                return out
+        except OSError:
+            pass
+        if not stamp:
+            return None
+        try:
+            index = vpk.read_index(dir_vpk)
+            entry = index.get(f"{ICON_FOLDER}{name}.vsvg_c") or \
+                vpk.find(index, f"icons/ui/{name}.vsvg_c")
+            svg = cut_svg(vpk.read_file(dir_vpk, entry)) if entry is not None else None
+            if svg is None:
+                return None
+            cache.mkdir(parents=True, exist_ok=True)
+            tmp = out.with_suffix(".tmp")
+            tmp.write_bytes(svg)
+            tmp.replace(out)
+            return out
+        except (OSError, vpk.VpkError):
+            return None
