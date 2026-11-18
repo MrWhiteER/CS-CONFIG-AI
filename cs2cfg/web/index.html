@@ -1914,7 +1914,6 @@
   .rm { color: var(--bad); font-family: var(--mono); font-size: 12px; }
   .ad { color: var(--accent); font-family: var(--mono); font-size: 12px; }
 
-  #status { color: var(--muted); font-size: 12px; min-height: 18px; padding: 2px 0; }
   .err { color: var(--bad); }
   .hidden { display: none !important; }
   .spin { display: inline-block; animation: sp 1s linear infinite; }
@@ -2153,7 +2152,6 @@
     font-size: 11px; font-weight: 600;
   }
 
-  #status { color: var(--muted); font-size: 12px; min-height: 18px; padding: 2px 0; }
   .err { color: var(--bad); }
   .hidden { display: none !important; }
   .spin { display: inline-block; animation: sp 1s linear infinite; }
@@ -3262,27 +3260,6 @@
 
      Floating it costs nothing -- it was already a bordered chip on its own
      background, so it reads the same. It just no longer moves the page. */
-  #status {
-    position: absolute; z-index: 30; left: 16px; bottom: 14px;
-    max-width: calc(100% - 32px);
-    padding: 9px 14px; border-radius: 10px;
-    background: rgba(10, 6, 20, .92);
-    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
-    border: 1px solid var(--line);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, .55);
-    color: var(--ink-dim); font-size: 12px; min-height: 0;
-    animation: status-in .22s cubic-bezier(.2, .8, .3, 1);
-  }
-  #status.err { border-color: color-mix(in srgb, var(--bad) 55%, transparent); }
-  @keyframes status-in {
-    from { opacity: 0; transform: translateY(8px); }
-    to   { opacity: 1; transform: none; }
-  }
-  @media (prefers-reduced-motion: reduce) { #status { animation: none; } }
-  @supports not (color: color-mix(in srgb, red 50%, blue)) {
-    #status.err { border-color: var(--bad); }
-  }
-
   ::-webkit-scrollbar { width: 9px; height: 9px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb {
@@ -5997,6 +5974,65 @@ html.setup-checking .app { visibility:hidden; }
 @media(max-width:580px) { .setup-shell { height:100dvh; } }
 @media(prefers-reduced-motion:reduce) { .setup-wizard *, .setup-wizard *::before, .setup-wizard *::after, .sync-control *, .sync-control *::after { animation:none !important; transition:none !important; }.setup-wizard .setup-particles { display:none; }.setup-step.setup-enter { animation:setup-theme-fade 100ms ease-out reverse both !important; }.setup-step.setup-exit, .setup-wizard.is-finishing { animation:setup-theme-fade 100ms ease-out both !important; }.setup-wizard .setup-choice:hover { transform:none; }[aria-pressed="true"] .setup-tick svg g { transform:scaleX(1); } }
 @media(prefers-reduced-motion:reduce) { .setup-eyebrow::before { transform:scaleX(1); } }
+/* Notification dock: opaque theme surfaces, semantic states and transform-only motion. */
+:root { --status-bg:#1b1627; --status-ink:#f3efff; --status-track:#373044; --status-accent:#bfa0ff; --status-good:#70e0ac; --status-bad:#ff929f; --status-warn:#ffcc76; --status-border:#706580; --status-shadow:0 12px 36px #0005; --status-radius:12px; }
+:root[data-theme="ember"] { --status-bg:#261c10; --status-ink:#fff2df; --status-track:#493921; --status-accent:#ffc163; --status-good:#8fdfa1; --status-bad:#ff9b91; --status-warn:#ffcf75; --status-border:#856b47; }
+:root[data-theme="carbon"] { --status-bg:#1b2028; --status-ink:#f0f4fa; --status-track:#38424f; --status-accent:#c3d0de; --status-good:#86e4b3; --status-bad:#ff9baf; --status-warn:#f2ce83; --status-border:#6b798c; }
+:root[data-theme="acid"] { --status-bg:#101f16; --status-ink:#edfff2; --status-track:#284735; --status-accent:#65ff9f; --status-good:#92efb6; --status-bad:#ff9caa; --status-warn:#efda78; --status-border:#528768; }
+:root[data-theme="crimson"] { --status-bg:#28151b; --status-ink:#fff0f3; --status-track:#50303a; --status-accent:#ff9cac; --status-good:#88e3b5; --status-bad:#ff9a9a; --status-warn:#fbd28d; --status-border:#945c6c; }
+:root[data-theme="frost"] { --status-bg:#13232c; --status-ink:#edfaff; --status-track:#2e4654; --status-accent:#90ddff; --status-good:#8ce4bb; --status-bad:#ffa0b4; --status-warn:#f6d898; --status-border:#5e8498; }
+:root[data-theme="neon"] { --status-bg:#181529; --status-ink:#f8f1ff; --status-track:#3b3052; --status-accent:#e0a7ff; --status-good:#72f2c2; --status-bad:#ffa0c1; --status-warn:#ffdc8e; --status-border:#866aa5; }
+:root[data-theme="daylight"] { --status-bg:#ffffff; --status-ink:#202b3a; --status-track:#e1e7ef; --status-accent:#5d42ae; --status-good:#176c4b; --status-bad:#b02f48; --status-warn:#825100; --status-border:#8996a7; --status-shadow:0 10px 30px #26304726; }
+:root[data-theme="paper"] { --status-bg:#fffaf0; --status-ink:#362c21; --status-track:#e6ddcc; --status-accent:#765224; --status-good:#286438; --status-bad:#a83336; --status-warn:#795000; --status-border:#a08e75; --status-shadow:0 10px 30px #45321c26; }
+:root[data-theme="pro"] { --status-bg:#20242a; --status-ink:#f3f5f7; --status-track:#414851; --status-accent:#ffad74; --status-good:#91dfb0; --status-bad:#ff9fa8; --status-warn:#f3d18b; --status-border:#7c8794; --status-radius:4px; --status-shadow:none; }
+#status { position:fixed; left:24px; bottom:24px; z-index:500; display:flex; flex-direction:column; gap:10px; width:min(410px,calc(100vw - 48px)); max-height:calc(100vh - 48px); overflow:auto; backdrop-filter:none; border-radius:0; padding:0; min-height:0; background:none; border:0; box-shadow:none; animation:none; color:var(--status-ink); pointer-events:none; }
+#status:empty { display:none; }
+.status-card { --status-state:var(--status-accent); position:relative; display:grid; grid-template-columns:36px minmax(0,1fr) 28px; align-items:start; gap:12px; padding:17px 14px 19px 17px; flex-shrink:0; overflow:hidden; background:var(--status-bg); color:var(--status-ink); border:1px solid var(--status-border); border-radius:var(--status-radius); box-shadow:var(--status-shadow); pointer-events:auto; animation:status-enter .4s cubic-bezier(.2,.9,.3,1.06) both; }
+.status-card[hidden] { display:none; }
+.status-card[data-kind="done"] { --status-state:var(--status-good); }
+.status-card[data-kind="error"] { --status-state:var(--status-bad); }
+.status-card[data-kind="warn"] { --status-state:var(--status-warn); }
+.status-card.leaving { animation:status-leave .18s ease-in both; pointer-events:none; }
+.status-icon { width:34px; height:34px; color:var(--status-state); }
+.status-icon svg { display:block; width:100%; height:100%; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.status-loader { animation:status-turn 1.5s linear infinite; }
+.status-loader .orbit { stroke-dasharray:38 54; }
+.status-card b { display:block; font-weight:650; font-family:inherit; font-size:14px; line-height:1.3; margin:0 0 5px; color:var(--status-ink); }
+.status-card p { margin:0; font-size:13px; line-height:1.45; color:var(--status-ink); overflow-wrap:anywhere; }
+.status-detail { display:block; margin-top:6px; font-size:12px; color:var(--status-ink); font-variant-numeric:tabular-nums; }
+.status-close { display:grid; place-items:center; width:28px; height:28px; padding:0; border:0; background:transparent; color:var(--status-ink); cursor:pointer; border-radius:4px; font-family:inherit;font-size:20px;line-height:1; }
+.status-close:hover { background:var(--status-track); }
+.status-close:focus-visible,.status-card summary:focus-visible { outline:2px solid var(--status-state); outline-offset:2px; }
+.status-card details { margin-top:8px; font-size:12px; color:var(--status-ink); }
+.status-card summary { cursor:pointer; }
+.status-card pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:130px; overflow:auto; font:12px/1.5 monospace; }
+.status-track { position:absolute; bottom:0; left:0; width:100%; height:4px; overflow:hidden; background:var(--status-track); }
+.status-fill { width:100%; height:100%; background:var(--status-state); transform:scaleX(var(--status-progress,1)); transform-origin:left; transition:transform .45s ease; }
+[data-kind="working"] .status-fill { width:40%; animation:status-travel 1.6s linear infinite; }
+[data-kind="done"] .status-icon svg { animation:status-check .4s ease-out both; }
+.status-card.timed .status-fill { animation:status-drain 6s linear forwards; }
+.status-card.paused .status-fill { animation-play-state:paused; }
+.status-card[data-kind="error"] .status-fill { transform:scaleX(1); }
+.upd-toast { background:var(--status-bg); color:var(--status-ink); border:1px solid var(--status-border); border-left:3px solid var(--status-accent); border-radius:var(--status-radius); box-shadow:var(--status-shadow); backdrop-filter:none; }
+.upd-toast h4,.upd-toast p { color:var(--status-ink); }
+.upd-toast h4 i { background:var(--status-accent); box-shadow:none; }
+@keyframes status-enter { from { opacity:0; transform:translate(-20px,8px); } to { opacity:1; transform:translate(0,0); } }
+@keyframes status-leave { to { opacity:0; transform:translate(-16px,4px); } }
+@keyframes status-turn { to { transform:rotate(360deg); } }
+@keyframes status-travel { from { transform:translateX(-100%); } to { transform:translateX(250%); } }
+@keyframes status-drain { from { transform:scaleX(1); } to { transform:scaleX(0); } }
+@keyframes status-check { from { opacity:0; transform:scale(.7); } to { opacity:1; transform:scale(1); } }
+html.status-page-hidden .status-card,html.status-page-hidden .status-card * { animation-play-state:paused !important; }
+@media (max-width:600px) { #status { left:12px; bottom:12px; width:calc(100vw - 24px); } }
+@media (prefers-reduced-motion:reduce) {
+ .status-card { animation:status-fade .08s linear both; }
+ .status-card.leaving { animation:status-fade-out .08s linear both; }
+ .status-card .status-loader,.status-card .status-fill,.status-card .status-icon svg { animation:none; transition:none; }
+ [data-kind="working"] .status-fill { width:40%; transform:translateX(75%); }
+ @keyframes status-fade { from { opacity:0; } to { opacity:1; } }
+ @keyframes status-fade-out { to { opacity:0; } }
+}
+
 </style>
 </head>
 <body>
@@ -6046,9 +6082,12 @@ const startup = (() => {
     task.job = Promise.resolve().then(load).catch(error => {
       // Loaders own their normal error states. Surface unexpected render errors too.
       console.error("Startup " + name + " failed", error);
-      if (typeof status === "function") status("Startup " + name + " failed: " + esc(error.message), true);
+      if (typeof status === "function") status(error.message, {id:'startup-error-'+name,kind:'error',title:'Part of the workspace could not load'});
     }).finally(() => {
       veil.style.setProperty("--boot-progress", (++settled / names.length * 100) + "%");
+      if (finished) { task.resolve(); return; }
+      if (settled === names.length) status('Your workspace is ready.', {id:'startup',kind:'done'});
+      else busy('Opening your workspace...', {id:'startup',progress:settled/names.length,detail:settled+' of '+names.length+' checks complete'});
       task.resolve();
     });
     return task.job;
@@ -6057,6 +6096,7 @@ const startup = (() => {
     if (finished) return;
     finished = true;
     clearTimeout(fallback); clearInterval(tipTimer);
+    status.dismiss('startup');
     veil.classList.add("is-dismissed");
     document.dispatchEvent(new Event('cs2cfg:ready'));
     setTimeout(() => veil.remove(), reduced.matches ? 100 : 240);
@@ -6250,7 +6290,7 @@ const startup = (() => {
       </div>
     </div>
 
-    <div id="status">Detecting hardware&hellip;</div>
+    <div id="status" aria-label="Notifications"></div>
 
     <div class="scroll">
 
@@ -7046,37 +7086,109 @@ const $ = (id) => document.getElementById(id);
 let intent = "balanced";
 let planned = null;
 
-let statusTimer = null;
-
-/* The status line is for things worth saying, and stays out of the way the
-   rest of the time.
-
-   It used to hold whatever was last written to it for the length of the
-   session, so a line announcing that a preview had not written anything sat
-   across the top of the app long after anyone had read it. Now an ordinary
-   message clears itself once it has been seen, and only an error waits for
-   something to replace it -- an error nobody read is the one case where
-   leaving it there is the right answer.
-*/
-function status(text, isError) {
-  const el = $("status");
-  if (!el) return;
-  clearTimeout(statusTimer);
-  if (!text) {
-    el.classList.add("hidden");
-    el.innerHTML = "";
-    return;
-  }
-  el.className = isError ? "err" : "";
-  el.classList.remove("hidden");
-  el.innerHTML = text;
-  // A spinner is not a message; it is replaced by one when the work finishes,
-  // and hiding it mid-flight would look like the work had stopped.
-  if (!isError && text.indexOf("spin") === -1) {
-    statusTimer = setTimeout(() => el.classList.add("hidden"), 6000);
-  }
+/* Notification helpers. Legacy callers share a card; explicit job ids allow concurrency.
+   Three visible cards plus a FIFO queue. Errors are never evicted by another job. */
+function statusText(value) {
+  return String(value == null ? '' : value).replace(/<\/?(?:span|b|strong|i|em|br)\b[^>]*>/gi,'')
+    .replace(/&(amp|lt|gt|quot|apos|#39|#x27|hellip|mdash|middot);/gi,(_,k)=>({amp:'&',lt:'<',gt:'>',quot:'"',apos:"'",'#39':"'",'#x27':"'",hellip:'\u2026',mdash:'\u2014',middot:'\u00b7'}[k.toLowerCase()]));
 }
-function busy(text) { status('<span class="spin">◐</span> ' + text); }
+function friendlyError(value) {
+  const raw=statusText(value instanceof Error ? value.message : value).trim();
+  const quotedFile=raw.match(/["']([^"'\r\n]+\.(?:cfg|vcfg|dem|zip|txt|json))["']/i)?.[1];
+  const filename=quotedFile?.split(/[\\/]/).pop();
+  const file=filename && filename.length<=100 && !/[<>]/.test(filename) ? filename : null;
+  if (/failed to fetch|network|http\s*[45]\d\d|not json|json.*(?:parse|position)|unexpected token|connection|refused|unreachable/i.test(raw)) return "The app's background service did not answer. Try again in a moment.";
+  if (/permission|access.*denied|winerror\s*5\b|errno\s*13|eacces|eperm/i.test(raw)) return 'The app could not access '+(file || 'that file or device')+'. Close any app using it, then try again.';
+  if (/not found|no such file|enoent|winerror\s*[23]\b|filenotfound/i.test(raw)) return (file ? 'The file '+file : 'That file or folder')+' is no longer available. Choose it again and retry.';
+  if (/timeout|timed?\s*out|taking too long/i.test(raw)) return 'This is taking longer than expected. Please try again in a moment.';
+  if (/disk.*full|no space|enospc/i.test(raw)) return 'There is not enough free space. Free up some space and try again.';
+  if (/traceback|exception|\b\w*error\b|\berrno\b|\bwinerror\b|\b0x[\da-f]+\b|\b\w+_\w+\b|\bat \w+\s*\(|[{}]|[A-Z]:\\|\bHTTP\b/i.test(raw) || /\b[A-Z_]{3,}\b|[\r\n]|\b[0-9a-f]{8}-[0-9a-f-]{20,}\b/.test(raw) || !raw || raw.length>260 || !raw.includes(' ')) return 'The app could not finish that action. Please try again. You can open Details for more information.';
+  return raw.charAt(0).toUpperCase()+raw.slice(1)+(/[.!?]$/.test(raw)?'':'.');
+}
+const notificationDock = (() => {
+  const records=new Map(), waiting=[];
+  let serial=0, legacy='legacy';
+  const titles={working:'Working on it',progress:'Making progress',done:'All set',error:'Something needs attention',notice:'Good to know',warn:'Before you continue'};
+  const icon=kind=>`<svg viewBox="0 0 36 36" aria-hidden="true" ${kind==='working'||kind==='progress'?'class="status-loader"':''}>${kind==='working'||kind==='progress'?'<circle cx="18" cy="18" r="12" opacity=".25"/><circle class="orbit" cx="18" cy="18" r="12"/>':kind==='done'?'<circle cx="18" cy="18" r="13"/><path d="m11 18 5 5 10-11"/>':kind==='error'?'<circle cx="18" cy="18" r="13"/><path d="m14 14 8 8m0-8-8 8"/>':kind==='warn'?'<path d="m18 4 15 27H3Z M18 13v8m0 5v1"/>':'<circle cx="18" cy="18" r="13"/><path d="M18 16v10m0-16v1"/>'}</svg>`;
+  function pause(r) {
+    if (!r.timer) return;
+    clearTimeout(r.timer);r.timer=null;r.remaining=Math.max(0,r.remaining-(Date.now()-r.started));r.el.classList.add('paused');
+  }
+  function resume(r) {
+    if (!r.timed || r.timer || document.hidden || r.hover || r.focus || !r.el?.isConnected) return;
+    r.el.classList.remove('paused');r.started=Date.now();r.timer=setTimeout(()=>dismiss(r.id),r.remaining);
+  }
+  function promote() {
+    while ($('status') && $('status').children.length<3 && waiting.length) {
+      const r=records.get(waiting.shift());if(r) mount(r);
+    }
+  }
+  function dismiss(id,immediate=false) {
+    const r=records.get(id);if(!r)return;
+    clearTimeout(r.timer);records.delete(id);
+    const at=waiting.indexOf(id);if(at>=0)waiting.splice(at,1);
+    if(r.el && !immediate){r.el.classList.add('leaving');setTimeout(()=>{r.el.remove();promote();},180);}
+    else {r.el?.remove();promote();}
+  }
+  function paint(r) {
+    clearTimeout(r.timer);r.timer=null;r.remaining=6000;
+    r.timed=!['working','progress','error'].includes(r.kind);
+    const el=r.el;const hadFocus=el.contains(document.activeElement);const detailsOpen=el.querySelector('details')?.open;const oldProgress=r.displayProgress;const oldKind=el.dataset.kind;r.displayProgress=r.progress;el.className='status-card'+(r.timed?' timed':'');el.dataset.kind=r.kind;
+    el.setAttribute('role',r.kind==='error'?'alert':'status');el.setAttribute('aria-live',r.kind==='error'?'assertive':'polite');el.setAttribute('aria-atomic','true');
+    const progress=Number.isFinite(r.progress)?Math.max(0,Math.min(1,r.progress)):null;
+    el.style.setProperty('--status-progress',progress??1);
+    el.innerHTML=`<div class="status-icon">${icon(r.kind)}</div><div class="status-copy"><b>${esc(r.title||titles[r.kind])}</b><p>${esc(r.text)}</p>${r.detail||progress!==null?`<span class="status-detail">${esc(r.detail||Math.round(progress*100)+'%')}</span>`:''}${r.kind==='error'?`<details><summary>Details</summary><pre>${esc(r.raw)}</pre></details>`:''}</div><button type="button" class="status-close" aria-label="Dismiss ${esc(r.title||titles[r.kind])}">&times;</button><div class="status-track" ${r.kind==='progress'?`role="progressbar" aria-label="${esc(r.title||titles[r.kind])}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(progress*100)}"`: 'aria-hidden="true"'}><div class="status-fill"></div></div>`;
+    if(r.kind==='progress' && oldKind==='progress' && Number.isFinite(oldProgress)) {
+      const fill=el.querySelector('.status-fill');fill.style.transform='scaleX('+Math.max(0,Math.min(1,oldProgress))+')';
+      // Commit the previous transform before setting the measured destination.
+      fill.getBoundingClientRect();fill.style.transform='scaleX('+progress+')';
+    }
+    el.querySelector('button').addEventListener('click',()=>dismiss(r.id));
+    if(detailsOpen && el.querySelector('details'))el.querySelector('details').open=true;
+    if(hadFocus)el.querySelector('button').focus();
+    if(r.hover || r.focus || document.hidden)el.classList.add('paused');
+    resume(r);
+  }
+  function mount(r) {
+    const root=$('status');if(!root)return;
+    root.className='';const el=document.createElement('section');r.el=el;root.appendChild(el);
+    el.addEventListener('pointerenter',()=>{r.hover=true;pause(r)});
+    el.addEventListener('pointerleave',()=>{r.hover=false;resume(r)});
+    el.addEventListener('focusin',()=>{r.focus=true;pause(r)});
+    el.addEventListener('focusout',e=>{if(!el.contains(e.relatedTarget)){r.focus=false;resume(r)}});
+    paint(r);
+  }
+  function show(text,options={}) {
+    let id=options.id||legacy;
+    if (!text){const r=records.get(id);if(r?.kind!=='error')dismiss(id);return id;}
+    let kind=options.kind||'done';
+    if(Number.isFinite(options.progress) && kind==='working')kind='progress';
+    if(kind==='progress' && !Number.isFinite(options.progress))kind='working';
+    if(!titles[kind])kind='notice';
+    if(!options.id && records.get(id)?.kind==='error'){legacy='legacy-'+(++serial);id=legacy;}
+    const raw=statusText(text), prior=records.get(id);
+    const r=prior||{id,el:null};
+    Object.assign(r,{kind,raw,text:kind==='error'?friendlyError(raw):raw,detail:statusText(options.detail||''),title:statusText(options.title||''),progress:options.progress});
+    records.set(id,r);
+    if(r.el){paint(r);r.el.style.animation='none';}
+    else if($('status') && $('status').children.length<3)mount(r);
+    else if(!waiting.includes(id))waiting.push(id);
+    return id;
+  }
+  document.addEventListener('visibilitychange',()=>{
+    document.documentElement.classList.toggle('status-page-hidden',document.hidden);
+    for(const r of records.values())if(r.el)document.hidden?pause(r):resume(r);
+  });
+  return {show,dismiss,clear(){waiting.length=0;for(const id of [...records.keys()])dismiss(id,true);},records};
+})();
+function status(text, isError) {
+  return notificationDock.show(text,typeof isError==='object'&&isError ? isError : {kind:isError?'error':'done'});
+}
+function busy(text, options={}) { return status(text,{...options,kind:'working'}); }
+status.progress=(text,progress,options={})=>busy(text,{...options,progress});
+status.dismiss=id=>notificationDock.dismiss(id);
+status.clear=()=>notificationDock.clear();
+
 function esc(s) {
   return String(s == null ? "" : s).replace(/[&<>"']/g,
     c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -7789,15 +7901,15 @@ function renderPlan(p) {
 let lastScan = null;
 
 async function scan(rescan) {
-  busy("Detecting hardware…");
+  busy('Checking your hardware...', {id:'hardware'});
   try {
     lastScan = await api("/api/scan" + (rescan ? "?rescan=1" : ""));
     renderHardware(lastScan);
     verificationStarted = true;
     refreshVerification();
     renderFps();
-    status("Ready.");
-  } catch (e) { status("Scan failed: " + esc(e.message), true); }
+    status('Your hardware is ready.', {id:'hardware',kind:'done'});
+  } catch (e) { status(e.message, {id:'hardware',kind:'error',title:'Hardware check could not finish'}); }
 }
 
 function requestBody() {
@@ -7869,7 +7981,7 @@ function undoChanges() {
   pendingChanges = [];
   changeChoice = {};
   closeConfirm();
-  status("Put back.");
+  status("Your previous choice is back.");
 }
 
 function closeConfirm() {
@@ -8512,7 +8624,7 @@ setInterval(() => { if (!document.hidden && !$('verification').hidden) refreshVe
 
 let planRevision = 0, profileApplyBusy = false;
 async function previewPlan() {
-  busy("Building plan…");
+  busy("Preparing your settings preview…");
   $("preview").disabled = true;
   $("apply").disabled = true;
   const revision = ++planRevision, body = requestBody();
@@ -8534,7 +8646,7 @@ $("apply").addEventListener("click", async () => {
     $('verification-title').textContent = 'Applying and reading back…';
     $('verification').dataset.state = 'changed';
   }
-  busy("Writing…");
+  busy('Applying your settings...', {id:'apply',detail:planned.changed_count != null ? planned.changed_count+' settings in your preview' : ''});
   $("apply").disabled = true;
   try {
     const r = await api("/api/apply", requestBody());
@@ -8565,14 +8677,14 @@ $("apply").addEventListener("click", async () => {
     const stood = r.skipped || [];
     if (stood.length) {
       status("Applied — but " + stood.map(x => esc(x.what)).join(" and ") +
-             " could not be written yet. " + esc(stood[0].detail), true);
+             " could not be changed yet. Close Steam and CS2, then try again. See the checklist for details.", {id:"apply",kind:"warn"});
     } else if (r.steps.some(s => !s.ok)) {
-      status('Applied with errors. Review the read-back checklist.', true);
+      status('Some settings could not be applied. Review the checklist.', {id:'apply',kind:'error'});
     } else {
-      status("Applied.");
+      status('Your settings have been applied.', {id:'apply',kind:'done',detail:r.steps.filter(s=>s.ok).length+' changes completed'});
     }
     scan(true);
-  } catch (e) { status("Apply failed: " + esc(e.message), true); $("apply").disabled = false; }
+  } catch (e) { status(e.message, {id:'apply',kind:'error',title:'Settings could not be applied'}); $("apply").disabled = false; }
   finally { profileApplyBusy = false; profileRail.syncStatus(); }
 });
 
@@ -8707,15 +8819,15 @@ const profileRail = (() => {
 
 $("revert").addEventListener("click", async () => {
   if (!confirm("Restore the most recent backup?")) return;
-  busy("Restoring…");
+  busy('Restoring your previous settings...', {id:'restore'});
   try {
     const r = await api("/api/revert", {});
     $("results").insertAdjacentHTML("afterbegin",
       '<section class="card"><h2>Restored ' + esc(r.stamp) + "</h2>" +
       r.lines.map(l => '<div class="mono">' + esc(l) + "</div>").join("") + "</section>");
-    status("Restored.");
+    status('Your previous settings have been restored.', {id:'restore',kind:'done',detail:r.lines.length+' restore steps completed'});
     scan(true);
-  } catch (e) { status("Revert failed: " + esc(e.message), true); }
+  } catch (e) { status(e.message, {id:'restore',kind:'error',title:'Settings could not be restored'}); }
 });
 
 // --- common settings ------------------------------------------------------
@@ -8861,8 +8973,7 @@ async function saveCommonSettings(subset) {
   try {
     const r = await api("/api/cfg/settings/apply", { changes });
     for (const k of keys) cfgEdits.delete(k);
-    status("Saved " + r.applied.length + " setting(s) to " + r.files.length +
-           " file(s). Backup " + (r.backup || "none") + ".");
+    status("Saved " + r.applied.length + " settings across " + r.files.length + " files." + (r.backup ? " A backup was saved." : ""));
     updateSettingButtons();
     markTabDirty();
     return true;
@@ -9767,14 +9878,14 @@ async function runFix(button) {
     if (good && id === "power.performance" && typeof r.boosted === "boolean") { fixData.power.boosted = r.boosted; fixData.power.plan = r.plan; }
     if (good && id === "steam.zombie" && r.ended) fixData.zombie_cs2 = false;
     paintFixState(id);
-    status(text, !good && !r.declined);
+    status(good ? fix.title + ' is complete.' : r.declined ? 'The action was cancelled.' : text, {kind:good?'done':r.declined?'notice':'error'});
     if (good && id !== "sound.apps") setTimeout(() => loadFixes(true), 2700);
     // Steam is back and signed in, and the launch was asked for. Handed to
     // the ordinary Play button rather than launched from here, so the game
     // still gets the whole borderless preparation instead of a second,
     // lesser launch path that would drift out of step with the first.
     if (good && r.then_play && $("play") && !$("play").disabled) {
-      status("Steam is back — launching CS2.");
+      status("Steam is back — launching CS2.", {kind:"notice"});
       $("play").click();
     }
   } catch (err) {
@@ -9905,7 +10016,7 @@ function renderTemps(data) {
       tempAlarm[key] = true;
       status(part.label + " is at " + Math.round(part.celsius) +
              "°C — past the point where it stops boosting. Expect the frame " +
-             "rate to sag until it cools.", true);
+             "rate to sag until it cools.", {kind:"warn"});
     } else if (!isHot && wasHot && part.state === "fine") {
       tempAlarm[key] = false;
     }
@@ -10598,7 +10709,7 @@ $("play-fix").addEventListener("click", async () => {
   const hint = $("fix-hint");
   button.disabled = true;
   const said = button.textContent;
-  button.textContent = "Checking…";
+  button.textContent = "Checking your configuration…";
   try {
     const r = await api("/api/play/fix", {});
     if (r.was_ok) {
@@ -10883,7 +10994,7 @@ async function makeStarter(quiet) {
     const made = (r.created || []).length;
     status(made
       ? "Created a starter config in " + r.folder + " (" + made + " files). " +
-        "Launch options should exec " + r.launch_target + "."
+        "Use Play to launch with your new configuration."
       : "A config was already there; nothing was changed.");
     // The tabs that were empty have something to show now.
     treeData = null; plugData = null; applyScriptStatus = null; keyData = null; cfgSettings = null;
@@ -11749,7 +11860,7 @@ document.addEventListener("click", async e => {
                (applyKeys.length
                  ? " — press " + applyKeys.join(" or ") + " to apply it live"
                  : " — takes effect next time you reload your configs") +
-               (r.backup ? ", backup " + r.backup : ""));
+               (r.backup ? ". A backup was saved." : ""));
       }
       await loadKeyboard(true);
     } catch (err) {
@@ -11921,7 +12032,7 @@ document.addEventListener("click", async e => {
     try {
       const r = await api("/api/cfg/layouts/sync/push", {});
       status(r.files.length
-        ? "Pushed " + r.files.length + " profile(s) to the cloud."
+        ? "Uploaded " + r.files.length + " profiles to the cloud."
         : "Nothing to push yet — no profiles detected in this collection.");
     } catch (err) {
       status("Could not push to the cloud: " + String(err && err.message || err), true);
@@ -11935,7 +12046,7 @@ document.addEventListener("click", async e => {
     try {
       const r = await api("/api/cfg/layouts/sync/pull", {});
       status(r.files.length
-        ? "Pulled " + r.files.length + " profile(s) from the cloud."
+        ? "Downloaded " + r.files.length + " profiles from the cloud."
         : "Nothing new to pull.");
       await refreshKbSwitcher();
       layoutData = await api("/api/cfg/layouts/status", {});
@@ -12048,7 +12159,7 @@ document.addEventListener("click", async e => {
   try {
     const pinned = Array.from(layoutPending[file] || []);
     layoutData = await api("/api/cfg/layouts/pin", { file, pinned });
-    status(layoutData.note || "Saved pins for " + file.split("/").pop());
+    status("Saved pins for " + file.split("/").pop() + (layoutData.note ? ". Choose a switch key for this profile in Keyboard." : "."), {kind:layoutData.note?"notice":"done"});
     renderKbLayouts();
   } catch (err) {
     status("Could not save pins: " + String(err && err.message || err), true);
@@ -12315,7 +12426,7 @@ async function loadFaceit(opts) {
       const previous = fcSeen[name];
       if (previous && newest.match_id !== previous.match_id && newest.played_at > previous.played_at) {
         status('New match: ' + fcSourceName(name) + ' · ' + esc(fcMapName(newest.map)) + ' — ' +
-          (newest.tied ? 'draw' : newest.won ? 'win' : 'loss'));
+          (newest.tied ? 'draw' : newest.won ? 'win' : 'loss'), {kind:'notice'});
       }
       fcSeen[name] = {match_id:newest.match_id, played_at:newest.played_at};
     }
@@ -12677,6 +12788,7 @@ function renderDemos() {
 }
 
 function showDemoJob(job) {
+  if (job?.active) busy('Downloading your demo...', {id:'demo-download',progress:job.total>0?job.seen/job.total:undefined,detail:job.total>0?bytes(job.seen)+' of '+bytes(job.total):bytes(job.seen)+' downloaded'});
   const wrap = $("demo-prog"), fill = $("demo-bar-fill"), say = $("demo-prog-say");
   if (!wrap) return;
   if (!job || !job.active) { wrap.classList.add("hidden"); return; }
@@ -12708,9 +12820,11 @@ function watchDemoJob() {
       renderFaceit();       // a match that now says DOWNLOADED
       paintGetRow();
       if (d.job && d.job.error && d.job.error !== "cancelled") {
-        status("Demo download failed: " + esc(d.job.error), true);
+        status(d.job.error, {id:'demo-download',kind:'error',title:'Demo download could not finish'});
+      } else if (d.job?.error === 'cancelled') {
+        status('Demo download cancelled.', {id:'demo-download',kind:'notice'});
       } else if (d.job && !d.job.error) {
-        status("Demo ready: " + esc(d.job.name));
+        status('Demo ready: ' + d.job.name, {id:'demo-download',kind:'done'});
       }
     }
   }, 900);
@@ -13087,7 +13201,7 @@ document.addEventListener("click", async e => {
       const picked = await api("/api/companions/browse", {});
       if (picked.cancelled || !picked.path) return;
       const r = await api("/api/companions/act", { do: "add", exe: picked.path });
-      if (r.ok) { companionsData = r.companions || []; renderCompanions(); status("Added."); }
+      if (r.ok) { companionsData = r.companions || []; renderCompanions(); status("The app has been added."); }
       else status(r.error || "Could not add that.", true);
     } catch (err) {
       status(String(err && err.message || err), true);
@@ -13104,7 +13218,7 @@ document.addEventListener("click", async e => {
     start.textContent = "Starting…";
     try {
       const r = await api("/api/companions/start", { id });
-      status(r.detail || r.error || (r.ok ? "Started." : "Could not start it."), !r.ok);
+      status(r.ok ? "Your app has started." : r.error, !r.ok);
     } catch (err) {
       status(String(err && err.message || err), true);
     } finally {
@@ -13223,7 +13337,7 @@ document.addEventListener("click", async e => {
   inspect.disabled = true;
   try {
     const r = await api("/api/inventory/inspect", { link });
-    status(r.detail || r.error || (r.ok ? "Opening…" : "Could not open that."), !r.ok);
+    status(r.ok ? "Your selection is opening." : r.error, !r.ok);
   } catch (err) {
     status(String(err && err.message || err), true);
   } finally {
@@ -13613,7 +13727,7 @@ function watchCloudLogin() {
     if (r.waiting) return;
     clearInterval(cloudPoll); cloudPoll = null;
     if (!r.ok) status(esc(r.error || "that sign-in did not finish"), true);
-    else status(r.linked ? "Attached." : "Signed in.");
+    else status(r.linked ? "Your account is linked." : "Signed in.");
     await loadCloud();
   }, 2000);
 }
@@ -14356,7 +14470,7 @@ document.addEventListener("click", async e => {
   go.textContent = "Setting…";
   try {
     const r = await api("/api/wingraphics/apply", {});
-    status(r.ok ? (r.detail || "Set.") : r.error, !r.ok);
+    status(r.ok ? "Your choice has been saved." : r.error, !r.ok);
   } catch (err) { status(String(err && err.message || err), true); }
   go.textContent = said;
   go.disabled = false;
@@ -14379,7 +14493,7 @@ document.addEventListener("change", async e => {
 function sayCrosshair(outcome) {
   if (!outcome) return;
   if (outcome.error) { status(esc(outcome.error), true); return; }
-  if (outcome.warning) { status(esc(outcome.warning), true); return; }
+  if (outcome.warning) { status(outcome.warning, {kind:"warn"}); return; }
   if (outcome.hidden) status("CS2's crosshair is off for this launch — Crosshair X is drawing it.");
 }
 
@@ -14409,7 +14523,7 @@ document.addEventListener("click", async e => {
   btn.textContent = "Starting\u2026";
   try {
     const r = await api("/api/crosshairx/start", {});
-    status(r.ok ? (r.detail || "Started.") : r.error, !r.ok);
+    status(r.ok ? "Crosshair X has started." : r.error, !r.ok);
   } catch (err) {
     status(String(err && err.message || err), true);
   }
@@ -14616,7 +14730,7 @@ async function setupTake() {
   // changed underneath every view that reads it.
   try { applyPrefs((await api("/api/prefs")).ui); } catch (e) { /* shown already */ }
   if (wantFiles) { await reloadForAccount(); }
-  status("Setup taken on.");
+  status("Your setup has been loaded.");
 }
 
 document.addEventListener("click", e => {
@@ -14724,7 +14838,7 @@ async function kbAssign(payload, describe) {
              ((answer && answer.error) || "unknown problem"), true);
     } else {
       status(describe(answer) +
-             (answer.backup ? "  \u00b7  backup " + answer.backup : "") +
+             (answer.backup ? ". A backup was saved." : "") +
              (answer.unknown ? "  \u00b7  note: this collection does not " +
                                "recognise that command" : ""));
       await loadKeyboard(true);
@@ -14749,13 +14863,13 @@ document.addEventListener("click", e => {
   if (pick) {
     const command = pick.dataset.bindcmd;
     kbAssign({ code: pickedKey.code, command },
-             a => pickedKey.label + " now runs " + a.command);
+             a => pickedKey.label + " now uses your chosen action");
     return;
   }
   const back = e.target.closest("[data-bindstock]");
   if (back) {
     kbAssign({ code: pickedKey.code, command: back.dataset.bindstock, force: true },
-             a => pickedKey.label + " is back to CS2's default, " + a.command);
+             a => pickedKey.label + " is back to CS2's default");
     return;
   }
   if (e.target.id === "kb-unbind") {
@@ -14824,8 +14938,7 @@ async function applyBind(id, code, force) {
   try {
     const r = await api("/api/cfg/plugin/bind",
                         { id: id, code: code, force: !!force });
-    status("Bound " + r.name + " to " + r.label + " (" + r.action +
-           ", backup " + r.backup + ")");
+    status(r.name + " is now bound to " + r.label + ". A backup was saved.");
     await loadPlugins(true);
   } catch (err) {
     const msg = String(err && err.message || err);
@@ -14866,7 +14979,7 @@ document.addEventListener("click", async e => {
     }
     await loadPlugins(true);
   } catch (err) {
-    status("Could not set " + id + ": " + (err && err.message || err), true);
+    status("Could not update that script: " + (err && err.message || err), true);
   } finally {
     btn.disabled = false;
   }
@@ -14900,17 +15013,17 @@ document.addEventListener("change", async e => {
     } else {
       // What the key does now matters more than how many lines moved, so it
       // is said first and in the key's own terms.
-      const gave = (r.restored || []).map(k => k.label + " \u2192 " + k.command);
+      const gave = (r.restored || []).map(k => k.label);
       status((want ? "Switched on " : "Switched off ") + r.name +
              (gave.length ? " \u2014 " + gave.join(", ") +
-                            " (CS2's own bind" + (gave.length > 1 ? "s" : "") + ")"
-                          : " \u2014 " + r.lines + " lines in " + r.path) +
+                            " restored to CS2 defaults"
+                          : ". Your configuration has been updated") +
              (r.backup ? ", backup " + r.backup : ""));
     }
     await loadPlugins(true);
   } catch (err) {
     box.checked = !want;
-    status("Could not change " + id + ": " + (err && err.message || err), true);
+    status("Could not update that script: " + (err && err.message || err), true);
   } finally {
     box.disabled = false;
   }
@@ -14996,12 +15109,12 @@ async function saveFile(force) {
     const r = await api("/api/cfg/save",
                         { path: f.path, text: editDraft, force: !!force });
     if (!r.written) {
-      status(r.note || "Nothing changed.");
+      status("Your file is already up to date.");
       stopEdit();
       return;
     }
-    status("Saved " + f.path + " — backup " + r.backup +
-           (r.errors ? " · " + r.errors + " syntax error(s) remain" : ""));
+    status("Saved " + f.path.split(/[\\/]/).pop() + ". A backup was saved." +
+           (r.errors ? " Some commands still need attention." : ""), {kind:r.errors?"warn":"done"});
     editing = false;
     editDraft = "";
     await showFile(f.path);
@@ -15302,7 +15415,7 @@ function renderUpdCentre() {
     tone = "bad"; say = "Check failed"; sub = s.error || "unknown problem";
     act = '<button class="btn small" id="updc-check">Try again</button>';
   } else if (s.state === "checking") {
-    tone = "busy"; share = 0.28; say = "Checking…"; sub = "asking GitHub";
+    tone = "busy"; share = 0.28; say = "Checking your configuration…"; sub = "asking GitHub";
   } else if (s.state === "downloading") {
     tone = "news";
     share = s.total ? s.done / s.total : 0.05;
@@ -16006,9 +16119,7 @@ document.addEventListener("click", async e => {
     srcFiles.files = done.files;
     renderSource();
     const wiring = done.wiring || {};
-    status("Made " + done.to + " and kept " + done.kept +
-           (wiring.changed ? "  \u00b7  autoexec " + wiring.action
-                           : "  \u00b7  " + (wiring.action || "")));
+    status("Converted " + name + ". Your original file was kept." + (wiring.changed ? " CS2 will load the new file on launch." : ""));
   } catch (err) {
     turn.disabled = false;
     status("Could not convert " + name + ": " + (err && err.message || err), true);
@@ -16743,16 +16854,16 @@ $("cfg-browse").addEventListener("click", async () => {
 $("cfg-scan").addEventListener("click", async () => {
   const folder = $("cfg-folder").value.trim();
   if (!folder) { status("Choose a folder to scan.", true); return; }
-  busy("Scanning configuration…");
+  busy('Reading your configuration files...', {id:'config-scan',progress:0,detail:'0 of 2 checks complete'});
   try {
     renderCfg(await api("/api/cfg/scan", { folder }));
     scannedFolder = folder;
     await loadCfgSettings();
     // A deliberate rescan means the other tabs are showing stale reads.
     treeData = plugData = keyData = null;
-    status("Scan complete. Nothing has been written.");
+    status('Your configuration scan is complete. No files were changed.', {id:'config-scan',kind:'done',detail:(cfgScan?.files?.length || 0)+' files checked'});
     rememberPrefs();
-  } catch (e) { status("Scan failed: " + esc(e.message), true); }
+  } catch (e) { status(e.message, {id:'config-scan',kind:'error',title:'Configuration scan could not finish'}); }
 });
 
 $("cfg-apply-polish").addEventListener("click", async () => {
@@ -16763,10 +16874,10 @@ $("cfg-apply-polish").addEventListener("click", async () => {
                "Only spacing, alignment and blank lines change. The commands each file runs " +
                "are verified to be identical afterwards. Every file is backed up first."))
     return;
-  busy("Formatting…");
+  busy("Tidying your configuration files…");
   try {
     const r = await api("/api/cfg/polish", { files });
-    status("Formatted " + r.written.length + " file(s). Backup " + (r.backup || "none") + ".");
+    status("Tidied " + r.written.length + " configuration files." + (r.backup ? " A backup was saved." : ""));
     $("cfg-scan").click();
   } catch (e) { status("Formatting failed: " + esc(e.message), true); }
 });
@@ -16776,7 +16887,7 @@ $("cfg-alias").addEventListener("change", showAlias);
 $("cfg-rename-preview").addEventListener("click", async () => {
   const a = currentAlias();
   if (!a) return;
-  busy("Working out the rename…");
+  busy("Checking which files need renaming…");
   try {
     renderRename(await api("/api/cfg/rename", {
       old_name: a.name,
@@ -16794,7 +16905,7 @@ $("cfg-rename-apply").addEventListener("click", async () => {
                "This changes the identifier and every reference to it. The commands it runs " +
                "are not modified, so its behaviour is unchanged. Files are backed up first."))
     return;
-  busy("Applying rename…");
+  busy("Renaming your configuration files…");
   try {
     const r = await api("/api/cfg/rename/apply", {
       old_name: a.name,
@@ -16802,7 +16913,7 @@ $("cfg-rename-apply").addEventListener("click", async () => {
       include_family: $("cfg-family").checked,
       include_wording: $("cfg-wording").checked,
     });
-    status("Renamed in " + r.written.length + " file(s). Backup " + (r.backup || "none") + ".");
+    status("Renamed your selection in " + r.written.length + " files." + (r.backup ? " A backup was saved." : ""));
     $("cfg-scan").click();
   } catch (e) { status("Rename failed: " + esc(e.message), true); }
 });
@@ -16810,7 +16921,7 @@ $("cfg-rename-apply").addEventListener("click", async () => {
 $("cfg-behaviour").addEventListener("click", async () => {
   const a = currentAlias();
   if (!a) return;
-  busy("Checking…");
+  busy("Checking your configuration…");
   try {
     const r = await api("/api/cfg/behaviour", { alias: a.name, body: $("cfg-body").value });
     let html = '<div class="sub" style="margin-top:9px">Behaviour change for ' + esc(r.alias) + "</div>";
@@ -17034,7 +17145,7 @@ $("play-close").addEventListener("click", async () => {
   busy("Closing CS2…");
   try {
     const r = await api("/api/play/stop", { close_game: true, force: true });
-    status("CS2: " + esc(r.closed || "closed"));
+    status("CS2 has closed. Your desktop is restored.");
   } catch (e) { status("Could not close CS2: " + esc(e.message), true); }
 });
 

@@ -1,0 +1,566 @@
+{
+  "checks": [
+    "working semantics",
+    "measured progress",
+    "progress width tweens",
+    "working to done keeps card",
+    "hover and focus pause hide",
+    "done hides and error persists",
+    "details default collapsed",
+    "keyboard dismissal",
+    "three visible and two queued",
+    "queue promotes next job",
+    "reduced motion has no loader or bar animations",
+    "updater shares card surface",
+    "small viewport fits"
+  ],
+  "contrast": [
+    {
+      "theme": "violet",
+      "state": "working",
+      "text": 15.622843629571117,
+      "bar": 5.805485084635853
+    },
+    {
+      "theme": "violet",
+      "state": "progress",
+      "text": 15.622843629571117,
+      "bar": 5.805485084635853
+    },
+    {
+      "theme": "violet",
+      "state": "done",
+      "text": 15.622843629571117,
+      "bar": 7.7587017520628985
+    },
+    {
+      "theme": "violet",
+      "state": "error",
+      "text": 15.622843629571117,
+      "bar": 5.911315514525491
+    },
+    {
+      "theme": "violet",
+      "state": "notice",
+      "text": 15.622843629571117,
+      "bar": 5.805485084635853
+    },
+    {
+      "theme": "violet",
+      "state": "warn",
+      "text": 15.622843629571117,
+      "bar": 8.480118030304174
+    },
+    {
+      "theme": "ember",
+      "state": "working",
+      "text": 15.142064736752971,
+      "bar": 6.908287627719913
+    },
+    {
+      "theme": "ember",
+      "state": "progress",
+      "text": 15.142064736752971,
+      "bar": 6.908287627719913
+    },
+    {
+      "theme": "ember",
+      "state": "done",
+      "text": 15.142064736752971,
+      "bar": 7.0021694136872945
+    },
+    {
+      "theme": "ember",
+      "state": "error",
+      "text": 15.142064736752971,
+      "bar": 5.474411131654936
+    },
+    {
+      "theme": "ember",
+      "state": "notice",
+      "text": 15.142064736752971,
+      "bar": 6.908287627719913
+    },
+    {
+      "theme": "ember",
+      "state": "warn",
+      "text": 15.142064736752971,
+      "bar": 7.634994893189566
+    },
+    {
+      "theme": "carbon",
+      "state": "working",
+      "text": 14.819326107299876,
+      "bar": 6.502597447462796
+    },
+    {
+      "theme": "carbon",
+      "state": "progress",
+      "text": 14.819326107299876,
+      "bar": 6.502597447462796
+    },
+    {
+      "theme": "carbon",
+      "state": "done",
+      "text": 14.819326107299876,
+      "bar": 6.679464628060184
+    },
+    {
+      "theme": "carbon",
+      "state": "error",
+      "text": 14.819326107299876,
+      "bar": 5.125159723788135
+    },
+    {
+      "theme": "carbon",
+      "state": "notice",
+      "text": 14.819326107299876,
+      "bar": 6.502597447462796
+    },
+    {
+      "theme": "carbon",
+      "state": "warn",
+      "text": 14.819326107299876,
+      "bar": 6.761853164028188
+    },
+    {
+      "theme": "acid",
+      "state": "working",
+      "text": 16.417428974846786,
+      "bar": 8.007130147602076
+    },
+    {
+      "theme": "acid",
+      "state": "progress",
+      "text": 16.417428974846786,
+      "bar": 8.007130147602076
+    },
+    {
+      "theme": "acid",
+      "state": "done",
+      "text": 16.417428974846786,
+      "bar": 7.461979964683734
+    },
+    {
+      "theme": "acid",
+      "state": "error",
+      "text": 16.417428974846786,
+      "bar": 5.182683280266922
+    },
+    {
+      "theme": "acid",
+      "state": "notice",
+      "text": 16.417428974846786,
+      "bar": 8.007130147602076
+    },
+    {
+      "theme": "acid",
+      "state": "warn",
+      "text": 16.417428974846786,
+      "bar": 7.327682498568133
+    },
+    {
+      "theme": "crimson",
+      "state": "working",
+      "text": 15.6680138933156,
+      "bar": 5.810001842717287
+    },
+    {
+      "theme": "crimson",
+      "state": "progress",
+      "text": 15.6680138933156,
+      "bar": 5.810001842717287
+    },
+    {
+      "theme": "crimson",
+      "state": "done",
+      "text": 15.6680138933156,
+      "bar": 7.507902249008616
+    },
+    {
+      "theme": "crimson",
+      "state": "error",
+      "text": 15.6680138933156,
+      "bar": 5.666307109852366
+    },
+    {
+      "theme": "crimson",
+      "state": "notice",
+      "text": 15.6680138933156,
+      "bar": 5.810001842717287
+    },
+    {
+      "theme": "crimson",
+      "state": "warn",
+      "text": 15.6680138933156,
+      "bar": 8.057707303367314
+    },
+    {
+      "theme": "frost",
+      "state": "working",
+      "text": 15.116574951897292,
+      "bar": 6.589993934200017
+    },
+    {
+      "theme": "frost",
+      "state": "progress",
+      "text": 15.116574951897292,
+      "bar": 6.589993934200017
+    },
+    {
+      "theme": "frost",
+      "state": "done",
+      "text": 15.116574951897292,
+      "bar": 6.5699883179984075
+    },
+    {
+      "theme": "frost",
+      "state": "error",
+      "text": 15.116574951897292,
+      "bar": 5.15947479211642
+    },
+    {
+      "theme": "frost",
+      "state": "notice",
+      "text": 15.116574951897292,
+      "bar": 6.589993934200017
+    },
+    {
+      "theme": "frost",
+      "state": "warn",
+      "text": 15.116574951897292,
+      "bar": 7.16628121764533
+    },
+    {
+      "theme": "neon",
+      "state": "working",
+      "text": 16.142122902168754,
+      "bar": 6.437688704260694
+    },
+    {
+      "theme": "neon",
+      "state": "progress",
+      "text": 16.142122902168754,
+      "bar": 6.437688704260694
+    },
+    {
+      "theme": "neon",
+      "state": "done",
+      "text": 16.142122902168754,
+      "bar": 8.780483137422614
+    },
+    {
+      "theme": "neon",
+      "state": "error",
+      "text": 16.142122902168754,
+      "bar": 6.385352604284237
+    },
+    {
+      "theme": "neon",
+      "state": "notice",
+      "text": 16.142122902168754,
+      "bar": 6.437688704260694
+    },
+    {
+      "theme": "neon",
+      "state": "warn",
+      "text": 16.142122902168754,
+      "bar": 9.176036002349818
+    },
+    {
+      "theme": "daylight",
+      "state": "working",
+      "text": 14.3045566520547,
+      "bar": 5.909934796931031
+    },
+    {
+      "theme": "daylight",
+      "state": "progress",
+      "text": 14.3045566520547,
+      "bar": 5.909934796931031
+    },
+    {
+      "theme": "daylight",
+      "state": "done",
+      "text": 14.3045566520547,
+      "bar": 5.141024828620836
+    },
+    {
+      "theme": "daylight",
+      "state": "error",
+      "text": 14.3045566520547,
+      "bar": 5.044007682643671
+    },
+    {
+      "theme": "daylight",
+      "state": "notice",
+      "text": 14.3045566520547,
+      "bar": 5.909934796931031
+    },
+    {
+      "theme": "daylight",
+      "state": "warn",
+      "text": 14.3045566520547,
+      "bar": 5.399083358543516
+    },
+    {
+      "theme": "paper",
+      "state": "working",
+      "text": 13.114583808352736,
+      "bar": 5.188361203360748
+    },
+    {
+      "theme": "paper",
+      "state": "progress",
+      "text": 13.114583808352736,
+      "bar": 5.188361203360748
+    },
+    {
+      "theme": "paper",
+      "state": "done",
+      "text": 13.114583808352736,
+      "bar": 5.245143101078511
+    },
+    {
+      "theme": "paper",
+      "state": "error",
+      "text": 13.114583808352736,
+      "bar": 4.881031493329235
+    },
+    {
+      "theme": "paper",
+      "state": "notice",
+      "text": 13.114583808352736,
+      "bar": 5.188361203360748
+    },
+    {
+      "theme": "paper",
+      "state": "warn",
+      "text": 13.114583808352736,
+      "bar": 5.26240461605568
+    },
+    {
+      "theme": "pro",
+      "state": "working",
+      "text": 14.262909653472898,
+      "bar": 5.056810972617563
+    },
+    {
+      "theme": "pro",
+      "state": "progress",
+      "text": 14.262909653472898,
+      "bar": 5.056810972617563
+    },
+    {
+      "theme": "pro",
+      "state": "done",
+      "text": 14.262909653472898,
+      "bar": 5.895523319698326
+    },
+    {
+      "theme": "pro",
+      "state": "error",
+      "text": 14.262909653472898,
+      "bar": 4.7463395047201695
+    },
+    {
+      "theme": "pro",
+      "state": "notice",
+      "text": 14.262909653472898,
+      "bar": 5.056810972617563
+    },
+    {
+      "theme": "pro",
+      "state": "warn",
+      "text": 14.262909653472898,
+      "bar": 6.299835969960965
+    }
+  ],
+  "minimumContrast": [
+    {
+      "theme": "violet",
+      "text": 15.622843629571117,
+      "bar": 5.805485084635853
+    },
+    {
+      "theme": "ember",
+      "text": 15.142064736752971,
+      "bar": 5.474411131654936
+    },
+    {
+      "theme": "carbon",
+      "text": 14.819326107299876,
+      "bar": 5.125159723788135
+    },
+    {
+      "theme": "acid",
+      "text": 16.417428974846786,
+      "bar": 5.182683280266922
+    },
+    {
+      "theme": "crimson",
+      "text": 15.6680138933156,
+      "bar": 5.666307109852366
+    },
+    {
+      "theme": "frost",
+      "text": 15.116574951897292,
+      "bar": 5.15947479211642
+    },
+    {
+      "theme": "neon",
+      "text": 16.142122902168754,
+      "bar": 6.385352604284237
+    },
+    {
+      "theme": "daylight",
+      "text": 14.3045566520547,
+      "bar": 5.044007682643671
+    },
+    {
+      "theme": "paper",
+      "text": 13.114583808352736,
+      "bar": 4.881031493329235
+    },
+    {
+      "theme": "pro",
+      "text": 14.262909653472898,
+      "bar": 4.7463395047201695
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "after-acid.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 929446
+    },
+    {
+      "file": "after-carbon.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 942485
+    },
+    {
+      "file": "after-crimson.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 930640
+    },
+    {
+      "file": "after-daylight.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 941448
+    },
+    {
+      "file": "after-ember.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 942270
+    },
+    {
+      "file": "after-frost.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 941929
+    },
+    {
+      "file": "after-neon.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 947240
+    },
+    {
+      "file": "after-paper.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 989603
+    },
+    {
+      "file": "after-pro.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 855068
+    },
+    {
+      "file": "after-violet.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 943062
+    },
+    {
+      "file": "before-acid.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 992424
+    },
+    {
+      "file": "before-carbon.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 1006844
+    },
+    {
+      "file": "before-crimson.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 991247
+    },
+    {
+      "file": "before-daylight.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 1012941
+    },
+    {
+      "file": "before-ember.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 1006943
+    },
+    {
+      "file": "before-frost.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 999102
+    },
+    {
+      "file": "before-neon.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 1014123
+    },
+    {
+      "file": "before-paper.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 1066713
+    },
+    {
+      "file": "before-pro.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 909588
+    },
+    {
+      "file": "before-violet.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 998400
+    },
+    {
+      "file": "loader-strip.png",
+      "width": 2240,
+      "height": 140,
+      "bytes": 61568
+    }
+  ],
+  "verification": {
+    "nodeStatusHarness": "Run node tests/status_bar_harness.cjs separately; passed in this session",
+    "profileRailHarness": "Run node docs/redesign/status-bar/preview/check-regressions.cjs separately; passed in this session",
+    "pythonModules": "tests.test_status_bar_web, tests.test_profile_rail_web, tests.test_themes blocked: py not on PATH; Python313/python.exe execution denied"
+  },
+  "errors": [],
+  "screenshotFixtures": "Six illustrative notification states over the real app; static API rejects desktop actions."
+}
