@@ -7939,9 +7939,9 @@ function requestBody() {
    blamed on the tool later. So each change records how to undo itself, and
    leaving with one outstanding brings the window back and asks.
 
-   Two things this deliberately does not do. It does not fire for work already
-   written to disk: a key bind is saved, with a backup, the moment it is made,
-   so there is nothing outstanding to answer for. And it does not grab focus
+   Key binds count too: one is saved, with a backup, the moment it is made,
+   without asking first, and this is where it can be put back. What this
+   deliberately does not do is grab focus
    while CS2 is in front -- see _focus in webui.py; the prompt still appears,
    it just waits rather than pulling somebody out of a live round.
    -------------------------------------------------------------------------- */
@@ -14749,6 +14749,30 @@ async function loadKeyOptions() {
   renderKeyboard();
 }
 
+// A key change, as one entry in the changes window. Putting it back binds
+// the key to what it ran before (or clears it if it was free). Reverts run
+// one after another, so a key changed twice ends where it started.
+let kbRevertChain = Promise.resolve();
+function kbNoteBind(code, label, before, after) {
+  const name = c => c ? kbPlainName(c) : "nothing";
+  const entry = label + " → " + name(after);
+  const already = pendingChanges.find(c => c.label.split(" → ")[0] === label);
+  if (already) { already.label = entry; return; }
+  pendingChanges.push({ id: "chg" + (++changeSeq), label: entry, revert: () => {
+    kbRevertChain = kbRevertChain.then(() => api("/api/cfg/bind",
+        before ? { code, command: before, force: true } : { code, unbind: true, force: true }))
+      .then(() => loadKeyboard(true))
+      .catch(err => status("Could not put " + label + " back: " +
+                           String(err && err.message || err), true));
+  } });
+}
+
+// The picker's plain name for a command, if this key's list knows it.
+function kbPlainName(command) {
+  const groups = (kbOptions && kbOptions.groups) || [];
+  return kbNameOf(command, groups);
+}
+
 // Assigning, restoring and clearing all go through here so the confirm, the
 // reload and the reporting are written once.
 async function kbAssign(payload, describe) {
@@ -14756,18 +14780,14 @@ async function kbAssign(payload, describe) {
   kbBusy = true;
   renderKeyboard();
   try {
-    let answer = await api("/api/cfg/bind", payload)
+    // No "are you sure" on every change: the key is simply replaced, and
+    // what it ran before is remembered. Leaving the app with changes like
+    // this still unanswered brings up the changes window, which offers to
+    // keep them or put them back (see chaseFocus).
+    const label = pickedKey.label;
+    const before = (kbLookup(payload.code, label) || {}).command || "";
+    let answer = await api("/api/cfg/bind", Object.assign({}, payload, { force: true }))
       .catch(e => e.data || { ok: false, error: e.message });
-    if (answer && answer.needs_confirm) {
-      const runs = (answer.taken && answer.taken[0] && answer.taken[0].runs) || "something";
-      if (!confirm(pickedKey.label + " already runs " + runs +
-                   ".\n\nReplace it?")) {
-        kbBusy = false;
-        renderKeyboard();
-        return;
-      }
-      answer = await api("/api/cfg/bind", Object.assign({}, payload, { force: true }));
-    }
     if (!answer || answer.ok === false) {
       status("Could not change " + pickedKey.label + ": " +
              ((answer && answer.error) || "unknown problem"), true);
@@ -14776,6 +14796,8 @@ async function kbAssign(payload, describe) {
              (answer.backup ? ". A backup was saved." : "") +
              (answer.unknown ? "  \u00b7  note: this collection does not " +
                                "recognise that command" : ""));
+      const after = payload.unbind ? "" : (payload.command || "");
+      if (after !== before) kbNoteBind(payload.code, label, before, after);
       await loadKeyboard(true);
       await loadKeyOptions();
       kbAssignedCode = payload.code;
@@ -14877,7 +14899,9 @@ async function applyBind(id, code, force) {
     await loadPlugins(true);
   } catch (err) {
     const msg = String(err && err.message || err);
-    if (/already runs/.test(msg) && confirm(msg + "\n\nTake the key anyway?")) {
+    // Taking a key from something else needs no extra click; a backup of
+    // the file is saved either way.
+    if (/already runs/.test(msg) && !force) {
       await applyBind(id, code, true);
       return;
     }
