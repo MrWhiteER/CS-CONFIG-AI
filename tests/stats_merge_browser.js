@@ -89,10 +89,10 @@ async function runStatsChecks(){
   document.querySelector('[data-match]').click();await settle();
   check('FACEIT scoreboard preserved',!$('mstat-back').classList.contains('hidden')&&document.querySelectorAll('.mstat-grid tbody tr').length===10&&calls.some(c=>c.route==='/api/demos/stats'));
   hideStats();
-  document.querySelector('[data-pick]').click();await settle();
+  document.querySelector('[data-demo-pick]').click();await settle();
   check('replay choice preserved',disk.picked===disk.demos[0].name);
-  document.querySelector('[data-pick]').click();await settle();check('replay choice clears',disk.picked==='');
-  document.querySelector('[data-watch]').click();await settle();check('Watch launches once',launches===1&&calls.some(c=>c.route==='/api/demos/pick'&&c.body.once));
+  document.querySelector('[data-demo-pick]').click();await settle();check('replay choice clears',disk.picked==='');
+  document.querySelector('[data-demo-watch]').click();await settle();check('Watch launches once',launches===1&&calls.some(c=>c.route==='/api/demos/pick'&&c.body.once));
   $('demo-link').value='https://www.faceit.com/en/cs2/room/'+fixture.matches[0].match_id;$('demo-fetch').click();await settle();
   check('Get demo retains scoreboard and download',calls.some(c=>c.route==='/api/demos/get')&&!$('mstat-back').classList.contains('hidden'));hideStats();
   await choose('cs2');
