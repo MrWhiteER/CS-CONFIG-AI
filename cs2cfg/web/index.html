@@ -6718,6 +6718,7 @@ const startup = (() => {
           <div class="seg-thumb" id="seg-thumb"></div>
           <button class="seg-item" data-sub="apply" role="tab" aria-selected="true">Apply</button>
           <button class="seg-item" data-sub="this-pc" role="tab" aria-selected="false"><span data-hardware-icon="display"></span> This PC</button>
+          <button class="seg-item" data-sub="lighting" role="tab" aria-selected="false"><span data-hardware-icon="lighting"></span> Lighting</button>
           <button class="seg-item" data-sub="steam" role="tab" aria-selected="false">Steam</button>
           <button class="seg-item" data-sub="account" role="tab" aria-selected="false">Account</button>
           <button class="seg-item" data-sub="apps" role="tab" aria-selected="false">Apps</button>
@@ -6738,10 +6739,18 @@ const startup = (() => {
                rather than in a card of its own further down the page. -->
           <div id="assessment-out"></div>
         </section>
-        <!-- Keyboard and mouse lights. Hardware, so it lives with the PC,
-             not with the performance overlay. -->
+      </div>
+
+      <!-- Keyboard and mouse lights get a tab of their own, so everything
+           about lighting is in one place. -->
+      <div class="subpane hidden" data-sub="lighting">
         <section class="panel" id="rgb-card">
-          <h2>Lighting</h2>
+          <h2><span data-hardware-icon="lighting"></span> Lighting</h2>
+          <p class="sub" style="margin:0 0 10px">
+            Your keyboard and mouse light up in the same colours as your key
+            bindings. The app talks to the devices directly, so no lighting
+            software from the maker has to be running.
+          </p>
           <div id="rgb-out"></div>
         </section>
       </div>
@@ -9173,7 +9182,7 @@ function setSettingsSub(name, restoring) {
   // Preference restoration only selects the pane. Startup owns its first loads.
   if (prefsReady && startup.finished) {
     if (name === "overlay") loadOverlay();
-    if (name === "this-pc") loadRgb();
+    if (name === "lighting") loadRgb();
     if (name === "sound") { loadAudio(false); loadGoxlr(true); }
     if (name === "logs") loadHistory();
     if (name === "config" || name === "editing") ensureScan(false);

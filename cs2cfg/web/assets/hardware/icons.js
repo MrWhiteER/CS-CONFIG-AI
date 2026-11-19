@@ -16,9 +16,10 @@ const HW_ART = {
   mouse:'<rect x="6" y="3" width="12" height="18" rx="6"/><path d="M12 3v7M6 11h12"/>',
   keyboard:'<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h1m3 0h1m3 0h1m3 0h.1M6 14h1m3 0h8"/>',
   headset:'<path d="M4 13V11a8 8 0 0 1 16 0v2m0 5v1a2 2 0 0 1-2 2h-4"/><rect x="3" y="11" width="4" height="7" rx="2"/><rect x="17" y="11" width="4" height="7" rx="2"/>',
-  mic:'<rect x="9" y="3" width="6" height="12" rx="3"/><path d="M6 11v1a6 6 0 0 0 12 0v-1M12 18v3m-4 0h8"/>'
+  mic:'<rect x="9" y="3" width="6" height="12" rx="3"/><path d="M6 11v1a6 6 0 0 0 12 0v-1M12 18v3m-4 0h8"/>',
+  lighting:'<rect x="7" y="11" width="10" height="9" rx="2"/><path d="M10 15h4M12 3v3M5 6l2 2m12-2-2 2M3 12h2m14 0h2"/>'
 };
-const HW_NAMES = {cpu:'CPU',gpu:'GPU',ram:'RAM',vram:'VRAM',ssd:'SSD / NVMe',hdd:'Hard drive',motherboard:'Motherboard',power:'Power supply / power',display:'Display',network:'Network',fan:'Fan / cooling',temperature:'Temperature',mouse:'Mouse',keyboard:'Keyboard',headset:'Headset',mic:'Microphone'};
+const HW_NAMES = {cpu:'CPU',gpu:'GPU',ram:'RAM',vram:'VRAM',ssd:'SSD / NVMe',hdd:'Hard drive',motherboard:'Motherboard',power:'Power supply / power',display:'Display',network:'Network',fan:'Fan / cooling',temperature:'Temperature',mouse:'Mouse',keyboard:'Keyboard',headset:'Headset',mic:'Microphone',lighting:'Lighting'};
 function hwKey(name) {
   const key = String(name || '').toLowerCase();
   return ({memory:'ram',processor:'cpu',graphics:'gpu',board:'motherboard',system:'motherboard',drive:'ssd',nvme:'ssd',monitor:'display',screen:'display',psu:'power',cooling:'fan',microphone:'mic',speaker:'headset',device:'cpu'})[key] || key;
