@@ -52,25 +52,79 @@ def catalogue() -> Dict[str, Any]:
 
 
 def _script_group(scan) -> Optional[Dict[str, Any]]:
-    """The user's own aliases, as a group of their own at the top."""
+    """The user's own aliases, as a group of their own at the top.
+
+    Each one is named for what it does ("Buy AK-47", "Pause / unpause the
+    match"), not for the banner it sits under in the file -- "RIFLES" says
+    nothing about which rifle a key would buy. A block of plain shortcuts
+    offers every shortcut in it, not just the first; the aliases that only
+    exist to be called by another script are left out.
+    """
     if scan is None:
         return None
-    from . import plugins
+    import re
+
+    from . import plugins, scriptnames
+
+    found = plugins.find(scan)
+    everything: Dict[str, str] = {}
+    for feature in found:
+        everything.update(feature.bodies)
+    # Names another alias calls are machinery, not something to put on a key.
+    called = set()
+    for owner, body in everything.items():
+        for word in re.split(r"[;\s\"]+", body or ""):
+            low = word.lower()
+            if low and low != owner and low in everything:
+                called.add(low)
 
     entries: List[Dict[str, Any]] = []
     seen = set()
-    for feature in plugins.find(scan):
-        if not feature.entry or feature.entry.lower() in seen:
-            continue
-        seen.add(feature.entry.lower())
+
+    def offer(command: str, label: str, feature) -> None:
+        if not command or command.lower() in seen:
+            return
+        seen.add(command.lower())
         entries.append({
-            "command": feature.entry,
-            "label": feature.name,
-            "hold": feature.entry.startswith("+"),
+            "command": command,
+            "label": label,
+            "hold": command.startswith("+"),
             "note": feature.description or "",
             "script": True,
             "enabled": feature.enabled,
         })
+
+    for feature in found:
+        bodies = feature.bodies
+        holds = sorted(n for n in bodies
+                       if n.startswith("+") and "-" + n[1:] in bodies)
+        if feature.kind in ("toggle", "cycle"):
+            offer(feature.entry, scriptnames.feature_name(feature, everything), feature)
+        elif feature.kind == "hold" and len(holds) == 1:
+            offer(feature.entry, scriptnames.feature_name(feature, everything), feature)
+        elif len(holds) > 1:
+            for name in holds:
+                label = scriptnames.hold_name(name, bodies, everything)
+                offer(feature.spelled.get(name, name), label, feature)
+
+        if feature.kind in ("toggle", "cycle"):
+            continue
+        for name in feature.bodies:          # in the order the file has them
+            if name.startswith(("+", "-")):
+                continue
+            # Called by another script and not something you would press on
+            # its own (a bind-swapper, a state of someone else's cycle): skip.
+            # A buy or a map shortcut that a bigger script also uses stays;
+            # a line of chat that a "say a random joke" cycle steps through
+            # does not.
+            if name in called and not scriptnames.is_shortcut(
+                    bodies.get(name, ""), everything):
+                continue
+            offer(feature.spelled.get(name, name),
+                  scriptnames.alias_name(name, bodies.get(name, ""),
+                                         feature.comments.get(name, ""),
+                                         feature.name, everything),
+                  feature)
     if not entries:
         return None
     return {"id": "scripts", "name": "Your scripts", "commands": entries}

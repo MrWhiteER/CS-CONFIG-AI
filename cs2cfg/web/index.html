@@ -12286,6 +12286,18 @@ function kbIcon(name) {
     art + "</svg>";
 }
 
+// The plain name the picker uses for a command ("Secondary (pistol)" for
+// slot2), so a button never shows the raw console word on its own.
+function kbNameOf(command, groups) {
+  const want = String(command || "").toLowerCase();
+  for (const g of groups || []) {
+    for (const c of g.commands || []) {
+      if (String(c.command).toLowerCase() === want) return c.label;
+    }
+  }
+  return command;
+}
+
 function kbPicker() {
   if (!pickedKey) return "";
   if (kbOptions && kbOptions.error) {
@@ -12349,7 +12361,7 @@ function kbPicker() {
     (stock && stock.toLowerCase() !== now
       ? '<button class="btn small" data-bindstock="' + esc(stock) + '"' +
         (kbBusy ? " disabled" : "") + ">Back to CS2's default (" +
-        esc(stock) + ")</button>"
+        esc(kbNameOf(stock, groups)) + ")</button>"
       : "") +
     (bound
       ? '<button class="btn small" id="kb-unbind"' + (kbBusy ? " disabled" : "") +
