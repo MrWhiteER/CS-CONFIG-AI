@@ -12233,6 +12233,55 @@ document.addEventListener("keydown", e => {
 // that the switcher is the only profile UI there is.
 function renderKbProfiles() { renderKbSwitcher(); }
 
+// The picked key, and beside it the name CS2's configs use for it --
+// "scancode26" for W -- as a second key cap you can click to copy.
+function kbDetailHead() {
+  const bind = kbBindingFor(pickedKey.code) || "";
+  const scan = /^scancode(\d+)$/.exec(bind);
+  const scanCap = bind
+    ? '<button type="button" class="kb-scan" data-kbcopy="' + esc(bind) + '"' +
+      ' title="Copy ' + esc(bind) + '" aria-label="Copy ' + esc(bind) + '">' +
+      "<small>" + (scan ? "Scancode" : "Bind name") + "</small>" +
+      "<b>" + esc(scan ? scan[1] : bind) + "</b>" +
+      '<span class="kb-scan-tip">Click to copy</span></button>'
+    : "";
+  return '<div class="kb-detail-head"><div class="kb-detail-key">' +
+    esc(pickedKey.label) + "</div>" + scanCap + "</div>";
+}
+
+async function kbCopy(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (e) {
+    // The desktop window can refuse the clipboard API; the old way still works.
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.style.position = "fixed"; area.style.opacity = "0";
+    document.body.appendChild(area);
+    area.select();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch (e2) { ok = false; }
+    area.remove();
+    return ok;
+  }
+}
+
+document.addEventListener("click", async e => {
+  const cap = e.target.closest("[data-kbcopy]");
+  if (!cap) return;
+  const text = cap.dataset.kbcopy;
+  const ok = await kbCopy(text);
+  cap.classList.add(ok ? "copied" : "failed");
+  const tip = cap.querySelector(".kb-scan-tip");
+  if (tip) tip.textContent = ok ? "Copied" : "Could not copy";
+  status(ok ? "Copied " + text + "." : "Could not copy " + text + ".", !ok);
+  setTimeout(() => {
+    cap.classList.remove("copied", "failed");
+    if (tip) tip.textContent = "Click to copy";
+  }, 1400);
+});
+
 function kbDetail() {
   if (!pickedKey) {
     return '<div class="kb-detail empty"><b>Pick a key</b><p>Click a key or mouse button.</p>' +
@@ -12240,13 +12289,11 @@ function kbDetail() {
   }
   const hit = kbLookup(pickedKey.code, pickedKey.label);
   if (!hit) {
-    return '<div class="kb-detail"><div class="kb-detail-key">' +
-      esc(pickedKey.label) + "</div>" +
+    return '<div class="kb-detail">' + kbDetailHead() +
       '<div class="sub">Not bound.</div>' +
       kbPicker() + "</div>";
   }
-  return '<div class="kb-detail"><div class="kb-detail-key">' +
-    esc(pickedKey.label) + "</div><div class=\"kb-detail-body\">" +
+  return '<div class="kb-detail">' + kbDetailHead() + "<div class=\"kb-detail-body\">" +
     '<div class="row"><span class="k">Runs</span><span class="v"><code>' +
     esc(hit.command) + "</code></span></div>" +
     (hit.agrees === false
