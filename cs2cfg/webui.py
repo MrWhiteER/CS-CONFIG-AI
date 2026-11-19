@@ -1462,6 +1462,62 @@ def _cfg_settings_apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
             "backup": None if session.empty else session.stamp}
 
 
+def _apply_keys(result) -> List[str]:
+    """The keys that bring app changes into a running game, as players read them."""
+    from . import applynow
+
+    return applynow.key_labels(result)
+
+
+def _apply_now_status(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Read-only: whether an apply key is set, and which one."""
+    from . import applynow
+
+    result = _rescan(state)
+    if result is None:
+        return {"ok": True, "ready": False, "needs_folder": True}
+    return {"ok": True, **applynow.status(result)}
+
+
+def _apply_now_key(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Set (or change) the key that applies every app change in game.
+
+    Writes the bind into the startup config and the apply file next to it in
+    one go, so the very next launch already has both. A key the player's own
+    configs already use is refused unless they confirm, same as any bind.
+    """
+    from . import applynow, cfgscan, keys
+
+    result = _rescan(state)
+    if result is None:
+        return {"ok": False, "error": "Pick your config folder on the Configs page first."}
+
+    code = str(body.get("code") or "")
+    binding = keys.from_code(code)
+    if not binding:
+        return {"ok": False, "error": _not_bindable(code)}
+
+    taken = applynow.key_taken(result, binding)
+    if taken and not body.get("force"):
+        return {"ok": False, "needs_confirm": True, "taken": [taken],
+                "error": f"{keys.label(binding)} already runs {taken['runs']}"}
+
+    try:
+        path, text = applynow.set_key_text(result, binding)
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)[:1].upper() + str(exc)[1:] + "."}
+
+    session = backup.BackupSession(note="apply-changes key (web)")
+    session.add(path)
+    cfglang.write_config_text(path, text, "utf-8")
+    backup.prune()
+
+    state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+    applynow.refresh(state.cfg_scan)
+    return {"ok": True, **applynow.status(state.cfg_scan),
+            "backup": None if session.empty else session.stamp}
+
+
 def _apply_script_state(result, cfgscan, keys) -> Optional[Dict[str, Any]]:
     """What already reloads the startup chain on a key, app-written or not.
 
@@ -1701,9 +1757,8 @@ def _cfg_layouts_apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
 
     if not applied:
         empty = not cfgscan._profile_own_binds(result, profile_file)
-        apply_info = cfgscan.existing_apply_script(result)
         return {"ok": True, "changed": False, "empty": empty, "file": profile_file,
-                "apply_keys": sorted((apply_info or {}).get("bound_to") or []),
+                "apply_keys": _apply_keys(result),
                 "label": label, "applied": [], "skipped": [keys.label(k) for k in skipped]}
 
     # The first time any of these keys is ever overridden, remember what it
@@ -1728,13 +1783,12 @@ def _cfg_layouts_apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     backup.prune()
 
     state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
-    apply_info = cfgscan.existing_apply_script(state.cfg_scan)
     return {
         "ok": True, "changed": True, "file": profile_file, "label": label,
         "applied": [keys.label(k) for k in applied],
         "skipped": [keys.label(k) for k in skipped],
         "backup": None if session.empty else session.stamp,
-        "apply_keys": sorted((apply_info or {}).get("bound_to") or []),
+        "apply_keys": _apply_keys(state.cfg_scan),
     }
 
 
@@ -1770,12 +1824,11 @@ def _cfg_layouts_default(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     backup.prune()
 
     state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
-    apply_info = cfgscan.existing_apply_script(state.cfg_scan)
     return {
         "ok": True, "changed": True,
         "applied": [keys.label(k) for k in applied],
         "backup": None if session.empty else session.stamp,
-        "apply_keys": sorted((apply_info or {}).get("bound_to") or []),
+        "apply_keys": _apply_keys(state.cfg_scan),
     }
 
 
@@ -2544,13 +2597,12 @@ def _cfg_plugin_set_state(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     backup.prune()
 
     state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
-    apply_info = cfgscan.existing_apply_script(state.cfg_scan)
     return {
         "ok": True, "changed": True, "name": found.name, "state": target,
         "backup": None if session.empty else session.stamp,
         "bound_to": found.bound_to,
         "bound_labels": [keys.label(b) for b in found.bound_to],
-        "apply_keys": sorted((apply_info or {}).get("bound_to") or []),
+        "apply_keys": _apply_keys(state.cfg_scan),
     }
 
 
@@ -5219,6 +5271,34 @@ def _update_settings(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     return {"ok": True, **checker.summary()}
 
 
+def _refresh_apply_now(state: State) -> None:
+    """Bring the in-game apply file up to date after a config change.
+
+    Never allowed to fail the change itself: the change is already on disk,
+    and the next successful refresh catches the file up anyway.
+    """
+    from . import applynow
+
+    try:
+        applynow.refresh(_rescan(state))
+    except Exception:
+        pass
+
+
+# Every handler that can change a config file CS2 reads. After any of them
+# succeeds the in-game apply file is rewritten, so the apply key always
+# brings in the latest state.
+_CONFIG_WRITERS = {
+    _apply, _revert, _cfg_save, _cfg_plugin_toggle, _cfg_plugin_bind,
+    _cfg_plugin_set_state, _cfg_bind, _cfg_settings_apply,
+    _cfg_apply_script_install, _cfg_layouts_pin, _cfg_layouts_apply,
+    _cfg_layouts_default, _cfg_layouts_create, _cfg_layouts_copy,
+    _cfg_layouts_delete, _cfg_layouts_remove, _cfg_layouts_import,
+    _cfg_layouts_sync_pull, _cfg_starter, _cfg_convert, _cfg_polish_apply,
+    _cfg_rename_apply, _goxlr_bind, _profile_use,
+}
+
+
 def make_handler(state: State):
     routes_get: Dict[str, Callable[[], Dict[str, Any]]] = {}
     routes_post: Dict[str, Callable[[State, Dict[str, Any]], Dict[str, Any]]] = {
@@ -5250,6 +5330,8 @@ def make_handler(state: State):
         "/api/cfg/settings/apply": _cfg_settings_apply,
         "/api/cfg/apply-script/status": _cfg_apply_script_status,
         "/api/cfg/apply-script/install": _cfg_apply_script_install,
+        "/api/cfg/apply-now/status": _apply_now_status,
+        "/api/cfg/apply-now/key": _apply_now_key,
         "/api/cfg/layouts/status": _cfg_layouts_status,
         "/api/cfg/layouts/pin": _cfg_layouts_pin,
         "/api/cfg/layouts/apply": _cfg_layouts_apply,
@@ -5845,7 +5927,10 @@ def make_handler(state: State):
                     self._send_json({"ok": True, **handler(state, body)})
                 else:
                     with state.lock:
-                        self._send_json({"ok": True, **handler(state, body)})
+                        reply = {"ok": True, **handler(state, body)}
+                        if handler in _CONFIG_WRITERS and reply.get("ok"):
+                            _refresh_apply_now(state)
+                        self._send_json(reply)
             except (ProbeError, steam.SteamError, ValueError) as exc:
                 self._send_json({"ok": False, "error": str(exc)}, 400)
             except Exception as exc:  # surfaced in the page, not swallowed

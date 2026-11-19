@@ -10341,58 +10341,73 @@ function cs2YoursHtml() {
   return html;
 }
 
-// Many hand-written configs already carry their own "reload my config" key
-// -- cfgscan looks for one by what it actually runs, not by name, so this
-// never suggests adding a second, redundant one next to it.
+// One key brings every change made in the app into a running game: the app
+// keeps one config file up to date with your full current setup, and this
+// key runs it. Pure config file -- nothing runs beside CS2.
 function cs2ApplyCardHtml() {
   const st = applyScriptStatus;
-  const bound = st && st.bound_to && st.bound_to.length;
-  let note, label = "";
-  if (!st || !st.already_installed) {
-    note = "Adds a key that reloads your configs from inside CS2, the same way the game " +
-      "itself does on launch &mdash; just run from a key press instead of a restart. Only " +
-      "ever writes to your own config files; nothing is injected into the game.";
-    label = "Set up (binds F12)";
-  } else if (bound) {
-    note = "Press <b>" + esc(st.bound_labels.join(" / ")) + "</b> in-game to reload your " +
-      "configs &mdash; any setting you change here takes effect immediately, no relaunch." +
-      (st.detected
-        ? " You already had this (<code>" + esc(st.alias) + "</code>, " +
-          esc(st.file) + ":" + st.line + "), so nothing new was added."
-        : " Rebind it any time from the Scripts tab.");
-  } else {
-    note = "<code>" + esc(st.alias) + "</code> reloads your configs but has no key " +
-      "yet" + (st.detected ? " (" + esc(st.file) + ":" + st.line + ")" : "") + ".";
-    label = "Bind F12";
+  let note, label;
+  if (st && st.needs_folder) {
+    return '<div class="subcat">Apply changes during a match</div>' +
+      '<p class="subcat-note">Pick your config folder on the Configs page first, ' +
+      "then come back here to choose your apply key.</p>";
   }
-  return '<div class="subcat">Apply without restarting CS2</div>' +
+  if (st && st.ready) {
+    note = "Press <b>" + esc(st.key_label) + "</b> in game and everything you changed " +
+      "here (keys, keyboard profiles, settings) takes effect right away, no restart. " +
+      "It only reads your own config files, so it is safe on FACEIT and Valve servers.";
+    label = "Change key";
+  } else {
+    note = "Changes you make here while CS2 is open normally wait for the next launch. " +
+      "Pick one key and pressing it in game applies all of them at once. " +
+      "It only uses your own config files, so it is safe on FACEIT and Valve servers.";
+    label = "Choose apply key";
+  }
+  return '<div class="subcat">Apply changes during a match</div>' +
     '<p class="subcat-note">' + note + "</p>" +
-    (label ? '<button class="btn primary small" id="cs2-apply-script-action">' +
-      esc(label) + "</button>" : "");
+    '<button class="btn primary small" id="cs2-apply-now-key">' + esc(label) + "</button>";
 }
 
-document.addEventListener("click", async e => {
-  const btn = e.target.closest("#cs2-apply-script-action");
-  if (!btn) return;
-  btn.disabled = true;
+async function setApplyNowKey(code, force) {
   try {
-    if (!applyScriptStatus || !applyScriptStatus.already_installed) {
-      applyScriptStatus = await api("/api/cfg/apply-script/install", {});
-    }
-    if (applyScriptStatus.already_installed && !applyScriptStatus.detected &&
-        !(applyScriptStatus.bound_to && applyScriptStatus.bound_to.length)) {
-      await loadPlugins(true);
-      const found = (plugData.plugins || [])
-        .find(p => p.aliases && p.aliases.includes(applyScriptStatus.alias));
-      if (found) await applyBind(found.id, "F12", false);
-      applyScriptStatus = await api("/api/cfg/apply-script/status", {});
-    }
+    const r = await api("/api/cfg/apply-now/key", { code: code, force: !!force });
+    applyScriptStatus = r;
+    status("Apply key set to " + r.key_label + ". It works from your next CS2 start. " +
+           "If CS2 is open now, restart it once." + (r.backup ? " A backup was saved." : ""));
     renderCs2Body();
   } catch (err) {
-    status("Could not set this up: " + String(err && err.message || err), true);
-  } finally {
-    btn.disabled = false;
+    const msg = String(err && err.message || err);
+    if (/already runs/.test(msg) && confirm(msg + "\n\nUse this key for applying changes anyway?")) {
+      await setApplyNowKey(code, true);
+      return;
+    }
+    status("Apply key unchanged: " + msg, true);
   }
+}
+
+document.addEventListener("click", e => {
+  const btn = e.target.closest("#cs2-apply-now-key");
+  if (!btn) return;
+  const box = document.createElement("div");
+  box.className = "keycatch";
+  box.innerHTML = '<div class="keycatch-inner">' +
+    "<h3>Press the key that applies your changes in game</h3>" +
+    '<p class="sub">Pick a key you do not use in matches, like F8. Esc cancels.</p>' +
+    "</div>";
+  document.body.appendChild(box);
+  const done = () => {
+    window.removeEventListener("keydown", onKey, true);
+    box.remove();
+  };
+  async function onKey(ev) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    done();
+    if (ev.code === "Escape") return;
+    await setApplyNowKey(ev.code, false);
+  }
+  window.addEventListener("keydown", onKey, true);
+  box.addEventListener("click", done);
 });
 
 function renderCs2Body() {
@@ -11859,7 +11874,7 @@ document.addEventListener("click", async e => {
                  ? " (" + r.skipped.length + " pinned, left alone)" : "") +
                (applyKeys.length
                  ? " — press " + applyKeys.join(" or ") + " to apply it live"
-                 : " — takes effect next time you reload your configs") +
+                 : " — takes effect next time CS2 starts, or set an apply key to use it mid-match") +
                (r.backup ? ". A backup was saved." : ""));
       }
       await loadKeyboard(true);
@@ -11887,7 +11902,7 @@ document.addEventListener("click", async e => {
                " key" + (r.applied.length === 1 ? "" : "s") + " restored" +
                (applyKeys.length
                  ? " — press " + applyKeys.join(" or ") + " to apply it live"
-                 : " — takes effect next time you reload your configs") +
+                 : " — takes effect next time CS2 starts, or set an apply key to use it mid-match") +
                (r.backup ? ", backup " + r.backup : ""));
       }
       await loadKeyboard(true);
@@ -15312,7 +15327,7 @@ async function loadCs2Settings(force, keepEdits) {
     // Read-only: whether something already reloads the startup chain on a
     // key, so the apply card knows its state before anyone clicks anything.
     if (!applyScriptStatus || force) {
-      try { applyScriptStatus = await api("/api/cfg/apply-script/status", {}); }
+      try { applyScriptStatus = await api("/api/cfg/apply-now/status", {}); }
       catch (e) { /* The card just offers to set one up; nothing else depends on it. */ }
     }
     if (!keepEdits) cs2Edits.clear();
