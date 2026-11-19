@@ -2019,6 +2019,11 @@
     padding: 12px 17px; border-top: 1px solid var(--line);
     display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap;
   }
+  .app-ask { z-index: 90; }
+  .app-ask .modal { max-width: 460px; }
+  .app-ask .body p { margin: 0 0 8px; color: var(--muted); line-height: 1.5; }
+  .app-ask .body p:last-child { margin-bottom: 0; }
+  .app-ask .btn.danger { background: var(--bad); border-color: var(--bad); }
   .chg { display: flex; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line-soft); }
   .chg:last-child { border-bottom: 0; }
   .chg .n { flex: 1 1 auto; min-width: 0; }
@@ -8641,8 +8646,8 @@ $("preview").addEventListener("click", previewPlan);
 
 $("apply").addEventListener("click", async () => {
   if (!planned || profileApplyBusy) return;
-  if (!confirm("Apply the " + planned.intent +
-               " profile?\n\nEverything changed is backed up first.")) return;
+  if (!await appAsk("Apply the " + planned.intent +
+               " profile?\n\nEverything changed is backed up first.", {yes: "Apply"})) return;
   profileApplyBusy = true;
   profileRail.syncStatus();
   verificationRevision++;
@@ -8823,7 +8828,7 @@ const profileRail = (() => {
 })();
 
 $("revert").addEventListener("click", async () => {
-  if (!confirm("Restore the most recent backup?")) return;
+  if (!await appAsk("Restore the most recent backup?\n\nYour current settings are swapped for the ones saved before the last change.", {yes: "Restore"})) return;
   busy('Restoring your previous settings...', {id:'restore'});
   try {
     const r = await api("/api/revert", {});
@@ -8994,6 +8999,48 @@ async function loadCfgSettings() {
   try { renderSettings(await api("/api/cfg/settings", {})); }
   catch (e) { $("cfg-settings-card").classList.add("hidden"); }
 }
+
+// --- asking and telling ---------------------------------------------------
+// The app's own question window, in place of the browser's confirm() and
+// alert(), which look foreign and name the local address as their sender.
+// The first paragraph of the text is the question; the rest explains it.
+// Resolves true for the main button, false for the other one, Escape, or a
+// click outside.
+function appAsk(text, opts) {
+  opts = opts || {};
+  const parts = String(text || "").split("\n\n");
+  const head = parts.shift();
+  const back = document.createElement("div");
+  back.className = "modal-back app-ask";
+  back.innerHTML = '<div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="app-ask-title">' +
+    '<h3 id="app-ask-title">' + esc(head) + "</h3>" +
+    (parts.length ? '<div class="body">' + parts.map(p => "<p>" + esc(p).replace(/\n/g, "<br>") + "</p>").join("") + "</div>" : "") +
+    '<div class="foot">' +
+    (opts.tell ? "" : '<button class="btn" data-ask="no">' + esc(opts.no || "Cancel") + "</button>") +
+    '<button class="btn primary' + (opts.danger ? " danger" : "") + '" data-ask="yes">' +
+    esc(opts.yes || (opts.tell ? "OK" : "Go ahead")) + "</button></div></div>";
+  document.body.appendChild(back);
+  const yes = back.querySelector('[data-ask="yes"]');
+  yes.focus();
+  return new Promise(resolve => {
+    const finish = answer => {
+      document.removeEventListener("keydown", onKey, true);
+      back.remove();
+      resolve(answer);
+    };
+    const onKey = e => {
+      if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); finish(false); }
+    };
+    document.addEventListener("keydown", onKey, true);
+    back.addEventListener("click", e => {
+      if (e.target === back) finish(false);
+      const b = e.target.closest("[data-ask]");
+      if (b) finish(b.dataset.ask === "yes");
+    });
+  });
+}
+
+function appTell(text) { return appAsk(text, { tell: true }); }
 
 // --- unsaved changes ------------------------------------------------------
 // Edits are kept while you move around and only questioned when you actually
@@ -9859,7 +9906,7 @@ async function runFix(button) {
   const id = button.dataset.fix;
   const fix = ((fixData && fixData.fixes) || []).find(f => f.id === id);
   if (!fix || fixSurveyPending || fixStates.get(id)?.phase === "fixing" || button.disabled) return;
-  if (fix.danger && !confirm(fix.title + "\n\n" + fix.danger + "\n\nGo ahead?")) return;
+  if (fix.danger && !await appAsk(fix.title + "\n\n" + fix.danger)) return;
 
   const body = { id: id };
   if (id === "net.restart" && $("fix-adapter")) body.adapter = $("fix-adapter").value;
@@ -10577,9 +10624,9 @@ async function saveCs2(subset) {
 
 $("cs2-apply").addEventListener("click", async () => {
   const video = [...cs2Edits.values()].filter(c => c.source === "video").length;
-  if (video && !confirm(
-      video + " of these settings live in cs2_video.txt.\n\n" +
-      "Close CS2 first, or it will overwrite them when it exits.\n\nContinue?")) return;
+  if (video && !await appAsk(
+      "Close CS2 first?\n\n" + video + " of these settings live in CS2's video file. " +
+      "If CS2 is open, it will overwrite them when it exits.", {yes: "Save anyway"})) return;
   await saveCs2(null);
 });
 
@@ -11935,8 +11982,7 @@ document.addEventListener("click", async e => {
       try {
         const r = await api("/api/cfg/layouts/export", { file });
         if (r.declined) return;
-        if (!confirm("Saved a copy of “" + label + "” to " + r.path +
-            ". Remove it from here now?")) return;
+        if (!await appAsk("Remove “" + label + "” from here now?\n\nA copy was saved to " + r.path + ".", {yes: "Remove"})) return;
         await api("/api/cfg/layouts/delete", { file });
         delete kbProfileIcons[file];
         await saveKbProfileIcons();
@@ -11950,8 +11996,8 @@ document.addEventListener("click", async e => {
       return;
     }
     if (action === "delete") {
-      if (!confirm("Delete “" + label + "” completely? This removes its file " +
-          "for good (backed up first, so it can still be restored from Backups).")) return;
+      if (!await appAsk("Delete “" + label + "” completely?\n\nThis removes its file for good. " +
+          "It is backed up first, so it can still be restored from Backups.", {yes: "Delete", danger: true})) return;
       try {
         await api("/api/cfg/layouts/delete", { file });
         delete kbProfileIcons[file];
@@ -11993,7 +12039,8 @@ document.addEventListener("click", async e => {
     const popover = kbswPopover;
     // A new profile starts as an empty keyboard. Copy keeps the source's binds.
     const start = popover.mode === "copy" ? null
-      : (confirm("Start with CS2's default binds?\n\nOK: CS2 defaults\nCancel: empty keyboard")
+      : (await appAsk("Start with CS2's default binds?\n\nPick an empty keyboard to set every key yourself.",
+                       {yes: "CS2 defaults", no: "Empty keyboard"})
         ? "defaults" : "empty");
     try {
       const r = popover.mode === "copy"
@@ -12044,9 +12091,9 @@ document.addEventListener("click", async e => {
     return;
   }
   if (e.target.closest("[data-kbsw-pull]")) {
-    if (!confirm("Pull profiles from the cloud? A local file with the same " +
-        "name is overwritten — backed up first, so it can still be " +
-        "restored from Backups.")) return;
+    if (!await appAsk("Pull profiles from the cloud?\n\nA local file with the same " +
+        "name is overwritten. It is backed up first, so it can still be " +
+        "restored from Backups.", {yes: "Pull"})) return;
     try {
       const r = await api("/api/cfg/layouts/sync/pull", {});
       status(r.files.length
@@ -13166,8 +13213,8 @@ document.addEventListener("click", async e => {
   if (remove) {
     const id = remove.dataset.companionRemove;
     const found = companionsData.find(c => c.id === id);
-    if (found && !confirm("Remove " + found.name + "? This only forgets it " +
-                          "here — nothing on your machine is touched.")) return;
+    if (found && !await appAsk("Remove " + found.name + "?\n\nThis only forgets it " +
+                          "here. Nothing on your machine is touched.", {yes: "Remove"})) return;
     try {
       const r = await api("/api/companions/act", { do: "remove", id });
       if (r.ok) { companionsData = r.companions || []; renderCompanions(); }
@@ -14546,7 +14593,7 @@ document.addEventListener("click", async e => {
   if (del) {
     e.stopPropagation();
     const name = del.dataset.setupDel;
-    if (!confirm("Delete the setup \u201c" + name + "\u201d?\n\nNothing else changes.")) return;
+    if (!await appAsk("Delete the setup \u201c" + name + "\u201d?\n\nNothing else changes.", {yes: "Delete", danger: true})) return;
     await setupsAct({ do: "delete", name });
     status("Deleted " + name + ".");
     return;
@@ -15083,7 +15130,7 @@ async function saveFile(force) {
     // The server refuses the first time if the edit would leave the file with
     // syntax errors; it is still the user's config, so they get to insist.
     if (/syntax error/.test(msg) &&
-        confirm(msg + "\n\nSave it anyway?")) {
+        await appAsk("Save it anyway?\n\n" + msg, {yes: "Save anyway"})) {
       await saveFile(true);
       return;
     }
@@ -15093,11 +15140,11 @@ async function saveFile(force) {
   }
 }
 
-document.addEventListener("click", e => {
+document.addEventListener("click", async e => {
   if (e.target.closest("#file-edit")) startEdit();
   else if (e.target.closest("#file-cancel")) {
     if (!sameText(editDraft, openFile.text) &&
-        !confirm("Discard your changes to " + openFile.path + "?")) return;
+        !await appAsk("Discard your changes to " + openFile.path + "?", {yes: "Discard", no: "Keep editing", danger: true})) return;
     stopEdit();
   } else if (e.target.closest("#file-save")) saveFile(false);
 });
@@ -15623,7 +15670,7 @@ function renderUpdToast() {
 async function updInstall() {
   const answer = await api("/api/update/install", {});
   if (!answer.ok) {
-    alert(answer.error || "Could not start the install.");
+    await appTell("Could not start the install.\n\n" + (answer.error || "Something went wrong. Try again in a moment."));
     return;
   }
   document.body.innerHTML =
@@ -16829,9 +16876,9 @@ $("cfg-apply-polish").addEventListener("click", async () => {
   if (!cfgScan) return;
   const files = cfgScan.files.filter(f => f.polish && f.polish.safe && f.polish.changed)
                             .map(f => f.relative);
-  if (!confirm("Apply formatting to " + files.length + " file(s)?\n\n" +
+  if (!await appAsk("Tidy " + files.length + " file(s)?\n\n" +
                "Only spacing, alignment and blank lines change. The commands each file runs " +
-               "are verified to be identical afterwards. Every file is backed up first."))
+               "are checked to be identical afterwards. Every file is backed up first.", {yes: "Tidy"}))
     return;
   busy("Tidying your configuration files…");
   try {
@@ -16860,9 +16907,9 @@ $("cfg-rename-preview").addEventListener("click", async () => {
 $("cfg-rename-apply").addEventListener("click", async () => {
   const a = currentAlias();
   if (!a) return;
-  if (!confirm("Rename " + a.name + " to " + $("cfg-newname").value.trim() + "?\n\n" +
-               "This changes the identifier and every reference to it. The commands it runs " +
-               "are not modified, so its behaviour is unchanged. Files are backed up first."))
+  if (!await appAsk("Rename " + a.name + " to " + $("cfg-newname").value.trim() + "?\n\n" +
+               "This changes the name and every place that uses it. What it does stays the " +
+               "same. Files are backed up first.", {yes: "Rename"}))
     return;
   busy("Renaming your configuration files…");
   try {
@@ -17095,12 +17142,12 @@ $("play-stop").addEventListener("click", async () => {
 });
 
 $("play-close").addEventListener("click", async () => {
-  if (!confirm(
+  if (!await appAsk(
       "Close CS2?\n\n" +
       "It is asked to close normally first, and only ended by force if it does not " +
       "respond within 8 seconds.\n\n" +
       "If you are in a live competitive match this counts as abandoning it, with the " +
-      "usual cooldown.")) return;
+      "usual cooldown.", {yes: "Close CS2", danger: true})) return;
   busy("Closing CS2…");
   try {
     const r = await api("/api/play/stop", { close_game: true, force: true });
