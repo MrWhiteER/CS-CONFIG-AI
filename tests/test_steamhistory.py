@@ -68,6 +68,16 @@ class Merging(unittest.TestCase):
                          ["cs2-x", f"steam-{ME}-1794168000"])
         self.assertEqual(out["counts"]["cs2"], 2)
 
+    def test_recording_takes_steams_mode_and_scoreboard(self):
+        # CS2's live feed calls a Premier match "competitive".
+        steam = steamhistory.parse([PAGE], ME, "Premier")
+        local = {"source": "cs2", "match_id": "cs2-x", "map": "de_mirage", "mode": "competitive",
+                 "started_at": 1794336151 + 120, "played_at": 1794336151 + 2400,
+                 "kills": 24, "deaths": 14, "rounds": 22, "adr": 91.0, "won": True}
+        row = matchlog.combined([], steam + [local], "cs2")["matches"][0]
+        self.assertEqual((row["match_id"], row["mode"], row["adr"]), ("cs2-x", "Premier", 91.0))
+        self.assertEqual(len(row["players"]), 10)
+
 
 class SharedSession(unittest.TestCase):
     def test_sign_in_closes_itself_and_tells_the_app(self):
