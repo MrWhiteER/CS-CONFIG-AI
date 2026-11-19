@@ -30,6 +30,11 @@ from .cfglang import (
 
 CONFIG_SUFFIXES = (".cfg", ".vcfg")
 
+# The app's own "apply my changes now" file (see applynow.py). It mirrors the
+# startup configs, so reading it back as part of a collection would make its
+# copy of a setting look like the one that wins.
+APPLY_NOW_FILE = "cs2cfg_apply_now.cfg"
+
 # Commands that are real but are not settings and not user aliases. Used to
 # avoid calling a normal engine command an unresolved reference.
 KNOWN_ENGINE_PREFIXES = (
@@ -227,6 +232,8 @@ def discover(folder: Path, cfg_root: Optional[Path] = None) -> Dict[str, ConfigF
 
     for path in sorted(folder.rglob("*")):
         if not path.is_file() or path.suffix.lower() not in CONFIG_SUFFIXES:
+            continue
+        if path.name.lower() == APPLY_NOW_FILE:
             continue
         try:
             raw = path.read_bytes()
