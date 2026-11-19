@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated": "2026-11-01",
+  "updated": "2026-11-19",
   "note": "Commands offered when binding a key from the keyboard view. Every one is either bound by CS2 itself in game/csgo/cfg/user_keys_default.vcfg, or already listed in cs2cfg/cfgscan.py as an engine command or engine action -- so nothing here is a guess about what the engine accepts. A command that does not exist would bind silently and then do nothing when pressed, which is the failure this list exists to avoid.",
   "sources": [
     "CS2's own cfg/user_keys_default.vcfg, read at runtime by cs2cfg/defaults.py",
@@ -20,19 +20,19 @@
         },
         {
           "command": "+back",
-          "label": "Move back",
+          "label": "Move backward",
           "hold": true,
           "icon": "down"
         },
         {
           "command": "+left",
-          "label": "Move left",
+          "label": "Move left (strafe)",
           "hold": true,
           "icon": "left"
         },
         {
           "command": "+right",
-          "label": "Move right",
+          "label": "Move right (strafe)",
           "hold": true,
           "icon": "right"
         },
@@ -50,14 +50,14 @@
         },
         {
           "command": "+sprint",
-          "label": "Walk quietly",
+          "label": "Walk (quiet steps)",
           "hold": true,
           "note": "CS2 renamed this; older configs call it +speed.",
           "icon": "walk"
         },
         {
           "command": "+lookspin",
-          "label": "Look behind",
+          "label": "Spin view around",
           "hold": true,
           "icon": "spin"
         }
@@ -69,13 +69,13 @@
       "commands": [
         {
           "command": "+attack",
-          "label": "Fire",
+          "label": "Shoot",
           "hold": true,
           "icon": "crosshair"
         },
         {
           "command": "+attack2",
-          "label": "Secondary fire / scope",
+          "label": "Right click: scope / zoom / knife stab",
           "hold": true,
           "icon": "scope"
         },
@@ -87,7 +87,7 @@
         },
         {
           "command": "+use",
-          "label": "Use / plant / defuse",
+          "label": "Use: plant bomb, defuse, open doors",
           "hold": true,
           "icon": "hand"
         },
@@ -99,7 +99,7 @@
         },
         {
           "command": "+zoom",
-          "label": "Zoom",
+          "label": "Zoom in",
           "hold": true,
           "icon": "zoom"
         }
@@ -111,12 +111,12 @@
       "commands": [
         {
           "command": "slot1",
-          "label": "Primary weapon",
+          "label": "Primary (rifle, SMG, sniper)",
           "icon": "rifle"
         },
         {
           "command": "slot2",
-          "label": "Pistol",
+          "label": "Secondary (pistol)",
           "icon": "pistol"
         },
         {
@@ -126,52 +126,54 @@
         },
         {
           "command": "slot4",
-          "label": "Grenade slot 4",
+          "label": "Grenades (cycle through)",
           "icon": "grenade"
         },
         {
           "command": "slot5",
-          "label": "Bomb / C4",
+          "label": "C4 bomb",
           "icon": "bomb"
         },
         {
           "command": "slot6",
-          "label": "Grenade slot 6",
+          "label": "HE grenade",
           "icon": "grenade"
         },
         {
           "command": "slot7",
-          "label": "Grenade slot 7",
+          "label": "Flashbang",
           "icon": "grenade"
         },
         {
           "command": "slot8",
-          "label": "Grenade slot 8",
+          "label": "Smoke grenade",
           "icon": "grenade"
         },
         {
           "command": "slot9",
-          "label": "Grenade slot 9",
+          "label": "Decoy grenade",
           "icon": "grenade"
         },
         {
           "command": "slot10",
-          "label": "Grenade slot 10",
+          "label": "Molotov / incendiary",
           "icon": "grenade"
         },
         {
           "command": "slot11",
-          "label": "Slot 11",
-          "icon": "box"
+          "label": "Extra item slot",
+          "icon": "box",
+          "note": "What CS2 puts here depends on the mode (for example a healthshot)."
         },
         {
           "command": "slot12",
-          "label": "Zeus / taser",
-          "icon": "zap"
+          "label": "Zeus x27 (taser)",
+          "icon": "zap",
+          "note": "CS2 puts this on X by default."
         },
         {
           "command": "lastinv",
-          "label": "Last weapon",
+          "label": "Switch to last weapon",
           "icon": "swap"
         },
         {
@@ -191,17 +193,17 @@
         },
         {
           "command": "switchhands",
-          "label": "Swap gun hand",
+          "label": "Switch gun hand (left/right)",
           "icon": "hands"
         },
         {
           "command": "switchhandsleft",
-          "label": "Gun in left hand",
+          "label": "Hold gun in left hand",
           "icon": "hands"
         },
         {
           "command": "switchhandsright",
-          "label": "Gun in right hand",
+          "label": "Hold gun in right hand",
           "icon": "hands"
         }
       ]
@@ -212,7 +214,7 @@
       "commands": [
         {
           "command": "buymenu",
-          "label": "Open the buy menu",
+          "label": "Buy menu",
           "icon": "cart"
         },
         {
@@ -222,7 +224,7 @@
         },
         {
           "command": "rebuy",
-          "label": "Buy the same as last round",
+          "label": "Buy same as last round",
           "icon": "refresh"
         },
         {
@@ -237,7 +239,7 @@
         },
         {
           "command": "sellbackall",
-          "label": "Sell everything back",
+          "label": "Sell back everything",
           "note": "Only works during the buy period, and only where refunds are on.",
           "icon": "coins"
         }
@@ -249,23 +251,23 @@
       "commands": [
         {
           "command": "+voicerecord",
-          "label": "Talk (hold)",
+          "label": "Push to talk",
           "hold": true,
           "icon": "mic"
         },
         {
           "command": "messagemode",
-          "label": "Type to everyone",
+          "label": "Chat to everyone",
           "icon": "chat"
         },
         {
           "command": "messagemode2",
-          "label": "Type to your team",
+          "label": "Chat to your team",
           "icon": "chatteam"
         },
         {
           "command": "player_ping",
-          "label": "Ping where you are looking",
+          "label": "Ping a spot",
           "icon": "pin"
         },
         {
@@ -293,28 +295,28 @@
         },
         {
           "command": "radio1",
-          "label": "Radio: standard",
+          "label": "Radio menu: commands",
           "icon": "tower"
         },
         {
           "command": "radio2",
-          "label": "Radio: group",
+          "label": "Radio menu: group orders",
           "icon": "tower"
         },
         {
           "command": "radio3",
-          "label": "Radio: reports",
+          "label": "Radio menu: reports",
           "icon": "tower"
         },
         {
           "command": "+spray_menu",
-          "label": "Spray wheel",
+          "label": "Graffiti / spray wheel",
           "hold": true,
           "icon": "spray"
         },
         {
           "command": "teammenu",
-          "label": "Team menu",
+          "label": "Choose team",
           "icon": "people"
         }
       ]
@@ -325,45 +327,45 @@
       "commands": [
         {
           "command": "+showscores",
-          "label": "Scoreboard (hold)",
+          "label": "Scoreboard",
           "hold": true,
           "icon": "board"
         },
         {
           "command": "+cl_show_team_equipment",
-          "label": "Show team equipment",
+          "label": "Show teammates' gear",
           "hold": true,
           "icon": "bag"
         },
         {
           "command": "show_loadout_toggle",
-          "label": "Show loadout",
+          "label": "Show your loadout",
           "icon": "bag"
         },
         {
           "command": "toggleconsole",
-          "label": "Console",
+          "label": "Open console",
           "note": "Needs the console enabled in the game's settings.",
           "icon": "terminal"
         },
         {
           "command": "jpeg",
-          "label": "Screenshot",
+          "label": "Take screenshot",
           "icon": "camera"
         },
         {
           "command": "cancelselect",
-          "label": "Close the open menu",
+          "label": "Close menu (Esc)",
           "icon": "close"
         },
         {
           "command": "stopsound",
-          "label": "Stop sounds",
+          "label": "Stop all sounds",
           "icon": "mute"
         },
         {
           "command": "clear",
-          "label": "Clear the console",
+          "label": "Clear console text",
           "icon": "eraser"
         }
       ]
@@ -381,7 +383,7 @@
         },
         {
           "command": "cs_quit_prompt",
-          "label": "Quit (asks first)",
+          "label": "Quit game (asks first)",
           "note": "CS2 binds this to F10 by default.",
           "icon": "power"
         }
@@ -399,13 +401,13 @@
         },
         {
           "command": "god",
-          "label": "Invincibility",
+          "label": "God mode (no damage)",
           "note": "Needs sv_cheats 1. Toggles -- press again to turn off.",
           "icon": "dot"
         },
         {
           "command": "buddha",
-          "label": "Can't die",
+          "label": "Can't die (health stays at 1)",
           "note": "Needs sv_cheats 1. Still takes damage, but health won't drop below 1. Toggles.",
           "icon": "dot"
         },
@@ -416,17 +418,17 @@
         },
         {
           "command": "bot_kick",
-          "label": "Remove all bots",
+          "label": "Kick all bots",
           "icon": "close"
         },
         {
           "command": "mp_warmup_end",
-          "label": "End warmup now",
+          "label": "End warmup",
           "icon": "dot"
         },
         {
           "command": "sv_rethrow_last_grenade",
-          "label": "Re-throw your last grenade",
+          "label": "Rethrow last grenade",
           "note": "Needs sv_cheats 1.",
           "icon": "grenade"
         }

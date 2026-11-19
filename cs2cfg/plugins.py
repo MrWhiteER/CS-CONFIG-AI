@@ -93,6 +93,9 @@ class Plugin:
     layout: List[dict] = field(default_factory=list)   # state -> what it runs
     flips: List[str] = field(default_factory=list)     # relative commands used
     anchors: List[str] = field(default_factory=list)   # absolute settings used
+    spelled: Dict[str, str] = field(default_factory=dict)   # alias -> as written
+    bodies: Dict[str, str] = field(default_factory=dict)    # alias -> what it runs
+    comments: Dict[str, str] = field(default_factory=dict)  # alias -> its // note
 
     @property
     def drifts(self) -> bool:
@@ -238,6 +241,8 @@ def find(result) -> List[Plugin]:
         for title, line_no, end_line, body in _blocks(text):
             names: Set[str] = set()
             bodies: Dict[str, str] = {}
+            spelled: Dict[str, str] = {}
+            comments: Dict[str, str] = {}
             applied: List[str] = []
             description = ""
 
@@ -252,6 +257,9 @@ def find(result) -> List[Plugin]:
                         alias_name = command.arg_text(0)
                         names.add(alias_name.lower())
                         bodies[alias_name.lower()] = command.arg_text(1)
+                        spelled[alias_name.lower()] = alias_name
+                        if parsed.comment and parsed.comment.strip():
+                            comments[alias_name.lower()] = parsed.comment.strip()
                     elif command.name.lower() == "echo" and command.tokens[1:]:
                         note = _ANNOUNCE.search(command.arg_text(0) or "")
                         if note:
@@ -355,6 +363,9 @@ def find(result) -> List[Plugin]:
                 end_line=end_line,
                 enabled=disabled_lines == 0,
                 layout=layout,
+                spelled=spelled,
+                bodies=dict(bodies),
+                comments=comments,
             )
             if description:
                 key = _KEY.search(description)
