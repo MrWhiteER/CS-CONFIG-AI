@@ -3294,6 +3294,112 @@ def _cfg_bind(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _scriptgen_binding(body: Dict[str, Any]) -> str:
+    from . import keys
+
+    binding = str(body.get("binding") or "").strip()
+    if not binding and body.get("code"):
+        binding = keys.from_code(str(body["code"])) or ""
+    return binding
+
+
+def _scriptgen_key(result, binding: str, entry: str) -> Dict[str, Any]:
+    """Whether the chosen key is free, and what it runs now if it is not."""
+    from . import keys
+
+    if not binding:
+        return {"binding": "", "label": "", "free": False, "runs": ""}
+    entries = (result.binds.get(binding) if result is not None else None) or []
+    runs = ""
+    if entries:
+        runs = (max(entries, key=lambda b: b.order).body or "").strip().strip(chr(34))
+    free = not runs or (bool(entry) and runs.lower() == entry.lower())
+    from . import scriptgen
+
+    said = scriptgen.describe(runs, result) if runs and not free else ""
+    return {"binding": binding, "label": keys.label(binding), "free": free, "runs": said}
+
+
+def _scriptgen_steps(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Read-only: every step the Script Builder offers, grouped."""
+    from . import scriptgen
+
+    result = _rescan(state)
+    offered = scriptgen.steps(result)
+    groups = []
+    for step in offered:
+        if not groups or groups[-1]["id"] != step["group"]:
+            groups.append({"id": step["group"], "name": step["group_name"]})
+    return {"ok": True, "steps": offered, "groups": groups,
+            "folder": result is not None}
+
+
+def _scriptgen_check(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Read-only: what a script would do, its lines, and every check on it."""
+    from . import scriptgen
+
+    result = _rescan(state)
+    binding = _scriptgen_binding(body)
+    spec = dict(body.get("spec") or {})
+    spec["binding"] = binding
+    key = _scriptgen_key(result, binding, "")
+    built = scriptgen.build(spec, result, key["label"])
+    key = _scriptgen_key(result, binding, built.entry)
+    return {"ok": True, "built": built.as_dict(), "key": key,
+            "folder": result is not None}
+
+
+def _scriptgen_save(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Write a Script Builder script into the config and put it on its key.
+
+    Built and checked again here rather than trusting the page: a script the
+    checks refuse is never written, whatever asked for it.
+    """
+    from . import cfgscan, scriptgen
+
+    result = _rescan(state)
+    if result is None:
+        return {"ok": False, "error": "Pick your config folder first (Settings)."}
+    binding = _scriptgen_binding(body)
+    spec = dict(body.get("spec") or {})
+    spec["binding"] = binding
+    key = _scriptgen_key(result, binding, "")
+    built = scriptgen.build(spec, result, key["label"])
+    if not built.ok:
+        problems = [c.text for c in built.checks if c.level == "block"]
+        return {"ok": False, "built": built.as_dict(),
+                "error": problems[0] if problems else "This script can't be saved yet."}
+
+    key = _scriptgen_key(result, binding, built.entry)
+    if not key["free"] and not body.get("force"):
+        return {"ok": False, "needs_confirm": True, "key": key,
+                "error": f"{key['label']} already does something else."}
+
+    target = (built.replaces or {}).get("file") or cfgscan.default_target(result)
+    if not target and result.entry_points:
+        target = result.entry_points[0]
+    config = next((c for c in result.files.values() if c.relative == target), None)
+    if config is None or config.generated_by:
+        return {"ok": False, "error": "No config file here can hold a script. Create a "
+                "starter config on the Settings tab first."}
+
+    original = config.path.read_bytes().decode(config.document.encoding, errors="replace")
+    flat = cfglang.restore_newlines(original, chr(10), False)
+    text = scriptgen.write_block(flat, chr(10), False, built, key["label"])
+    text = cfglang.restore_newlines(text, config.document.newline,
+                                    config.document.trailing_newline)
+    session = backup.BackupSession(note=f"script builder: {built.spec['name']}")
+    session.add(config.path)
+    cfglang.write_config_text(config.path, text, config.document.encoding)
+    backup.prune()
+    state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+
+    bound = _cfg_bind(state, {"binding": binding, "command": built.entry, "force": True})
+    return {"ok": bool(bound.get("ok")), "file": target, "alias": built.entry,
+            "key": key, "replaced": bool(built.replaces),
+            "error": bound.get("error", ""), "backup": session.stamp}
+
+
 def _cfg_plugin_bind(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     """Move a script onto a different key.
 
@@ -5310,7 +5416,7 @@ _CONFIG_WRITERS = {
     _cfg_layouts_default, _cfg_layouts_create, _cfg_layouts_copy,
     _cfg_layouts_delete, _cfg_layouts_remove, _cfg_layouts_import,
     _cfg_layouts_sync_pull, _cfg_starter, _cfg_convert, _cfg_polish_apply,
-    _cfg_rename_apply, _goxlr_bind, _profile_use,
+    _cfg_rename_apply, _goxlr_bind, _profile_use, _scriptgen_save,
 }
 
 
@@ -5341,6 +5447,9 @@ def make_handler(state: State):
         "/api/cfg/keys": _cfg_keys,
         "/api/cfg/key/options": _cfg_key_options,
         "/api/cfg/bind": _cfg_bind,
+        "/api/scriptgen/steps": _scriptgen_steps,
+        "/api/scriptgen/check": _scriptgen_check,
+        "/api/scriptgen/save": _scriptgen_save,
         "/api/cfg/settings": _cfg_settings,
         "/api/cfg/settings/apply": _cfg_settings_apply,
         "/api/cfg/apply-script/status": _cfg_apply_script_status,

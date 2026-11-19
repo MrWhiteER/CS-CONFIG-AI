@@ -2641,6 +2641,7 @@
   body[data-hue="fix"]       { --g1:#7a3a46; --g2:#40308e; --g3:#5a2460; }
   body[data-hue="files"]     { --g1:#4a3560; --g2:#2a5a7a; --g3:#5a2f72; }
   body[data-hue="scripts"]   { --g1:#6b2a5a; --g2:#3a2f8c; --g3:#4d2f7a; }
+  body[data-hue="builder"]   { --g1:#5a2a6b; --g2:#33308c; --g3:#4d2f7a; }
   body[data-hue="keyboard"]  { --g1:#6a1f7a; --g2:#3a2f9c; --g3:#2a1f65; }
   body[data-hue="video"]     { --g1:#1f4f8a; --g2:#5b2a7a; --g3:#123049; }
 
@@ -5029,10 +5030,11 @@
   .rail .tabs:has([data-tab="cs2"][aria-selected="true"]) { --nav-index: 4; --nav-break: 12px; }
   .rail .tabs:has([data-tab="keyboard"][aria-selected="true"]) { --nav-index: 5; --nav-break: 12px; }
   .rail .tabs:has([data-tab="scripts"][aria-selected="true"]) { --nav-index: 6; --nav-break: 12px; }
-  .rail .tabs:has([data-tab="files"][aria-selected="true"]) { --nav-index: 7; --nav-break: 12px; }
-  .rail .tabs:has([data-tab="gpu"][aria-selected="true"]) { --nav-index: 8; --nav-break: 12px; }
-  .rail .tabs:has([data-tab="fix"][aria-selected="true"]) { --nav-index: 9; --nav-break: 12px; }
-  .rail .tabs:has([data-tab="settings"][aria-selected="true"]) { --nav-index: 10; --nav-break: 24px; }
+  .rail .tabs:has([data-tab="builder"][aria-selected="true"]) { --nav-index: 7; --nav-break: 12px; }
+  .rail .tabs:has([data-tab="files"][aria-selected="true"]) { --nav-index: 8; --nav-break: 12px; }
+  .rail .tabs:has([data-tab="gpu"][aria-selected="true"]) { --nav-index: 9; --nav-break: 12px; }
+  .rail .tabs:has([data-tab="fix"][aria-selected="true"]) { --nav-index: 10; --nav-break: 12px; }
+  .rail .tabs:has([data-tab="settings"][aria-selected="true"]) { --nav-index: 11; --nav-break: 24px; }
   .rail .tabs .tab {
     flex: 0 0 var(--nav-row); height: var(--nav-row); min-height: var(--nav-row);
     box-sizing: border-box; width: 100%; position: relative;
@@ -5838,6 +5840,66 @@
 }
 </style>
 
+<style>
+/* Script Builder. Theme tokens only, so every theme (light ones too) reads. */
+.sb-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 400px); gap: 16px; align-items: start; }
+@media (max-width: 1050px) { .sb-grid { grid-template-columns: 1fr; } }
+.sb-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; }
+.sb-side { position: sticky; top: 8px; }
+.sb-step { display: flex; gap: 12px; margin-bottom: 20px; }
+.sb-step:last-child { margin-bottom: 0; }
+.sb-step > div { flex: 1; min-width: 0; }
+.sb-num { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--accent-dim); color: var(--accent); display: grid; place-items: center; font-weight: 700; font-size: 13px; }
+.sb-step h4, .sb-side h4 { margin: 3px 0 9px; font-size: 14px; color: var(--ink); }
+.sb-input { width: 100%; box-sizing: border-box; background: var(--chip); border: 1px solid var(--line); color: var(--ink); border-radius: 9px; padding: 8px 11px; font: inherit; }
+.sb-input:focus { outline: none; border-color: var(--accent); }
+.sb-modes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+.sb-mode { text-align: left; border: 1px solid var(--line); border-radius: 11px; padding: 10px 12px; background: var(--panel-2); color: var(--ink); font: inherit; cursor: pointer; }
+.sb-mode b { display: block; margin-bottom: 2px; }
+.sb-mode small { color: var(--muted); font-size: 12px; line-height: 1.35; display: block; }
+.sb-mode[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--accent-dim); }
+.sb-acts { display: flex; flex-direction: column; gap: 7px; }
+.sb-act { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; background: var(--panel-2); border: 1px solid var(--line); border-radius: 11px; padding: 8px 10px; }
+.sb-act.bad { border-color: var(--bad); }
+.sb-act .n { color: var(--faint); width: 16px; text-align: right; font-size: 12px; }
+.sb-act b { font-weight: 600; color: var(--ink); }
+.sb-act .tag { font-size: 11px; padding: 2px 8px; border-radius: 20px; background: var(--chip); color: var(--muted); }
+.sb-act .sp { flex: 1; }
+.sb-act input { background: var(--chip); border: 1px solid var(--line); color: var(--ink); border-radius: 7px; padding: 5px 8px; font: inherit; }
+.sb-act input[type="text"] { width: 220px; max-width: 100%; }
+.sb-act input[type="number"] { width: 72px; }
+.sb-act label { color: var(--muted); font-size: 12px; display: inline-flex; gap: 6px; align-items: center; }
+.sb-mini { border: 0; background: none; color: var(--faint); cursor: pointer; font: inherit; padding: 2px 5px; border-radius: 6px; }
+.sb-mini:hover:not(:disabled) { color: var(--ink); background: var(--chip); }
+.sb-mini:disabled { opacity: .3; cursor: default; }
+.sb-add { border: 1px dashed var(--line); border-radius: 11px; padding: 11px; margin-top: 2px; }
+.sb-cats { display: flex; gap: 6px; flex-wrap: wrap; margin: 9px 0; }
+.sb-cat { font: inherit; font-size: 12px; padding: 4px 10px; border-radius: 20px; border: 1px solid var(--line); color: var(--muted); background: none; cursor: pointer; }
+.sb-cat[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent, #04140f); }
+.sb-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.sb-chip { font: inherit; font-size: 13px; background: var(--chip); color: var(--ink); border: 1px solid var(--line-soft); padding: 6px 10px; border-radius: 8px; cursor: pointer; }
+.sb-chip:hover:not(:disabled) { border-color: var(--accent); }
+.sb-chip:disabled { opacity: .4; cursor: not-allowed; }
+.sb-hint { color: var(--faint); font-size: 12px; margin: 8px 0 0; }
+.sb-key { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.sb-kc { min-width: 46px; height: 40px; padding: 0 12px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); display: inline-grid; place-items: center; font: 700 14px/1 var(--body, inherit); box-shadow: 0 3px 0 var(--sunk); cursor: pointer; }
+.sb-kc.listening { border-color: var(--accent); color: var(--accent); }
+.sb-says { background: var(--panel-2); border: 1px solid var(--line-soft); border-radius: 11px; padding: 11px 13px; margin-bottom: 14px; color: var(--ink); }
+.sb-says p { margin: 0 0 5px; } .sb-says p:last-child { margin: 0; }
+.sb-says ol { margin: 4px 0 0; padding-left: 20px; }
+.sb-chk { display: flex; gap: 9px; margin-bottom: 8px; color: var(--ink); line-height: 1.4; }
+.sb-chk .ic { flex: none; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 800; color: var(--bg); margin-top: 1px; }
+.sb-chk.ok .ic { background: var(--good); } .sb-chk.warn .ic { background: var(--warn); } .sb-chk.block .ic { background: var(--bad); }
+.sb-chk .fix { margin-top: 5px; }
+.sb-lines { margin-top: 10px; border-top: 1px solid var(--line-soft); padding-top: 9px; }
+.sb-lines summary { color: var(--muted); cursor: pointer; }
+.sb-lines pre { background: var(--sunk); color: var(--ink); border-radius: 9px; padding: 9px 11px; font: 12px/1.5 Consolas, monospace; white-space: pre-wrap; word-break: break-all; margin: 8px 0 0; }
+.sb-btns { display: flex; gap: 9px; margin-top: 14px; }
+.sb-btns .primary { flex: 1; }
+.sb-ideas { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 7px; }
+.sb-ideas .sb-chip { font-size: 12px; }
+.sb-confirm { border: 1px solid var(--warn); border-radius: 11px; padding: 10px 12px; margin-top: 12px; color: var(--ink); }
+</style>
 <link rel="stylesheet" href="assets/devices/workspace.css">
 <link rel="stylesheet" href="assets/fixit/toolbox.css">
 <link rel="stylesheet" href="assets/hardware/icons.css">
@@ -6211,6 +6273,8 @@ const startup = (() => {
         <i class="ic"><span data-hardware-icon="keyboard"></span></i><span class="tx">Keyboard</span></button>
       <button class="tab" data-tab="scripts" role="tab" aria-selected="false" title="Scripts">
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7l-5 5 5 5M15 7l5 5-5 5"/></svg></i><span class="tx">Scripts</span></button>
+      <button class="tab" data-tab="builder" role="tab" aria-selected="false" title="Script Builder">
+        <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l9.5-9.5M14.5 4.5l1 2.5 2.5 1-2.5 1-1 2.5-1-2.5-2.5-1 2.5-1zM19 13l.6 1.4 1.4.6-1.4.6L19 17l-.6-1.4-1.4-.6 1.4-.6z"/></svg></i><span class="tx">Script Builder</span></button>
       <button class="tab" data-tab="files" role="tab" aria-selected="false" title="Files">
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 012-2h4l2 2.5h8a2 2 0 012 2V18a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></i><span class="tx">Files</span></button>
       <button class="tab" data-tab="gpu" role="tab" aria-selected="false" title="Graphics">
@@ -6631,6 +6695,22 @@ const startup = (() => {
         <div class="subtabs" id="plug-tabs"></div>
         <div id="plug-out"><span class="sub">Scan a configuration folder first.</span></div>
       </section>
+    </div>
+
+    <div class="tab-panel hidden" data-panel="builder">
+      <div class="hero">
+        <div class="hero-copy">
+          <div class="eyebrow">Make your own</div>
+          <h2>Script Builder</h2>
+          <p>
+            Put several actions on one key without writing any code. Pick what
+            should happen, pick a key, and the app writes it into your config.
+            Everything is checked first, so a script can never get stuck or
+            break the game rules.
+          </p>
+        </div>
+      </div>
+      <div id="sb-out"><span class="sub">Reading&hellip;</span></div>
     </div>
 
     <div class="tab-panel hidden" data-panel="files">
@@ -16323,6 +16403,297 @@ const serverPingWidget = (() => {
   return {shown(){start();},hidden(){clearTimeout(timer); if(opened) panel.hidePopover();}};
 })();
 
+/* --- Script Builder --------------------------------------------------------
+   Several actions on one key, picked from plain words. The page only collects
+   choices; every check and every line is made by cs2cfg/scriptgen.py, so a
+   script the checks refuse can never be written from here.
+   -------------------------------------------------------------------------- */
+const SB_MODES = [
+  ["press", "Press once", "Every press does all the steps."],
+  ["hold", "While held", "Starts on press, everything undoes when you let go."],
+  ["toggle", "On / off", "First press turns it on, next press turns it off."],
+];
+const SB_IDEAS = [
+  {label: "Drop the bomb + tell team", spec: {name: "Drop the bomb and tell my team", mode: "press",
+    steps: [{id: "drop_bomb"}, {id: "say_team", text: "Dropping the bomb"}, {id: "cmd:lastinv"}]}},
+  {label: "Talk with the game quieter", spec: {name: "Talk with the game quieter", mode: "hold",
+    steps: [{id: "cmd:+voicerecord"}, {id: "volume", value: 0.2}]}},
+  {label: "Buy all grenades", spec: {name: "Buy all grenades", mode: "press",
+    steps: [{id: "buy_flash"}, {id: "buy_smoke"}, {id: "buy_he"}, {id: "buy_molotov"}]}},
+  {label: "Big radar while held", spec: {name: "Big radar while held", mode: "hold",
+    steps: [{id: "radar_zoom", value: 0.3}]}},
+  {label: "Game sound on / off", spec: {name: "Game sound on off", mode: "toggle",
+    steps: [{id: "volume", value: 0}]}},
+];
+const sb = {data: null, spec: {name: "", mode: "press", steps: []}, binding: "", keyLabel: "",
+            cat: "weapons", find: "", built: null, key: null, listening: false, confirm: null,
+            saving: false, timer: 0};
+
+function sbStep(id) { return (sb.data && sb.data.steps || []).find(s => s.id === id); }
+
+async function sbLoad(force) {
+  const box = $("sb-out");
+  if (sb.data && !force) { sbRender(); return; }
+  await ensureScan(false);
+  try {
+    sb.data = await api("/api/scriptgen/steps", {});
+    if (!sb.data.groups.some(g => g.id === sb.cat) && sb.data.groups.length) sb.cat = sb.data.groups[0].id;
+    sbRender();
+    sbCheck();
+  } catch (err) {
+    if (box) box.innerHTML = '<span class="sub warn">' + esc(String(err && err.message || err)) + "</span>";
+  }
+}
+
+function sbNewStep(id) {
+  const step = sbStep(id);
+  const out = {id};
+  if (!step) return out;
+  if (step.input === "text") out.text = "";
+  if (step.input === "number") { out.value = step.default; out.back = step.back_default; }
+  return out;
+}
+
+function sbHasMove() {
+  return sb.spec.steps.some(s => (sbStep(s.id) || {}).move);
+}
+
+function sbStepRow(picked, i) {
+  const step = sbStep(picked.id) || {label: picked.id, group_name: ""};
+  const n = sb.spec.steps.length;
+  const bad = sb.built && !sb.built.ok && ((step.move && sb.spec.steps.filter(s => (sbStep(s.id) || {}).move).length > 1) ||
+    (step.hold && sb.spec.mode === "press"));
+  let extra = "";
+  if (step.input === "text") {
+    extra = '<input type="text" maxlength="100" data-sb-text="' + i + '" placeholder="' + esc(step.placeholder || "") +
+      '" value="' + esc(picked.text || "") + '">';
+  } else if (step.input === "number") {
+    extra = '<label>Set to <input type="number" step="' + step.step + '" min="' + step.min + '" max="' + step.max +
+      '" data-sb-val="' + i + '" value="' + esc(picked.value) + '"></label>';
+    if (sb.spec.mode !== "press") {
+      extra += '<label>then back to <input type="number" step="' + step.step + '" min="' + step.min + '" max="' + step.max +
+        '" data-sb-back="' + i + '" value="' + esc(picked.back) + '"></label>';
+    }
+  }
+  return '<div class="sb-act' + (bad ? " bad" : "") + '"><span class="n">' + (i + 1) + '</span><b>' + esc(step.label) + '</b>' +
+    extra + '<span class="tag">' + esc(step.group_name || "") + '</span><span class="sp"></span>' +
+    '<button class="sb-mini" data-sb-move="' + i + ':-1" title="Move up"' + (i === 0 ? " disabled" : "") + '>&#8593;</button>' +
+    '<button class="sb-mini" data-sb-move="' + i + ':1" title="Move down"' + (i === n - 1 ? " disabled" : "") + '>&#8595;</button>' +
+    '<button class="sb-mini" data-sb-del="' + i + '" title="Remove this step">&#10005;</button></div>';
+}
+
+function sbChips() {
+  const find = sb.find.trim().toLowerCase();
+  const list = (sb.data.steps || []).filter(s => find
+    ? (s.label + " " + (s.group_name || "")).toLowerCase().includes(find)
+    : s.group === sb.cat);
+  if (!list.length) return '<p class="sb-hint">Nothing matches that. Try another word.</p>';
+  const hasMove = sbHasMove();
+  let fadedMove = false, fadedHold = false;
+  const chips = list.map(s => {
+    let off = "";
+    if (s.move && hasMove) { off = "CS2 allows only one moving or shooting action per key."; fadedMove = true; }
+    else if (s.hold && sb.spec.mode === "press") { off = "Only works on a “While held” or “On / off” key."; fadedHold = true; }
+    return '<button class="sb-chip" data-sb-add="' + esc(s.id) + '"' + (off ? ' disabled title="' + esc(off) + '"' : (s.note ? ' title="' + esc(s.note) + '"' : "")) +
+      '>' + esc(s.label) + '</button>';
+  }).join("");
+  let hint = "";
+  if (fadedMove) hint += '<p class="sb-hint">You already have one moving or shooting action. CS2 allows only one per key, so the others are faded.</p>';
+  if (fadedHold) hint += '<p class="sb-hint">Faded steps only work while a key is held. Choose “While held” or “On / off” to use them.</p>';
+  return '<div class="sb-chips">' + chips + '</div>' + hint;
+}
+
+function sbSide() {
+  const b = sb.built;
+  let html = '<h4>What your script will do</h4>';
+  const key = sb.keyLabel ? "<b>" + esc(sb.keyLabel) + "</b>" : "your key";
+  if (b && b.says && b.says.length) {
+    const lead = sb.spec.mode === "hold" ? "While you hold " + key + ":" :
+      sb.spec.mode === "toggle" ? "First press of " + key + ":" : "When you press " + key + ":";
+    html += '<div class="sb-says"><p>' + lead + '</p><ol>' + b.says.map(t => "<li>" + esc(t) + "</li>").join("") + '</ol>';
+    if (sb.spec.mode !== "press") {
+      const undo = [];
+      if (sb.spec.steps.some(s => (sbStep(s.id) || {}).hold)) undo.push("lets go of everything held");
+      (b.release_says || []).forEach(t => undo.push(t));
+      html += '<p style="margin-top:8px">' + (sb.spec.mode === "hold" ? "When you let go: " : "Next press: ") +
+        esc(undo.length ? undo.join(", ") : "nothing needs undoing") + '.</p>';
+    }
+    html += '</div>';
+  } else {
+    html += '<div class="sb-says"><p>Add steps on the left and they show up here in plain words.</p></div>';
+  }
+  html += '<h4>Checks</h4>';
+  const checks = (b && b.checks || []).slice();
+  if (sb.key && sb.key.binding && !sb.key.free) {
+    checks.push({level: "warn", text: sb.key.label + " already does \u201c" + sb.key.runs + "\u201d. Saving puts your script there instead."});
+  }
+  html += checks.map(c => {
+    let fix = "";
+    if (c.fix === "mode:hold") fix = '<div class="fix"><button class="btn small" data-sb-mode="hold">Switch to While held</button></div>';
+    if (c.fix === "mode:press") fix = '<div class="fix"><button class="btn small" data-sb-mode="press">Switch to Press once</button></div>';
+    if (c.fix === "valve") fix = '<div class="fix"><button class="btn small" data-sb-keepmove>Keep only the first one</button></div>';
+    return '<div class="sb-chk ' + esc(c.level) + '"><span class="ic">' + (c.level === "ok" ? "&#10003;" : "!") + '</span><div>' + esc(c.text) + fix + '</div></div>';
+  }).join("");
+  if (b && b.ok && b.lines && b.lines.length) {
+    const bindLine = sb.binding ? '\nbind "' + sb.binding + '" "' + b.entry + '"' : "";
+    html += '<details class="sb-lines"><summary>Show the config lines</summary><pre>' +
+      esc(b.lines.join("\n") + bindLine) + '</pre></details>';
+  }
+  if (sb.confirm) {
+    html += '<div class="sb-confirm">' + esc(sb.confirm) + '<div class="sb-btns" style="margin-top:8px">' +
+      '<button class="btn" data-sb-cancel>Keep that key</button><button class="btn primary" data-sb-force>Replace it</button></div></div>';
+  }
+  const can = b && b.ok && !sb.saving && sb.data && sb.data.folder;
+  html += '<div class="sb-btns"><button class="btn" data-sb-clear>Clear</button><button class="btn primary" data-sb-save' +
+    (can ? "" : " disabled") + '>' + (sb.saving ? "Saving…" : "Save to my config") + '</button></div>';
+  if (sb.data && !sb.data.folder) html += '<p class="sb-hint">Pick your config folder in Settings first, then you can save.</p>';
+  html += '<p class="sb-hint">Saved scripts show up in Scripts and in the Keyboard key picker under “Your scripts”. ' +
+    'Saving the same name again replaces the old one.</p>';
+  html += '<p class="sb-hint" style="margin-top:12px">Ready-made ideas:</p><div class="sb-ideas">' +
+    SB_IDEAS.map((idea, i) => '<button class="sb-chip" data-sb-idea="' + i + '">' + esc(idea.label) + '</button>').join("") + '</div>';
+  return html;
+}
+
+function sbRender() {
+  const box = $("sb-out");
+  if (!box || !sb.data) return;
+  const keep = document.activeElement && box.contains(document.activeElement) ? document.activeElement : null;
+  const keepSel = keep ? {attr: [...keep.attributes].filter(a => a.name.startsWith("data-sb") || a.name === "id").map(a => a.name + '="' + a.value + '"'),
+    pos: keep.selectionStart} : null;
+  const cats = sb.data.groups.map(g => '<button class="sb-cat" data-sb-cat="' + esc(g.id) + '" aria-pressed="' +
+    (!sb.find && g.id === sb.cat) + '">' + esc(g.name) + '</button>').join("");
+  box.innerHTML = '<div class="sb-grid"><section class="sb-card">' +
+    '<div class="sb-step"><span class="sb-num">1</span><div><h4>Give it a name</h4>' +
+      '<input class="sb-input" id="sb-name" maxlength="40" placeholder="For example: Drop the bomb and tell my team" value="' + esc(sb.spec.name) + '"></div></div>' +
+    '<div class="sb-step"><span class="sb-num">2</span><div><h4>How the key works</h4><div class="sb-modes">' +
+      SB_MODES.map(m => '<button class="sb-mode" data-sb-mode="' + m[0] + '" aria-pressed="' + (sb.spec.mode === m[0]) + '"><b>' +
+        m[1] + '</b><small>' + m[2] + '</small></button>').join("") + '</div></div></div>' +
+    '<div class="sb-step"><span class="sb-num">3</span><div><h4>What it does, in order</h4><div class="sb-acts">' +
+      sb.spec.steps.map(sbStepRow).join("") +
+      '<div class="sb-add"><input class="sb-input" id="sb-find" placeholder="Add a step: search, e.g. jump, buy, volume, say…" value="' + esc(sb.find) + '">' +
+      '<div class="sb-cats">' + cats + '</div>' + sbChips() + '</div></div></div></div>' +
+    '<div class="sb-step"><span class="sb-num">4</span><div><h4>Which key</h4><div class="sb-key">' +
+      '<button class="sb-kc' + (sb.listening ? " listening" : "") + '" id="sb-keybtn">' + (sb.listening ? "Press a key…" : esc(sb.keyLabel || "Pick")) + '</button>' +
+      '<span class="sub">' + (sb.listening ? "Press any key or mouse button. Esc cancels." : "Click, then press any key or mouse button.") + '</span>' +
+      (sb.key && sb.key.binding ? '<span class="sb-hint" style="margin:0">' + esc(sb.key.free ? sb.key.label + " is free right now." : sb.key.label + " is in use right now.") + '</span>' : "") +
+    '</div></div></div>' +
+    '</section><section class="sb-card sb-side">' + sbSide() + '</section></div>';
+  if (keepSel && keepSel.attr.length) {
+    const again = box.querySelector("[" + keepSel.attr[0] + "]");
+    if (again) { again.focus(); try { if (keepSel.pos != null) again.setSelectionRange(keepSel.pos, keepSel.pos); } catch (_) {} }
+  }
+}
+
+function sbChanged() {
+  sb.confirm = null;
+  clearTimeout(sb.timer);
+  sb.timer = setTimeout(sbCheck, 180);
+}
+
+async function sbCheck() {
+  try {
+    const r = await api("/api/scriptgen/check", {spec: sb.spec, binding: sb.binding});
+    sb.built = r.built; sb.key = r.key;
+  } catch (err) {
+    sb.built = {ok: false, checks: [{level: "block", text: String(err && err.message || err)}]};
+  }
+  sbRender();
+}
+
+async function sbSave(force) {
+  sb.saving = true; sbRender();
+  try {
+    const r = await api("/api/scriptgen/save", {spec: sb.spec, binding: sb.binding, force: !!force});
+    sb.confirm = null;
+    status((r.replaced ? "Updated “" : "Saved “") + sb.spec.name + "” on " + (r.key && r.key.label || sb.keyLabel) +
+      ". Restart CS2 or press your Apply-now key to use it.");
+    plugData = null; keyData = null; kbOptions = null; sb.data = null;
+    sb.saving = false;
+    await sbLoad(true);
+    return;
+  } catch (err) {
+    const data = err && err.data || {};
+    if (data.needs_confirm) sb.confirm = (data.key && data.key.label || "That key") + " already does " + (data.key && data.key.runs || "something else") + ". Put your script there instead?";
+    else status("Could not save the script: " + (err && err.message || err), true);
+  }
+  sb.saving = false; sbRender();
+}
+
+function sbSetKey(binding) {
+  sb.listening = false;
+  if (binding) { sb.binding = binding; sb.keyLabel = ""; }
+  sbRender(); sbCheck().then(() => { if (sb.key) { sb.keyLabel = sb.key.label; sbRender(); } });
+}
+
+document.addEventListener("keydown", e => {
+  if (!sb.listening) return;
+  e.preventDefault(); e.stopPropagation();
+  if (e.code === "Escape") { sb.listening = false; sbRender(); return; }
+  const binding = kbBindingFor(e.code);
+  if (!binding) { status("That key can't be used in CS2. Try another.", true); return; }
+  sbSetKey(binding);
+}, true);
+document.addEventListener("mousedown", e => {
+  if (!sb.listening || e.target && e.target.id === "sb-keybtn" && e.button === 0) return;
+  const map = {1: "mouse3", 3: "mouse4", 4: "mouse5"};
+  if (!map[e.button]) return;
+  e.preventDefault(); e.stopPropagation();
+  sbSetKey(map[e.button]);
+}, true);
+document.addEventListener("wheel", e => {
+  if (!sb.listening) return;
+  e.preventDefault();
+  sbSetKey(e.deltaY < 0 ? "mwheelup" : "mwheeldown");
+}, {capture: true, passive: false});
+
+document.addEventListener("click", e => {
+  const box = $("sb-out");
+  if (!box || !box.contains(e.target)) return;
+  const t = e.target.closest("button");
+  if (!t) return;
+  const d = t.dataset;
+  if (t.id === "sb-keybtn") { sb.listening = !sb.listening; sbRender(); return; }
+  if (d.sbMode) { sb.spec.mode = d.sbMode; sbRender(); sbChanged(); return; }
+  if (d.sbCat) { sb.cat = d.sbCat; sb.find = ""; sbRender(); return; }
+  if (d.sbAdd) {
+    if (sb.spec.steps.length >= 12) { status("Up to 12 steps fit on one key.", true); return; }
+    sb.spec.steps.push(sbNewStep(d.sbAdd)); sbRender(); sbChanged(); return;
+  }
+  if (d.sbDel) { sb.spec.steps.splice(+d.sbDel, 1); sbRender(); sbChanged(); return; }
+  if (d.sbMove) {
+    const [i, dir] = d.sbMove.split(":").map(Number);
+    const j = i + dir, list = sb.spec.steps;
+    if (j < 0 || j >= list.length) return;
+    [list[i], list[j]] = [list[j], list[i]]; sbRender(); sbChanged(); return;
+  }
+  if (d.sbKeepmove !== undefined) {
+    let seen = false;
+    sb.spec.steps = sb.spec.steps.filter(s => { const m = (sbStep(s.id) || {}).move; if (!m) return true; if (seen) return false; seen = true; return true; });
+    sbRender(); sbChanged(); return;
+  }
+  if (d.sbIdea) {
+    const idea = SB_IDEAS[+d.sbIdea];
+    sb.spec = {name: idea.spec.name, mode: idea.spec.mode,
+      steps: idea.spec.steps.map(s => Object.assign(sbNewStep(s.id), s))};
+    sbRender(); sbChanged(); return;
+  }
+  if (d.sbClear !== undefined) { sb.spec = {name: "", mode: "press", steps: []}; sb.confirm = null; sbRender(); sbChanged(); return; }
+  if (d.sbSave !== undefined) { sbSave(false); return; }
+  if (d.sbForce !== undefined) { sbSave(true); return; }
+  if (d.sbCancel !== undefined) { sb.confirm = null; sbRender(); return; }
+});
+
+document.addEventListener("input", e => {
+  const box = $("sb-out");
+  if (!box || !box.contains(e.target)) return;
+  const t = e.target, d = t.dataset;
+  if (t.id === "sb-name") { sb.spec.name = t.value; sbChanged(); return; }
+  if (t.id === "sb-find") { sb.find = t.value; sbRender(); return; }
+  if (d.sbText !== undefined) { sb.spec.steps[+d.sbText].text = t.value; sbChanged(); return; }
+  if (d.sbVal !== undefined) { sb.spec.steps[+d.sbVal].value = t.value === "" ? null : +t.value; sbChanged(); return; }
+  if (d.sbBack !== undefined) { sb.spec.steps[+d.sbBack].back = t.value === "" ? null : +t.value; sbChanged(); return; }
+});
+
 let activeTab = "launcher";
 
 function setTab(name) {
@@ -16340,6 +16711,7 @@ function setTab(name) {
   if (name === "inventory" && !inventoryData) loadInventory(false);
   if (name === "skins") { if (!skinsToolStatus) loadSkinsToolStatus(); if (!skinsData) loadSkinsCatalog(false); }
   if (name === "scripts") loadPlugins(false);
+  if (name === "builder") sbLoad(false);
   if (name === "keyboard") loadKeyboard(false);
   if (name === "fix") loadFixes(false);
   if (name === "settings") {
@@ -17388,6 +17760,7 @@ $("rescan").addEventListener("click", () => scan(true));
     if (which === "gpu") return "gpu";
     if (which === "files") return "files";
     if (which === "scripts") return "scripts";
+    if (which === "builder") return "builder";
     if (which === "keyboard") return "keyboard";
     if (which !== "cs2") return which === "settings" ? "tools" : "launcher";
     const open = document.querySelector('#cs2-sections .seg-item[aria-selected="true"]');
