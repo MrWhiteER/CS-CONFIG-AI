@@ -519,11 +519,14 @@ class RazerUsbPacing(unittest.TestCase):
 class LightingCard(unittest.TestCase):
     page = (Path(__file__).resolve().parents[1] / "cs2cfg" / "web" / "index.html").read_text(encoding="utf-8")
 
-    def test_card_lives_in_this_pc_not_overlay(self):
-        overlay = self.page.split('data-sub="overlay">', 1)[1].split('<div class="subpane', 1)[0]
-        this_pc = self.page.split('data-sub="this-pc">', 1)[1].split('<div class="subpane', 1)[0]
-        self.assertNotIn('id="rgb-out"', overlay)
-        self.assertIn('id="rgb-out"', this_pc)
+    def test_card_lives_in_its_own_lighting_tab(self):
+        def pane(name):
+            return self.page.split('<div class="subpane hidden" data-sub="' + name + '">', 1)[1].split('<div class="subpane', 1)[0]
+        self.assertIn('data-sub="lighting" role="tab"', self.page)
+        self.assertIn('id="rgb-out"', pane("lighting"))
+        for other in ("overlay", "this-pc"):
+            self.assertNotIn('id="rgb-out"', pane(other))
+        self.assertIn('if (name === "lighting") loadRgb();', self.page)
 
     @unittest.skipUnless(shutil.which("node"), "optional Node runtime for browser-script checks")
     def test_settings_ui_harness(self):
