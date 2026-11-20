@@ -1720,15 +1720,73 @@ def _cfg_layouts_pin(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
             "profiles": _layout_view(state.cfg_scan, fresh_pins, keys, fresh_hidden)}
 
 
-def _cfg_layouts_apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
-    """Switch to a profile right now: write its overrides onto the standard
-    layout in place, as if its own key had just been pressed and the result
-    kept for good.
+def _current_profile(result) -> Optional[str]:
+    """The profile picked on the Keyboard tab, if it still exists."""
+    from . import cfgscan, layouts
 
-    A pinned key is left alone, same as it already would be if the profile
-    loaded live. Only edits files on disk -- getting it into a running game
-    still takes whatever already reloads live edits (the apply-saved-settings
-    key, if one is set up, or a relaunch).
+    current = layouts.load_current(result.root)
+    if current and cfgscan.is_match_profile(result, current):
+        return current
+    return None
+
+
+def _sync_active_layout(state: State, result=None) -> Optional[str]:
+    """Write the file that puts the active profile's keys on at launch.
+
+    Profiles are separate keyboards: switching never edits the default
+    layout's own files, and a key changed while a profile is active only
+    changes that profile. The autoexec runs this generated file last; for
+    the default layout it is empty. Returns the backup stamp when anything
+    was written, else None.
+    """
+    from . import cfgscan, emit, layouts
+
+    result = result if result is not None else _rescan(state)
+    if result is None:
+        return None
+    current = _current_profile(result)
+    relative = cfgscan.active_layout_path(result)
+    path = Path(result.cfg_root) / Path(relative)
+    if current is None and not path.exists():
+        return None           # never used profiles: leave the setup alone
+
+    pins = layouts.load_pins(result.root).get(current or "", [])
+    text = cfgscan.active_layout_text(result, current, pins)
+    session = backup.BackupSession(note="keyboard profile file (web)")
+    wrote = False
+    try:
+        old = path.read_text(encoding="utf-8")
+    except OSError:
+        old = None
+    if old != text:
+        session.add(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        cfglang.write_config_text(path, text, "utf-8")
+        wrote = True
+    if current is not None and result.entry_points:
+        entry = next((c for c in result.files.values()
+                      if c.relative == result.entry_points[0]), None)
+        if entry is not None:
+            said = emit.ensure_exec_line(entry.path, relative, session,
+                                         title="Keyboard profile (cs2-autoconfig)",
+                                         shout="KEYBOARD PROFILE")
+            wrote = wrote or not said.startswith(("already", "autoexec not found"))
+    backup.prune()
+    if wrote:
+        state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+        return session.stamp or "written"
+    return None
+
+
+def _cfg_layouts_apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Switch to a profile: from now on the game gets that profile's keys,
+    and only those.
+
+    Profiles are separate keyboards. The default layout's files are not
+    touched; a generated file run last at launch takes off every key the
+    profile does not use and puts on the ones it does (see
+    ``cfgscan.profile_layout``). Getting it into a running game takes the
+    apply key, or a relaunch.
     """
     from . import cfgscan, keys, layouts
 
@@ -1737,68 +1795,47 @@ def _cfg_layouts_apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         return {"ok": False, "error": "scan a configuration folder first"}
 
     profile_file = str(body.get("file") or "")
-    pins = layouts.load_pins(result.root)
-    skip_keys = pins.get(profile_file, [])
-
-    try:
-        applied, skipped, texts = cfgscan.apply_profile_overrides(
-            result, profile_file, skip_keys)
-    except ValueError as exc:
-        return {"ok": False, "error": str(exc)}
+    if not cfgscan.is_match_profile(result, profile_file):
+        return {"ok": False, "error": f"'{profile_file}' is not a detected layout profile"}
 
     profiles = {p["file"]: p for p in cfgscan.match_profiles(result)}
-    profile = profiles.get(profile_file)
-    label = profile["label"] if profile else profile_file
+    label = profiles[profile_file]["label"] if profile_file in profiles else profile_file
+    pins = layouts.load_pins(result.root).get(profile_file, [])
 
-    # Clicking a tab is the one explicit choice the switcher now trusts --
-    # see layouts.load_current -- regardless of whether this particular
-    # click changed anything on disk.
-    layouts.save_current(result.root, profile_file)
-
-    if not applied:
-        empty = not cfgscan._profile_own_binds(result, profile_file)
-        return {"ok": True, "changed": False, "empty": empty, "file": profile_file,
+    own = {k: b for k, b in cfgscan._profile_own_binds(result, profile_file).items()
+           if (b.body or "").strip()}
+    if not own:
+        # Nothing on it yet. Switching would take every key away.
+        return {"ok": True, "changed": False, "empty": True, "file": profile_file,
                 "apply_keys": _apply_keys(result),
-                "label": label, "applied": [], "skipped": [keys.label(k) for k in skipped]}
+                "label": label, "applied": [], "skipped": []}
 
-    # The first time any of these keys is ever overridden, remember what it
-    # was -- the one thing that makes a later "Default" mean something.
-    chain = cfgscan.startup_chain(result)
-    config = next(c for c in result.files.values() if c.relative == profile_file)
-    overrides = {o["key"]: o for o in
-                 cfgscan._profile_entry(result, chain, config)["overrides"]}
-    by_file: Dict[str, Dict[str, str]] = {}
-    for key in applied:
-        item = overrides.get(key)
-        if item is not None:
-            by_file.setdefault(item["standard_file"], {})[key] = item["standard_body"]
-    for file, bodies in by_file.items():
-        layouts.record_baseline(result.root, file, bodies)
+    was = _current_profile(result)
+    layouts.save_current(result.root, profile_file)
+    wrote = _sync_active_layout(state, result)
+    if was == profile_file and not wrote:
+        return {"ok": True, "changed": False, "empty": False, "file": profile_file,
+                "apply_keys": _apply_keys(state.cfg_scan),
+                "label": label, "applied": [], "skipped": []}
 
-    session = backup.BackupSession(note=f"switch to profile {profile_file} (web)")
-    for file, text in texts.items():
-        config = next(c for c in result.files.values() if c.relative == file)
-        session.add(config.path)
-        cfglang.write_config_text(config.path, text, config.document.encoding)
-    backup.prune()
-
-    state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+    final, _unbinds = cfgscan.profile_layout(state.cfg_scan, profile_file, pins)
+    applied = [b.key for b in final.values() if b.file == profile_file]
     return {
-        "ok": True, "changed": True, "file": profile_file, "label": label,
+        "ok": True, "changed": True, "empty": False, "file": profile_file, "label": label,
         "applied": [keys.label(k) for k in applied],
-        "skipped": [keys.label(k) for k in skipped],
-        "backup": None if session.empty else session.stamp,
+        "skipped": [keys.label(k) for k in pins],
+        "backup": wrote if wrote and wrote != "written" else None,
         "apply_keys": _apply_keys(state.cfg_scan),
     }
 
 
 def _cfg_layouts_default(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
-    """Go back to Default: restore every key a profile has ever overridden
-    back to what it was the first time that happened.
+    """Go back to Default: your own keys, exactly as your config files have
+    them.
 
-    The Keyboard tab's switcher shows this alongside the profiles themselves
-    as the one way out of a profile that got applied -- with no "Default" to
-    switch back to, a key a profile took over stayed that way for good.
+    Switching no longer edits those files, so going back only empties the
+    generated profile file. Keys an older version wrote into the default
+    files when switching are still put back from the recorded originals.
     """
     from . import cfgscan, keys, layouts
 
@@ -1806,28 +1843,30 @@ def _cfg_layouts_default(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     if result is None:
         return {"ok": False, "error": "scan a configuration folder first"}
 
-    baseline = layouts.load_baseline(result.root)
-    applied, texts = cfgscan.apply_default_layout(result, baseline)
-
+    was = _current_profile(result)
     layouts.save_current(result.root, None)
 
-    if not applied:
-        return {"ok": True, "changed": False,
-                "empty": not any(baseline.values()),
-                "applied": []}
-
+    baseline = layouts.load_baseline(result.root)
+    applied, texts = cfgscan.apply_default_layout(result, baseline)
     session = backup.BackupSession(note="restore default layout (web)")
     for file, text in texts.items():
         config = next(c for c in result.files.values() if c.relative == file)
         session.add(config.path)
         cfglang.write_config_text(config.path, text, config.document.encoding)
     backup.prune()
+    if texts:
+        state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+    wrote = _sync_active_layout(state, state.cfg_scan)
 
-    state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+    if not applied and was is None and not wrote:
+        ever = bool(any(baseline.values()) or
+                    (Path(result.cfg_root) / cfgscan.active_layout_path(result)).exists())
+        return {"ok": True, "changed": False, "empty": not ever, "applied": []}
     return {
         "ok": True, "changed": True,
         "applied": [keys.label(k) for k in applied],
-        "backup": None if session.empty else session.stamp,
+        "backup": (None if session.empty else session.stamp) or
+                  (wrote if wrote and wrote != "written" else None),
         "apply_keys": _apply_keys(state.cfg_scan),
     }
 
@@ -2624,10 +2663,33 @@ def _cfg_keys(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         if feature.entry:
             features.setdefault(feature.entry.lower(), feature)
 
+    from . import cfgscan
+
+    chain = cfgscan.startup_chain(result)
+    active = _current_profile(result)
+    profile_keys = None
+    if active is not None:
+        from . import layouts
+
+        profile_keys, _gone = cfgscan.profile_layout(
+            result, active, layouts.load_pins(result.root).get(active, []))
     bound = {}
     for key, entries in result.binds.items():
-        # The last bind to load is the one the engine keeps.
-        winner = max(entries, key=lambda b: b.order)
+        # What the game ends up with: the last bind to load at startup, in
+        # any spelling of the key (CS2 reads "e" as scancode8). A match
+        # profile's binds only apply once its key is pressed, so they do not
+        # decide what the board shows.
+        if profile_keys is not None:
+            # A profile is active: the board is that profile's keyboard.
+            winner = profile_keys.get(cfgscan.physical_key(key))
+            if winner is None:
+                continue
+        elif chain:
+            winner = cfgscan.startup_bind(result, chain, key)
+            if winner is None:
+                continue
+        else:
+            winner = max(entries, key=lambda b: b.order)
         command = (winner.body or "").strip().strip('"')
         if not command:
             # bind "key" "" -- cleared, e.g. by a new empty profile. Free.
@@ -3162,6 +3224,57 @@ def _first_binds_file(result) -> Optional[str]:
     return sorted(by_relative)[-1]
 
 
+def _profile_bind(state: State, result, profile_file: str, binding: str,
+                  command: str, clearing: bool) -> Dict[str, Any]:
+    """Change one key in the active profile's own file, then put the
+    profile back on the keyboard so the game gets it too."""
+    from . import cfgscan, commands, keys
+
+    config = next(c for c in result.files.values() if c.relative == profile_file)
+    original = config.path.read_bytes().decode(config.document.encoding, errors="replace")
+    lines = cfglang.restore_newlines(original, chr(10), False).split(chr(10))
+    mine = [b for b in cfgscan.binds_for_key(result, binding) if b.file == profile_file]
+    body_text = "" if clearing else command
+    changed = None
+    for b in sorted(mine, key=lambda b: -b.order):
+        index = b.line - 1
+        if not (0 <= index < len(lines) and "bind" in lines[index]):
+            continue
+        was = (b.body or "").strip().strip(chr(34))
+        lines[index] = lines[index].replace(chr(34) + was + chr(34),
+                                            chr(34) + body_text + chr(34), 1)
+        changed = "unbound" if clearing else f"was {was}"
+        break
+    if changed is None:
+        if clearing:
+            return {"ok": False, "error": f"{keys.label(binding)} is not bound to anything"}
+        while lines and not lines[-1].strip():
+            lines.pop()
+        lines.append(f'bind "{binding}" "{command}"')
+        changed = "added"
+
+    note = ("unbound " if clearing else "bind ") + keys.label(binding)
+    session = backup.BackupSession(note=f"{note} in profile {profile_file}")
+    session.add(config.path)
+    cfglang.write_config_text(
+        config.path,
+        cfglang.restore_newlines(chr(10).join(lines), config.document.newline,
+                                 config.document.trailing_newline),
+        config.document.encoding)
+    backup.prune()
+    state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+    _sync_active_layout(state, state.cfg_scan)
+    return {
+        "ok": True, "binding": binding, "label": keys.label(binding),
+        "command": "" if clearing else command,
+        "unbound": clearing, "changed": changed, "file": profile_file,
+        "profile": profile_file,
+        "backup": session.stamp,
+        "apply_keys": _apply_keys(state.cfg_scan),
+        "unknown": bool(command) and not commands.is_offered(command),
+    }
+
+
 def _cfg_bind(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     """Put a command on a key, or take the key's binding away.
 
@@ -3190,13 +3303,24 @@ def _cfg_bind(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     if not command and not clearing:
         return {"ok": False, "error": "no command given"}
 
-    existing = result.binds.get(binding) or []
-    if clearing and not existing:
+    # A profile is active: the key belongs to that profile alone. Neither the
+    # default layout nor any other profile changes.
+    profile_file = _current_profile(result)
+    if profile_file is not None:
+        return _profile_bind(state, result, profile_file, binding, command, clearing)
+
+    # What CS2 really ends up with for this key: only files that load at
+    # startup count (a match profile binding the same key does nothing until
+    # its own key is pressed), and every spelling of the key counts ("e" and
+    # "scancode8" are one key to the game, and the later one wins).
+    chain = cfgscan.startup_chain(result)
+    existing = [b for b in cfgscan.binds_for_key(result, binding) if b.file in chain]
+    winner = existing[-1] if existing else None
+    if clearing and winner is None:
         return {"ok": False, "error": f"{keys.label(binding)} is not bound to anything"}
 
     # Replacing something the user put there deliberately is worth a question.
-    if existing and not clearing and not body.get("force"):
-        winner = max(existing, key=lambda b: b.order)
+    if winner is not None and not clearing and not body.get("force"):
         already = (winner.body or "").strip().strip(chr(34))
         # An empty bind ("") is a key a fresh profile cleared: free to take.
         if already and already.lower() != command.lower():
@@ -3205,42 +3329,38 @@ def _cfg_bind(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
                                "runs": already}],
                     "error": f"{keys.label(binding)} already runs {already}"}
 
-    # Where to write. An existing bind decides it; otherwise the file that
-    # holds the most binds already is where this one belongs.
-    if existing:
-        target_file = max(existing, key=lambda b: b.order).file
+    # Where to write. The bind that wins at startup decides it; otherwise the
+    # startup file meant for binds. Never a match profile: CS2 does not load
+    # one at launch, so a change written there never reached the game.
+    if winner is not None:
+        target_file = winner.file
     else:
-        counts: Dict[str, int] = {}
-        for entries in result.binds.values():
-            for b in entries:
-                counts[b.file] = counts.get(b.file, 0) + 1
-        if counts:
-            target_file = max(counts.items(), key=lambda kv: kv[1])[0]
-        else:
-            # A collection with no binds in it yet -- a new account, or one the
-            # starter has just built. There is no busiest file to follow, so
-            # fall back to the file meant for binds. Without this the very
-            # first bind anyone makes is refused, which is exactly when the
-            # Keyboard tab most needs to work.
-            target_file = _first_binds_file(result)
-            if target_file is None:
-                return {"ok": False, "error":
-                        "nothing here can hold a bind. Create a starter config on "
-                        "the Settings tab, or point the app at the folder your "
-                        "config already lives in."}
+        target_file = (cfgscan.startup_binds_file(result, chain)
+                       or _first_binds_file(result))
+        if target_file is None:
+            return {"ok": False, "error":
+                    "nothing here can hold a bind. Create a starter config on "
+                    "the Settings tab, or point the app at the folder your "
+                    "config already lives in."}
 
-    config = next((c for c in result.files.values() if c.relative == target_file), None)
-    if config is None:
-        return {"ok": False, "error": f"{target_file} is not part of the scan"}
+    # Clearing takes every startup bind of the key away, not just the last:
+    # otherwise an earlier one quietly takes over again.
+    touched = existing if clearing else ([winner] if winner is not None else [])
+    files = sorted({b.file for b in touched} | {target_file})
 
-    original = config.path.read_bytes().decode(config.document.encoding, errors="replace")
-    flat = cfglang.restore_newlines(original, chr(10), False)
-    lines = flat.split(chr(10))
+    texts: Dict[str, str] = {}
+    configs = {}
+    for name in files:
+        config = next((c for c in result.files.values() if c.relative == name), None)
+        if config is None:
+            return {"ok": False, "error": f"{name} is not part of the scan"}
+        configs[name] = config
+        original = config.path.read_bytes().decode(config.document.encoding, errors="replace")
+        texts[name] = cfglang.restore_newlines(original, chr(10), False)
 
     changed = None
-    for b in sorted(existing, key=lambda b: -b.order):
-        if b.file != target_file:
-            continue
+    for b in sorted(touched, key=lambda b: -b.order):
+        lines = texts[b.file].split(chr(10))
         index = b.line - 1
         if not (0 <= index < len(lines) and "bind" in lines[index]):
             continue
@@ -3255,11 +3375,12 @@ def _cfg_bind(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
             lines[index] = lines[index].replace(chr(34) + was + chr(34),
                                                 chr(34) + command + chr(34), 1)
             changed = f"was {was}"
-        break
+        texts[b.file] = chr(10).join(lines)
 
     if changed is None:
         if clearing:
             return {"ok": False, "error": "could not find that bind to remove"}
+        lines = texts[target_file].split(chr(10))
         anchor = next((i for i, l in enumerate(lines)
                        if l.lstrip().startswith("bind ")), None)
         if anchor is None:
@@ -3272,14 +3393,20 @@ def _cfg_bind(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         else:
             pad = lines[anchor][:len(lines[anchor]) - len(lines[anchor].lstrip())]
             lines.insert(anchor, f'{pad}bind "{binding}" "{command}"')
+        texts[target_file] = chr(10).join(lines)
         changed = "added"
 
     note = ("unbound " if clearing else "bind ") + keys.label(binding)
     session = backup.BackupSession(note=note if clearing else f"{note} to {command}")
-    session.add(config.path)
-    body_text = cfglang.restore_newlines(chr(10).join(lines), config.document.newline,
-                                         config.document.trailing_newline)
-    cfglang.write_config_text(config.path, body_text, config.document.encoding)
+    for name in files:
+        config = configs[name]
+        restored = cfglang.restore_newlines(texts[name], config.document.newline,
+                                            config.document.trailing_newline)
+        current = config.path.read_bytes().decode(config.document.encoding, errors="replace")
+        if restored == current:
+            continue
+        session.add(config.path)
+        cfglang.write_config_text(config.path, restored, config.document.encoding)
     backup.prune()
     state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
 
@@ -3288,6 +3415,7 @@ def _cfg_bind(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         "command": "" if clearing else command,
         "unbound": clearing, "changed": changed, "file": target_file,
         "backup": session.stamp,
+        "apply_keys": _apply_keys(state.cfg_scan),
         # Said rather than refused: an unknown command is more likely an
         # incomplete catalogue than a mistake, but a typo looks identical.
         "unknown": bool(command) and not commands.is_offered(command),
@@ -3672,6 +3800,81 @@ def _ingame_ack(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         watcher.clear()
     return {"account": user.account_id, "count": 0, "sources": {},
             "note": "Marked as seen."}
+
+
+# Which of CS2's own changes the app can keep or put back, and how. Key
+# binds and in-game settings go into the player's config; picture quality
+# goes into cs2_video.txt (only ever written with the game closed).
+_RESOLVABLE = {"Key binds", "In-game settings", "Picture quality"}
+
+
+def _ingame_resolve(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Answer the changes made inside CS2 during the last session.
+
+    For each change the player says Keep or Put back. Either way the answer
+    is written into the player's own config, because the config runs at every
+    launch: a key changed in the game's menu and not written down would be
+    undone by the next launch anyway. Put back writes the value from before
+    the session, so the next launch and the apply key both bring it back.
+    """
+    from . import defaults as keydefaults
+
+    found = _ingame(state, {"account": body.get("account")})
+    if not found or found.get("first_run") or not found.get("count"):
+        _ingame_ack(state, {"account": body.get("account")})
+        return {"ok": True, "kept": 0, "put_back": 0, "problems": []}
+    if found.get("running"):
+        return {"ok": False, "error": "Close CS2 first. It saves its settings when it quits."}
+
+    wanted = {}
+    for item in body.get("choices") or []:
+        if isinstance(item, dict):
+            wanted[(str(item.get("source")), str(item.get("key")))] = (
+                "back" if item.get("choice") == "back" else "keep")
+
+    kept, put_back, problems = 0, 0, []
+    settings: List[Dict[str, Any]] = []
+    for source, changes in (found.get("sources") or {}).items():
+        if source not in _RESOLVABLE:
+            continue
+        for change in changes:
+            key = str(change.get("key") or "")
+            choice = wanted.get((source, key), "keep")
+            value = change.get("was") if choice == "back" else change.get("now")
+            if source == "Key binds":
+                binding = keydefaults.normalise(key)
+                if state.cfg_scan is None:
+                    continue
+                if value is None or not str(value).strip():
+                    answer = _cfg_bind(state, {"binding": binding, "unbind": True, "force": True})
+                    if not answer.get("ok") and "not bound" in str(answer.get("error", "")):
+                        answer = {"ok": True}
+                else:
+                    answer = _cfg_bind(state, {"binding": binding, "command": str(value),
+                                               "force": True})
+                if not answer.get("ok"):
+                    problems.append(f"{key}: {answer.get('error')}")
+                    continue
+            elif value is None:
+                # A setting that did not exist before cannot be "put back" to
+                # anything; one the game dropped is simply left to the game.
+                continue
+            else:
+                settings.append({"name": key, "value": str(value),
+                                 **({"source": "video"} if source == "Picture quality" else {})})
+            if choice == "back":
+                put_back += 1
+            else:
+                kept += 1
+
+    if settings and state.cfg_scan is not None:
+        answer = _cfg_settings_apply(state, {"changes": settings,
+                                             "account": body.get("account")})
+        if not answer.get("ok"):
+            problems.append(str(answer.get("error")))
+
+    _ingame_ack(state, {"account": body.get("account")})
+    return {"ok": True, "kept": kept, "put_back": put_back, "problems": problems}
 
 
 def _play_fix(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
@@ -5401,9 +5604,57 @@ def _refresh_apply_now(state: State) -> None:
     from . import applynow
 
     try:
+        _sync_active_layout(state)
+    except Exception:
+        pass
+    try:
+        _apply_now_auto(state)
+    except Exception:
+        pass
+    try:
         applynow.refresh(_rescan(state))
     except Exception:
         pass
+
+
+def _apply_now_auto(state: State) -> Optional[str]:
+    """Set up the apply key for a player who has none: F12, or the next free
+    F key. Once per collection, so a player's own later choice stands."""
+    from . import applynow, cfgscan
+
+    result = _rescan(state)
+    planned = applynow.ensure_auto_key(result)
+    if planned is None:
+        return None
+    path, text, key = planned
+    session = backup.BackupSession(note="apply-changes key, set up automatically")
+    session.add(path)
+    cfglang.write_config_text(path, text, "utf-8")
+    backup.prune()
+    state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+    return key
+
+
+def _apply_now_follow_game(state: State, running: bool) -> None:
+    """When CS2 starts or stops, rewrite the in-game apply file.
+
+    Started: from now on the key sends only what changes after this point.
+    Stopped: back to the full setup, remembered as what the next launch
+    loads. Runs off the status poll's thread so the poll never waits.
+    """
+    previous = getattr(state, "_apply_game_up", None)
+    state._apply_game_up = running
+    if previous is None or previous == running:
+        return
+
+    def work() -> None:
+        try:
+            with state.lock:
+                _refresh_apply_now(state)
+        except Exception:
+            pass
+
+    threading.Thread(target=work, name="apply-now-follow-game", daemon=True).start()
 
 
 # Every handler that can change a config file CS2 reads. After any of them
@@ -5417,6 +5668,7 @@ _CONFIG_WRITERS = {
     _cfg_layouts_delete, _cfg_layouts_remove, _cfg_layouts_import,
     _cfg_layouts_sync_pull, _cfg_starter, _cfg_convert, _cfg_polish_apply,
     _cfg_rename_apply, _goxlr_bind, _profile_use, _scriptgen_save,
+    _configs_prepare, _firstrun_finish, _ingame_resolve,
 }
 
 
@@ -5435,6 +5687,7 @@ def make_handler(state: State):
         "/api/play/fix": _play_fix,
         "/api/ingame": _ingame,
         "/api/ingame/ack": _ingame_ack,
+        "/api/ingame/resolve": _ingame_resolve,
         "/api/prefs": _save_prefs,
         "/api/cfg/scan": _cfg_scan,
         "/api/cfg/tree": _cfg_tree,
@@ -5881,6 +6134,7 @@ def make_handler(state: State):
                     live.update(_stand_down(state, live["game_running"]))
                 except Exception:
                     pass
+                _apply_now_follow_game(state, live["game_running"])
                 if state.launch is None:
                     self._send_json({"ok": True, "phase": "idle", "active": False,
                                      "lines": [], **live})
