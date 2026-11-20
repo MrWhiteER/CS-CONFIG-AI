@@ -9261,8 +9261,8 @@ function moveSegThumb(which) {
   thumb.style.width = Math.round(here.width) + "px";
   // The track takes the live category's colour, so the thumb changes hue as
   // it travels rather than staying one colour across four categories.
-  // Named data-current, not data-live: the click handler treats data-live as
-  // "choose this demo", and a sub-tab click must never be read as that.
+  // Named data-current, not data-live: the demo buttons used to be data-live,
+  // and a sub-tab click must never be read as "choose this demo".
   bar.dataset.current = live.dataset.sub || "";
   bar.classList.add("measured");
 }
@@ -12764,7 +12764,7 @@ function paintGetRow() {
         esc(name) + ". Choosing it now takes one console line, or it plays " +
         "by itself next time you launch.</span></span>" +
         '<span class="actions">' +
-          '<button class="btn" data-live="' + esc(name) + '">Choose it</button>' +
+          '<button class="btn" data-demo-live="' + esc(name) + '">Choose it</button>' +
         "</span>";
       return;
     }
@@ -12772,7 +12772,7 @@ function paintGetRow() {
       '<span class="say"><b>Demo ready</b><span>' + esc(name) +
       " &mdash; Watch starts CS2 and the demo plays on its own.</span></span>" +
       '<span class="actions">' +
-        '<button class="btn" data-watch="' + esc(name) + '">Watch</button>' +
+        '<button class="btn" data-demo-watch="' + esc(name) + '">Watch</button>' +
       "</span>";
     return;
   }
@@ -12904,8 +12904,8 @@ function renderDemos() {
         (d.name === picked ? ' &middot; <span class="demo-key">NEXT LAUNCH</span>' : "") +
       "</span></span>" +
       '<span class="actions">' +
-        '<button class="btn small fc-watch" data-watch="' + esc(d.name) + '">Watch</button>' +
-        '<button class="btn small" data-pick="' + esc(d.name) + '">' +
+        '<button class="btn small fc-watch" data-demo-watch="' + esc(d.name) + '">Watch</button>' +
+        '<button class="btn small" data-demo-pick="' + esc(d.name) + '">' +
         (d.name === picked ? "Clear choice" : "Choose") + "</button>" +
       "</span>" +
     "</div>").join("");
@@ -13034,9 +13034,13 @@ document.addEventListener("click", async e => {
 document.addEventListener("click", async e => {
   const fetchBtn = e.target.closest("#demo-fetch");
   const cancel = e.target.closest("#demo-cancel");
-  const pick = e.target.closest("[data-pick]");
-  const watch = e.target.closest("[data-watch]");
-  const live = e.target.closest("[data-live]");
+  const pick = e.target.closest("[data-demo-pick]");
+  const watch = e.target.closest("[data-demo-watch]");
+  const live = e.target.closest("[data-demo-live]");
+  // Demo buttons carry their own data-demo-* names. The profile rail in the
+  // title bar uses data-pick for Competitive / Balanced / Quality, and a plain
+  // [data-pick] here read every profile click as "choose the demo called
+  // 'balanced'" -- an error toast on whatever page was open.
   if (!fetchBtn && !cancel && !pick && !watch && !live) return;
 
   // Into the session that is already running. Nothing is launched and nothing
@@ -13046,7 +13050,7 @@ document.addEventListener("click", async e => {
     live.disabled = true;
     try {
       const r = await api("/api/demos/pick",
-                          { name: live.dataset.live, once: true });
+                          { name: live.dataset.demoLive, once: true });
       // The game runs the chosen demo at startup, and this session is past
       // that. Saying "it will play" would be untrue, so the console line that
       // runs the same file is offered instead.
@@ -13103,7 +13107,7 @@ document.addEventListener("click", async e => {
   }
 
   if (pick) {
-    const name = pick.dataset.pick;
+    const name = pick.dataset.demoPick;
     // Pressing the button on the demo already bound clears it, so the key
     // does not keep a demo alive after you have moved on.
     const wanted = (demoData && demoData.picked === name) ? "" : name;
@@ -13120,7 +13124,7 @@ document.addEventListener("click", async e => {
   }
 
   if (watch) {
-    watchNext = watch.dataset.watch;
+    watchNext = watch.dataset.demoWatch;
     // Also put it on the key. +playdemo runs while the game is still coming
     // up and does not always take. The autoexec hook runs after the game is
     // properly started, so between the two the demo gets played either way.

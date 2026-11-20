@@ -211,10 +211,6 @@ class TheScoreboardOutlivesItsWindow(unittest.TestCase):
         self.assertGreaterEqual(self.page.count("sayInGetRow("), 4)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class TheKeyDoesNotLinger(unittest.TestCase):
     """Watch binds the demo as a fallback for that one launch. A key that
     silently loads last week's match three sessions later is worse than no
@@ -298,3 +294,41 @@ class TheKeyDoesNotLinger(unittest.TestCase):
         self._pick(once=True)
         self.state.cs2_install = None
         self._launch(watching=False)   # must not raise
+
+
+class DemoButtonsOwnTheirNames(unittest.TestCase):
+    """The demo buttons are found by a click handler on the whole document.
+
+    The profile rail in the title bar marks Competitive / Balanced / Quality
+    with data-pick, so a demo handler looking for [data-pick] read every
+    profile click as "choose the demo called 'balanced'" and showed an error.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        import re
+        from cs2cfg import paths
+
+        cls.page = (paths.bundle_root() / "web" / "index.html").read_text(
+            encoding="utf-8", errors="replace")
+        cls.re = re
+
+    def test_the_demo_handler_only_answers_demo_buttons(self):
+        for name in ("pick", "watch", "live"):
+            self.assertIn(f'e.target.closest("[data-demo-{name}]")', self.page)
+            self.assertNotIn(f'e.target.closest("[data-{name}]")', self.page)
+
+    def test_the_demo_rows_use_the_demo_names(self):
+        self.assertIn('data-demo-pick="', self.page)
+        self.assertIn('data-demo-watch="', self.page)
+        self.assertIn('data-demo-live="', self.page)
+
+    def test_no_page_wide_handler_listens_for_the_profile_attribute(self):
+        # The profile rail handles its own clicks on its own root element.
+        self.assertIsNone(self.re.search(
+            r'document\.addEventListener\("click"[^\n]*\n(?:[^\n]*\n){0,6}'
+            r'[^\n]*closest\("\[data-pick\]"\)', self.page))
+
+
+if __name__ == "__main__":
+    unittest.main()
