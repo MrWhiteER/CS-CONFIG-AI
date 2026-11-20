@@ -7,7 +7,7 @@ import threading
 import zlib
 from pathlib import Path
 from .. import mapart, vpk, vdf
-from . import canonical, pixel
+from . import MAPS, canonical, pixel
 
 _lock = threading.Lock()
 _memory = {}
@@ -154,7 +154,7 @@ def read_overview(text):
 
 def picture(dir_vpk, cache_dir, key):
     key = canonical(key)
-    if key != 'mirage' or dir_vpk is None:
+    if key not in MAPS or dir_vpk is None:
         return None
     try:
         stamp = Path(dir_vpk).stat().st_mtime_ns
@@ -205,7 +205,7 @@ def draw(art, rows):
              '<image width="1024" height="1024" href="'+html.escape(art['image'],quote=True)+'"/>']
     for i,row in enumerate(rows,1):
         x,y = pixel(row['stand'],art['overview'])
-        u,v = pixel(row['land'],art['overview'])
+        u,v = pixel(row['land'] or row['stand'],art['overview'])
         color = {'smoke':'#dce1eb','fire':'#ff873e','flash':'#ffffff','grenade':'#ff5252'}[row['type']]
         parts.append(f'<g><title>{html.escape(row["name"])}</title><path d="M{x:.1f} {y:.1f} Q{(x+u)/2:.1f} {min(y,v)-90:.1f} {u:.1f} {v:.1f}" fill="none" stroke="{color}" stroke-width="5" stroke-dasharray="12 10"/><circle cx="{x:.1f}" cy="{y:.1f}" r="10" fill="white" stroke="#14101c" stroke-width="4"/><circle cx="{u:.1f}" cy="{v:.1f}" r="30" fill="{color}" fill-opacity=".35" stroke="{color}" stroke-width="5"/><text x="{u:.1f}" y="{v+9:.1f}" text-anchor="middle" font-family="Segoe UI" font-size="28" fill="white" stroke="#111" paint-order="stroke" stroke-width="3">{i}</text></g>')
     return ''.join(parts)+'</svg>'

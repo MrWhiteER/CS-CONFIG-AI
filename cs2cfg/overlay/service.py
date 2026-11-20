@@ -114,7 +114,8 @@ class OverlayService:
                 raise PermissionError("Overlay is disabled")
             state = parse_payload(raw, self._gsi_token,
                                   include_team='lineups' in self._settings['overlay_tools'],
-                                  pictures=bool(self.picture_session and self.picture_session.active))
+                                  pictures=bool((self.picture_session and self.picture_session.active) or
+                                      (getattr(self, 'lineups_editing', False) and 'lineups' in self._settings['overlay_tools'])))
             self._game_state.update(state)
             if self.picture_session and self.picture_session.active:
                 self.picture_session.feed(state)

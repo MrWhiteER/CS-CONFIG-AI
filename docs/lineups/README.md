@@ -125,3 +125,27 @@ Passed: node tools/lineups_preview.cjs --check, node tools/overlay_preview.cjs
 --check (six renderers, ten themes), tests/overlay_settings_harness.js,
 tests/overlay_panel_harness.js, tests/status_bar_harness.cjs,
 tests/rgb_settings_harness.js, and git diff --check.
+
+## Personal lineups (parts 1 and 2, November 2026)
+
+New lineup opens a form in the overlay with name, map, side, type, throw, area
+and one instruction per line. New drafts use the current map when available.
+Drag the feet on the radar (or click; arrow keys also work). The landing ring
+is optional. Use my game position copies the authenticated local player's
+position and forward direction when GSI supplies them. Dragging feet clears
+that aim, because a radar marker cannot establish a camera angle.
+
+Personal records live under paths.user_data_dir()/lineups/mine/<map>.json.
+Radar-only points use {radar_x, radar_y} in overview pixels; world points keep
+{x, y, z}. Missing landing points and aim are accepted only on personal rows.
+The shipped catalogue still requires finite world coordinates and angles.
+Personal rows share the catalogue search and have a Made by you filter and tag.
+Edit updates the record; Delete applies immediately and shows a visible Undo
+button. Undo is action driven, with no delayed writes or confirmation popup.
+Import/export is not included.
+
+Regenerate previews with node tools/lineups_preview.cjs. The Carbon, Daylight
+and New lineup screenshots contain original schematic fixtures, no game art.
+Run node tools/lineups_preview.cjs --check for the list and editor browser tests.
+Run py -3 -m unittest tests.test_lineups_mine tests.test_lineups_editor
+on the owner's machine: py is not available inside this execution sandbox.

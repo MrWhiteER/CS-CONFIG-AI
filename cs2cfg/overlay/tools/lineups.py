@@ -11,8 +11,7 @@ def data(state, args=None):
     key = args.get('map', round_state.get('map', 'mirage'))
     document = load(key)
     art = None
-    if document:
-        art = _lineups_art(state, document['map'])
+    art = _lineups_art(state, key)
     images = {}
     if document and state.cs2_install:
         from ...lineups.pictures import game_build, cached_pictures
@@ -39,10 +38,11 @@ def stop_pictures(state, args=None):
 
 def player_position(state):
     import math
+    import time
     from ...lineups import number
     with state.overlay._lock:
         game = state.overlay._game_state
-        if not game.visible(auto_hide=True):
+        if game.received is None or time.monotonic() - game.received > 15:
             return None
         snapshot = game.state
         player = snapshot.get('player', {})

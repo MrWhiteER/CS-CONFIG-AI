@@ -74,6 +74,31 @@ const checks=`(async()=>{try{
  if(preview.textContent.includes('Mid site'))throw Error('Mid site label returned');
  if(preview.querySelectorAll('.lineup-detail li').length!==3)throw Error('Instructions hidden by radar');
  preview.remove();
+ const personal=document.createElement('div');document.body.append(personal);
+ let saved,editing=false;
+ const personalData={...fixture.data.lineups,map_request:true,round:{show:false}};
+ const personalCall=async(action,args)=>{
+  if(action==='editing'){editing=args.active;return personalData;}
+  if(action==='creating')return {text:'Pictures are unavailable. Save with radar markers.'};
+  if(action==='change'){saved=args;return {...personalData,document:{...personalData.document,lineups:[{...args.row,id:'mine-test',mine:true}]}};}
+  return personalData;
+ };
+ window.overlayRenderers.lineups(personal,personalData,personalCall);
+ await window.lineupsUI.form(personal,personalData,personalCall);
+ const editor=personal.querySelector('.lineup-editor');
+ if(!editor?.open||!editing||!editor.querySelector('[data-marker="stand"]'))throw Error('New lineup form missing feet or editing subscription');
+ const form=editor.querySelector('form');form.elements.name.value='My corner';form.elements.area.value='A site';form.elements.steps.value='Stand beside the wall.\\nAim at the roof.';
+ const feet=editor.querySelector('[data-marker="stand"]');feet.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));
+ editor.querySelector('[data-land]').click();if(!editor.querySelector('[data-marker="land"]'))throw Error('Landing ring missing');
+ editor.querySelector('[data-clear-land]').click();
+ form.dispatchEvent(new Event('submit',{cancelable:true}));
+ await Promise.resolve();await Promise.resolve();await Promise.resolve();
+ if(saved?.action!=='save'||saved.row.stand.radar_x!==516||saved.row.land!==null||saved.row.aim!==null||saved.row.steps.length!==2)throw Error('Radar-only save failed');
+ if(editing)throw Error('Editing subscription leaked after save');
+ if(!personal.textContent.includes('Made by you'))throw Error('Saved personal lineup missing');
+ personal.querySelector('[data-edit]').click();await Promise.resolve();await Promise.resolve();
+ if(!personal.querySelector('.lineup-editor')?.textContent.includes('Edit lineup'))throw Error('Edit form missing');
+ personal.querySelector('[data-cancel]').click();await Promise.resolve();await Promise.resolve();personal.remove();
  document.body.dataset.lineupsCheck='OK';
  }catch(error){document.body.dataset.lineupsCheck='ERROR: '+error.message;}})();`;
 if(process.argv.includes('--check')){
@@ -88,4 +113,6 @@ if(process.argv.includes('--check')){
   render({name:'lineups-'+theme,query:'preview=1&theme='+theme,width:1280,height:1100,extra:setup,screenshot:path.join(output,theme+'.png')});
   console.log(path.join(output,theme+'.png'));
  }
+ const newForm=setup+`(async()=>{const body=document.querySelector('[data-tool="lineups"] .tool-body');await window.lineupsUI.form(body,fixture.data.lineups,async()=>fixture.data.lineups);const f=body.querySelector('form');f.elements.name.value='My window smoke';f.elements.area.value='Mid';f.elements.steps.value='Stand beside the wall.\\nAim at the roof corner.\\nJump and throw.';})();`;
+ render({name:'lineups-new',query:'preview=1&theme=carbon',width:1280,height:1100,extra:newForm,screenshot:path.join(output,'new-lineup.png')});
 }
