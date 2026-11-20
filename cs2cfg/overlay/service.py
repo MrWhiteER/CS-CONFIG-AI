@@ -66,6 +66,7 @@ class OverlayService:
         self._widgets = {}
         self._widget_failed = set()
         self.pinned_context = lambda: {}
+        self.lineups_art = lambda key: None
         self._hardware_widget_failed = False
         self._modes = {}
         self._status = "disabled"
@@ -108,13 +109,19 @@ class OverlayService:
         with self._lock:
             if not self._settings["overlay_enabled"]:
                 raise PermissionError("Overlay is disabled")
-            state = parse_payload(raw, self._gsi_token)
+            state = parse_payload(raw, self._gsi_token,
+                                  include_team='lineups' in self._settings['overlay_tools'])
             self._game_state.update(state)
             if self._hud:
                 self._configure_hud(self._settings)
                 if not self._game_state.visible(auto_hide=self._settings['overlay_hide_in_rounds'],
                                                 always_visible=self._settings['overlay_always_visible']):
                     self.suspend_pins()
+
+    def lineups_state(self):
+        from ..lineups.rounds import context
+        with self._lock:
+            return context(self._game_state, self._settings)
 
     def _reset_totals(self) -> None:
         self._frame_count = 0
@@ -410,7 +417,9 @@ class OverlayService:
                               always_visible=self._settings['overlay_always_visible']))
         # Only cheap read-only sources run here; never call tool dispatch or a WebView.
         try:
-            context = self.pinned_context() if native_visible else {}
+            lineups_visible = ('lineups' in self._settings['overlay_tools'] and allowed
+                               and self.lineups_state()['show'])
+            context = self.pinned_context() if native_visible or lineups_visible else {}
         except (OSError, ValueError) as exc:
             context = {}
             self._error = f'Pinned profile status: {exc}'
@@ -460,6 +469,56 @@ class OverlayService:
             elif tool == 'serverlock':
                 data = self.panel.regions.native_snapshot() if self.panel else {'text': 'Coming soon'}
             widget.update(data, pinned_position(found.rect, row, self._settings['overlay_corner'], offset=index * 140))
+
+        self._update_lineups(found, allowed, context)
+
+    def _update_lineups(self, found, allowed, context):
+        # Off means no data reads, art extraction, or additional GSI work.
+        widget = self._widgets.get('lineups')
+        enabled = self._settings['overlay_enabled'] and 'lineups' in self._settings['overlay_tools']
+        if not enabled:
+            if widget:
+                widget.set_allowed(False)
+                widget.stop()
+                self._widgets.pop('lineups', None)
+            return
+        round_state = self.lineups_state()
+        visible = (allowed and round_state['show'] and self._hud.pin_requested()
+                   and not (self.panel and self.panel.visible))
+        if widget:
+            widget.set_allowed(visible)
+        if not visible:
+            return
+        if widget is None:
+            if 'lineups' in self._widget_failed:
+                return
+            from .hud import Hud
+            widget = Hud(register_hotkeys=False)
+            widget.tool = 'lineups'
+            widget.set_allowed(False)
+            try:
+                widget.start()
+            except (OSError, RuntimeError):
+                widget.stop()
+                self._widget_failed.add('lineups')
+                return
+            self._widgets['lineups'] = widget
+        from ..lineups import load, search
+        document = load(round_state['map'])
+        rows = search(document['lineups'], side=round_state['side'], kind='smoke') if document else []
+        row = self._settings['overlay_layout'].get('lineups', {})
+        widget.configure(fields=(), hotkey=self._settings['overlay_hotkey'],
+                         exclude_from_capture=self._settings['overlay_hide_from_capture'],
+                         tool='lineups', opacity=row.get('opacity',60),
+                         theme=context.get('theme','violet'), auto_visible=True)
+        try:
+            art = self.lineups_art(round_state['map'])
+        except (OSError, ValueError, RuntimeError):
+            art = None
+        x,y = pinned_position(found.rect, row, self._settings['overlay_corner'])
+        y = max(found.rect[1], min(y,found.rect[3]-580))
+        widget.update({'round':round_state,'rows':rows,'art':art}, (x,y))
+        widget.set_allowed(True)
 
     def panel_allowed(self):
         return bool(self._settings["overlay_enabled"] and self._hwnd)

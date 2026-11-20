@@ -50,7 +50,7 @@ def remove_cfg(install: Path) -> None:
     (Path(install) / "game" / "csgo" / "cfg" / CFG_NAME).unlink(missing_ok=True)
 
 
-def parse_payload(raw: bytes, token: str) -> dict:
+def parse_payload(raw: bytes, token: str, *, include_team=False) -> dict:
     if len(raw) > MAX_BODY:
         raise ValueError("GSI body too large")
     try:
@@ -76,7 +76,7 @@ def parse_payload(raw: bytes, token: str) -> dict:
     return {"provider": pick(body.get("provider"), ("appid", "steamid")),
             "map": pick(body.get("map"), ("name", "phase")),
             "round": pick(body.get("round"), ("phase",)),
-            "player_id": pick(player, ("steamid", "activity")),
+            "player_id": pick(player, ("steamid", "activity", "team") if include_team else ("steamid", "activity")),
             "player_state": pick(player.get("state"), ("health",))}
 
 
