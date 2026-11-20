@@ -131,9 +131,12 @@ def render(result: cfgscan.ScanResult, previous: str = "") -> str:
     settings.sort(key=lambda s: s.order)
 
     binds = []
+    seen = set()
     for key in result.binds:
         winner = cfgscan._effective_bind(result, chain, key)
-        if winner is not None and winner.file in chain:
+        # Two spellings of one key ("e", "scancode8") share one winner.
+        if winner is not None and winner.file in chain and id(winner) not in seen:
+            seen.add(id(winner))
             binds.append(winner)
     binds.sort(key=lambda b: b.order)
 

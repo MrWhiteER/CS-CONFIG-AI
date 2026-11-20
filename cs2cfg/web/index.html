@@ -14985,7 +14985,12 @@ async function kbAssign(payload, describe) {
       status("Could not change " + pickedKey.label + ": " +
              ((answer && answer.error) || "unknown problem"), true);
     } else {
+      // CS2 reads its config files when it starts, so say when this lands.
+      const applyKeys = answer.apply_keys || [];
       status(describe(answer) +
+             (applyKeys.length
+               ? " — press " + applyKeys.join(" or ") + " in game to use it now"
+               : " — takes effect next time CS2 starts, or set an apply key to use it mid-match") +
              (answer.backup ? ". A backup was saved." : "") +
              (answer.unknown ? "  \u00b7  note: this collection does not " +
                                "recognise that command" : ""));

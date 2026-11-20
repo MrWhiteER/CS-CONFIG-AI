@@ -1035,11 +1035,45 @@ def append_apply_script(result: ScanResult) -> Tuple[str, str]:
 # Keyboard/mouse layout profiles
 # ---------------------------------------------------------------------------
 
+def physical_key(name: str) -> str:
+    """One name per physical key, however a config spells it.
+
+    CS2 reads ``bind "e"`` as ``bind scancode8`` (its console says so:
+    "Interpreting bind command as: bind scancode8 ..."), so the two spellings
+    are the same key and the later one wins. Treating them as two keys let a
+    ``bind "e"`` further down the startup chain quietly undo every change the
+    Keyboard tab made to ``scancode8``.
+    """
+    from . import defaults as keydefaults
+
+    return keydefaults.normalise(name)
+
+
+def binds_for_key(result: ScanResult, key: str) -> List[BindDef]:
+    """Every bind of the same physical key, in every spelling, in load order."""
+    wanted = physical_key(key)
+    out: List[BindDef] = []
+    for name, defs in result.binds.items():
+        if name == key.lower() or physical_key(name) == wanted:
+            out.extend(defs)
+    return sorted(out, key=lambda d: d.order)
+
+
+def startup_bind(result: ScanResult, chain: Set[str], key: str) -> Optional[BindDef]:
+    """The bind CS2 really ends up with for ``key`` after launch, if any.
+
+    Only files the game loads at startup count -- a match profile that binds
+    the same key does nothing until its own key is pressed -- and every
+    spelling of the key counts, because the game treats them as one.
+    """
+    defs = [d for d in binds_for_key(result, key) if d.file in chain]
+    return defs[-1] if defs else None
+
+
 def _effective_bind(result: ScanResult, chain: Set[str], key: str) -> Optional[BindDef]:
-    defs = result.binds.get(key.lower())
-    if not defs:
+    ordered = binds_for_key(result, key)
+    if not ordered:
         return None
-    ordered = sorted(defs, key=lambda d: d.order)
     chain_defs = [d for d in ordered if d.file in chain]
     return (chain_defs or ordered)[-1]
 
@@ -1088,8 +1122,11 @@ def _profile_entry(result: ScanResult, chain: Set[str], config: ConfigFile) -> D
     own = _profile_own_binds(result, relative)
 
     overrides = []
+    additions = []
     for key, bind in sorted(own.items()):
-        standard = _effective_bind(result, chain, key)
+        # Only what loads at startup is "standard": another profile binding
+        # the same key is not something switching should write into.
+        standard = startup_bind(result, chain, key)
         if standard is not None and standard.file != relative and standard.body != bind.body:
             overrides.append({
                 "key": bind.key,
@@ -1098,12 +1135,17 @@ def _profile_entry(result: ScanResult, chain: Set[str], config: ConfigFile) -> D
                 "standard_file": standard.file,
                 "standard_line": standard.line,
             })
+        elif standard is None and (bind.body or "").strip():
+            # A key the standard layout never binds. Switching has to add it,
+            # or the profile's own choice for it never reaches the game.
+            additions.append({"key": bind.key, "profile_body": bind.body})
 
     trigger = _alias_execing(result, relative, layout_switch_path(relative))
     return {
         "file": relative,
         "label": Path(relative).stem.replace("_", " ").title(),
         "overrides": overrides,
+        "additions": additions,
         "trigger": trigger,
     }
 
@@ -1128,16 +1170,18 @@ def profile_is_active(
     if config is None or not _is_match_profile(config, chain):
         return False
 
-    skip = {k.lower() for k in skip_keys}
+    skip = {physical_key(k) for k in skip_keys}
     own = _profile_own_binds(result, profile_file)
 
     compared = []
     for key, bind in own.items():
-        if key.lower() in skip:
+        if physical_key(key) in skip:
             continue
-        standard = _effective_bind(result, chain, key)
-        if standard is not None and standard.file != profile_file:
+        standard = startup_bind(result, chain, key)
+        if standard is not None:
             compared.append(standard.body == bind.body)
+        elif (bind.body or "").strip():
+            compared.append(False)      # a key switching still has to add
 
     return bool(compared) and all(compared)
 
@@ -1247,13 +1291,13 @@ def apply_profile_overrides(
         raise ValueError(f"'{profile_file}' is not a detected layout profile")
 
     entry = _profile_entry(result, chain, config)
-    skip = {k.lower() for k in skip_keys}
+    skip = {physical_key(k) for k in skip_keys}
 
     applied: List[str] = []
     skipped: List[str] = []
     changes: List[Dict[str, object]] = []
     for item in entry["overrides"]:
-        if item["key"].lower() in skip:
+        if physical_key(item["key"]) in skip:
             skipped.append(item["key"])
             continue
         applied.append(item["key"])
@@ -1262,7 +1306,66 @@ def apply_profile_overrides(
             "from_body": item["standard_body"], "to_body": item["profile_body"],
         })
 
-    return applied, skipped, _write_bind_bodies(result, changes)
+    texts = _write_bind_bodies(result, changes)
+
+    # Keys the standard layout never bound. Before, switching skipped them
+    # without a word, so a profile's own keys never reached the game.
+    additions: Dict[str, Dict[str, str]] = {}
+    for item in entry.get("additions") or []:
+        physical = physical_key(item["key"])
+        if physical in skip:
+            if item["key"] not in skipped:
+                skipped.append(item["key"])
+            continue
+        additions[physical] = item          # one line per physical key
+    target = startup_binds_file(result, chain) if additions else None
+    if additions and target is not None:
+        holder = next(c for c in result.files.values() if c.relative == target)
+        if target in texts:
+            flat = cfglang.restore_newlines(texts[target], "\n", False)
+        else:
+            original = holder.path.read_bytes().decode(holder.document.encoding, errors="replace")
+            flat = cfglang.restore_newlines(original, "\n", False)
+        lines = flat.split("\n")
+        while lines and not lines[-1].strip():
+            lines.pop()
+        for item in additions.values():
+            lines.append(f'bind "{item["key"]}" "{item["profile_body"]}"')
+            applied.append(item["key"])
+        texts[target] = cfglang.restore_newlines(
+            "\n".join(lines), holder.document.newline, holder.document.trailing_newline)
+
+    return applied, skipped, texts
+
+
+def startup_binds_file(result: ScanResult, chain: Optional[Set[str]] = None) -> Optional[str]:
+    """The startup file a brand new bind belongs in.
+
+    The starter's binds file if the startup chain has one, else the startup
+    file that already holds the most binds, else the last plain commands file
+    the startup chain reaches. Never a match profile (it does not load at
+    launch) and never a generated file (those are rewritten wholesale).
+    """
+    from . import starter
+
+    if chain is None:
+        chain = startup_chain(result)
+    usable = {c.relative: c for c in result.files.values()
+              if c.relative in chain and c.is_commands and not c.generated_by}
+    if not usable:
+        return None
+    for relative in usable:
+        if relative.lower().endswith(starter.BINDS_FILE):
+            return relative
+    counts: Dict[str, int] = {}
+    for defs in result.binds.values():
+        for d in defs:
+            if d.file in usable:
+                counts[d.file] = counts.get(d.file, 0) + 1
+    if counts:
+        return max(counts.items(), key=lambda kv: kv[1])[0]
+    ordered = [name for name, _depth in result.exec_chain if name in usable]
+    return ordered[-1] if ordered else sorted(usable)[-1]
 
 
 def profile_missing_defaults(
@@ -1309,8 +1412,10 @@ def default_restorable(
     out = []
     for file, keys in baseline.items():
         for key, original_body in keys.items():
+            # Any spelling of the key: a profile may write "scancode8" where
+            # the standard layout says "e", and both are the same key.
             current = next(
-                (d for d in result.binds.get(key, ()) if d.file == file), None)
+                (d for d in reversed(binds_for_key(result, key)) if d.file == file), None)
             if current is None or current.body == original_body:
                 continue
             out.append({

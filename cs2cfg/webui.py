@@ -1765,13 +1765,18 @@ def _cfg_layouts_apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     # was -- the one thing that makes a later "Default" mean something.
     chain = cfgscan.startup_chain(result)
     config = next(c for c in result.files.values() if c.relative == profile_file)
-    overrides = {o["key"]: o for o in
-                 cfgscan._profile_entry(result, chain, config)["overrides"]}
+    entry = cfgscan._profile_entry(result, chain, config)
+    overrides = {o["key"]: o for o in entry["overrides"]}
+    added = {a["key"] for a in entry.get("additions") or []}
+    binds_file = cfgscan.startup_binds_file(result, chain) if added else None
     by_file: Dict[str, Dict[str, str]] = {}
     for key in applied:
         item = overrides.get(key)
         if item is not None:
             by_file.setdefault(item["standard_file"], {})[key] = item["standard_body"]
+        elif key in added and binds_file:
+            # Unbound before the switch: "Default" puts it back to nothing.
+            by_file.setdefault(binds_file, {})[key] = ""
     for file, bodies in by_file.items():
         layouts.record_baseline(result.root, file, bodies)
 
@@ -2624,10 +2629,21 @@ def _cfg_keys(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         if feature.entry:
             features.setdefault(feature.entry.lower(), feature)
 
+    from . import cfgscan
+
+    chain = cfgscan.startup_chain(result)
     bound = {}
     for key, entries in result.binds.items():
-        # The last bind to load is the one the engine keeps.
-        winner = max(entries, key=lambda b: b.order)
+        # What the game ends up with: the last bind to load at startup, in
+        # any spelling of the key (CS2 reads "e" as scancode8). A match
+        # profile's binds only apply once its key is pressed, so they do not
+        # decide what the board shows.
+        if chain:
+            winner = cfgscan.startup_bind(result, chain, key)
+            if winner is None:
+                continue
+        else:
+            winner = max(entries, key=lambda b: b.order)
         command = (winner.body or "").strip().strip('"')
         if not command:
             # bind "key" "" -- cleared, e.g. by a new empty profile. Free.
@@ -3190,13 +3206,18 @@ def _cfg_bind(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     if not command and not clearing:
         return {"ok": False, "error": "no command given"}
 
-    existing = result.binds.get(binding) or []
-    if clearing and not existing:
+    # What CS2 really ends up with for this key: only files that load at
+    # startup count (a match profile binding the same key does nothing until
+    # its own key is pressed), and every spelling of the key counts ("e" and
+    # "scancode8" are one key to the game, and the later one wins).
+    chain = cfgscan.startup_chain(result)
+    existing = [b for b in cfgscan.binds_for_key(result, binding) if b.file in chain]
+    winner = existing[-1] if existing else None
+    if clearing and winner is None:
         return {"ok": False, "error": f"{keys.label(binding)} is not bound to anything"}
 
     # Replacing something the user put there deliberately is worth a question.
-    if existing and not clearing and not body.get("force"):
-        winner = max(existing, key=lambda b: b.order)
+    if winner is not None and not clearing and not body.get("force"):
         already = (winner.body or "").strip().strip(chr(34))
         # An empty bind ("") is a key a fresh profile cleared: free to take.
         if already and already.lower() != command.lower():
@@ -3205,42 +3226,38 @@ def _cfg_bind(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
                                "runs": already}],
                     "error": f"{keys.label(binding)} already runs {already}"}
 
-    # Where to write. An existing bind decides it; otherwise the file that
-    # holds the most binds already is where this one belongs.
-    if existing:
-        target_file = max(existing, key=lambda b: b.order).file
+    # Where to write. The bind that wins at startup decides it; otherwise the
+    # startup file meant for binds. Never a match profile: CS2 does not load
+    # one at launch, so a change written there never reached the game.
+    if winner is not None:
+        target_file = winner.file
     else:
-        counts: Dict[str, int] = {}
-        for entries in result.binds.values():
-            for b in entries:
-                counts[b.file] = counts.get(b.file, 0) + 1
-        if counts:
-            target_file = max(counts.items(), key=lambda kv: kv[1])[0]
-        else:
-            # A collection with no binds in it yet -- a new account, or one the
-            # starter has just built. There is no busiest file to follow, so
-            # fall back to the file meant for binds. Without this the very
-            # first bind anyone makes is refused, which is exactly when the
-            # Keyboard tab most needs to work.
-            target_file = _first_binds_file(result)
-            if target_file is None:
-                return {"ok": False, "error":
-                        "nothing here can hold a bind. Create a starter config on "
-                        "the Settings tab, or point the app at the folder your "
-                        "config already lives in."}
+        target_file = (cfgscan.startup_binds_file(result, chain)
+                       or _first_binds_file(result))
+        if target_file is None:
+            return {"ok": False, "error":
+                    "nothing here can hold a bind. Create a starter config on "
+                    "the Settings tab, or point the app at the folder your "
+                    "config already lives in."}
 
-    config = next((c for c in result.files.values() if c.relative == target_file), None)
-    if config is None:
-        return {"ok": False, "error": f"{target_file} is not part of the scan"}
+    # Clearing takes every startup bind of the key away, not just the last:
+    # otherwise an earlier one quietly takes over again.
+    touched = existing if clearing else ([winner] if winner is not None else [])
+    files = sorted({b.file for b in touched} | {target_file})
 
-    original = config.path.read_bytes().decode(config.document.encoding, errors="replace")
-    flat = cfglang.restore_newlines(original, chr(10), False)
-    lines = flat.split(chr(10))
+    texts: Dict[str, str] = {}
+    configs = {}
+    for name in files:
+        config = next((c for c in result.files.values() if c.relative == name), None)
+        if config is None:
+            return {"ok": False, "error": f"{name} is not part of the scan"}
+        configs[name] = config
+        original = config.path.read_bytes().decode(config.document.encoding, errors="replace")
+        texts[name] = cfglang.restore_newlines(original, chr(10), False)
 
     changed = None
-    for b in sorted(existing, key=lambda b: -b.order):
-        if b.file != target_file:
-            continue
+    for b in sorted(touched, key=lambda b: -b.order):
+        lines = texts[b.file].split(chr(10))
         index = b.line - 1
         if not (0 <= index < len(lines) and "bind" in lines[index]):
             continue
@@ -3255,11 +3272,12 @@ def _cfg_bind(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
             lines[index] = lines[index].replace(chr(34) + was + chr(34),
                                                 chr(34) + command + chr(34), 1)
             changed = f"was {was}"
-        break
+        texts[b.file] = chr(10).join(lines)
 
     if changed is None:
         if clearing:
             return {"ok": False, "error": "could not find that bind to remove"}
+        lines = texts[target_file].split(chr(10))
         anchor = next((i for i, l in enumerate(lines)
                        if l.lstrip().startswith("bind ")), None)
         if anchor is None:
@@ -3272,14 +3290,20 @@ def _cfg_bind(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         else:
             pad = lines[anchor][:len(lines[anchor]) - len(lines[anchor].lstrip())]
             lines.insert(anchor, f'{pad}bind "{binding}" "{command}"')
+        texts[target_file] = chr(10).join(lines)
         changed = "added"
 
     note = ("unbound " if clearing else "bind ") + keys.label(binding)
     session = backup.BackupSession(note=note if clearing else f"{note} to {command}")
-    session.add(config.path)
-    body_text = cfglang.restore_newlines(chr(10).join(lines), config.document.newline,
-                                         config.document.trailing_newline)
-    cfglang.write_config_text(config.path, body_text, config.document.encoding)
+    for name in files:
+        config = configs[name]
+        restored = cfglang.restore_newlines(texts[name], config.document.newline,
+                                            config.document.trailing_newline)
+        current = config.path.read_bytes().decode(config.document.encoding, errors="replace")
+        if restored == current:
+            continue
+        session.add(config.path)
+        cfglang.write_config_text(config.path, restored, config.document.encoding)
     backup.prune()
     state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
 
@@ -3288,6 +3312,7 @@ def _cfg_bind(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         "command": "" if clearing else command,
         "unbound": clearing, "changed": changed, "file": target_file,
         "backup": session.stamp,
+        "apply_keys": _apply_keys(state.cfg_scan),
         # Said rather than refused: an unknown command is more likely an
         # incomplete catalogue than a mistake, but a typo looks identical.
         "unknown": bool(command) and not commands.is_offered(command),
