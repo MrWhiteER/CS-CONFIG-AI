@@ -21,7 +21,8 @@ class Personal(unittest.TestCase):
             with self.assertRaises(ValueError): validate(doc)
         row['stand']['radar_x'] = 300
         row.pop('mine')
-        with self.assertRaises(ValueError): validate(doc)
+        row['aim'] = {'pitch': 0, 'yaw': 0}
+        with self.assertRaisesRegex(ValueError, 'Invalid point'): validate(doc)
 
     def test_save_edit_delete_restore_and_validation(self):
         with tempfile.TemporaryDirectory() as tmp, patch.object(mine, 'user_data_dir', return_value=Path(tmp)):

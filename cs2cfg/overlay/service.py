@@ -143,6 +143,10 @@ class OverlayService:
 
     def configure(self, ui: dict) -> None:
         wanted = settings.read(ui, strict=True)
+        if (getattr(self, 'lineups_editing', False)
+                and (not wanted['overlay_enabled'] or 'lineups' not in wanted['overlay_tools'])):
+            self.lineups_editing = False
+            self._configure_gsi(wanted['overlay_enabled'])
         if (self.picture_session and self.picture_session.active
                 and (not wanted['overlay_enabled'] or 'lineups' not in wanted['overlay_tools'])):
             self.picture_session.abort()

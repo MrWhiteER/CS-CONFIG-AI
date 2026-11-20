@@ -3,7 +3,7 @@ from .base import Tool
 
 
 def data(state, args=None):
-    from ...lineups import MAPS
+    from ...lineups import MAPS, load as seed_load
     from ...lineups.mine import combined as load
     from ...webui import _lineups_art
     args = args or {}
@@ -17,7 +17,9 @@ def data(state, args=None):
         from ...lineups.pictures import game_build, cached_pictures
         from ...paths import user_data_dir
         try:
-            images = cached_pictures(document, game_build(state.cs2_install), user_data_dir())
+            seed = seed_load(document['map'])
+            if seed:
+                images = cached_pictures(seed, game_build(state.cs2_install), user_data_dir())
         except (OSError, ValueError, KeyError):
             pass
     session = state.overlay.picture_session
@@ -27,6 +29,7 @@ def data(state, args=None):
             'picture_status': session.text if session else '',
             'picture_active': bool(session and session.active),
             'position': player_position(state),
+            'undo_available': bool(getattr(state.overlay, 'lineups_undo', None)),
             'notice': getattr(state.overlay, 'lineups_notice', '')}
 
 
@@ -46,7 +49,9 @@ def player_position(state):
             return None
         snapshot = game.state
         player = snapshot.get('player', {})
-        if (not snapshot.get('provider', {}).get('steamid')
+        if (snapshot.get('provider', {}).get('appid') != 730
+                or player.get('activity') != 'playing'
+                or not snapshot.get('provider', {}).get('steamid')
                 or player.get('steamid') != snapshot['provider']['steamid']):
             return None
         try:
@@ -72,6 +77,15 @@ def editing(state, args=None):
         state.overlay.lineups_editing = bool((args or {}).get('active'))
         state.overlay._configure_gsi(state.overlay._settings['overlay_enabled'])
     return data(state, args)
+
+
+def creating(state, args=None):
+    # No verified key/HUD acknowledgement is available through our GSI path.
+    # Do not create binds, launch a game or capture on an unrelated heartbeat.
+    return {'available': False, 'active': False,
+            'text': 'Automatic pictures are unavailable: this app cannot verify when '
+                    'the picture key has hidden the display. Save your lineup with radar '
+                    'markers for now. Clean pictures would require offline practice.'}
 
 
 def change(state, args=None):
@@ -101,5 +115,5 @@ def change(state, args=None):
 
 
 TOOL = Tool('lineups', 'Lineups', 'globe', data, refresh_hz=1,
-            actions={'stop_pictures': stop_pictures, 'change': change, 'editing': editing},
+            actions={'stop_pictures': stop_pictures, 'change': change, 'editing': editing, 'creating': creating},
             default_size=(1000, 620), pinnable=True)

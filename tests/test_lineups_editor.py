@@ -10,9 +10,9 @@ from cs2cfg.overlay.tools.lineups import player_position, editing
 class Editor(unittest.TestCase):
     def state(self):
         game = AutoHide()
-        game.update({'provider': {'steamid': 'local'},
+        game.update({'provider': {'appid': 730, 'steamid': 'local'},
                      'map': {'name': 'de_mirage', 'phase': 'live'},
-                     'player': {'steamid': 'local', 'position': '10, 20, 30',
+                     'player': {'steamid': 'local', 'activity': 'playing', 'position': '10, 20, 30',
                                 'forward': '0, 1, 0'}})
         return SimpleNamespace(overlay=SimpleNamespace(_lock=threading.RLock(),
             _game_state=game, _settings={'overlay_enabled': True}, _configure_gsi=Mock()))

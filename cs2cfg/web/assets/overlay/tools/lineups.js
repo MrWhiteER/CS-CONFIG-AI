@@ -13,6 +13,7 @@
   let box='0 0 1024 1024';
   if(rows.length===1){const [x,y]=p(rows[0].stand),[u,v]=p(rows[0].land||rows[0].stand),size=Math.min(1024,Math.max(240,Math.abs(u-x)+120,Math.abs(v-y)+210));box=[Math.max(0,Math.min(1024-size,(x+u-size)/2)),Math.max(0,Math.min(1024-size,(y+v-size)/2-40)),size,size].join(' ');}
   return '<svg class="lineup-radar" viewBox="'+box+'" role="img" aria-label="Stand points and landing areas"><image width="1024" height="1024" href="'+e(art.image)+'"/>'+rows.map((r,i)=>{
+   if(!r.land){const [x,y]=p(r.stand);return '<g><title>'+e(r.name)+'</title><circle cx="'+x+'" cy="'+y+'" r="10" fill="white" stroke="#111" stroke-width="4"/></g>';}
    const [x,y]=p(r.stand),[u,v]=p(r.land||r.stand),c={smoke:'#dce1eb',fire:'#ff873e',flash:'#ffffff',grenade:'#ff5252'}[r.type];
    return '<g><title>'+e(r.name)+'</title><path d="M'+x+' '+y+' Q'+((x+u)/2)+' '+(Math.min(y,v)-90)+' '+u+' '+v+'" fill="none" stroke="'+c+'" stroke-width="5" stroke-dasharray="12 10"/><circle cx="'+x+'" cy="'+y+'" r="10" fill="white" stroke="#111" stroke-width="4"/><circle cx="'+u+'" cy="'+v+'" r="30" fill="'+c+'" fill-opacity=".4" stroke="'+c+'" stroke-width="5"/><text x="'+u+'" y="'+(v+9)+'" text-anchor="middle" fill="white" stroke="#111" stroke-width="3" paint-order="stroke" font-size="28">'+(i+1)+'</text></g>';
   }).join('')+'</svg><p>White point: where to stand · Dashed line: throw direction · Ring: landing area</p>';
@@ -20,6 +21,7 @@
  window.lineupsUI={search,radar};
  window.overlayRenderers.lineups=(root,d,call)=>{
   root.lineupLatest=d;
+  root.updateLineupPosition?.();
   const updateRound=()=>{
    const status=root.querySelector('.lineup-picture-status');if(status)status.textContent=d.picture_status||'';
    const stop=root.querySelector('[data-stop-pictures]');if(stop)stop.hidden=!d.picture_active;
@@ -84,7 +86,7 @@
   const edit=!!row, state=root.lineupsState;
   let d=initial, key=row?state.map:(initial.position?.map||initial.round?.map||state.map);
   if(!(initial.maps||[]).some(m=>m.id===key))key=state.map;
-  let stand=row?.stand||null,land=row?.land||null,aim=row?.aim||null,placing='stand';
+  let stand=row?.stand||null,land=row?.land||null,aim=row?.aim||null,placing='stand',placedByUser=!!row;
   const dialog=document.createElement('dialog');dialog.className='lineup-editor';
   const select=(name,label,values,value)=>'<label>'+label+'<select name="'+name+'">'+values.map(([v,t])=>'<option value="'+e(v)+'" '+(v===value?'selected':'')+'>'+e(t)+'</option>').join('')+'</select></label>';
   dialog.innerHTML='<form><header><h3>'+(edit?'Edit lineup':'New lineup')+'</h3><button type="button" data-cancel>Cancel</button></header><div class="lineup-editor-columns"><div class="lineup-editor-fields"><label>Name<input name="name" required maxlength="240" value="'+e(row?.name||'')+'" placeholder="My window smoke"></label><div class="lineup-field-pair">'+select('map','Map',(initial.maps||[]).map(m=>[m.id,m.name]),key)+select('side','Side',[['T','T side'],['CT','CT side']],row?.side||'T')+'</div><div class="lineup-field-pair">'+select('type','Type',[['smoke','Smoke'],['fire','Fire'],['flash','Flash'],['grenade','Grenade']],row?.type||'smoke')+select('throw','Throw',[['left click','Left click'],['right click','Right click'],['both','Both'],['jump throw','Jump throw'],['run throw','Run throw'],['walk throw','Walk throw']],row?.throw||'left click')+'</div><label>Area<input name="area" required maxlength="240" value="'+e(row?.area||'')+'" placeholder="A site"></label><label>Steps and details <small>One step per line</small><textarea name="steps" required rows="5">'+e((row?.steps||[]).join('\n'))+'</textarea></label></div><div class="lineup-editor-places"><h4>Where you stand</h4><p>Drag the feet onto the radar. You can also click a spot or move the marker with arrow keys.</p><div data-edit-radar></div><div class="lineup-marker-tools"><button type="button" data-stand>Place feet</button><button type="button" data-land>Place landing ring</button><button type="button" data-clear-land>Remove ring</button></div><button type="button" data-position>Use my game position</button><p data-position-note role="status"></p><button type="button" data-create>Take two pictures</button><p data-create-note role="status"></p></div></div><footer><p data-error role="status"></p><button type="submit">Save lineup</button></footer></form>';
@@ -100,14 +102,15 @@
    const marker=(point,kind)=>{const p=pixel(point);return p?'<g tabindex="0" role="slider" aria-label="'+(kind==='stand'?'Feet':'Landing ring')+'; use arrow keys to move" data-marker="'+kind+'" transform="translate('+p.join(' ')+')" style="color:'+(kind==='stand'?'#ffdf69':'#97d8ff')+'">'+(kind==='stand'?feet:'<circle r="30" fill="none" stroke="currentColor" stroke-width="8"/>')+'</g>':'';};
    slot.innerHTML='<svg viewBox="0 0 '+o.width+' '+o.height+'" class="lineup-placement" aria-label="Place your lineup markers">'+(d.art?'<image width="'+o.width+'" height="'+o.height+'" href="'+e(d.art.image)+'"/>':'<rect width="100%" height="100%" fill="#26343e"/><path d="M0 512H1024M512 0V1024" stroke="#84919a" stroke-width="2"/><text x="30" y="70" fill="white" font-size="32">Radar picture unavailable</text>')+marker(stand,'stand')+marker(land,'land')+'</svg>';
    const svg=slot.querySelector('svg');
-   const move=event=>{const p=svg.createSVGPoint();p.x=event.clientX;p.y=event.clientY;const q=p.matrixTransform(svg.getScreenCTM().inverse());const point={radar_x:Math.max(0,Math.min(o.width,q.x)),radar_y:Math.max(0,Math.min(o.height,q.y))};if(placing==='stand'){stand=point;aim=null;}else land=point;const g=svg.querySelector('[data-marker="'+placing+'"]');if(g)g.setAttribute('transform','translate('+point.radar_x+' '+point.radar_y+')');};
+   const move=event=>{const p=svg.createSVGPoint();p.x=event.clientX;p.y=event.clientY;const q=p.matrixTransform(svg.getScreenCTM().inverse());const point={radar_x:Math.max(0,Math.min(o.width,q.x)),radar_y:Math.max(0,Math.min(o.height,q.y))};if(placing==='stand'){stand=point;aim=null;placedByUser=true;}else land=point;const g=svg.querySelector('[data-marker="'+placing+'"]');if(g)g.setAttribute('transform','translate('+point.radar_x+' '+point.radar_y+')');};
    svg.onpointerdown=event=>{event.preventDefault();placing=event.target.closest('[data-marker]')?.dataset.marker||placing;if(placing==='land'&&!land){land={radar_x:0,radar_y:0};paint();slot.querySelector('svg').dispatchEvent(new PointerEvent('pointerdown',{clientX:event.clientX,clientY:event.clientY,pointerId:event.pointerId,bubbles:true}));return;}svg.setPointerCapture(event.pointerId);move(event);};
    svg.onpointermove=event=>{if(svg.hasPointerCapture(event.pointerId))move(event);};
    svg.onpointerup=event=>{if(svg.hasPointerCapture(event.pointerId))svg.releasePointerCapture(event.pointerId);};
-   for(const g of svg.querySelectorAll('[data-marker]'))g.onkeydown=event=>{const delta={ArrowLeft:[-4,0],ArrowRight:[4,0],ArrowUp:[0,-4],ArrowDown:[0,4]}[event.key];if(!delta)return;event.preventDefault();placing=g.dataset.marker;const p=pixel(placing==='stand'?stand:land);const next={radar_x:Math.max(0,Math.min(o.width,p[0]+delta[0])),radar_y:Math.max(0,Math.min(o.height,p[1]+delta[1]))};if(placing==='stand'){stand=next;aim=null;}else land=next;g.setAttribute('transform','translate('+next.radar_x+' '+next.radar_y+')');};
+   for(const g of svg.querySelectorAll('[data-marker]'))g.onkeydown=event=>{const delta={ArrowLeft:[-4,0],ArrowRight:[4,0],ArrowUp:[0,-4],ArrowDown:[0,4]}[event.key];if(!delta)return;event.preventDefault();placing=g.dataset.marker;const p=pixel(placing==='stand'?stand:land);const next={radar_x:Math.max(0,Math.min(o.width,p[0]+delta[0])),radar_y:Math.max(0,Math.min(o.height,p[1]+delta[1]))};if(placing==='stand'){stand=next;aim=null;placedByUser=true;}else land=next;g.setAttribute('transform','translate('+next.radar_x+' '+next.radar_y+')');};
   }
-  function position(){const pos=(root.lineupLatest||d).position;if(pos?.map===key){stand=pos.stand;aim=pos.aim;dialog.querySelector('[data-position-note]').textContent='Your game position and aim were placed.';paint();}else dialog.querySelector('[data-position-note]').textContent='Your position is not available. Drag the feet onto the radar.';}
-  const close=async()=>{dialog.close();dialog.remove();await call('editing',{active:false,map:state.map});};
+  function position(){const pos=(root.lineupLatest||d).position;if(pos?.map===key){stand=pos.stand;aim=pos.aim;placedByUser=true;dialog.querySelector('[data-position-note]').textContent='Your game position and aim were placed.';paint();}else dialog.querySelector('[data-position-note]').textContent='Your position is not available. Drag the feet onto the radar.';}
+  root.updateLineupPosition=()=>{if(!placedByUser)position();};
+  const close=async()=>{delete root.updateLineupPosition;dialog.close();dialog.remove();await call('editing',{active:false,map:state.map});};
   dialog.querySelector('[data-cancel]').onclick=close;dialog.oncancel=event=>{event.preventDefault();close();};
   dialog.querySelector('[data-stand]').onclick=()=>{placing='stand';};
   dialog.querySelector('[data-land]').onclick=()=>{placing='land';if(!land&&overview()){land={radar_x:overview().width*.6,radar_y:overview().height*.4};paint();}};
@@ -115,7 +118,7 @@
   dialog.querySelector('[data-position]').onclick=position;
   dialog.querySelector('[data-create]').onclick=async()=>{const result=await call('creating',{map:key});dialog.querySelector('[data-create-note]').textContent=result.text;};
   field('map').disabled=edit;
-  field('map').onchange=async()=>{key=field('map').value;stand=land=aim=null;d=await call('data',{map:key});paint();position();};
+  field('map').onchange=async()=>{key=field('map').value;stand=land=aim=null;placedByUser=false;d=await call('data',{map:key});paint();position();};
   form.onsubmit=async event=>{event.preventDefault();if(!stand||!overview()){dialog.querySelector('[data-error]').textContent='Choose a map and place your feet first.';return;}
    const values=Object.fromEntries(new FormData(form));const saved={id:row?.id,name:values.name.trim(),side:values.side,type:values.type,throw:values.throw,area:values.area.trim(),steps:values.steps.split('\n').map(s=>s.trim()).filter(Boolean),stand,land,aim};
    const result=await call('change',{action:'save',map:key,row:saved,overview:overview()});

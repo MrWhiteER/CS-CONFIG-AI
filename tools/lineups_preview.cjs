@@ -56,6 +56,7 @@ const checks=`(async()=>{try{
  if(!body.querySelector('details').textContent.includes('Rene Rebsdorf'))throw Error('Credit missing');
  const art={image:'data:image/png;base64,',overview:fixture.data.lineups.document.overview};
  if(!ui.radar(art,[sample]).includes('stroke-dasharray'))throw Error('Radar annotation missing');
+ if(ui.radar(art,[{...sample,stand:{radar_x:300,radar_y:500},land:null}]).includes('stroke-dasharray'))throw Error('Optional landing must not draw an invented throw arc');
  if(body.querySelector('.lineup-round').hidden)throw Error('Round card missing');
  window.overlayRenderers.lineups(body,{...fixture.data.lineups,round:{show:false}},()=>{});
  if(!body.querySelector('.lineup-round').hidden)throw Error('Live card did not fold');
@@ -80,7 +81,11 @@ const checks=`(async()=>{try{
  const personalCall=async(action,args)=>{
   if(action==='editing'){editing=args.active;return personalData;}
   if(action==='creating')return {text:'Pictures are unavailable. Save with radar markers.'};
-  if(action==='change'){saved=args;return {...personalData,document:{...personalData.document,lineups:[{...args.row,id:'mine-test',mine:true}]}};}
+  if(action==='change'){
+   if(args.action==='delete')return {...personalData,undo_available:true};
+   if(args.action==='save')saved=args;
+   return {...personalData,document:{...personalData.document,lineups:[{...saved.row,id:'mine-test',mine:true}]}};
+  }
   return personalData;
  };
  window.overlayRenderers.lineups(personal,personalData,personalCall);
@@ -98,6 +103,21 @@ const checks=`(async()=>{try{
  if(!personal.textContent.includes('Made by you'))throw Error('Saved personal lineup missing');
  personal.querySelector('[data-edit]').click();await Promise.resolve();await Promise.resolve();
  if(!personal.querySelector('.lineup-editor')?.textContent.includes('Edit lineup'))throw Error('Edit form missing');
+ personal.querySelector('[data-cancel]').click();await Promise.resolve();await Promise.resolve();
+ personal.querySelector('[data-delete]').click();await Promise.resolve();await Promise.resolve();
+ if(!personal.querySelector('[data-undo]'))throw Error('Delete must offer visible Undo');
+ personal.querySelector('[data-undo]').click();await Promise.resolve();await Promise.resolve();
+ if(!personal.textContent.includes('Made by you'))throw Error('Undo did not restore lineup');
+ await window.lineupsUI.form(personal,personalData,personalCall);
+ const live={...personalData,map_request:false,position:{map:'mirage',stand:{x:100,y:200,z:30},aim:{pitch:10,yaw:20}}};
+ window.overlayRenderers.lineups(personal,live,personalCall);
+ if(!personal.querySelector('[data-position-note]').textContent.includes('were placed'))throw Error('Fresh GSI did not automatically place feet');
+ personal.querySelector('[data-marker="stand"]').dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));
+ const moved=personal.querySelector('[data-marker="stand"]').getAttribute('transform');
+ window.overlayRenderers.lineups(personal,{...live,position:{...live.position,stand:{x:300,y:400,z:30}}},personalCall);
+ if(personal.querySelector('[data-marker="stand"]').getAttribute('transform')!==moved)throw Error('GSI overwrote a manually placed marker');
+ personal.querySelector('[data-create]').click();await Promise.resolve();await Promise.resolve();
+ if(!personal.querySelector('[data-create-note]').textContent.includes('unavailable'))throw Error('Picture fallback missing');
  personal.querySelector('[data-cancel]').click();await Promise.resolve();await Promise.resolve();personal.remove();
  document.body.dataset.lineupsCheck='OK';
  }catch(error){document.body.dataset.lineupsCheck='ERROR: '+error.message;}})();`;
@@ -106,7 +126,7 @@ if(process.argv.includes('--check')){
   const result=render({name:'lineups-check-'+theme,query:'preview=1&theme='+theme,extra:setup+checks,width:1280,height:1100,dump:true});
   if(!result.includes('data-lineups-check="OK"'))throw Error(theme+': '+(result.match(/data-lineups-check="[^"]*/)?.[0]||'Checks did not complete'));
  }
- console.log('Lineups Chromium: list, type ahead, side filter, synonyms, empty state, plain text, credit, radar annotations, round fold, preserved search, map switch, all 18 details fit without scrolling, picture status and thumbnail enlargement OK');
+ console.log('Lineups Chromium: catalogue, filters, 18 details, picture view, new/edit/save, radar-only points, landing ring, delete/Undo, GSI placement and picture fallback OK (Carbon and Daylight)');
 }else{
  const output=path.join(root,'docs/lineups/preview');fs.mkdirSync(output,{recursive:true});
  for(const theme of ['carbon','daylight']){

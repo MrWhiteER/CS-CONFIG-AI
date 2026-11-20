@@ -5150,7 +5150,11 @@ def _lineups_pictures(state, body):
             install = state.cs2_install
             if not install:
                 return {'available': False, 'text': 'Install CS2 in Steam first.'}
-            key = body.get('key', 'F8')
+            key = body.get('key', settings.get('overlay_lineups_picture_key', 'F8'))
+            if (key == settings.get('overlay_lineups_create_key', 'F9')
+                    or key in {settings.get(k, '').split('+')[-1].strip().upper()
+                               for k in ('overlay_hotkey', 'overlay_panel_hotkey')}):
+                return {'available': False, 'text': 'Choose different picture keys and overlay shortcuts in Settings.'}
             paths = []
             from . import whoami
             steam_root = getattr(state, 'steam_root', None)

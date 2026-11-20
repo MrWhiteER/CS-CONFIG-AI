@@ -12,6 +12,8 @@ DEFAULTS = {
     "overlay_tools": [key for key in IDS if key != 'lineups'],
     "overlay_enabled": False,
     "overlay_lineups_round_start": True,
+    "overlay_lineups_picture_key": "F8",
+    "overlay_lineups_create_key": "F9",
     "overlay_hide_in_rounds": False,
     "overlay_always_visible": False,
     "overlay_hide_from_capture": True,
@@ -61,6 +63,8 @@ def read(ui: dict | None = None, *, strict: bool = False) -> dict:
                      and len(set(value)) == len(value) and "settings" in value)
             if valid:
                 value = list(value)
+        elif key in ('overlay_lineups_picture_key', 'overlay_lineups_create_key'):
+            valid = isinstance(value, str) and value in tuple('F'+str(n) for n in range(6, 12))
         elif isinstance(DEFAULTS[key], bool):
             valid = isinstance(value, bool)
         elif key == "overlay_corner":
@@ -78,9 +82,18 @@ def read(ui: dict | None = None, *, strict: bool = False) -> dict:
                 valid = False
         if not valid:
             if strict:
+                if key in ('overlay_lineups_picture_key', 'overlay_lineups_create_key'):
+                    raise ValueError('Choose a picture key from the list.')
                 raise ValueError(f"Invalid {key}.")
             continue
         out[key] = value
     if strict and hotkey(out["overlay_hotkey"]) == hotkey(out["overlay_panel_hotkey"]):
         raise ValueError("HUD and panel shortcuts must be different.")
+    reserved = {out[k].split('+')[-1].strip().upper() for k in ('overlay_hotkey', 'overlay_panel_hotkey')}
+    for name, preferred in (('overlay_lineups_picture_key', 'F8'), ('overlay_lineups_create_key', 'F9')):
+        if out[name] in reserved:
+            if strict:
+                raise ValueError('Picture keys and overlay shortcuts must use different keys.')
+            out[name] = next(k for k in (preferred, 'F6', 'F7', 'F8', 'F9', 'F10', 'F11') if k not in reserved)
+        reserved.add(out[name])
     return out

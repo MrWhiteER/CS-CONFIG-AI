@@ -74,7 +74,8 @@ def validate(document):
                             or not 0 <= point['radar_y'] <= o['height']):
                         raise ValueError('Point outside overview')
                     continue
-            if not isinstance(point,dict) or not all(number(point.get(k)) for k in ('x', 'y', 'z')):
+            if (not isinstance(point,dict) or any(k in point for k in ('radar_x', 'radar_y'))
+                    or not all(number(point.get(k)) for k in ('x', 'y', 'z'))):
                 raise ValueError('Invalid point')
             x, y = pixel(point, o)
             if not 0 <= x <= o['width'] or not 0 <= y <= o['height']:
@@ -106,5 +107,5 @@ def search(rows, query='', side='', kind=''):
                 'nade': 'grenade', 'he': 'grenade', 'pop': 'flash'}
     words = [synonyms.get(w, w) for w in re.findall(r'\w+', query.casefold()) if w != 'site']
     return [r for r in rows if (not side or r['side'] in (side, 'both'))
-            and (not kind or r['type'] == kind)
+            and (not kind or (r.get('mine') is True if kind == 'mine' else r['type'] == kind))
             and all(w in f"{r['name']} {r['area']} {r['type']}".casefold() for w in words)]

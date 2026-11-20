@@ -29,6 +29,9 @@ for (const title of ['Performance overlay', 'HUD', 'Panel', 'Behaviour', 'Frame 
   assert(output.includes(`<h2>${title}</h2>`));
 }
 assert(output.includes('Enable the overlay and start CS2'));
+assert(output.includes('Lineup picture key'));
+assert(output.includes('id="lineups-create-key"'));
+assert(output.includes('Automatic pictures for your own lineups are unavailable'));
 assert(!output.includes('286.4'));
 output = render('waiting');
 assert(output.includes('Start CS2, then refresh'));

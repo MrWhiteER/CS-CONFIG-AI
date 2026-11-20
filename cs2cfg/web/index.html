@@ -9501,7 +9501,8 @@ function renderOverlay(d) {
       toggle('overlay_always_visible', 'Always visible', 'Override Auto hide while CS2 is focused.') +
       '<p class="sub2">Auto hide waits for game state if it is missing or out of date. Always visible still requires Fullscreen Windowed.</p>') +
     card('Lineups', '<p class="sub2">Make pictures in offline Mirage practice. Close CS2 first. Keep the game visible and press the chosen key once for each picture.</p>' +
-      '<label>Picture key <select id="lineups-picture-key">' + ['F6','F7','F8','F9','F10','F11'].map(k => '<option' + (k === 'F8' ? ' selected' : '') + '>' + k + '</option>').join('') + '</select></label><button class="btn" id="lineups-pictures">Make lineup pictures</button>' +
+      '<label>Picture key <select id="lineups-picture-key">' + ['F6','F7','F8','F9','F10','F11'].map(k => '<option' + (k === (s.overlay_lineups_picture_key || 'F8') ? ' selected' : '') + '>' + k + '</option>').join('') + '</select></label><button class="btn" id="lineups-pictures">Make lineup pictures</button>' +
+      '<label>Lineup picture key <select id="lineups-create-key">' + ['F6','F7','F8','F9','F10','F11'].map(k => '<option' + (k === (s.overlay_lineups_create_key || 'F9') ? ' selected' : '') + '>' + k + '</option>').join('') + '</select></label><p class="sub2">Use different keys for pictures and overlay shortcuts. Automatic pictures for your own lineups are unavailable; save radar markers instead. Hiding the game display and weapon requires offline practice.</p>' +
       '<div class="actions"><span id="lineups-picture-status" role="status">' + esc(d.picture_status || '') + '</span><button class="btn" id="lineups-pictures-stop"' + (d.picture_active ? '' : ' hidden') + '>Stop pictures</button></div>') +
     card('Frame stats',
       '<p class="sub2">' + (live ? (d.frame_capture_ready ? 'Frame capture ready.' : 'Resource stats available; frame capture needs setup.') :
@@ -9537,6 +9538,8 @@ document.addEventListener("click", async e => {
         overlay_corner: $("overlay-corner").value,
         overlay_hotkey: $("overlay-hotkey").value.trim(),
         overlay_panel_hotkey: $("overlay-panel-hotkey").value.trim(),
+        overlay_lineups_picture_key: $("lineups-picture-key").value,
+        overlay_lineups_create_key: $("lineups-create-key").value,
         overlay_fields: [...document.querySelectorAll('[data-overlay-field]:checked')].map(x => x.dataset.overlayField),
       });
       renderOverlay(answer);

@@ -149,3 +149,73 @@ and New lineup screenshots contain original schematic fixtures, no game art.
 Run node tools/lineups_preview.cjs --check for the list and editor browser tests.
 Run py -3 -m unittest tests.test_lineups_mine tests.test_lineups_editor
 on the owner's machine: py is not available inside this execution sandbox.
+
+## Personal pictures (part 3: radar-only fallback)
+
+The separate Lineup picture key in Settings -> Overlay -> Lineups defaults to
+F9; the existing catalogue Picture key defaults to F8. Save overlay settings
+persists both. They must differ from one another and from the final key of
+either overlay shortcut. This reserves the new key; it is not currently bound
+in the game. The existing catalogue picture workflow remains available.
+
+Command check on 2026-11-21: the game command registry labels cl_drawhud and
+r_drawviewmodel as cheat commands. The intended hide pair would therefore be
+cl_drawhud 0 and r_drawviewmodel 0, with both restored to 1 afterwards, in an
+app-launched local practice game only. No no-cheats weapon-hiding alternative
+was verified. Registry source:
+https://github.com/SteamDatabase/GameTracking-CS2/blob/master/DumpSource2/convars.txt
+The screenshot, png_screenshot and jpeg_screenshot commands in the companion
+commands.txt are development-only; they are not a confirmed retail alternative.
+
+No supported acknowledgement of a picture-key press or HUD visibility was
+found in the available GSI path. Position/forward and an ordinary heartbeat
+cannot establish either fact. A same-alias hide/restore could restore before
+an external capture, and an early cancel cannot execute an undo file simply by
+deleting it. These are unresolved prerequisites, not things fake GSI flags can
+verify. See cs2cfg/overlay/gsi.py for the fields this app actually accepts.
+
+The least invasive candidate is the existing strict Steam launch with a
+one-session +exec for an app-owned cfg, requiring CS2 to be closed first. It
+avoids changing launch preferences, autoexec or player config files. Loading
+a newly written cfg into an already-running game cannot be assumed. Until
+key/HUD evidence and game-side undo can be verified, the personal picture
+button explains the limitation and saves nothing to the game folders. It
+never launches, binds, enables cheats, hides the overlay or captures a frame.
+The requested two-picture capture, cropping, retake and picture-marker flow
+is NOT implemented. The brief explicitly permits radar-only fallback when
+picture capture cannot be achieved within its hard rules. No creating-mode
+cfg/bind is installed, so there is no creating-mode cleanup to execute.
+
+Tests added: tests.test_lineups_mine (optional land and bounded radar points),
+tests.test_lineups_editor (local pose, stale/malformed reports and editing),
+and tests.test_lineups_creating (key conflicts and refusing unsupported capture
+even with fake frames and invented game-state flags). Existing picture tests
+still cover the earlier catalogue workflow. All Python tests remain unrun here:
+py -3 is not recognized by this sandbox. The operator should run:
+
+    py -3 -m unittest tests.test_lineups tests.test_lineups_mine tests.test_lineups_editor tests.test_lineups_creating tests.test_lineups_pictures tests.test_lineups_rounds tests.test_overlay_gsi
+
+Browser validation passed: node tools/lineups_preview.cjs --check in Carbon and
+Daylight (new/edit/save, radar markers, optional landing ring, delete/Undo,
+automatic GSI placement without overwriting a dragged marker, and the picture
+fallback), node tools/overlay_preview.cjs --check, all four JS harnesses, and
+git diff --check. Preview images are original diagrams. Real-game radar file
+availability, live GSI position/forward availability, capture and restoration,
+and actual throws remain untested. No real game folders were used in tests.
+
+### Make one lineup from this checkout
+
+1. Launch cs2cfg.bat in G:\Projects\cs2-lineups-own.
+2. In Settings -> Overlay, enable the overlay and save.
+3. Press Ctrl+Alt+P. In the overlay Settings tool, enable Lineups in Your dock
+   and save. Open Lineups from the dock.
+4. Click New lineup. Choose the map, name, side, type, throw and area; enter
+   one instruction per line.
+5. Drag the feet to the stand spot. Optionally click Place landing ring and
+   drag the ring. If available, Use my game position also records your aim.
+6. Click Save lineup. Find it with Made by you. Edit changes it; Delete removes
+   it immediately and the visible Undo button restores it.
+
+Cumulative file copies are in tmp/lineups-handoff/part-1, part-2 and part-3,
+with FILES.txt manifests. The operator commits; no git staging, commit, push,
+PR, merge, release or tag was performed. tools/lineups_handoff.cjs was not recreated.
