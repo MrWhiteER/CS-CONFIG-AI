@@ -34,7 +34,7 @@
    const selected=found.find(r=>r.id===state.selected)||found[0];state.selected=selected?.id;
    root.querySelector('.lineup-count').textContent=found.length+' '+(found.length===1?'lineup':'lineups')+' · '+(doc?.name||'Choose a map');
    const list=root.querySelector('.lineups-results');
-   list.innerHTML=found.map((r,i)=>'<button class="lineup-row" data-lineup="'+e(r.id)+'" aria-pressed="'+(r===selected)+'"><strong>'+e(r.name)+'</strong><small>'+e(types[r.type])+' · '+e(r.area)+' site · '+e(r.side==='both'?'Both sides':r.side+' side')+'</small></button>').join('')||'<p>No lineups match. Try another search or side.</p>';
+   list.innerHTML=found.map((r,i)=>'<button class="lineup-row" data-lineup="'+e(r.id)+'" aria-pressed="'+(r===selected)+'"><strong>'+e(r.name)+'</strong><small>'+e(types[r.type])+' · '+e(r.area+(['A','B'].includes(r.area)?' site':''))+' · '+e(r.side==='both'?'Both sides':r.side+' side')+'</small></button>').join('')||'<p>No lineups match. Try another search or side.</p>';
    root.querySelector('.lineup-detail').innerHTML=selected?'<h4>'+e(selected.name)+'</h4><p class="lineup-meta">'+e(types[selected.type])+' · '+e(selected.throw[0].toUpperCase()+selected.throw.slice(1))+' · '+(selected.checked?'Checked in game':'Awaiting game check')+'</p>'+radar(d.art,[selected])+'<ol>'+selected.steps.map(s=>'<li>'+e(s)+'</li>').join('')+'</ol>':'<p>Choose a lineup to see where to stand and how to throw.</p>';
    for(const button of list.querySelectorAll('[data-lineup]'))button.onclick=()=>{state.selected=button.dataset.lineup;paint();};
   };

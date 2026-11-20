@@ -35,6 +35,15 @@ class Data(unittest.TestCase):
         doc['lineups'].append(copy.deepcopy(doc['lineups'][0]))
         with self.assertRaises(ValueError): lineups.validate(doc)
 
+    def test_instruction_quality(self):
+        for field, value in [('area', 'Mid site'),
+                             ('steps', ['Stand by T spawn.', 'Stand by T spawn.']),
+                             ('steps', ['Stand at the marked point on the radar.']),
+                             ('steps', ['Aim at the corner.'])]:
+            doc=lineups.load(); doc['lineups'][0][field]=value
+            with self.subTest(field=field, value=value), self.assertRaises(ValueError):
+                lineups.validate(doc)
+
     def test_synonyms_and_filters(self):
         row={**lineups.load()['lineups'][0], 'name':'Default corner','area':'B','type':'fire'}
         for query in ('b site molly','B molotov','incendiary','fire'):

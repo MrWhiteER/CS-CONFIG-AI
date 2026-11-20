@@ -51,6 +51,15 @@ def validate(document):
             raise ValueError('Invalid lineup')
         if not isinstance(row.get('steps'), list) or not 1 <= len(row['steps']) <= 3 or not all(map(plain, row['steps'])):
             raise ValueError('Invalid instructions')
+        normalized = [re.sub(r'[^a-z0-9]+', ' ', step.casefold()).strip() for step in row['steps']]
+        if len(set(normalized)) != len(normalized):
+            raise ValueError('Repeated instructions')
+        landmarks = ('t spawn', 'ct spawn', 'palace', 'ramp', 'connector', 'jungle',
+                     'ticket', 'stairs', 'mid', 'short', 'market', 'apartments', 'bench', 'van')
+        if document['map'] == 'mirage' and any(
+                'marked point' in step or not any(place in step for place in landmarks)
+                for step in normalized):
+            raise ValueError('Instructions need a Mirage landmark')
         a = row['aim']
         if not isinstance(a,dict) or not all(number(a.get(k)) for k in ('pitch', 'yaw')) or not -90 <= a['pitch'] <= 90 or not -180 <= a['yaw'] <= 180:
             raise ValueError('Invalid aim')

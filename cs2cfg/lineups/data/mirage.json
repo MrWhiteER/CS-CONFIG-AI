@@ -31,9 +31,9 @@
         "z": -165.96875
       },
       "steps": [
-        "Stand at the marked point on the radar.",
-        "Strafe right, then jump throw",
-        "Jump and throw with left click."
+        "Stand by the T spawn wooden box.",
+        "Aim at the left edge of the antenna above the Mid roof.",
+        "Jump and release left click from the T spawn wooden box."
       ],
       "source": "CS2-annotations, MIT",
       "checked": false
@@ -60,9 +60,9 @@
         "z": -37.96875
       },
       "steps": [
-        "Stand at the marked point on the radar.",
-        "Aim slight off the edge of the building. Combine with jungle smoke",
-        "Jump and throw with left click."
+        "Stand by the A ramp entrance corner.",
+        "Aim at just beside the Palace roof edge above Stairs.",
+        "Jump and release left click from the A ramp entrance corner."
       ],
       "source": "CS2-annotations, MIT",
       "checked": false
@@ -89,9 +89,9 @@
         "z": 18.03125
       },
       "steps": [
-        "Stand at the marked point on the radar.",
-        "Aim at the dot on the wall and jump throw. Combine with stairs smoke",
-        "Jump and throw with left click."
+        "Stand by the A ramp entrance wall.",
+        "Aim at the dot on the A ramp wall below the Palace roof.",
+        "Jump and release left click from the A ramp entrance wall."
       ],
       "source": "CS2-annotations, MIT",
       "checked": false
@@ -118,9 +118,9 @@
         "z": -165.96875
       },
       "steps": [
-        "Wedge into corner",
-        "Aim at the top of the antenna. jump throw",
-        "Jump and throw with left click."
+        "Stand by the T spawn corner beside A ramp.",
+        "Aim at the top of the antenna above Connector.",
+        "Jump and release left click from the T spawn corner beside A ramp."
       ],
       "source": "CS2-annotations, MIT",
       "checked": false
@@ -147,9 +147,9 @@
         "z": -169.96875
       },
       "steps": [
-        "Stand at the marked point on the radar.",
-        "Middle of the line",
-        "Throw with left click."
+        "Stand by the A ramp right wall.",
+        "Aim at the middle seam on the A ramp wall.",
+        "Release left click from the A ramp right wall."
       ],
       "source": "CS2-annotations, MIT",
       "checked": false
@@ -176,9 +176,9 @@
         "z": -36.96875
       },
       "steps": [
-        "Stand at the marked point on the radar.",
-        "Aim between the two horizontal lines at the vertical line",
-        "Throw with left click."
+        "Stand by the Palace exit corner.",
+        "Aim at the vertical seam between the horizontal lines on the Palace wall.",
+        "Release left click from the Palace exit corner."
       ],
       "source": "CS2-annotations, MIT",
       "checked": false
@@ -205,9 +205,9 @@
         "z": -184.162582
       },
       "steps": [
-        "Stand at the marked point on the radar.",
-        "Tip of the antenna",
-        "Throw with left click."
+        "Stand by the T spawn wooden box.",
+        "Aim at the antenna tip above Top mid.",
+        "Release left click from the T spawn wooden box."
       ],
       "source": "CS2-annotations, MIT",
       "checked": false
@@ -234,9 +234,9 @@
         "z": -165.96875
       },
       "steps": [
-        "Stand at the marked point on the radar.",
-        "1x at the top of the flap on the box",
-        "Throw with left click."
+        "Stand by the Top mid boxes.",
+        "Aim at the top flap of the Top mid box.",
+        "Release left click from the Top mid boxes."
       ],
       "source": "CS2-annotations, MIT",
       "checked": false
@@ -263,9 +263,9 @@
         "z": -164.94046
       },
       "steps": [
-        "Stand at the marked point on the radar.",
-        "Aim at the tip of the antenna",
-        "Throw with left click."
+        "Stand by the Top mid boxes.",
+        "Aim at the antenna tip above Short.",
+        "Release left click from the Top mid boxes."
       ],
       "source": "CS2-annotations, MIT",
       "checked": false
@@ -292,9 +292,9 @@
         "z": -165.972
       },
       "steps": [
-        "Wedge into the corner",
-        "Aim at the top most part of the tower, jump throw",
-        "Jump and throw with left click."
+        "Stand by the B apartments entrance corner.",
+        "Aim at the highest point of the Market tower.",
+        "Jump and release left click from the B apartments entrance corner."
       ],
       "source": "CS2-annotations, MIT",
       "checked": false
@@ -321,9 +321,9 @@
         "z": -165.966705
       },
       "steps": [
-        "Stand at the marked point on the radar.",
-        "Top part of the right most window",
-        "Jump and throw with left click."
+        "Stand by the B apartments entrance corner.",
+        "Aim at the top of the rightmost Market window.",
+        "Jump and release left click from the B apartments entrance corner."
       ],
       "source": "CS2-annotations, MIT",
       "checked": false
@@ -350,9 +350,9 @@
         "z": -108.837357
       },
       "steps": [
-        "Stand at the marked point on the radar.",
-        "Right most part of the tower (not the beam)",
-        "Jump and throw with left click."
+        "Stand by the A ramp entrance wall.",
+        "Aim at the right edge of the tower above CT spawn.",
+        "Jump and release left click from the A ramp entrance wall."
       ],
       "source": "CS2-annotations, MIT",
       "checked": false
@@ -379,9 +379,9 @@
         "z": -255.135513
       },
       "steps": [
-        "Wedge into corner",
-        "Aim at edge of wall and top grout",
-        "Jump and throw with left click."
+        "Stand by the CT spawn corner toward Ticket booth.",
+        "Aim at the wall edge at the upper grout line toward A ramp.",
+        "Jump and release left click from the CT spawn corner toward Ticket booth."
       ],
       "source": "CS2-annotations, MIT",
       "checked": false
