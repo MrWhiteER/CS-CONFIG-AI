@@ -98,14 +98,27 @@ def key_taken(result: cfgscan.ScanResult, key: str) -> Optional[Dict[str, object
 # The file itself
 # ---------------------------------------------------------------------------
 
-def _previous_keys(text: str) -> Set[str]:
+def _previous_keys(text: str) -> List[str]:
     """Every key an earlier version of the file bound or cleared."""
-    out = set()
+    out: List[str] = []
     for line in (text or "").splitlines():
         match = _BIND_LINE.match(line)
-        if match:
-            out.add(match.group(2))
+        if match and match.group(2) not in out:
+            out.append(match.group(2))
     return out
+
+
+def _active_profile(result: cfgscan.ScanResult) -> Optional[str]:
+    """The profile picked on the Keyboard tab, if one is and it still exists."""
+    from . import layouts
+
+    try:
+        current = layouts.load_current(result.root)
+    except Exception:
+        return None
+    if current and cfgscan.is_match_profile(result, current):
+        return current
+    return None
 
 
 def render(result: cfgscan.ScanResult, previous: str = "") -> str:
@@ -138,11 +151,22 @@ def render(result: cfgscan.ScanResult, previous: str = "") -> str:
         if winner is not None and winner.file in chain and id(winner) not in seen:
             seen.add(id(winner))
             binds.append(winner)
+    taken_off: List[str] = []
+    active = _active_profile(result)
+    if active is not None:
+        # A profile is a whole keyboard of its own: its keys, and the default
+        # layout's other keys taken off -- the same as the next launch.
+        from . import layouts
+
+        final, taken_off = cfgscan.profile_layout(
+            result, active, layouts.load_pins(result.root).get(active, []))
+        binds = list(final.values())
     binds.sort(key=lambda b: b.order)
 
-    bound = {b.key.lower() for b in binds}
-    cleared = sorted(k for k in _previous_keys(previous)
-                     if k.lower() not in bound)
+    bound = {cfgscan.physical_key(b.key) for b in binds}
+    cleared = sorted({k for k in _previous_keys(previous) + taken_off
+                      if cfgscan.physical_key(k) not in bound},
+                     key=str.lower)
 
     lines = [
         MARKER,

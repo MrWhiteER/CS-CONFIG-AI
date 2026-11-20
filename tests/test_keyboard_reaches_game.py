@@ -19,6 +19,7 @@ from __future__ import annotations
 import shutil
 import sys
 import tempfile
+import re
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -80,10 +81,32 @@ class KeyboardReachesGame(unittest.TestCase):
         return (self.cfg_root / relative).read_text(encoding="utf-8")
 
     def in_game(self, key):
-        """What CS2 is left with for ``key`` after the autoexec runs."""
-        result = cfgscan.scan(self.cfg_root / "mrwhiteer", cfg_root=self.cfg_root)
-        winner = cfgscan.startup_bind(result, cfgscan.startup_chain(result), key)
-        return winner.body if winner else None
+        """What CS2 is left with for ``key`` after the autoexec runs: follows
+        the exec lines the way the game does, bind/unbind/unbindall included."""
+        keys = {}
+
+        def run(relative, depth=0):
+            path = self.cfg_root / relative
+            if depth > 8 or not path.is_file():
+                return
+            for raw in path.read_text(encoding="utf-8").splitlines():
+                line = raw.split("//", 1)[0].strip()
+                words = re.findall(r'"([^"]*)"|(\S+)', line)
+                words = [a or b for a, b in words]
+                if not words:
+                    continue
+                verb = words[0].lower()
+                if verb == "exec" and len(words) > 1:
+                    run(words[1].replace("\\", "/"), depth + 1)
+                elif verb == "unbindall":
+                    keys.clear()
+                elif verb == "unbind" and len(words) > 1:
+                    keys.pop(cfgscan.physical_key(words[1]), None)
+                elif verb == "bind" and len(words) > 2:
+                    keys[cfgscan.physical_key(words[1])] = words[2]
+
+        run("mrwhiteer/autoexec.vcfg")
+        return keys.get(cfgscan.physical_key(key))
 
     # -- the Keyboard tab ----------------------------------------------------
 
@@ -123,31 +146,75 @@ class KeyboardReachesGame(unittest.TestCase):
         # Only the profile binds H; until it is switched to, H is free.
         self.assertNotIn("scancode11", board)
 
-    # -- switching profiles --------------------------------------------------
+    # -- switching profiles: separate keyboards ------------------------------
 
-    def test_switching_changes_every_key_the_profile_sets(self):
+    def switch(self):
         answer = webui._cfg_layouts_apply(self.state, {"file": PROFILE})
         self.assertTrue(answer["ok"], answer.get("error"))
+        return answer
+
+    def test_switching_gives_exactly_the_profile_keys(self):
+        before = {f: self.read(f) for f in (BINDS, IMPORTED)}
+        self.switch()
         self.assertEqual(self.in_game("mwheelup"), "slot7")
         self.assertEqual(self.in_game("scancode25"), "+radialradio2")
-        self.assertEqual(self.in_game("scancode8"), "+use")       # was "e" in imported
-        self.assertEqual(self.in_game("scancode11"), "+lookatweapon")  # newly added
-        self.assertIsNone(self.in_game("scancode99"))              # empty bind: not added
-        self.assertEqual(self.read(PROFILE), FILES[PROFILE])
+        self.assertEqual(self.in_game("scancode8"), "+use")
+        self.assertEqual(self.in_game("scancode11"), "+lookatweapon")
+        # W is only on the default layout: it does not come along.
+        self.assertIsNone(self.in_game("scancode26"))
+        # The default layout's own files are untouched.
+        self.assertEqual({f: self.read(f) for f in (BINDS, IMPORTED)}, before)
 
-    def test_default_puts_everything_back(self):
-        webui._cfg_layouts_apply(self.state, {"file": PROFILE})
+    def test_mouse_look_survives_a_profile_that_clears_it(self):
+        path = self.cfg_root / PROFILE
+        path.write_text(path.read_text(encoding="utf-8") + 'bind "mouse_x" ""\n', encoding="utf-8")
+        binds = self.cfg_root / BINDS
+        binds.write_text(binds.read_text(encoding="utf-8") + 'bind "mouse_x" "yaw"\n', encoding="utf-8")
+        self.state.cfg_scan = cfgscan.scan(self.cfg_root / "mrwhiteer", cfg_root=self.cfg_root)
+        self.switch()
+        self.assertEqual(self.in_game("mouse_x"), "yaw")
+
+    def test_a_key_changed_in_a_profile_stays_in_that_profile(self):
+        self.switch()
+        answer = webui._cfg_bind(self.state, {"code": "KeyW", "command": "+jump", "force": True})
+        self.assertTrue(answer["ok"], answer.get("error"))
+        self.assertEqual(answer["file"], PROFILE)
+        self.assertIn('bind "scancode26" "+jump"', self.read(PROFILE))
+        self.assertEqual(self.in_game("scancode26"), "+jump")
+        # Default is untouched, and gets W back as it was.
+        self.assertEqual(self.read(BINDS), FILES[BINDS])
+        webui._cfg_layouts_default(self.state, {})
+        self.assertEqual(self.in_game("scancode26"), "+forward")
+
+    def test_the_board_shows_the_profile_while_it_is_on(self):
+        self.switch()
+        board = webui._cfg_keys(self.state, {})["bound"]
+        self.assertEqual(board["mwheelup"]["command"], "slot7")
+        self.assertNotIn("scancode26", board)
+
+    def test_default_puts_your_own_keys_back(self):
+        self.switch()
         answer = webui._cfg_layouts_default(self.state, {})
         self.assertTrue(answer["ok"], answer.get("error"))
         self.assertEqual(self.in_game("mwheelup"), "slot3; slot7")
         self.assertEqual(self.in_game("scancode25"), "switchhands")
         self.assertEqual(self.in_game("scancode8"), "+invsmoke; !health")
-        self.assertEqual(self.in_game("scancode11"), "")             # unbound again
+        self.assertEqual(self.in_game("scancode26"), "+forward")
+        self.assertIsNone(self.in_game("scancode11"))
 
     def test_switching_twice_reports_already_active(self):
-        webui._cfg_layouts_apply(self.state, {"file": PROFILE})
+        self.switch()
         again = webui._cfg_layouts_apply(self.state, {"file": PROFILE})
         self.assertFalse(again["changed"])
+
+    def test_the_apply_now_file_matches_the_profile(self):
+        from cs2cfg import applynow
+
+        self.switch()
+        text = applynow.render(self.state.cfg_scan)
+        self.assertIn('unbind "scancode26"', text)
+        self.assertIn('bind "mwheelup" "slot7"', text)
+        self.assertNotIn('bind "mwheelup" "slot3; slot7"', text)
 
 
 if __name__ == "__main__":
