@@ -5538,6 +5538,28 @@ def _refresh_apply_now(state: State) -> None:
         pass
 
 
+def _apply_now_follow_game(state: State, running: bool) -> None:
+    """When CS2 starts or stops, rewrite the in-game apply file.
+
+    Started: from now on the key sends only what changes after this point.
+    Stopped: back to the full setup, remembered as what the next launch
+    loads. Runs off the status poll's thread so the poll never waits.
+    """
+    previous = getattr(state, "_apply_game_up", None)
+    state._apply_game_up = running
+    if previous is None or previous == running:
+        return
+
+    def work() -> None:
+        try:
+            with state.lock:
+                _refresh_apply_now(state)
+        except Exception:
+            pass
+
+    threading.Thread(target=work, name="apply-now-follow-game", daemon=True).start()
+
+
 # Every handler that can change a config file CS2 reads. After any of them
 # succeeds the in-game apply file is rewritten, so the apply key always
 # brings in the latest state.
@@ -6013,6 +6035,7 @@ def make_handler(state: State):
                     live.update(_stand_down(state, live["game_running"]))
                 except Exception:
                     pass
+                _apply_now_follow_game(state, live["game_running"])
                 if state.launch is None:
                     self._send_json({"ok": True, "phase": "idle", "active": False,
                                      "lines": [], **live})

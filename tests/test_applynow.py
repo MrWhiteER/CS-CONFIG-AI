@@ -179,3 +179,46 @@ class TestFollowsChanges(ApplyNowCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestOnlyChangesWhileRunning(ApplyNowCase):
+    """While CS2 runs, the key sends only what changed since it started, not
+    the whole config: hundreds of commands at once can read as a flood."""
+
+    def setUp(self):
+        super().setUp()
+        self.set_key("F8")
+        # CS2 closed: full setup written, remembered as what launch loads.
+        applynow.refresh(self.state.cfg_scan, running=False)
+
+    def commands(self):
+        return [l for l in self.apply_file.read_text(encoding="utf-8").splitlines()
+                if l.strip() and not l.startswith("//")]
+
+    def test_nothing_changed_sends_only_the_message(self):
+        applynow.refresh(self.state.cfg_scan, running=True)
+        self.assertEqual(self.commands(),
+                         ['echo "CS CONFIG AI: your latest changes are now applied"'])
+
+    def test_a_changed_key_is_the_only_bind_sent(self):
+        r = webui._cfg_bind(self.state, {"code": "mouse4", "command": "+jump", "force": True})
+        self.assertTrue(r["ok"], r)
+        applynow.refresh(self.state.cfg_scan, running=True)
+        sent = self.commands()
+        self.assertIn('bind "mouse4" "+jump"', sent)
+        self.assertEqual(len(sent), 2, sent)
+
+    def test_a_cleared_key_is_unbound(self):
+        r = webui._cfg_bind(self.state, {"code": "mouse4", "unbind": True, "force": True})
+        self.assertTrue(r["ok"], r)
+        applynow.refresh(self.state.cfg_scan, running=True)
+        self.assertIn('unbind "mouse4"', self.commands())
+
+    def test_closing_the_game_goes_back_to_the_full_setup(self):
+        webui._cfg_bind(self.state, {"code": "mouse4", "command": "+jump", "force": True})
+        applynow.refresh(self.state.cfg_scan, running=True)
+        applynow.refresh(self.state.cfg_scan, running=False)
+        self.assertIn('bind "mouse3" "say custom text"', self.commands())
+        # and the next running session compares against the new setup
+        applynow.refresh(self.state.cfg_scan, running=True)
+        self.assertEqual(len(self.commands()), 1)

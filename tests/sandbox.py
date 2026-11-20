@@ -19,7 +19,7 @@ import tempfile
 from pathlib import Path
 from unittest import mock
 
-from cs2cfg import backup, layouts
+from cs2cfg import applynow, backup, layouts
 
 
 def redirect_backups(case) -> Path:
@@ -45,4 +45,9 @@ def redirect_layouts(case) -> Path:
     patch = mock.patch.object(layouts, "_store", return_value=root)
     patch.start()
     case.addCleanup(patch.stop)
+    # What the apply key compares against lives in the app's data too.
+    base = mock.patch.object(applynow, "_baseline_file",
+                             return_value=root / "apply_now_baseline.json")
+    base.start()
+    case.addCleanup(base.stop)
     return root

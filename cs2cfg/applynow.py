@@ -196,8 +196,109 @@ def render(result: cfgscan.ScanResult, previous: str = "") -> str:
     return "\n".join(lines) + "\n"
 
 
-def refresh(result: Optional[cfgscan.ScanResult]) -> Optional[Path]:
+_ENTRY = re.compile(r'^\s*(alias|bind|unbind)\s+"([^"]*)"|^\s*([A-Za-z_][\w.]*)\s+"', re.IGNORECASE)
+
+
+def _entries(text: str) -> Dict[str, str]:
+    """A rendered file as ``{what: line}`` -- one entry per script, setting
+    and physical key -- in file order."""
+    out: Dict[str, str] = {}
+    for line in (text or "").splitlines():
+        if not line.strip() or line.lstrip().startswith("//"):
+            continue
+        match = _ENTRY.match(line)
+        if not match:
+            continue
+        verb, name, setting = match.group(1), match.group(2), match.group(3)
+        if verb and verb.lower() == "alias":
+            out[f"alias:{name}"] = line
+        elif verb:
+            out[f"key:{cfgscan.physical_key(name)}"] = line
+        elif setting and setting.lower() != "echo":
+            out[f"set:{setting.lower()}"] = line
+    return out
+
+
+def _baseline_file() -> Path:
+    from .paths import user_data_dir
+
+    return user_data_dir() / "apply_now_baseline.json"
+
+
+def _load_baseline(target: Path) -> Optional[Dict[str, str]]:
+    import json
+
+    try:
+        data = json.loads(_baseline_file().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    held = data.get(str(target)) if isinstance(data, dict) else None
+    return held if isinstance(held, dict) else None
+
+
+def _save_baseline(target: Path, entries: Dict[str, str]) -> None:
+    import json
+
+    path = _baseline_file()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            data = {}
+    except (OSError, ValueError):
+        data = {}
+    if data.get(str(target)) == entries:
+        return
+    data[str(target)] = entries
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=1), encoding="utf-8")
+
+
+def render_changes(full_text: str, baseline: Dict[str, str]) -> str:
+    """Only what differs from what CS2 loaded when it started.
+
+    Pressing the key sends a handful of commands instead of the whole
+    setup: hundreds of commands in one go is what a server can take for a
+    flood. Still safe to press any number of times.
+    """
+    now = _entries(full_text)
+    changed = [line for what, line in now.items() if baseline.get(what) != line]
+    gone = []
+    for what, line in baseline.items():
+        if what.startswith("key:") and what not in now:
+            match = _ENTRY.match(line)
+            if match and match.group(2) is not None:
+                gone.append(f'unbind "{match.group(2)}"')
+
+    lines = [
+        MARKER,
+        "// Applies what you changed in CS CONFIG AI since CS2 started. Press",
+        "// your apply key in game. Only the changes are in here, so the key",
+        "// sends a few commands, never your whole config.",
+        "",
+    ]
+    scripts = [l for l in changed if l.lstrip().lower().startswith("alias")]
+    keys = [l for l in changed if l.lstrip().lower().startswith(("bind", "unbind"))]
+    settings = [l for l in changed if l not in scripts and l not in keys]
+    for title, block in (("// Scripts", scripts), ("// Settings", settings),
+                         ("// Keys", gone + keys)):
+        if block:
+            lines.append(title)
+            lines += block
+            lines.append("")
+    if not (scripts or settings or keys or gone):
+        lines.append("// Nothing changed since CS2 started.")
+        lines.append("")
+    lines.append('echo "CS CONFIG AI: your latest changes are now applied"')
+    return "\n".join(lines) + "\n"
+
+
+def refresh(result: Optional[cfgscan.ScanResult],
+            running: Optional[bool] = None) -> Optional[Path]:
     """Rewrite the file from what is on disk now, if an apply key is set.
+
+    While CS2 is closed the file holds the full setup, and that setup is
+    remembered as what the next launch loads. While CS2 is running it holds
+    only the changes since then (see ``render_changes``).
 
     Without a key nothing would ever run it, so no file is left lying about.
     Writes only when the content actually changed.
@@ -209,7 +310,21 @@ def refresh(result: Optional[cfgscan.ScanResult]) -> Optional[Path]:
         previous = target.read_text(encoding="utf-8", errors="replace")
     except OSError:
         previous = ""
-    text = render(result, previous)
+    if running is None:
+        try:
+            from . import steam
+
+            running = steam.cs2_running_recent()
+        except Exception:
+            running = False
+
+    baseline = _load_baseline(target)
+    full = render(result, previous + "\n" + "\n".join((baseline or {}).values()))
+    if running and baseline is not None:
+        text = render_changes(full, baseline)
+    else:
+        text = full
+        _save_baseline(target, _entries(full))
     if text != previous:
         target.parent.mkdir(parents=True, exist_ok=True)
         cfglang.write_config_text(target, text, "utf-8")
