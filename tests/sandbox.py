@@ -50,4 +50,8 @@ def redirect_layouts(case) -> Path:
                              return_value=root / "apply_now_baseline.json")
     base.start()
     case.addCleanup(base.stop)
+    auto = mock.patch.object(applynow, "_auto_file",
+                             return_value=root / "apply_now_auto.json")
+    auto.start()
+    case.addCleanup(auto.stop)
     return root

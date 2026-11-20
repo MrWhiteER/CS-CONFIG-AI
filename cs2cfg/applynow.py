@@ -375,6 +375,81 @@ def set_key_text(result: cfgscan.ScanResult, key: str) -> Tuple[Path, str]:
     return config.path, text + block
 
 
+# Picked for the player when no apply key is set yet: F12 first, then the
+# next F key down that nothing else uses.
+AUTO_KEYS = ("scancode69", "scancode68", "scancode67", "scancode66",
+             "scancode65", "scancode64", "scancode63", "scancode62")
+
+
+def _auto_file() -> Path:
+    from .paths import user_data_dir
+
+    return user_data_dir() / "apply_now_auto.json"
+
+
+def _auto_done(target: Path) -> bool:
+    import json
+
+    try:
+        done = json.loads(_auto_file().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    return isinstance(done, list) and str(target) in done
+
+
+def _mark_auto_done(target: Path) -> None:
+    import json
+
+    path = _auto_file()
+    try:
+        done = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(done, list):
+            done = []
+    except (OSError, ValueError):
+        done = []
+    if str(target) not in done:
+        done.append(str(target))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(done, indent=1), encoding="utf-8")
+
+
+def auto_key(result: cfgscan.ScanResult) -> Optional[str]:
+    """The key to set up for a player who has no apply key yet, or None.
+
+    A key that already runs something is skipped, except an old "reload my
+    whole config" key (one that runs the autoexec): the apply key does the
+    same job without re-sending the whole config.
+    """
+    for key in AUTO_KEYS:
+        taken = key_taken(result, key)
+        if taken is None or "autoexec" in str(taken.get("runs", "")).lower():
+            return key
+    return None
+
+
+def ensure_auto_key(result: Optional[cfgscan.ScanResult]) -> Optional[Tuple[Path, str, str]]:
+    """Every player gets an apply key without having to pick one.
+
+    Done once per collection: a player who later removes or changes the key
+    is not overruled. Returns ``(autoexec path, new text, key)`` to write, or
+    None when nothing should change.
+    """
+    if result is None or not result.entry_points or current_key(result) is not None:
+        return None
+    target = path_for(result)
+    if _auto_done(target):
+        return None
+    key = auto_key(result)
+    _mark_auto_done(target)
+    if key is None:
+        return None
+    try:
+        path, text = set_key_text(result, key)
+    except ValueError:
+        return None
+    return path, text, key
+
+
 def status(result: Optional[cfgscan.ScanResult]) -> Dict[str, object]:
     from . import keys
 

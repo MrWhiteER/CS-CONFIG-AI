@@ -222,3 +222,37 @@ class TestOnlyChangesWhileRunning(ApplyNowCase):
         # and the next running session compares against the new setup
         applynow.refresh(self.state.cfg_scan, running=True)
         self.assertEqual(len(self.commands()), 1)
+
+
+class TestAutomaticKey(ApplyNowCase):
+    """Every player gets an apply key without picking one (Edy, Nov 20)."""
+
+    def test_f12_is_set_up_when_free(self):
+        self.assertEqual(webui._apply_now_auto(self.state), "scancode69")
+        self.assertIn('bind "scancode69" "exec cs2cfg_apply_now"',
+                      self.autoexec.read_text(encoding="utf-8"))
+        self.assertEqual(applynow.current_key(self.state.cfg_scan), "scancode69")
+
+    def test_a_taken_f12_is_left_alone(self):
+        binds = self.cfg_root / "mrwhiteer/mainsettings/key_binds.vcfg"
+        binds.write_text(binds.read_text(encoding="utf-8") + 'bind "scancode69" "+jump"\n',
+                         encoding="utf-8")
+        self.state.cfg_scan = cfgscan.scan(self.collection, cfg_root=self.cfg_root)
+        self.assertEqual(webui._apply_now_auto(self.state), "scancode68")
+
+    def test_an_old_reload_key_is_replaced(self):
+        binds = self.cfg_root / "mrwhiteer/mainsettings/key_binds.vcfg"
+        binds.write_text(binds.read_text(encoding="utf-8") + 'bind "scancode69" "!autoexec"\n',
+                         encoding="utf-8")
+        self.state.cfg_scan = cfgscan.scan(self.collection, cfg_root=self.cfg_root)
+        self.assertEqual(webui._apply_now_auto(self.state), "scancode69")
+
+    def test_only_once_so_the_players_choice_stands(self):
+        webui._apply_now_auto(self.state)
+        self.autoexec.write_text(FILES["mrwhiteer/autoexec.vcfg"], encoding="utf-8")
+        self.state.cfg_scan = cfgscan.scan(self.collection, cfg_root=self.cfg_root)
+        self.assertIsNone(webui._apply_now_auto(self.state))
+
+    def test_an_existing_key_is_kept(self):
+        self.set_key("F8")
+        self.assertIsNone(webui._apply_now_auto(self.state))

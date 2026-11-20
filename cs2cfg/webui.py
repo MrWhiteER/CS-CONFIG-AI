@@ -5533,9 +5533,31 @@ def _refresh_apply_now(state: State) -> None:
     except Exception:
         pass
     try:
+        _apply_now_auto(state)
+    except Exception:
+        pass
+    try:
         applynow.refresh(_rescan(state))
     except Exception:
         pass
+
+
+def _apply_now_auto(state: State) -> Optional[str]:
+    """Set up the apply key for a player who has none: F12, or the next free
+    F key. Once per collection, so a player's own later choice stands."""
+    from . import applynow, cfgscan
+
+    result = _rescan(state)
+    planned = applynow.ensure_auto_key(result)
+    if planned is None:
+        return None
+    path, text, key = planned
+    session = backup.BackupSession(note="apply-changes key, set up automatically")
+    session.add(path)
+    cfglang.write_config_text(path, text, "utf-8")
+    backup.prune()
+    state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+    return key
 
 
 def _apply_now_follow_game(state: State, running: bool) -> None:
@@ -5571,6 +5593,7 @@ _CONFIG_WRITERS = {
     _cfg_layouts_delete, _cfg_layouts_remove, _cfg_layouts_import,
     _cfg_layouts_sync_pull, _cfg_starter, _cfg_convert, _cfg_polish_apply,
     _cfg_rename_apply, _goxlr_bind, _profile_use, _scriptgen_save,
+    _configs_prepare, _firstrun_finish,
 }
 
 
