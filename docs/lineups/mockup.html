@@ -1,0 +1,85 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+*{box-sizing:border-box;margin:0}body{width:1600px;height:900px;font-family:"Segoe UI",system-ui,sans-serif;color:#ece8f7;
+background:radial-gradient(ellipse at 60% 40%,#6b5a43 0%,#3d3428 45%,#1d1914 100%);position:relative;overflow:hidden}
+.game{position:absolute;inset:0;background:repeating-linear-gradient(90deg,rgba(0,0,0,.05) 0 80px,transparent 80px 160px)}
+.tag{position:absolute;left:24px;bottom:18px;font-size:13px;color:rgba(255,255,255,.55)}
+.hudtime{position:absolute;top:14px;left:620px;background:rgba(0,0,0,.55);padding:6px 18px;border-radius:6px;font-weight:700;font-size:20px}
+.hudtime small{display:block;font-size:11px;font-weight:600;color:#f0c75e;text-align:center;letter-spacing:.08em}
+.panel{position:absolute;background:rgba(13,8,22,.78);backdrop-filter:blur(20px);border-radius:14px;border-top:1px solid rgba(255,255,255,.18);box-shadow:0 20px 50px rgba(0,0,0,.5)}
+.card{left:24px;top:24px;width:430px;padding:16px}
+h2{font-size:15px;font-weight:650;display:flex;align-items:center;gap:8px}
+.pill{font-size:11px;padding:3px 8px;border-radius:99px;background:rgba(240,199,94,.18);color:#f0c75e;font-weight:600}
+.pill.t{background:rgba(232,160,64,.2);color:#f2b25c}
+.sub{font-size:12px;color:rgba(236,232,247,.62);margin:4px 0 12px}
+.map{position:relative;width:100%;height:260px;border-radius:10px;background:#1b1626;overflow:hidden}
+.map svg{position:absolute;inset:0}
+.cap{position:absolute;right:8px;bottom:6px;font-size:10px;color:rgba(236,232,247,.4)}
+.list{margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.it{display:flex;gap:8px;align-items:center;font-size:13px;padding:7px 9px;border-radius:8px;background:rgba(255,255,255,.05)}
+.it.on{background:rgba(155,120,255,.25);outline:1px solid rgba(175,145,255,.6)}
+.n{width:20px;height:20px;border-radius:50%;background:#cfd3dc;color:#111;font-size:11px;font-weight:700;display:grid;place-items:center;flex:none}
+.foot{margin-top:10px;font-size:11px;color:rgba(236,232,247,.5);display:flex;justify-content:space-between}
+.big{right:24px;top:24px;width:760px;padding:18px;display:grid;grid-template-columns:330px 1fr;gap:16px;height:610px}
+.search{grid-column:1/3;display:flex;gap:10px;align-items:center}
+.box{flex:1;background:rgba(255,255,255,.08);border-radius:10px;padding:10px 14px;font-size:14px}
+.box b{color:#fff;font-weight:500}.box span{color:rgba(236,232,247,.45)}
+.chips{display:flex;gap:6px}.chip{font-size:12px;padding:6px 10px;border-radius:99px;background:rgba(255,255,255,.07)}
+.chip.on{background:rgba(155,120,255,.3)}
+.res{display:flex;flex-direction:column;gap:6px;overflow:hidden}
+.r{padding:9px 11px;border-radius:9px;background:rgba(255,255,255,.05);font-size:13px}
+.r.on{background:rgba(155,120,255,.25);outline:1px solid rgba(175,145,255,.6)}
+.r small{display:block;font-size:11px;color:rgba(236,232,247,.55);margin-top:2px}
+.ic{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
+.det .map{height:250px}
+.steps{margin-top:12px;display:grid;gap:8px}
+.st{display:flex;gap:10px;font-size:13px;align-items:flex-start}
+.st .n{background:#9b78ff;color:#fff}
+.shot{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.ph{height:92px;border-radius:8px;background:linear-gradient(135deg,#4a3f33,#2a241d);position:relative;font-size:10px;color:rgba(255,255,255,.55);padding:6px}
+.ph:after{content:"";position:absolute;left:50%;top:55%;width:10px;height:10px;margin:-5px;border:2px solid #fff;border-radius:50%}
+.lbl{position:absolute;font-size:12px;font-weight:700;color:#fff;background:#9b78ff;padding:4px 10px;border-radius:6px}
+</style></head><body><div class="game"></div>
+<div class="hudtime">0:14<small>BUY TIME</small></div>
+<div class="tag">Mockup, not final design. Background stands in for the game. Map drawing is a placeholder: the real one comes from the player's own CS2 files.</div>
+
+<div class="panel card">
+ <h2>Smokes for this round <span class="pill t">Mirage · T side</span></h2>
+ <div class="sub">Shows during buy time, folds away when the round starts. Pin to keep it.</div>
+ <div class="map"><svg viewBox="0 0 400 260">
+  <g fill="#2b2440" stroke="#3e3558"><rect x="20" y="20" width="120" height="90" rx="6"/><rect x="250" y="20" width="130" height="80" rx="6"/><rect x="160" y="60" width="70" height="150" rx="6"/><rect x="20" y="150" width="120" height="90" rx="6"/><rect x="260" y="150" width="120" height="90" rx="6"/></g>
+  <text x="80" y="70" fill="#6d628c" font-size="13" text-anchor="middle">B site</text><text x="315" y="64" fill="#6d628c" font-size="13" text-anchor="middle">A site</text><text x="195" y="140" fill="#6d628c" font-size="12" text-anchor="middle">Mid</text><text x="320" y="200" fill="#6d628c" font-size="12" text-anchor="middle">T spawn</text>
+  <g stroke="rgba(255,255,255,.45)" stroke-dasharray="4 4" stroke-width="1.5" fill="none"><path d="M330 190 Q300 120 270 60"/><path d="M320 205 Q260 150 235 45"/><path d="M300 215 Q220 190 195 95"/><path d="M290 225 Q180 230 110 115"/></g>
+  <g fill="rgba(220,224,232,.85)"><circle cx="270" cy="60" r="13"/><circle cx="235" cy="45" r="13"/><circle cx="195" cy="95" r="13"/><circle cx="110" cy="115" r="13"/></g>
+  <circle cx="270" cy="60" r="17" fill="none" stroke="#b49bff" stroke-width="2.5"/>
+  <g font-size="11" font-weight="700" text-anchor="middle" fill="#111"><text x="270" y="64">1</text><text x="235" y="49">2</text><text x="195" y="99">3</text><text x="110" y="119">4</text></g>
+ </svg><div class="cap">Map picture from your CS2 files</div></div>
+ <div class="list"><div class="it on"><span class="n">1</span>CT spawn</div><div class="it"><span class="n">2</span>Jungle</div><div class="it"><span class="n">3</span>Window</div><div class="it"><span class="n">4</span>Market window</div></div>
+ <div class="foot"><span>More lineups: Ctrl+Alt+P, then search</span><span>📌 Pin</span></div>
+</div>
+
+<div class="panel big">
+ <div class="search"><div class="box"><b>b site molly</b><span>  ·  search any lineup</span></div><div class="chips"><span class="chip">Smoke</span><span class="chip on">Fire</span><span class="chip">Flash</span><span class="chip">Grenade</span><span class="chip on">T side</span></div></div>
+ <div class="res">
+  <div class="r on"><span class="ic" style="background:#ff7a3d"></span>B site default corner<small>Fire · from Apartments · jump throw</small></div>
+  <div class="r"><span class="ic" style="background:#ff7a3d"></span>Bench<small>Fire · from Apartments · left click</small></div>
+  <div class="r"><span class="ic" style="background:#ff7a3d"></span>Van<small>Fire · from Apartments door · run throw</small></div>
+  <div class="r"><span class="ic" style="background:#ff7a3d"></span>Short (B side of Mid)<small>Fire · from Window room · left click</small></div>
+  <div class="r"><span class="ic" style="background:#ff7a3d"></span>Kitchen<small>Fire · from Apartments · jump throw</small></div>
+  <div style="font-size:11px;color:rgba(236,232,247,.45);margin-top:4px">Map: Mirage (you are on it) ▾ · change to practise another map</div>
+ </div>
+ <div class="det">
+  <div class="map"><svg viewBox="0 0 400 250"><g fill="#2b2440" stroke="#3e3558"><rect x="20" y="20" width="170" height="130" rx="6"/><rect x="230" y="40" width="150" height="70" rx="6"/></g>
+   <text x="105" y="90" fill="#6d628c" font-size="13" text-anchor="middle">B site</text><text x="305" y="80" fill="#6d628c" font-size="12" text-anchor="middle">Apartments</text>
+   <circle cx="330" cy="95" r="7" fill="#fff"/><path d="M330 95 Q220 20 90 60" stroke="#ff7a3d" stroke-width="2" stroke-dasharray="5 4" fill="none"/>
+   <circle cx="90" cy="60" r="18" fill="rgba(255,122,61,.35)" stroke="#ff7a3d" stroke-width="2"/></svg><div class="cap">Map picture from your CS2 files</div></div>
+  <div class="steps">
+   <div class="st"><span class="n">1</span>Stand in the corner of Apartments, against the left wall.</div>
+   <div class="st"><span class="n">2</span>Aim at the top of the chimney, as in the right picture.</div>
+   <div class="st"><span class="n">3</span>Jump and throw (left click).</div>
+  </div>
+  <div class="shot"><div class="ph">Where to stand</div><div class="ph">Where to aim</div></div>
+ </div>
+</div>
+<div class="lbl" style="left:24px;top:600px">1 · Round start: smokes only</div>
+<div class="lbl" style="right:24px;top:648px">2 · Open overlay: search any nade</div>
+</body></html>
