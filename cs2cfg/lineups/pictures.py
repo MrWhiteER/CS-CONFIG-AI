@@ -7,12 +7,13 @@ import base64
 import hashlib
 import html
 import json
+import math
 from pathlib import Path
 from . import validate
 from .radar import png
 
 UNAVAILABLE = ('Lineup pictures are not available in this build. '
-               'The app cannot safely move the practice camera and confirm each shot yet. '
+               'The app cannot confirm the practice player position and aim from game state yet. '
                'Use the radar and written steps for now.')
 
 
@@ -38,6 +39,82 @@ def practice_cfg(row):
             'mp_warmup_pausetimer 1\n'
             f"setpos {stand['x']} {stand['y']} {stand['z']}\n"
             f"setang {aim['pitch']} {aim['yaw']} 0\n")
+
+
+def pose_matches(document, row, state):
+    """Trial readiness check on a full, authenticated GSI snapshot.
+
+    This does NOT establish offline provenance. Do not use it to authorize
+    game control. A map/warmup event without position cannot authorize a shot.
+    The production parser intentionally remains unchanged while this trial is
+    disconnected. GSI positions are documented for observers, not a playing
+    practice client; silently treating absent values as zero would hide that.
+    """
+    try:
+        if (state['provider']['appid'] != 730
+                or state['provider']['steamid'] != state['player']['steamid']
+                or not state['provider']['steamid']
+                or state['map']['name'] != 'de_' + document['map']
+                or state['map']['phase'] != 'warmup'
+                or state['player']['activity'] != 'playing'
+                or state['player']['state']['health'] <= 0):
+            return False
+        def vector(value):
+            # GSI supplies comma-separated strings, not pixel coordinates.
+            parts = tuple(float(v.strip()) for v in value.split(','))
+            if len(parts) != 3 or not all(math.isfinite(v) for v in parts):
+                raise ValueError('Missing practice position')
+            return parts
+        position = vector(state['player']['position'])
+        forward = vector(state['player']['forward'])
+        pitch, yaw = (math.radians(row['aim'][k]) for k in ('pitch', 'yaw'))
+        expected = (math.cos(pitch)*math.cos(yaw), math.cos(pitch)*math.sin(yaw), -math.sin(pitch))
+        return (math.dist(position, tuple(row['stand'][k] for k in ('x','y','z'))) <= 2
+                and math.dist(forward, expected) <= 0.01)
+    except (KeyError, TypeError, ValueError, AttributeError, OverflowError):
+        return False
+
+
+class CaptureTrial:
+    """Disconnected single-shot-per-launch experiment, with fakeable frames.
+
+    Caller must already own a verified offline launch. This class cannot
+    establish that provenance, launch CS2, or close it. No production code
+    instantiates it. New launches must have monotonically increasing IDs;
+    snapshots from a previous launch cannot advance the next shot. There are
+    no sleeps, inferred camera coordinates, or acceptance of map-only events.
+    """
+    def __init__(self, document, capture):
+        self.document = validate(document)
+        self.capture = capture
+        self.index = 0
+        self.launch_id = 0
+        self.waiting = False
+        self.frames = []
+
+    def begin_launch(self, launch_id):
+        if (self.waiting or self.index == len(self.document['lineups'])
+                or not isinstance(launch_id, int) or isinstance(launch_id, bool)
+                or launch_id <= self.launch_id):
+            raise ValueError('A new practice launch is required')
+        self.launch_id = launch_id
+        self.waiting = True
+        return practice_cfg(self.document['lineups'][self.index])
+
+    def feed(self, launch_id, state):
+        if not self.waiting or launch_id != self.launch_id:
+            return False
+        row = self.document['lineups'][self.index]
+        if not pose_matches(self.document, row, state):
+            return False
+        frame = self.capture()
+        # Validate before advancing; a failed/blank backend must be retryable.
+        marked = annotate(frame, kind='aim', label=row['steps'][1],
+                          point=(frame[0]//2, frame[1]//2))
+        self.frames.append(marked)
+        self.waiting = False
+        self.index += 1
+        return True
 
 
 def annotate(frame, *, kind, label, point):
