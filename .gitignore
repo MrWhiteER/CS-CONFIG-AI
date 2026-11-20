@@ -51,3 +51,6 @@ tools/matchfound_probe.log
 
 # Official PresentMon console binary is supplied locally, never committed.
 /tools/presentmon/
+
+# Real CS2 radar previews contain Valve art: local only, never committed.
+/docs/lineups/preview/*real*
