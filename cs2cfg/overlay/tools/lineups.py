@@ -1,4 +1,4 @@
-"""Read-only, lazy Lineups adapter; dispatch gates it before any IO."""
+"""Lazy Lineups browser and picture stop action; dispatch gates all IO."""
 from .base import Tool
 
 
@@ -24,8 +24,16 @@ def data(state, args=None):
     return {'maps': [{'id': k, 'name': v} for k,v in MAPS.items()],
             'document': document, 'art': art, 'round': round_state,
             'map_request': 'map' in args, 'pictures': images,
-            'picture_status': session.text if session else ''}
+            'picture_status': session.text if session else '',
+            'picture_active': bool(session and session.active)}
+
+
+def stop_pictures(state, args=None):
+    from ...webui import _lineups_pictures
+    _lineups_pictures(state, {'action': 'stop'})
+    return data(state)
 
 
 TOOL = Tool('lineups', 'Lineups', 'globe', data, refresh_hz=1,
+            actions={'stop_pictures': stop_pictures},
             default_size=(1000, 620), pinnable=True)

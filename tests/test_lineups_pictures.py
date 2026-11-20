@@ -175,23 +175,27 @@ class Pictures(unittest.TestCase):
 class PictureWiring(unittest.TestCase):
     def state(self, row, kind='stand'):
         state = Pictures().trial_state(row)
-        state['map']['mode'] = 'practice'
+        state['map']['mode'] = 'casual'
         state['allplayers'] = {'local': {}}
         pitch = math.radians(89 if kind == 'stand' else row['aim']['pitch'])
         yaw = math.radians(row['aim']['yaw'])
         state['player']['forward'] = ','.join(map(str, (math.cos(pitch)*math.cos(yaw), math.cos(pitch)*math.sin(yaw), -math.sin(pitch))))
         return state
 
-    def test_offline_refuses_online_unknown_other_human(self):
+    def test_local_modes_and_optional_players_accept_other_human_refused(self):
         state = self.state(load()['lineups'][0])
         self.assertTrue(pictures.offline_ready(state))
-        for mode in ('casual', 'competitive', '', None):
+        for mode in ('casual', 'competitive', 'deathmatch', 'custom', '', None):
             state['map']['mode'] = mode
-            self.assertFalse(pictures.offline_ready(state))
-        state['map']['mode'] = 'offline'
+            self.assertTrue(pictures.offline_ready(state))
+        del state['allplayers']
+        self.assertTrue(pictures.offline_ready(state))
+        state['allplayers'] = {'local': {}}
         state['allplayers']['human'] = {'name': 'Other'}
         self.assertFalse(pictures.offline_ready(state))
         state['allplayers'] = {'local': {}, 'BOT1': {}}
+        self.assertTrue(pictures.offline_ready(state))
+        state['allplayers'] = {'local': {}, '0': {}, 'bot-id': {'bot': True}}
         self.assertTrue(pictures.offline_ready(state))
         state['provider']['steamid'] = 'different'
         self.assertFalse(pictures.offline_ready(state))
@@ -243,13 +247,16 @@ class PictureWiring(unittest.TestCase):
             self.assertIn('<circle cx="50" cy="50"', (runner.root/'0/aim.svg').read_text())
 
     def test_abort_keeps_partial_pictures_and_removes_owned_cfgs(self):
-        for reason in ('online', 'left', 'closed', 'off'):
+        for reason in ('human', 'left', 'closed', 'stop'):
             with self.subTest(reason=reason), tempfile.TemporaryDirectory() as tmp:
                 runner = self.runner(tmp); runner.start(mock.Mock())
                 row = runner.document['lineups'][0]; runner.feed(self.state(row))
-                if reason in ('online', 'left'):
+                if reason in ('human', 'left'):
                     state = self.state(row)
-                    state['map']['mode' if reason == 'online' else 'name'] = 'competitive'
+                    if reason == 'human':
+                        state['allplayers']['76561198012345678'] = {'name': 'Other'}
+                    else:
+                        state['map']['name'] = 'de_inferno'
                     runner.feed(state)
                 elif reason == 'closed':
                     runner.game_running(True); runner.game_running(False)
@@ -266,8 +273,139 @@ class PictureWiring(unittest.TestCase):
             state = self.state(runner.document['lineups'][0])
             self.assertFalse(runner.feed(state)); self.assertEqual(runner.index, 0)
             del state['player']['position']
-            self.assertFalse(runner.feed(state)); self.assertFalse(runner.active)
+            self.assertFalse(runner.feed(state)); self.assertTrue(runner.active)
+            self.assertEqual(runner.text, 'The game is not reporting your position yet. Close the console and stand still.')
             self.assertEqual(capture.call_count, 1)
+
+    def test_transient_events_wait_and_keep_cfgs_before_and_after_ready(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            capture = mock.Mock()
+            runner = self.runner(tmp, capture); runner.start(mock.Mock())
+            row = runner.document['lineups'][0]
+            waiting = 'Waiting for Mirage practice. Keep the game visible.'
+            for event in ({}, {'map': {'name': 'de_inferno'}},
+                          {'provider': {'appid': 730}, 'map': {'name': 'de_mirage', 'mode': 'casual'}}):
+                self.assertFalse(runner.feed(event))
+                self.assertTrue(runner.active); self.assertFalse(runner.ready)
+                self.assertEqual(runner.text, waiting)
+            for activity in ('textinput', 'menu', 'playing'):
+                event = self.state(row, 'aim'); event['player']['activity'] = activity
+                self.assertFalse(runner.feed(event)); self.assertTrue(runner.active)
+                self.assertEqual(runner.text, 'Picture 1 of 2 - press F8')
+            event = self.state(row); del event['player']['position']
+            self.assertFalse(runner.feed(event)); self.assertTrue(runner.active)
+            self.assertIn('not reporting your position yet', runner.text)
+            for phase in ('over', 'gameover', 'intermission', 'loading', None):
+                for component in ('map', 'round'):
+                    event = self.state(row); event.setdefault(component, {})['phase'] = phase
+                    # An unreported round phase can accompany a valid warmup pose.
+                    if component == 'round' and phase in ('loading', None):
+                        event['map']['phase'] = 'loading'
+                    self.assertFalse(runner.feed(event)); self.assertTrue(runner.active)
+            self.assertFalse(runner.feed({})); self.assertTrue(runner.active)
+            for name in (pictures.SHOTS_CFG, pictures.UNDO_CFG):
+                self.assertTrue((Path(tmp)/name).exists())
+            capture.assert_not_called()
+
+    def test_provisional_setup_cannot_capture_without_our_launch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runner = self.runner(tmp); runner.active = True
+            self.assertFalse(runner.feed(self.state(runner.document['lineups'][0])))
+            runner.capture.assert_not_called()
+            self.assertFalse(runner.ready)
+
+    def test_service_receives_first_map_and_transients_without_cleanup(self):
+        import json
+        from cs2cfg.overlay.service import OverlayService
+        from cs2cfg.overlay.tools.lineups import stop_pictures
+        import types
+        with tempfile.TemporaryDirectory() as tmp:
+            service = OverlayService()
+            service._settings.update(overlay_enabled=True, overlay_tools=['lineups'])
+            service._gsi_token = 'a'*64
+            service._configure_gsi = mock.Mock()
+            service.picture_session = runner = self.runner(tmp)
+            runner.start(mock.Mock()); row = runner.document['lineups'][0]
+            def receive(event):
+                event['auth'] = {'token': 'a'*64}
+                service.receive_gsi(json.dumps(event).encode())
+            receive({'provider': {'appid': 730}, 'map': {'name': 'de_mirage', 'mode': 'casual'}})
+            for activity in ('textinput', 'menu', 'playing'):
+                event = self.state(row); event['player']['activity'] = activity
+                event['player'].pop('position')
+                receive(event)
+                self.assertTrue(runner.active); self.assertEqual(runner.index, 0)
+            service._configure_gsi.assert_not_called()
+            receive(self.state(row))
+            self.assertEqual(runner.index, 1)
+            service._configure_gsi.assert_not_called()
+            # The overlay stop action shares Settings' stop path and cleanup.
+            state = types.SimpleNamespace(overlay=service, cs2_install=None)
+            with mock.patch('cs2cfg.overlay.tools.lineups.data', return_value={}) as data:
+                stop_pictures(state)
+                data.assert_called_once_with(state)
+            self.assertFalse(runner.active)
+            service._configure_gsi.assert_called_once_with(True)
+            for name in (pictures.SHOTS_CFG, pictures.UNDO_CFG):
+                self.assertFalse((Path(tmp)/name).exists())
+
+    def test_other_human_stops_even_before_ready(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runner = self.runner(tmp); runner.start(mock.Mock())
+            state = self.state(runner.document['lineups'][0])
+            state['allplayers']['76561198012345678'] = {'name': 'Other'}
+            self.assertFalse(runner.feed(state)); self.assertFalse(runner.active)
+            self.assertFalse(runner.ready); runner.capture.assert_not_called()
+
+    def test_loading_process_check_waits_until_game_has_been_seen(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runner = self.runner(tmp); runner.start(mock.Mock())
+            runner.game_running(False)
+            self.assertTrue(runner.active)
+            runner.game_running(True)
+            runner.game_running(False)
+            self.assertFalse(runner.active)
+            for name in (pictures.SHOTS_CFG, pictures.UNDO_CFG):
+                self.assertFalse((Path(tmp)/name).exists())
+
+    def test_pose_origin_height_and_forward_tolerances(self):
+        doc = load(); row = doc['lineups'][0]
+        for dx, dy, dz, forward_delta, matches in (
+                (2, -2, -64, .015, True), (0, 0, 72, 0, True),
+                (2.1, 0, 0, 0, False), (0, -2.1, 0, 0, False),
+                (0, 0, 72.1, 0, False), (0, 0, 0, .021, False)):
+            with self.subTest(dx=dx, dy=dy, dz=dz, forward_delta=forward_delta):
+                state = self.state(row, 'aim')
+                state['player']['position'] = ', '.join(str(row['stand'][k]+offset)
+                    for k, offset in zip(('x','y','z'), (dx,dy,dz)))
+                forward = list(map(float, state['player']['forward'].split(',')))
+                forward[0] += forward_delta
+                state['player']['forward'] = ', '.join(map(str, forward))
+                self.assertEqual(pictures.pose_matches(doc, row, state), matches)
+
+    def test_full_run_with_realistic_parsed_gsi_saves_36_pictures(self):
+        import json
+        from cs2cfg.overlay.gsi import parse_payload
+        with tempfile.TemporaryDirectory() as tmp:
+            doc = load()
+            capture = mock.Mock(return_value=(100,100,bytes([10,20,30,255])*10000))
+            runner = pictures.PictureSession(doc, 'test-build', tmp, tmp, capture)
+            runner.start(mock.Mock())
+            for index, (row, kind) in enumerate(pictures.shot_plan(doc)):
+                event = self.state(row, kind)
+                event['map']['mode'] = 'competitive' if index % 2 else 'casual'
+                event['provider']['steamid'] = event['player']['steamid'] = '76561198000000001'
+                event.pop('allplayers')
+                event['player']['position'] = ', '.join(str(row['stand'][k] - (64 if k == 'z' else 0))
+                                                       for k in ('x','y','z'))
+                event['auth'] = {'token': 'a'*64}
+                parsed = parse_payload(json.dumps(event).encode(), 'a'*64, pictures=True)
+                self.assertTrue(runner.feed(parsed))
+            self.assertEqual(capture.call_count, 36)
+            self.assertEqual(runner.text, 'Done - 36 pictures saved')
+            self.assertFalse(runner.active)
+            for name in (pictures.SHOTS_CFG, pictures.UNDO_CFG):
+                self.assertFalse((Path(tmp)/name).exists())
 
     def test_launch_failure_cleans_up_and_reads_binding_without_writing(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -347,7 +485,13 @@ class PictureButton(unittest.TestCase):
                 self.assertEqual(set(p.name for p in cfg.iterdir()), {pictures.SHOTS_CFG, pictures.UNDO_CFG})
                 session = overlay.picture_session
                 session.feed({'provider': {'appid': 730}, 'map': {'name': 'de_mirage', 'mode': 'casual'}})
-                self.assertFalse(session.active); self.assertEqual(list(cfg.iterdir()), [])
+                self.assertTrue(session.active)
+                self.assertEqual(session.text, 'Waiting for Mirage practice. Keep the game visible.')
+                # The same action used by the Settings stop button removes both cfgs.
+                stopped = webui._lineups_pictures(state, {'action': 'stop'})
+                self.assertFalse(stopped['active']); self.assertFalse(session.active)
+                self.assertEqual(list(cfg.iterdir()), [])
+                self.assertIn('Pictures stopped', stopped['text'])
             overlay._settings['overlay_enabled'] = False
             with mock.patch('cs2cfg.steam.cs2_running') as running:
                 self.assertFalse(webui._lineups_pictures(state, {})['available'])

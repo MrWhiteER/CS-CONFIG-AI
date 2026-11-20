@@ -35,6 +35,14 @@ const checks=`(async()=>{try{
  if(body.querySelector('.lineup-picture-status').textContent!=='Picture 3 of 36 - press F8')throw Error('Picture status missing');assertFits();
  window.overlayRenderers.lineups(body,{...fixture.data.lineups,picture_status:'Done - 36 pictures saved'},()=>{});
  if(!body.querySelector('.lineup-picture-status').textContent.includes('Done - 36'))throw Error('Completion status missing');assertFits();
+ let stopped=false;
+ window.overlayRenderers.lineups(body,{...fixture.data.lineups,map_request:true,picture_active:true,picture_status:'Picture 3 of 36 - press F8'},async(action)=>{
+  if(action!=='stop_pictures')throw Error('Wrong stop action');stopped=true;
+  return {...fixture.data.lineups,picture_active:false,picture_status:'Pictures stopped.'};
+ });
+ const stop=body.querySelector('[data-stop-pictures]');if(stop.hidden||stop.textContent!=='Stop pictures')throw Error('Stop pictures missing');assertFits();
+ stop.disabled=false;await stop.onclick({target:stop});
+ if(!stopped||!stop.hidden||body.querySelector('.lineup-picture-status').textContent!=='Pictures stopped.')throw Error('Stop pictures failed');assertFits();
  const query=body.querySelector('[data-query]');query.disabled=false;query.value='window';query.dispatchEvent(new Event('input'));
  if(body.querySelectorAll('[data-lineup]').length!==3)throw Error('Type ahead failed');
  query.value='';query.dispatchEvent(new Event('input'));

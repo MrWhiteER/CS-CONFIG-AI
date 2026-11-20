@@ -14,26 +14,37 @@ UNDO_CFG = 'cs2cfg_lineup_shots_undo.cfg'
 KEYS = tuple('F' + str(n) for n in range(6, 12))
 
 
+def other_human_present(state):
+    """Only a reported nonlocal human is a reason to stop."""
+    local = state.get('provider', {}).get('steamid')
+    players = state.get('allplayers')
+    if not local or not isinstance(players, dict):
+        return False
+    return any(identity != local and isinstance(player, dict)
+               and player.get('bot') is not True
+               and not str(identity).upper().startswith('BOT')
+               and str(identity) != '0' and str(player.get('steamid')) != '0'
+               for identity, player in players.items())
+
+
 def offline_ready(state):
-    """An ambiguous mode is never evidence of an offline game."""
+    """Fresh local Mirage evidence; the caller must own this game's launch."""
     try:
         local = state['provider']['steamid']
         player = state.get('player_id', state.get('player', {}))
         game = state['map']
         if (state['provider']['appid'] != 730 or not local
-                or player.get('steamid') != local or player.get('activity') != 'playing'
-                or game.get('name') != 'de_mirage'
-                or game.get('mode') not in ('practice', 'offline')
-                or state.get('round', {}).get('phase', game.get('phase'))
-                not in ('warmup', 'freezetime', 'live')):
+                or player.get('steamid') != local
+                or game.get('name') != 'de_mirage'):
             return False
-        players = state.get('allplayers', {})
-        if not isinstance(players, dict):
-            return False
-        return all(identity == local or
-                   (isinstance(p, dict) and p.get('bot') is True)
-                   or (identity.upper().startswith('BOT') and isinstance(p, dict))
-                   for identity, p in players.items())
+        if 'allplayers' in state and not isinstance(state['allplayers'], dict):
+            return False  # Incomplete evidence waits; it does not end a session.
+        # CS2 reports a game mode (casual, competitive, etc.), never "offline".
+        # This is safe only for our own launch: setpos/setang require sv_cheats,
+        # which only a local server allows. Capture also requires GSI to report
+        # the target position and angle, which cannot happen on an online server.
+        # allplayers is optional in local GSI; absence is not contrary evidence.
+        return not other_human_present(state)
     except (KeyError, TypeError, AttributeError):
         return False
 
@@ -93,7 +104,7 @@ class PictureSession:
     """Event-driven external capture. All paths/backends are supplied by caller.
 
     No sleeps, launch deadlines, keyboard simulation or console execution.
-    Startup cfg is provisional until fresh GSI proves the allowed practice mode.
+    Startup cfg is provisional until fresh GSI confirms our local Mirage player.
     """
     def __init__(self, document, build, cache, cfg, capture, key='F8'):
         self.document = validate(document)
@@ -105,6 +116,7 @@ class PictureSession:
         self.active = False
         self.ready = False
         self.seen_game = False
+        self.launched = False
         self.text = ''
 
     def start(self, launch, *, running=False, previous=None):
@@ -119,6 +131,7 @@ class PictureSession:
             (self.cfg/UNDO_CFG).write_text(undo, encoding='utf-8')
             (self.cfg/SHOTS_CFG).write_text(shots, encoding='utf-8')
             launch('+map de_mirage +exec cs2cfg_lineup_shots')
+            self.launched = True
         except Exception:
             self.abort('The practice game could not start. Close CS2 and try again.')
             raise
@@ -143,26 +156,39 @@ class PictureSession:
             self.abort()
 
     def feed(self, state):
-        if not self.active:
+        if not self.active or not self.launched:
             return False
-        if not self.ready and not state.get("map", {}).get("name"):
-            return False  # Startup/menu events cannot advance a picture.
+        if other_human_present(state):
+            self.abort('Pictures stopped: another player joined. Saved pictures were kept. '
+                       'Close CS2 before playing online.')
+            return False
+        map_name = state.get('map', {}).get('name')
+        if self.ready and map_name and map_name != 'de_mirage':
+            self.abort('Pictures stopped: you left Mirage. Saved pictures were kept. '
+                       'Close CS2 before playing online.')
+            return False
         if not offline_ready(state):
-            self.abort('Pictures stopped: offline Mirage practice could not be confirmed. '
-                       'Saved pictures were kept. Close CS2 before playing online.')
+            self.text = (f'Picture {self.index+1} of {len(shot_plan(self.document))} - press {self.key}'
+                         if self.ready else 'Waiting for Mirage practice. Keep the game visible.')
             return False
         self.ready = True
+        self.seen_game = True
         self.text = f'Picture {self.index+1} of {len(shot_plan(self.document))} - press {self.key}'
         row, kind = shot_plan(self.document)[self.index]
         expected = {**row, 'aim': {**row['aim'], 'pitch': 89 if kind == 'stand' else row['aim']['pitch']}}
-        # Reuse strict pose comparison, accepting the owner's allowed phases.
+        # Menus, loading and round transitions wait; they never end the session.
         pose = {**state, 'map': {**state['map'], 'phase': 'warmup'},
                 'player': {**state.get('player_id', state.get('player', {})),
                            **state.get('player', {}), 'state': state.get('player_state', state.get('player', {}).get('state', {}))}}
+        if pose['player'].get('activity') == 'playing' and not pose['player'].get('position'):
+            self.text = ('The game is not reporting your position yet. '
+                         'Close the console and stand still.')
+            return False
+        if (pose['player'].get('activity') != 'playing'
+                or state['map'].get('phase') not in ('warmup', 'live', 'freezetime')
+                or state.get('round', {}).get('phase') not in (None, 'warmup', 'freezetime', 'live')):
+            return False
         if not pose_matches(self.document, expected, pose):
-            if not pose['player'].get('position') or not pose['player'].get('forward'):
-                self.abort('Pictures stopped: this game does not report the practice camera. '
-                           'Use the radar and steps. Close CS2 before playing online.')
             return False
         try:
             frame = self.capture()
@@ -245,8 +271,10 @@ def pose_matches(document, row, state):
         forward = vector(state['player']['forward'])
         pitch, yaw = (math.radians(row['aim'][k]) for k in ('pitch', 'yaw'))
         expected = (math.cos(pitch)*math.cos(yaw), math.cos(pitch)*math.sin(yaw), -math.sin(pitch))
-        return (math.dist(position, tuple(row['stand'][k] for k in ('x','y','z'))) <= 2
-                and math.dist(forward, expected) <= 0.01)
+        return (abs(position[0] - row['stand']['x']) <= 2
+                and abs(position[1] - row['stand']['y']) <= 2
+                and abs(position[2] - row['stand']['z']) <= 72
+                and math.dist(forward, expected) <= 0.02)
     except (KeyError, TypeError, ValueError, AttributeError, OverflowError):
         return False
 

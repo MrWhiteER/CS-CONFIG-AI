@@ -5128,13 +5128,22 @@ def _lineups_pictures(state, body):
     from .lineups.window_capture import capture_cs2
     from .paths import user_data_dir
     from .launcher import launch_via_steam, LaunchError
-    settings = state.overlay._settings
-    if not settings['overlay_enabled'] or 'lineups' not in settings['overlay_tools']:
-        return {'available': False, 'text': 'Turn on the overlay and Lineups first.'}
     with state.overlay._lock:
         current = state.overlay.picture_session
+        if body.get('action') == 'stop':
+            if current and current.active:
+                current.abort()
+                state.overlay._configure_gsi(state.overlay._settings['overlay_enabled'])
+            return {'available': True, 'active': False,
+                    'text': current.text if current else 'Pictures stopped.'}
+        if body.get('action') == 'status':
+            return {'available': True, 'active': bool(current and current.active),
+                    'text': current.text if current else ''}
+        settings = state.overlay._settings
+        if not settings['overlay_enabled'] or 'lineups' not in settings['overlay_tools']:
+            return {'available': False, 'text': 'Turn on the overlay and Lineups first.'}
         if current and current.active:
-            return {'available': True, 'text': current.text}
+            return {'available': True, 'active': True, 'text': current.text}
         if steam.cs2_running():
             return {'available': False, 'text': 'Close CS2, then press Make lineup pictures again.'}
         try:
@@ -5160,8 +5169,7 @@ def _lineups_pictures(state, body):
                 return {'available': False, 'text': 'Game state setup is unavailable. Close CS2 and try again.'}
             session.start(lambda args: launch_via_steam(args, require_args=True),
                           previous=read_binding(paths, key))
-            return {'available': True, 'text': session.text + ' Open Lineups in the overlay to follow progress. '
-                    'Press the picture key once, then wait for the next picture number.'}
+            return {'available': True, 'active': session.active, 'text': session.text}
         except (OSError, ValueError, KeyError, steam.SteamError, LaunchError):
             if state.overlay.picture_session:
                 if state.overlay.picture_session.active:

@@ -229,6 +229,8 @@ class OverlayService:
                 "notice": self._notice, "error": self._error,
                 "gsi_notice": self._gsi_notice,
                 "gsi_ready": self._game_state.received is not None,
+                "picture_status": self.picture_session.text if self.picture_session else '',
+                "picture_active": bool(self.picture_session and self.picture_session.active),
                 "frame_capture_ready": ready, "frame_capture_hint": hint,
                 "frame_capture_hint_dismissible": hint == permissions.SIGN_OUT_HINT,
                 "display": display_values({**(current or {}), "frame_capture_ready": ready}),
@@ -550,9 +552,12 @@ class OverlayService:
             while not self._stop.is_set():
                 found = window.find_game_window("cs2.exe")
                 if self.picture_session and self.picture_session.active:
-                    self.picture_session.game_running(found is not None)
-                    if not self.picture_session.active:
-                        self._configure_gsi(True)
+                    # A missing window during loading is not a closed game.
+                    from ..steam import cs2_running
+                    with self._lock:
+                        self.picture_session.game_running(found is not None or cs2_running())
+                        if not self.picture_session.active:
+                            self._configure_gsi(True)
                 if self._hwnd and (found is None or found.hwnd != self._hwnd):
                     self._end_game()
                 if found is None:

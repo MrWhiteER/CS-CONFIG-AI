@@ -9501,7 +9501,8 @@ function renderOverlay(d) {
       toggle('overlay_always_visible', 'Always visible', 'Override Auto hide while CS2 is focused.') +
       '<p class="sub2">Auto hide waits for game state if it is missing or out of date. Always visible still requires Fullscreen Windowed.</p>') +
     card('Lineups', '<p class="sub2">Make pictures in offline Mirage practice. Close CS2 first. Keep the game visible and press the chosen key once for each picture.</p>' +
-      '<label>Picture key <select id="lineups-picture-key">' + ['F6','F7','F8','F9','F10','F11'].map(k => '<option' + (k === 'F8' ? ' selected' : '') + '>' + k + '</option>').join('') + '</select></label><button class="btn" id="lineups-pictures">Make lineup pictures</button>') +
+      '<label>Picture key <select id="lineups-picture-key">' + ['F6','F7','F8','F9','F10','F11'].map(k => '<option' + (k === 'F8' ? ' selected' : '') + '>' + k + '</option>').join('') + '</select></label><button class="btn" id="lineups-pictures">Make lineup pictures</button>' +
+      '<div class="actions"><span id="lineups-picture-status" role="status">' + esc(d.picture_status || '') + '</span><button class="btn" id="lineups-pictures-stop"' + (d.picture_active ? '' : ' hidden') + '>Stop pictures</button></div>') +
     card('Frame stats',
       '<p class="sub2">' + (live ? (d.frame_capture_ready ? 'Frame capture ready.' : 'Resource stats available; frame capture needs setup.') :
         (s.overlay_enabled ? 'Start CS2, then refresh to see live values.' : 'Enable the overlay and start CS2 to see live values.')) + '</p>' +
@@ -9518,13 +9519,14 @@ function renderOverlay(d) {
 }
 
 document.addEventListener("click", async e => {
-  const button = e.target.closest("#overlay-save, #overlay-refresh, #overlay-dismiss-sign-out, #overlay-borderless, #lineups-pictures");
+  const button = e.target.closest("#overlay-save, #overlay-refresh, #overlay-dismiss-sign-out, #overlay-borderless, #lineups-pictures, #lineups-pictures-stop");
   if (!button || new URLSearchParams(location.search).has("overlayPreview")) return;
   button.disabled = true;
   try {
-    if (button.id === "lineups-pictures") {
-      const answer = await api("/api/lineups/pictures", {key: $("lineups-picture-key").value});
-      $("overlay-said").textContent = answer.text;
+    if (button.id === "lineups-pictures" || button.id === "lineups-pictures-stop") {
+      const answer = await api("/api/lineups/pictures", button.id === "lineups-pictures-stop" ? {action: 'stop'} : {key: $("lineups-picture-key").value});
+      $("lineups-picture-status").textContent = answer.text;
+      $("lineups-pictures-stop").hidden = !answer.active;
     } else if (button.id === "overlay-refresh") await loadOverlay();
     else if (button.id === "overlay-save") {
       const answer = await api("/api/overlay/settings", {
