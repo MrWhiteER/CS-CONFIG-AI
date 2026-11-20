@@ -104,12 +104,12 @@ def cut_texture(raw):
             version = struct.unpack_from('<H', raw, pos)[0]
             width, height, depth, fmt, mips = struct.unpack_from('<HHHBB', raw, pos+20)
             extras = struct.unpack_from('<I', raw, pos+36)[0]
-            if version != 1 or depth != 1 or extras>32 or fmt not in (1,2,4) or not 1 <= mips <= 12:
+            if version != 1 or depth != 1 or extras>32 or fmt not in (1,2,4,28) or not 1 <= mips <= 12:
                 return None
             if not 1 <= width <= 2048 or not 1 <= height <= 2048:
                 return None
             def length(w,h):
-                return w*h*4 if fmt == 4 else ((w+3)//4)*((h+3)//4)*(8 if fmt == 1 else 16)
+                return w*h*4 if fmt in (4,28) else ((w+3)//4)*((h+3)//4)*(8 if fmt == 1 else 16)
             mip_sizes = [length(max(1,width>>m),max(1,height>>m)) for m in range(mips)]
             compression = 0
             extra_offset = struct.unpack_from('<I',raw,pos+32)[0]
@@ -134,7 +134,9 @@ def cut_texture(raw):
                     except zstandard.ZstdError:
                         return None
                 else: return None
-            rgba = data if fmt == 4 else decode_blocks(data,width,height,fmt==2)
+            rgba = data if fmt in (4,28) else decode_blocks(data,width,height,fmt==2)
+            if fmt == 28:
+                rgba = bytes(channel for i in range(0,len(data),4) for channel in (data[i+2],data[i+1],data[i],data[i+3]))
             return png(width,height,rgba) if len(rgba)==width*height*4 else None
     except (ValueError, struct.error, IndexError, ImportError):
         pass

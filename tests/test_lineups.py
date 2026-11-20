@@ -80,6 +80,22 @@ class Radar(unittest.TestCase):
         self.assertIsNone(radar.cut_texture(b'broken'))
         self.assertIsNone(radar.cut_texture(raw[:-1]))
 
+    def test_bgra_raw_and_lz4(self):
+        import zlib
+        pixels=bytes([3,2,251,255,240,20,10,128])
+        for compressed in (False, True):
+            payload=bytes([0x80])+pixels if compressed else pixels
+            size=68 if compressed else 40
+            header=struct.pack('<IHHII',28+size+len(payload),12,1,8,1)
+            directory=struct.pack('<4sII',b'DATA',8,size)
+            texture=struct.pack('<HH4fHHHBBIII',1,0,0,0,0,0,2,1,1,28,1,0,8 if compressed else 0,1 if compressed else 0)
+            extra=struct.pack('<III',4,8,16)+struct.pack('<IIII',1,8,1,len(payload)) if compressed else b''
+            result=radar.cut_texture(header+directory+texture+extra+payload)
+            self.assertIsNotNone(result)
+            at=result.index(b'IDAT')
+            length=struct.unpack_from('>I',result,at-4)[0]
+            self.assertEqual(zlib.decompress(result[at+4:at+4+length]),b'\0'+bytes([251,2,3,255,10,20,240,128]))
+
     def test_overview_and_art_missing(self):
         self.assertEqual(radar.read_overview('"de_mirage" { "pos_x" "-3230" "pos_y" "1713" "scale" "5" }')['scale'],5)
         with tempfile.TemporaryDirectory() as tmp:
