@@ -143,3 +143,16 @@ html[data-theme="daylight"] [data-panel="keyboard"],html[data-theme="paper"] [da
 @media(prefers-reduced-motion:reduce) { .kb-device-body { transition:none; } }
 
 [data-panel="keyboard"] .ms-zone.picked .ms-callout { stroke:var(--rgb-selected); stroke-width:1.5; rx:4; }
+/* The picked key and its config name, side by side as two key caps. */
+[data-panel="keyboard"] .kb-detail-head { display:flex; align-items:flex-start; gap:10px; margin-bottom:10px; }
+[data-panel="keyboard"] .kb-detail-head .kb-detail-key { margin-bottom:0; }
+[data-panel="keyboard"] .kb-scan { appearance:none; cursor:pointer; position:relative; display:inline-flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; min-width:64px; padding:4px 10px 3px; color:var(--ink); background:linear-gradient(180deg, var(--panel-2), var(--panel)); border:1px solid var(--line); border-bottom-width:4px; border-radius:6px; font-family:var(--mono); transition:transform 110ms ease, border-color 150ms ease, box-shadow 150ms ease; }
+[data-panel="keyboard"] .kb-scan small { font-size:8.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); font-family:inherit; }
+[data-panel="keyboard"] .kb-scan b { font-size:20px; font-weight:700; line-height:1.1; }
+[data-panel="keyboard"] .kb-scan-tip { position:absolute; left:50%; top:calc(100% + 6px); transform:translateX(-50%); white-space:nowrap; font-size:10px; color:var(--muted); opacity:0; pointer-events:none; transition:opacity 150ms ease; }
+[data-panel="keyboard"] .kb-scan:hover, [data-panel="keyboard"] .kb-scan:focus-visible { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-dim); outline:none; }
+[data-panel="keyboard"] .kb-scan:hover .kb-scan-tip, [data-panel="keyboard"] .kb-scan:focus-visible .kb-scan-tip, [data-panel="keyboard"] .kb-scan.copied .kb-scan-tip, [data-panel="keyboard"] .kb-scan.failed .kb-scan-tip { opacity:1; }
+[data-panel="keyboard"] .kb-scan:active { transform:translateY(2px); border-bottom-width:2px; margin-bottom:2px; }
+[data-panel="keyboard"] .kb-scan.copied { border-color:var(--good, #2bd47d); }
+[data-panel="keyboard"] .kb-scan.copied .kb-scan-tip { color:var(--good, #2bd47d); }
+[data-panel="keyboard"] .kb-scan.failed { border-color:var(--bad); }
