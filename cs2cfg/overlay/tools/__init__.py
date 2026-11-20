@@ -4,9 +4,10 @@ from .hardware import TOOL as HARDWARE
 from .events import TOOL as EVENTS
 from .profiles import TOOL as PROFILES
 from .serverlock import TOOL as SERVERLOCK
+from .lineups import TOOL as LINEUPS
 from .settings import TOOL as SETTINGS
 
-TOOLS = (PERFORMANCE, HARDWARE, EVENTS, PROFILES, SERVERLOCK, SETTINGS)
+TOOLS = (PERFORMANCE, HARDWARE, EVENTS, PROFILES, SERVERLOCK, LINEUPS, SETTINGS)
 REGISTRY = {tool.id: tool for tool in TOOLS}
 
 def listing(state):

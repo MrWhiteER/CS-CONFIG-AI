@@ -1,7 +1,7 @@
 """Bounded machine-wide layout. Arbitrary tool identifiers are rejected."""
 import math
 
-IDS = ('performance', 'hardware', 'events', 'profiles', 'serverlock', 'settings')
+IDS = ('performance', 'hardware', 'events', 'profiles', 'serverlock', 'lineups', 'settings')
 
 def validate(value):
     if not isinstance(value, dict) or any(k not in IDS for k in value):

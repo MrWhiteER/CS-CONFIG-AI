@@ -87,6 +87,7 @@ class State:
 
         self.overlay = OverlayService()  # Inert until enabled in preferences.
         self.overlay.pinned_context = lambda: _overlay_pinned_context(self)
+        self.overlay.lineups_art = lambda key: _lineups_art(self, key)
         from .rgb import RgbSync
 
         # Inert until switched on in preferences; remembers the last board so
@@ -5119,6 +5120,18 @@ def _cloud_logout(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
 
     state._login = None
     return cloud.sign_out()
+
+
+def _lineups_art(state, key):
+    from .lineups.radar import picture
+    from .paths import user_data_dir
+    if not state.overlay._settings['overlay_enabled'] or 'lineups' not in state.overlay._settings['overlay_tools']:
+        return None
+    try:
+        package = _skins_vpk(state)
+    except (OSError, ValueError, AttributeError, steam.SteamError):
+        return None
+    return picture(package, user_data_dir(), key) if package else None
 
 
 def _overlay_pinned_context(state):

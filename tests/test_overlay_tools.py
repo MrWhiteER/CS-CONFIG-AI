@@ -20,7 +20,7 @@ from cs2cfg.overlay.tools import profiles as profile_tool, settings as settings_
 class Registry(unittest.TestCase):
     def test_explicit_unique_registry_and_native_pin_support(self):
         self.assertEqual(tuple(REGISTRY), layout.IDS)
-        self.assertEqual(len(TOOLS), 6)
+        self.assertEqual(len(TOOLS), 7)
         self.assertEqual({t.id for t in TOOLS if t.pinnable}, set(layout.IDS) - {'settings'})
         for tool in TOOLS:
             self.assertTrue(callable(tool.data))
@@ -91,7 +91,7 @@ class LayoutSettings(unittest.TestCase):
         a = settings.read()
         a['overlay_tools'].clear()
         a['overlay_layout']['hardware'] = {'pinned': True}
-        self.assertEqual(settings.read()['overlay_tools'], list(layout.IDS))
+        self.assertEqual(settings.read()['overlay_tools'], [k for k in layout.IDS if k != 'lineups'])
         self.assertEqual(settings.read()['overlay_layout'], {})
 
     def test_save_restore_endpoint_preserves_pins_and_existing_settings(self):
@@ -304,7 +304,7 @@ class ActiveTheme(unittest.TestCase):
             result = listing(state)
         self.assertEqual(result['theme'], 'paper')
         result['settings']['overlay_tools'].clear()
-        self.assertEqual(state.overlay._settings['overlay_tools'], list(layout.IDS))
+        self.assertEqual(state.overlay._settings['overlay_tools'], [k for k in layout.IDS if k != 'lineups'])
 
 class PinPlacement(unittest.TestCase):
     def test_saved_positions_are_clamped_to_new_monitor(self):

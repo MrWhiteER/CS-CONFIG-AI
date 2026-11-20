@@ -9,8 +9,9 @@ CORNERS = ("top_left", "top_right", "bottom_left", "bottom_right")
 DEFAULTS = {
     "overlay_dim_game": True,
     "overlay_layout": {},
-    "overlay_tools": list(IDS),
+    "overlay_tools": [key for key in IDS if key != 'lineups'],
     "overlay_enabled": False,
+    "overlay_lineups_round_start": True,
     "overlay_hide_in_rounds": False,
     "overlay_always_visible": False,
     "overlay_hide_from_capture": True,
