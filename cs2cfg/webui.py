@@ -3802,6 +3802,81 @@ def _ingame_ack(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
             "note": "Marked as seen."}
 
 
+# Which of CS2's own changes the app can keep or put back, and how. Key
+# binds and in-game settings go into the player's config; picture quality
+# goes into cs2_video.txt (only ever written with the game closed).
+_RESOLVABLE = {"Key binds", "In-game settings", "Picture quality"}
+
+
+def _ingame_resolve(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Answer the changes made inside CS2 during the last session.
+
+    For each change the player says Keep or Put back. Either way the answer
+    is written into the player's own config, because the config runs at every
+    launch: a key changed in the game's menu and not written down would be
+    undone by the next launch anyway. Put back writes the value from before
+    the session, so the next launch and the apply key both bring it back.
+    """
+    from . import defaults as keydefaults
+
+    found = _ingame(state, {"account": body.get("account")})
+    if not found or found.get("first_run") or not found.get("count"):
+        _ingame_ack(state, {"account": body.get("account")})
+        return {"ok": True, "kept": 0, "put_back": 0, "problems": []}
+    if found.get("running"):
+        return {"ok": False, "error": "Close CS2 first. It saves its settings when it quits."}
+
+    wanted = {}
+    for item in body.get("choices") or []:
+        if isinstance(item, dict):
+            wanted[(str(item.get("source")), str(item.get("key")))] = (
+                "back" if item.get("choice") == "back" else "keep")
+
+    kept, put_back, problems = 0, 0, []
+    settings: List[Dict[str, Any]] = []
+    for source, changes in (found.get("sources") or {}).items():
+        if source not in _RESOLVABLE:
+            continue
+        for change in changes:
+            key = str(change.get("key") or "")
+            choice = wanted.get((source, key), "keep")
+            value = change.get("was") if choice == "back" else change.get("now")
+            if source == "Key binds":
+                binding = keydefaults.normalise(key)
+                if state.cfg_scan is None:
+                    continue
+                if value is None or not str(value).strip():
+                    answer = _cfg_bind(state, {"binding": binding, "unbind": True, "force": True})
+                    if not answer.get("ok") and "not bound" in str(answer.get("error", "")):
+                        answer = {"ok": True}
+                else:
+                    answer = _cfg_bind(state, {"binding": binding, "command": str(value),
+                                               "force": True})
+                if not answer.get("ok"):
+                    problems.append(f"{key}: {answer.get('error')}")
+                    continue
+            elif value is None:
+                # A setting that did not exist before cannot be "put back" to
+                # anything; one the game dropped is simply left to the game.
+                continue
+            else:
+                settings.append({"name": key, "value": str(value),
+                                 **({"source": "video"} if source == "Picture quality" else {})})
+            if choice == "back":
+                put_back += 1
+            else:
+                kept += 1
+
+    if settings and state.cfg_scan is not None:
+        answer = _cfg_settings_apply(state, {"changes": settings,
+                                             "account": body.get("account")})
+        if not answer.get("ok"):
+            problems.append(str(answer.get("error")))
+
+    _ingame_ack(state, {"account": body.get("account")})
+    return {"ok": True, "kept": kept, "put_back": put_back, "problems": problems}
+
+
 def _play_fix(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     """Put the stretch and resolution back while the game is running.
 
@@ -5593,7 +5668,7 @@ _CONFIG_WRITERS = {
     _cfg_layouts_delete, _cfg_layouts_remove, _cfg_layouts_import,
     _cfg_layouts_sync_pull, _cfg_starter, _cfg_convert, _cfg_polish_apply,
     _cfg_rename_apply, _goxlr_bind, _profile_use, _scriptgen_save,
-    _configs_prepare, _firstrun_finish,
+    _configs_prepare, _firstrun_finish, _ingame_resolve,
 }
 
 
@@ -5612,6 +5687,7 @@ def make_handler(state: State):
         "/api/play/fix": _play_fix,
         "/api/ingame": _ingame,
         "/api/ingame/ack": _ingame_ack,
+        "/api/ingame/resolve": _ingame_resolve,
         "/api/prefs": _save_prefs,
         "/api/cfg/scan": _cfg_scan,
         "/api/cfg/tree": _cfg_tree,

@@ -8087,6 +8087,20 @@ function gameChanged() {
   return !!(d && !d.first_run && d.count);
 }
 
+/* Changes made in CS2's own menus that can be kept or put back. Keep writes
+   the new value into the player's config; Put back writes the old one. */
+const GAME_ANSWERABLE = ["Key binds", "In-game settings", "Picture quality"];
+function gameChangeId(source, key) { return "game\u0001" + source + "\u0001" + key; }
+function gameChoices() {
+  const out = [];
+  for (const [id, choice] of Object.entries(changeChoice)) {
+    if (!id.startsWith("game\u0001")) continue;
+    const parts = id.split("\u0001");
+    out.push({ source: parts[1], key: parts.slice(2).join("\u0001"), choice });
+  }
+  return out;
+}
+
 /* What the window has to say, drawn from both places at once. */
 function changesBody() {
   const d = ingameData;
@@ -8118,8 +8132,11 @@ function changesBody() {
   if (gameChanged()) {
     for (const [source, list] of Object.entries(d.sources || {})) {
       html += '<div class="subcat">' + esc(source) + "</div>";
-      html += '<div class="chg-rows">' + list.map(c =>
-        '<div class="chg-row ' + esc(c.kind || "changed") + '">' +
+      const answerable = GAME_ANSWERABLE.includes(source);
+      html += '<div class="chg-rows">' + list.map(c => {
+        const id = gameChangeId(source, c.key);
+        const back = changeChoice[id] === "back";
+        return '<div class="chg-row ' + esc(c.kind || "changed") + (back ? " undoing" : "") + '">' +
           changeMark(c.kind) +
           '<div class="chg-what"><b>' + esc(c.label || c.key) + "</b>" +
             (c.label ? '<span class="sub2 mono">' + esc(c.key) + "</span>" : "") +
@@ -8129,7 +8146,16 @@ function changesBody() {
             '<span class="chg-arrow">\u2192</span>' +
             '<code class="now">' + esc(c.now === null ? "\u2014" : c.now) + "</code>" +
           "</div>" +
-        "</div>").join("") + "</div>";
+          (answerable
+            ? '<div class="chg-pick" role="group" aria-label="What to do with this change">' +
+                '<button data-choice="keep" data-for="' + esc(id) + '"' +
+                  ' aria-pressed="' + (!back) + '">Keep</button>' +
+                '<button data-choice="back" data-for="' + esc(id) + '"' +
+                  ' aria-pressed="' + back + '">Put back</button>' +
+              "</div>"
+            : "") +
+        "</div>";
+      }).join("") + "</div>";
     }
     if (d.missing && d.missing.length) {
       html += '<p class="sub2" style="margin-top:8px">Could not read: ' +
@@ -8152,25 +8178,26 @@ function openConfirm() {
   if (title) {
     title.textContent = mine && theirs ? "Two things changed"
       : mine ? "You changed something"
-      : "CS2 changed its own settings";
+      : "You changed settings inside CS2";
   }
   if (say) {
     say.textContent = mine && theirs
-      ? "Changes of yours are still unanswered, and the game has moved some of " +
-        "its own settings. Choose what to keep; the game's are only reported."
+      ? "Some of your changes here are still unanswered, and you changed some " +
+        "settings inside CS2 during your last game. Keep each one or put it back, " +
+        "then press Done."
       : mine
       ? "You left the app with a change still unconfirmed. Keep each one or " +
         "put it back, then press Done."
-      : "Changed in the game's own menus, not here. Nothing is written back to " +
-        "CS2 \u2014 this is only telling you.";
+      : "You changed these inside CS2 during your last game. Keep saves them in " +
+        "your config so every launch has them. Put back returns them to how they " +
+        "were before that game. Press Done when you've chosen.";
   }
 
   const act = $("chgwin-act");
   if (act) {
-    act.innerHTML = mine
-      ? '<button class="btn" id="confirm-undo">Put everything back</button>' +
-        '<button class="btn primary" id="confirm-keep">Done</button>'
-      : '<button class="btn primary" id="confirm-keep">Got it</button>';
+    act.innerHTML =
+      '<button class="btn" id="confirm-undo">Put everything back</button>' +
+      '<button class="btn primary" id="confirm-keep">Done</button>';
   }
 
   $("confirm-veil").classList.remove("hidden");
@@ -8232,11 +8259,30 @@ async function answerChanges(how) {
   const hadGame = gameChanged();
   if (how === "all-back") {
     for (const c of pendingChanges) changeChoice[c.id] = "back";
+    if (hadGame) {
+      for (const [source, list] of Object.entries(ingameData.sources || {})) {
+        if (!GAME_ANSWERABLE.includes(source)) continue;
+        for (const c of list) changeChoice[gameChangeId(source, c.key)] = "back";
+      }
+    }
   }
+  const choices = hadGame ? gameChoices() : [];
   applyChoices();
   if (hadGame) {
     try {
-      ingameData = await api("/api/ingame/ack", { account: currentAccount() });
+      const r = await api("/api/ingame/resolve", { account: currentAccount(), choices });
+      if (r && r.ok === false) {
+        status(r.error || "Could not save your answers about the game's changes.", true);
+        return;
+      }
+      const bits = [];
+      if (r && r.kept) bits.push("kept " + r.kept);
+      if (r && r.put_back) bits.push("put back " + r.put_back);
+      if (bits.length) {
+        status("Changes from your last game: " + bits.join(", ") +
+               ". Your config now matches, so your next launch has them.");
+      }
+      ingameData = { count: 0, sources: {} };
     } catch (e) { /* it will be offered again on the next pass */ }
   }
 }

@@ -33,11 +33,15 @@ FILES = {
     "mrwhiteer/autoexec.vcfg": (
         'unbindall\n'
         'exec "mrwhiteer/tools/alias.vcfg"\n'
+        'exec "mrwhiteer/mainsettings/gamesettings.vcfg"\n'
         'exec "mrwhiteer/mainsettings/key_binds.vcfg"\n'
         'exec "mrwhiteer/mainsettings/imported.vcfg"\n'
     ),
     "mrwhiteer/tools/alias.vcfg": (
         'alias "!train" "exec mrwhiteer/lan/training.vcfg"\n'
+    ),
+    "mrwhiteer/mainsettings/gamesettings.vcfg": (
+        'sensitivity "1.1"\n'
     ),
     "mrwhiteer/mainsettings/key_binds.vcfg": (
         'bind "scancode26" "+forward"\n'
@@ -219,3 +223,54 @@ class KeyboardReachesGame(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AnsweringGameChanges(KeyboardReachesGame):
+    """Changes made in CS2's own menus, answered after the session: Keep
+    writes the new value into the config, Put back writes the old one, so
+    the next launch (and the apply key) agrees with the answer."""
+
+    def finding(self):
+        return {"count": 3, "running": False, "sources": {
+            "Key binds": [
+                {"key": "MOUSE4", "was": "player_ping", "now": "+jump", "kind": "changed"},
+                {"key": "f", "was": None, "now": "+lookatweapon", "kind": "added"},
+            ],
+            "In-game settings": [
+                {"key": "cl_crosshairsize", "was": "2", "now": "5", "kind": "changed"},
+            ],
+        }}
+
+    def resolve(self, choices):
+        with mock.patch.object(webui, "_ingame", return_value=self.finding()), \
+             mock.patch.object(webui, "_ingame_ack", return_value={}) as ack:
+            answer = webui._ingame_resolve(self.state, {"choices": choices})
+        self.assertTrue(ack.called)
+        return answer
+
+    def test_keep_writes_the_new_values_into_the_config(self):
+        answer = self.resolve([])
+        self.assertTrue(answer["ok"], answer)
+        self.assertEqual(answer["kept"], 3)
+        self.assertEqual(self.in_game("mouse4"), "+jump")
+        self.assertEqual(self.in_game("scancode9"), "+lookatweapon")
+
+    def test_put_back_writes_the_old_values(self):
+        answer = self.resolve([
+            {"source": "Key binds", "key": "MOUSE4", "choice": "back"},
+            {"source": "Key binds", "key": "f", "choice": "back"},
+            {"source": "In-game settings", "key": "cl_crosshairsize", "choice": "back"},
+        ])
+        self.assertTrue(answer["ok"], answer)
+        self.assertEqual(answer["put_back"], 3, answer)
+        self.assertEqual(answer["problems"], [])
+        self.assertEqual(self.in_game("mouse4"), "player_ping")
+        self.assertIsNone(self.in_game("scancode9"))
+        result = cfgscan.scan(self.cfg_root / "mrwhiteer", cfg_root=self.cfg_root)
+        self.assertEqual(result.effective_setting("cl_crosshairsize").value, "2")
+
+    def test_nothing_is_written_while_the_game_is_running(self):
+        running = dict(self.finding(), running=True)
+        with mock.patch.object(webui, "_ingame", return_value=running):
+            answer = webui._ingame_resolve(self.state, {"choices": []})
+        self.assertFalse(answer["ok"])
