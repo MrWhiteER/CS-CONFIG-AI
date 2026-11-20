@@ -45,26 +45,35 @@ def validate(document):
             raise ValueError('Invalid lineup identity')
         seen.add(row['id'])
         if (not plain(row.get('name')) or row.get('side') not in ('T', 'CT', 'both')
-                or row.get('type') not in TYPES or row.get('area') not in ('A', 'B', 'Mid')
+                or row.get('type') not in TYPES or (not plain(row.get('area')) if row.get('mine') is True else row.get('area') not in ('A', 'B', 'Mid'))
                 or row.get('throw') not in THROWS or not isinstance(row.get('checked'), bool)
                 or row.get('source') not in ('CS2-annotations, MIT', 'own')):
             raise ValueError('Invalid lineup')
-        if not isinstance(row.get('steps'), list) or not 1 <= len(row['steps']) <= 3 or not all(map(plain, row['steps'])):
+        if not isinstance(row.get('steps'), list) or not 1 <= len(row['steps']) <= (30 if row.get('mine') is True else 3) or not all(map(plain, row['steps'])):
             raise ValueError('Invalid instructions')
         normalized = [re.sub(r'[^a-z0-9]+', ' ', step.casefold()).strip() for step in row['steps']]
         if len(set(normalized)) != len(normalized):
             raise ValueError('Repeated instructions')
         landmarks = ('t spawn', 'ct spawn', 'palace', 'ramp', 'connector', 'jungle',
                      'ticket', 'stairs', 'mid', 'short', 'market', 'apartments', 'bench', 'van')
-        if document['map'] == 'mirage' and any(
+        if row.get('mine') is not True and document['map'] == 'mirage' and any(
                 'marked point' in step or not any(place in step for place in landmarks)
                 for step in normalized):
             raise ValueError('Instructions need a Mirage landmark')
         a = row['aim']
-        if not isinstance(a,dict) or not all(number(a.get(k)) for k in ('pitch', 'yaw')) or not -90 <= a['pitch'] <= 90 or not -180 <= a['yaw'] <= 180:
+        if not (row.get('mine') is True and a is None) and (not isinstance(a,dict) or not all(number(a.get(k)) for k in ('pitch', 'yaw')) or not -90 <= a['pitch'] <= 90 or not -180 <= a['yaw'] <= 180):
             raise ValueError(f"Invalid aim for lineup {row['id']} ({row['name']})")
         for key in ('stand', 'land'):
             point = row[key]
+            if row.get('mine') is True:
+                if key == 'land' and point is None:
+                    continue
+                if isinstance(point, dict) and set(point) == {'radar_x', 'radar_y'}:
+                    if (not all(number(point[k]) for k in point)
+                            or not 0 <= point['radar_x'] <= o['width']
+                            or not 0 <= point['radar_y'] <= o['height']):
+                        raise ValueError('Point outside overview')
+                    continue
             if not isinstance(point,dict) or not all(number(point.get(k)) for k in ('x', 'y', 'z')):
                 raise ValueError('Invalid point')
             x, y = pixel(point, o)
@@ -74,6 +83,8 @@ def validate(document):
 
 
 def pixel(point, overview):
+    if 'radar_x' in point:
+        return point['radar_x'], point['radar_y']
     return ((point['x'] - overview['pos_x']) / overview['scale'],
             (overview['pos_y'] - point['y']) / overview['scale'])
 

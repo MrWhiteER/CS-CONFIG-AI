@@ -96,7 +96,8 @@ class OverlayService:
                 self._gsi_token = install_token(user_data_dir())
                 self._gsi_install = install
                 write_cfg(install, port, self._gsi_token,
-                          pictures=bool(self.picture_session and self.picture_session.active))
+                          pictures=bool((self.picture_session and self.picture_session.active) or
+                                        (getattr(self, 'lineups_editing', False) and 'lineups' in self._settings['overlay_tools'])))
             elif not enabled and install:
                 remove_cfg(install)
             elif enabled:
