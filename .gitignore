@@ -37,6 +37,7 @@ Thumbs.db
 desktop.ini
 
 # Working files kept beside the source during development.
+/tmp/
 *.pre-skin
 *.orig
 *.rej
