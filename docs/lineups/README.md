@@ -1,88 +1,97 @@
-# Lineups: steps 1–3
+﻿# Lineups fixes and picture prototype
 
-The overlay contains a read-only Lineups browser and a round-start smoke card.
-The tool is off by default. It reads team, map and round phase only from GSI.
-No game input, memory access, console commands or elevated jobs were added.
+The Lineups tool is off by default. Enable the overlay in Settings, open it
+with Ctrl+Alt+P, open the Settings tool, enable Lineups in Your dock, and save.
+Open Lineups from the dock. It supports search, map and side filters, pinning,
+and the GSI round-start smoke card. Only Mirage has data.
 
-## Try it
+## Radar and instructions
 
-Enable the overlay in Settings, open it with Ctrl+Alt+P, and open its Settings tool.
-In Your dock, enable Lineups and save. Open Lineups from the dock. Search a name,
-choose a side or throw, or select another map. Only Mirage currently has data;
-the other maps show an empty list. Pin the Lineups window to keep the smoke card
-through a live round. The round-start setting can be turned off independently.
-The normal pinned-tools shortcut also hides this card.
+The runtime radar reader supports PNG, RGBA8888, BGRA8888 (format 28), BC1 and
+BC3, including LZ4 and Zstandard mip data. BGRA channels are converted to RGBA.
+No Valve art is shipped. Radar pictures come from the player's own install.
+The detail radar is a small square zoomed around the stand and landing points;
+steps remain underneath in a scrollable detail pane. The curve is a direction
+guide, not a simulated flight path.
 
-During buy time or warmup, fresh GSI from the local player selects the current
-map and side for the native smoke card even when the panel is closed. The card
-folds in live rounds unless pinned. It hides when game focus is lost, when the
-panel is open, when game state is stale, and when spectating a different player.
+Mid is displayed as Mid; only A and B get the word site. The validator rejects
+invalid areas, repeated step text, marked-point instructions and Mirage steps
+without a named landmark. Each record has separate stand, aim and throw steps.
+Expanded landmark descriptions still need visual checks in CS2.
 
-## Pictures and data limits
+Mirage contains 12 T smokes and 6 CT smokes. One CT entry comes from the MIT
+seed; five are app-authored practice candidates. All entries have checked=false
+and display Awaiting game check. The five candidates use an ideal ballistic
+model between overview landmarks. Actual map collision geometry was unavailable;
+wall clearance, bounces and throw accuracy are unverified. This does not fulfill
+the requested geometry-validated throws. THIRD_PARTY.md records the assumptions.
 
-No Valve artwork is included. At runtime the radar reader searches the player's
-own game package, reads overview coordinates, and caches the radar in the app
-data folder under a name containing the package modification time. PNG, RGBA,
-BC1 and BC3 textures are supported, including raw LZ4 and existing Zstandard
-compressed mip data. Other formats fall back to a plain list. Native PNG
-drawing supports noninterlaced 8-bit RGB and RGBA images. Actual installed CS2
-texture layouts, GSI behavior and native Windows drawing still need a game test.
-The dashed curve is a direction guide, not a physics simulation.
+## Make lineup pictures: unfinished, radar fallback
 
-The permitted seed and its named fork supply only one CT smoke. This version
-contains 12 T-side smokes and one CT-side smoke, below the requested CT count.
-All are marked as awaiting a game check. No throws or pictures were invented.
-The MIT notice and seed attribution are in THIRD_PARTY.md and About Lineups.
-Stand/aim picture capture is step 4 and has not been added.
+The Settings -> Overlay page now has a Lineups section and a Make lineup
+pictures button. Pressing it reports that real capture is unavailable. It does
+not launch CS2, install a cfg, capture a frame or send commands to the game.
+This is the fallback allowed by Pictures point 3 of LINEUPS_BRIEF.md, not a
+completed implementation of point 2.
 
-## Verification in this worktree
+The existing overlay capture module only excludes overlay windows from capture;
+it does not capture game pictures. Windows Graphics Capture is the intended
+noninvasive method, but no production backend or reliable capture method has
+been implemented or verified here. GSI provides map/phase but does not confirm
+camera position, aim or an offline server. A map-loaded event alone cannot prove
+a shot is ready or safe. Advancing a running game's camera would require an
+additional command path beyond the brief's no-input rule. No such path was added.
+There are no launch sleeps, console typing, memory access, injection, admin
+prompts, confirmation popups, game-input hooks or background picture workers.
 
-Passed:
-
-- `node tools/lineups_preview.cjs --check`: list, search, side filters, synonyms,
-  empty state, plain text, credits, radar annotations, round card folding,
-  preservation of search during refresh, and map switching.
-- `node tools/overlay_preview.cjs --check`: six existing renderers and ten themes.
-- `node tests/overlay_panel_harness.js`: existing panel lifecycle and controls.
-- `node tests/overlay_settings_harness.js`: settings states and syntax.
-- Node JSON checks: 13 unique records, required fields, coordinate bounds and
-  plain instructions.
-- `git diff --check`.
-
-Generated and visually reviewed: `preview/carbon.png` and `preview/daylight.png`.
-These previews show the fallback without CS2 pictures; their game state is a fixture.
-The preview runner keeps its temporary Chromium profile inside this worktree.
-
-Python execution was denied by the sandbox. Python unit tests were written but
-could not be run. Run them one module at a time with TEMP, TMP, TMPDIR and
-CS2CFG_DATA pointing inside this worktree:
+A developer-only fake-frame prototype is available:
 
 ```
-python -m unittest discover -s tests -p test_lineups.py
-python -m unittest discover -s tests -p test_lineups_rounds.py
-python -m unittest discover -s tests -p test_overlay_gsi.py
-python -m unittest discover -s tests -p test_overlay_tools.py
-python -m unittest discover -s tests -p test_overlay_pinned.py
-python -m unittest discover -s tests -p test_overlay_service.py
-python -m unittest discover -s tests -p test_mapart.py
+py -3 tools/lineups_pictures_dry_run.py
 ```
 
-Real CS2, its radar extraction, throw accuracy, native card appearance and a
-packaged application build were not tested. No real game configuration folder
-was written to during this work.
+It writes only under tmp/lineups-pictures by default. It uses fake readiness
+events for each shot, draws an aim ring and a stand arrow on supplied fake
+frames, and saves reviewable practice cfg text that it never executes. The fake
+stand arrow uses a supplied pixel location; an exact real stand marker still
+requires camera projection/calibration. All frames say TEST PICTURE. Fake caches
+are isolated from real art, keyed by map, supplied build and data hash; a
+completion manifest is written only after every fake shot. There is no real
+game-build discovery or automatic production cache refresh yet. Nothing in the
+app loads these fake frames as real pictures. Tests use temporary directories
+and never discover or write to a player's CS2 config folders.
 
-## Git handoff
+## What Edy can click on this PC
 
-Staging and committing each step were attempted and blocked by permission to
-create the linked worktree's index.lock. No workaround was used. The original
-brief and mockup remain staged. There are no new commit hashes.
+1. Open CS2 Auto Config from its usual shortcut (or run cs2cfg.bat in this checkout).
+2. Open Settings.
+3. Open Overlay.
+4. Find the Lineups section.
+5. Click Make lineup pictures once.
 
-Read-only checkpoints are in `tmp/lineups-handoff/`. The first patch captures
-step 1; later checkpoints are cumulative against the original HEAD. They are
-recovery/review copies, not a replacement Git repository. The later checkpoint
-contains final integration fixes to earlier steps. Keep the brief and mockup
-in step 1 when the operator creates the three commits. No pull request, merge,
-release or tag was created.
+The button currently shows the radar-fallback explanation. There is no working
+click sequence to generate real stand/aim pictures in this build. For browsing,
+enable the overlay and Lineups as described above. Run no picture generation
+during an online match; the unfinished real path is disabled in every state.
 
-The requested `git push -u origin codex/lineups` was also attempted. The sandbox
-could not connect to github.com on port 443, so the push did not complete.
+## Verification and handoff
+
+Passed: node tools/lineups_preview.cjs --check (including square, zoomed detail
+radar and Mid label), node tools/overlay_preview.cjs --check (six renderers, ten
+themes), node tests/overlay_settings_harness.js, node tests/overlay_panel_harness.js,
+and git diff --check. Regenerated preview/carbon.png and daylight.png without
+game art. Existing local files with real in their names were left alone.
+
+All 97 Python test modules were attempted separately with py -3 -m unittest
+ tests.<module>, skipping tests.test_graphics. None started: this environment
+has no py command. No Python pass result is claimed. The per-module record is
+in tmp/lineups-handoff/python-tests.txt. Unit tests cover BGRA raw/LZ4 conversion,
+instruction validation, fake event sequencing, annotations and cache identity.
+
+Real CS2 radar extraction, native card appearance, landmark accuracy, new CT
+throws, picture capture and a packaged application build remain untested.
+
+Cumulative file snapshots are in tmp/lineups-handoff/part-1 through part-4,
+with repo-relative FILES.txt manifests. Part 4 includes final integration fixes,
+documentation and regenerated previews. No paths were deleted. No git add,
+commit, push, PR, merge, release or tag operation was run.

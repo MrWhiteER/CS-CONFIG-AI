@@ -12,12 +12,12 @@ const setup=`window.overlayPanelActive(false);
  window.overlayPanelActive(true);`;
 const checks=`(async()=>{try{
  const body=document.querySelector('[data-tool="lineups"] .tool-body'),ui=window.lineupsUI;
- if(body.querySelectorAll('[data-lineup]').length!==13)throw Error('Seed list missing');
+ if(body.querySelectorAll('[data-lineup]').length!==fixture.data.lineups.document.lineups.length)throw Error('Seed list missing');
  const query=body.querySelector('[data-query]');query.disabled=false;query.value='window';query.dispatchEvent(new Event('input'));
  if(body.querySelectorAll('[data-lineup]').length!==3)throw Error('Type ahead failed');
  query.value='';query.dispatchEvent(new Event('input'));
  const side=body.querySelector('[data-side]');side.disabled=false;side.value='CT';side.dispatchEvent(new Event('change'));
- if(body.querySelectorAll('[data-lineup]').length!==1||!body.querySelector('.lineup-detail').textContent.includes('Deep A ramp'))throw Error('Side filter failed');
+ if(body.querySelectorAll('[data-lineup]').length!==fixture.data.lineups.document.lineups.filter(r=>r.side==='CT'||r.side==='both').length||!body.querySelector('.lineup-detail').textContent.includes('Deep A ramp'))throw Error('Side filter failed');
  const sample={...fixture.data.lineups.document.lineups[0],area:'B',name:'Default corner',type:'fire'};
  for(const q of ['b site molly','B molotov','incendiary'])if(ui.search([sample],q,'T','fire').length!==1)throw Error('Synonym failed');
  query.value='nothing matches';query.dispatchEvent(new Event('input'));
@@ -36,6 +36,14 @@ const checks=`(async()=>{try{
  });
  const map=body.querySelector('[data-map]');map.value='inferno';await map.onchange({target:map});
  if(requested!=='inferno'||body.querySelectorAll('[data-lineup]').length)throw Error('Map switch failed');
+ const preview=document.createElement('div');preview.style.width='560px';document.body.append(preview);
+ window.overlayRenderers.lineups(preview,{...fixture.data.lineups,art,map_request:true},()=>{});
+ const svg=preview.querySelector('.lineup-radar'),bounds=svg.getBoundingClientRect();
+ if(Math.abs(bounds.width-bounds.height)>1||bounds.width>241)throw Error('Detail radar must fit a small square');
+ if(svg.getAttribute('viewBox')==='0 0 1024 1024')throw Error('Detail radar did not zoom to throw');
+ if(preview.textContent.includes('Mid site'))throw Error('Mid site label returned');
+ if(preview.querySelectorAll('.lineup-detail li').length!==3)throw Error('Instructions hidden by radar');
+ preview.remove();
  document.body.dataset.lineupsCheck='OK';
  }catch(error){document.body.dataset.lineupsCheck='ERROR: '+error.message;}})();`;
 if(process.argv.includes('--check')){

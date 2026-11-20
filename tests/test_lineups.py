@@ -14,10 +14,11 @@ class Data(unittest.TestCase):
         doc = lineups.load('de_mirage')
         self.assertEqual(lineups.validate(doc), doc)
         self.assertEqual(sum(r['side']=='T' for r in doc['lineups']),12)
-        self.assertEqual(sum(r['side']=='CT' for r in doc['lineups']),1)
+        self.assertGreaterEqual(sum(r['side']=='CT' for r in doc['lineups']),6)
         self.assertTrue(all(not r['checked'] for r in doc['lineups']))
+        count=len(doc['lineups'])
         doc['lineups'].clear()
-        self.assertEqual(len(lineups.load()['lineups']),13)
+        self.assertEqual(len(lineups.load()['lineups']),count)
         self.assertIsNone(lineups.load('../../anything'))
 
     def test_invalid_fields_and_command_text(self):
@@ -43,6 +44,32 @@ class Data(unittest.TestCase):
             doc=lineups.load(); doc['lineups'][0][field]=value
             with self.subTest(field=field, value=value), self.assertRaises(ValueError):
                 lineups.validate(doc)
+
+    def test_every_shipped_pitch_is_finite_and_null_names_lineup(self):
+        for row in lineups.load()['lineups']:
+            with self.subTest(lineup=row['id']):
+                self.assertTrue(lineups.number(row['aim']['pitch']))
+                self.assertTrue(-90 <= row['aim']['pitch'] <= 90)
+                doc = lineups.load()
+                target = next(r for r in doc['lineups'] if r['id'] == row['id'])
+                target['aim']['pitch'] = None
+                with self.assertRaises(ValueError) as caught:
+                    lineups.validate(doc)
+                self.assertIn(row['id'], str(caught.exception))
+
+    def test_bench_candidate_has_ballistic_solution(self):
+        import math
+        row = next(r for r in lineups.load()['lineups']
+                   if r['id'] == 'own-ct-b-apartments-from-bench')
+        pitch = row['aim']['pitch']
+        elevation = math.radians(-pitch + (90 - abs(pitch)) * 10 / 90)
+        distance = math.hypot(row['land']['x'] - row['stand']['x'],
+                              row['land']['y'] - row['stand']['y'])
+        flight = distance / (675 * math.cos(elevation))
+        height = 675 * math.sin(elevation) * flight - 320 * flight * flight / 2
+        self.assertAlmostEqual(height, row['land']['z'] - row['stand']['z'] - 64, places=4)
+        self.assertEqual(row['source'], 'own')
+        self.assertFalse(row['checked'])
 
     def test_synonyms_and_filters(self):
         row={**lineups.load()['lineups'][0], 'name':'Default corner','area':'B','type':'fire'}

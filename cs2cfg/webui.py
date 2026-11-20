@@ -5122,6 +5122,12 @@ def _cloud_logout(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     return cloud.sign_out()
 
 
+def _lineups_pictures(state, body):
+    from .lineups.pictures import request
+    settings = state.overlay._settings
+    return request(enabled=settings['overlay_enabled'] and 'lineups' in settings['overlay_tools'])
+
+
 def _lineups_art(state, key):
     from .lineups.radar import picture
     from .paths import user_data_dir
@@ -5582,6 +5588,7 @@ def make_handler(state: State):
         "/api/overlay": _overlay,
         "/api/overlay/panel": _overlay_panel,
         "/api/overlay/settings": _overlay_settings,
+        "/api/lineups/pictures": _lineups_pictures,
         "/api/rgb": _rgb,
         "/api/rgb/settings": _rgb_settings,
     }

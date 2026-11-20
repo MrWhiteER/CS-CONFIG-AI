@@ -62,7 +62,7 @@ def validate(document):
             raise ValueError('Instructions need a Mirage landmark')
         a = row['aim']
         if not isinstance(a,dict) or not all(number(a.get(k)) for k in ('pitch', 'yaw')) or not -90 <= a['pitch'] <= 90 or not -180 <= a['yaw'] <= 180:
-            raise ValueError('Invalid aim')
+            raise ValueError(f"Invalid aim for lineup {row['id']} ({row['name']})")
         for key in ('stand', 'land'):
             point = row[key]
             if not isinstance(point,dict) or not all(number(point.get(k)) for k in ('x', 'y', 'z')):
