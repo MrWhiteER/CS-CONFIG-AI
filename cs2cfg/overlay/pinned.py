@@ -61,6 +61,8 @@ def render(tool, data, fields=None):
     elif tool == 'serverlock':
         lines.append(str(data.get('text') or 'Coming soon'))
     elif tool == 'lineups':
+        if data.get('picture_status'):
+            lines.append(data['picture_status'])
         round_state = data.get('round', {})
         lines.append(str(round_state.get('name','')) + ' · ' + str(round_state.get('side','')) + ' side')
         names = [f"{i}. {r['name']}" for i,r in enumerate(data.get('rows', []),1)]

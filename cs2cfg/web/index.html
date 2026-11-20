@@ -9500,8 +9500,8 @@ function renderOverlay(d) {
       toggle('overlay_hide_from_capture', 'Hide from capture', 'Exclude the HUD and panel from supported capture tools.') +
       toggle('overlay_always_visible', 'Always visible', 'Override Auto hide while CS2 is focused.') +
       '<p class="sub2">Auto hide waits for game state if it is missing or out of date. Always visible still requires Fullscreen Windowed.</p>') +
-    card('Lineups', '<p class="sub2">Pictures from your own game. This build uses the radar while safe picture capture is unfinished.</p>' +
-      '<button class="btn" id="lineups-pictures">Make lineup pictures</button>') +
+    card('Lineups', '<p class="sub2">Make pictures in offline Mirage practice. Close CS2 first. Keep the game visible and press the chosen key once for each picture.</p>' +
+      '<label>Picture key <select id="lineups-picture-key">' + ['F6','F7','F8','F9','F10','F11'].map(k => '<option' + (k === 'F8' ? ' selected' : '') + '>' + k + '</option>').join('') + '</select></label><button class="btn" id="lineups-pictures">Make lineup pictures</button>') +
     card('Frame stats',
       '<p class="sub2">' + (live ? (d.frame_capture_ready ? 'Frame capture ready.' : 'Resource stats available; frame capture needs setup.') :
         (s.overlay_enabled ? 'Start CS2, then refresh to see live values.' : 'Enable the overlay and start CS2 to see live values.')) + '</p>' +
@@ -9523,7 +9523,7 @@ document.addEventListener("click", async e => {
   button.disabled = true;
   try {
     if (button.id === "lineups-pictures") {
-      const answer = await api("/api/lineups/pictures", {});
+      const answer = await api("/api/lineups/pictures", {key: $("lineups-picture-key").value});
       $("overlay-said").textContent = answer.text;
     } else if (button.id === "overlay-refresh") await loadOverlay();
     else if (button.id === "overlay-save") {

@@ -67,6 +67,7 @@ class OverlayService:
         self._widget_failed = set()
         self.pinned_context = lambda: {}
         self.lineups_art = lambda key: None
+        self.picture_session = None
         self._hardware_widget_failed = False
         self._modes = {}
         self._status = "disabled"
@@ -94,7 +95,8 @@ class OverlayService:
                 from ..paths import user_data_dir
                 self._gsi_token = install_token(user_data_dir())
                 self._gsi_install = install
-                write_cfg(install, port, self._gsi_token)
+                write_cfg(install, port, self._gsi_token,
+                          pictures=bool(self.picture_session and self.picture_session.active))
             elif not enabled and install:
                 remove_cfg(install)
             elif enabled:
@@ -110,8 +112,13 @@ class OverlayService:
             if not self._settings["overlay_enabled"]:
                 raise PermissionError("Overlay is disabled")
             state = parse_payload(raw, self._gsi_token,
-                                  include_team='lineups' in self._settings['overlay_tools'])
+                                  include_team='lineups' in self._settings['overlay_tools'],
+                                  pictures=bool(self.picture_session and self.picture_session.active))
             self._game_state.update(state)
+            if self.picture_session and self.picture_session.active:
+                self.picture_session.feed(state)
+                if not self.picture_session.active:
+                    self._configure_gsi(True)
             if self._hud:
                 self._configure_hud(self._settings)
                 if not self._game_state.visible(auto_hide=self._settings['overlay_hide_in_rounds'],
@@ -134,6 +141,10 @@ class OverlayService:
 
     def configure(self, ui: dict) -> None:
         wanted = settings.read(ui, strict=True)
+        if (self.picture_session and self.picture_session.active
+                and (not wanted['overlay_enabled'] or 'lineups' not in wanted['overlay_tools'])):
+            self.picture_session.abort()
+            self._configure_gsi(wanted['overlay_enabled'])
         with self._control:
             if (wanted["overlay_enabled"] != self._settings["overlay_enabled"]
                     or not self._thread):
@@ -161,6 +172,8 @@ class OverlayService:
             self._thread.start()
 
     def stop(self) -> None:
+        if self.picture_session and self.picture_session.active:
+            self.picture_session.abort()
         with self._control:
             self._shutdown()
             self._configure_gsi(False)
@@ -483,7 +496,8 @@ class OverlayService:
                 self._widgets.pop('lineups', None)
             return
         round_state = self.lineups_state()
-        visible = (allowed and round_state['show'] and self._hud.pin_requested()
+        capturing = bool(self.picture_session and self.picture_session.active)
+        visible = (allowed and (round_state['show'] or capturing) and self._hud.pin_requested()
                    and not (self.panel and self.panel.visible))
         if widget:
             widget.set_allowed(visible)
@@ -517,7 +531,8 @@ class OverlayService:
             art = None
         x,y = pinned_position(found.rect, row, self._settings['overlay_corner'])
         y = max(found.rect[1], min(y,found.rect[3]-580))
-        widget.update({'round':round_state,'rows':rows,'art':art}, (x,y))
+        widget.update({'round':round_state,'rows':rows,'art':art,
+                       'picture_status': self.picture_session.text if self.picture_session else ''}, (x,y))
         widget.set_allowed(True)
 
     def panel_allowed(self):
@@ -534,6 +549,10 @@ class OverlayService:
         try:
             while not self._stop.is_set():
                 found = window.find_game_window("cs2.exe")
+                if self.picture_session and self.picture_session.active:
+                    self.picture_session.game_running(found is not None)
+                    if not self.picture_session.active:
+                        self._configure_gsi(True)
                 if self._hwnd and (found is None or found.hwnd != self._hwnd):
                     self._end_game()
                 if found is None:

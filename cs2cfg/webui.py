@@ -5123,9 +5123,47 @@ def _cloud_logout(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _lineups_pictures(state, body):
-    from .lineups.pictures import request
+    from .lineups import load
+    from .lineups.pictures import PictureSession, game_build, read_binding
+    from .lineups.window_capture import capture_cs2
+    from .paths import user_data_dir
+    from .launcher import launch_via_steam, LaunchError
     settings = state.overlay._settings
-    return request(enabled=settings['overlay_enabled'] and 'lineups' in settings['overlay_tools'])
+    if not settings['overlay_enabled'] or 'lineups' not in settings['overlay_tools']:
+        return {'available': False, 'text': 'Turn on the overlay and Lineups first.'}
+    with state.overlay._lock:
+        current = state.overlay.picture_session
+        if current and current.active:
+            return {'available': True, 'text': current.text}
+        if steam.cs2_running():
+            return {'available': False, 'text': 'Close CS2, then press Make lineup pictures again.'}
+        try:
+            install = state.cs2_install
+            if not install:
+                return {'available': False, 'text': 'Install CS2 in Steam first.'}
+            key = body.get('key', 'F8')
+            paths = []
+            for user in state.users:
+                if str(user.account_id) == str(_active_account(state)):
+                    paths.extend(sorted((user.path/'730/local/cfg').glob('cs2_user_keys*.vcfg')))
+            session = PictureSession(load('mirage'), game_build(install), user_data_dir(),
+                                     steam.cfg_dir(install), capture_cs2, key)
+            state.overlay.picture_session = session
+            # Install capture-only GSI components before launching the game.
+            session.active = True
+            state.overlay._configure_gsi(True)
+            if not state.overlay._gsi_token or state.overlay._gsi_notice:
+                session.active = False
+                return {'available': False, 'text': 'Game state setup is unavailable. Close CS2 and try again.'}
+            session.start(lambda args: launch_via_steam(args, require_args=True),
+                          previous=read_binding(paths, key))
+            return {'available': True, 'text': session.text + ' Open Lineups in the overlay to follow progress. '
+                    'Press the picture key once, then wait for the next picture number.'}
+        except (OSError, ValueError, KeyError, steam.SteamError, LaunchError):
+            if state.overlay.picture_session and state.overlay.picture_session.active:
+                state.overlay.picture_session.abort()
+                state.overlay._configure_gsi(True)
+            return {'available': False, 'text': 'Picture setup could not start. Close CS2 and try again.'}
 
 
 def _lineups_art(state, key):

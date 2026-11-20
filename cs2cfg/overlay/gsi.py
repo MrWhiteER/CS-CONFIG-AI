@@ -28,14 +28,15 @@ def install_token(directory: Path) -> str:
     return token
 
 
-def write_cfg(install: Path, port: int, token: str) -> Path:
+def write_cfg(install: Path, port: int, token: str, *, pictures=False) -> Path:
     if not 1 <= port <= 65535 or len(token) != 64 or any(c not in "0123456789abcdef" for c in token):
         raise ValueError("Invalid GSI configuration")
     path = Path(install) / "game" / "csgo" / "cfg" / CFG_NAME
     # Do not create game directories or follow a file redirected elsewhere.
     if path.is_symlink() or not path.parent.is_dir():
         raise OSError("CS2 cfg directory unavailable")
-    data = '\n'.join(f'        "{key}" "1"' for key in COMPONENTS)
+    components = COMPONENTS + (('player_position', 'allplayers_id') if pictures else ())
+    data = '\n'.join(f'        "{key}" "1"' for key in components)
     path.write_text(
         '"CS2 Auto Config"\n{\n'
         f'    "uri" "http://127.0.0.1:{port}/api/overlay/gsi"\n'
@@ -50,7 +51,7 @@ def remove_cfg(install: Path) -> None:
     (Path(install) / "game" / "csgo" / "cfg" / CFG_NAME).unlink(missing_ok=True)
 
 
-def parse_payload(raw: bytes, token: str, *, include_team=False) -> dict:
+def parse_payload(raw: bytes, token: str, *, include_team=False, pictures=False) -> dict:
     if len(raw) > MAX_BODY:
         raise ValueError("GSI body too large")
     try:
@@ -73,11 +74,16 @@ def parse_payload(raw: bytes, token: str, *, include_team=False) -> dict:
 
     player = body.get("player")
     player = player if isinstance(player, dict) else {}
-    return {"provider": pick(body.get("provider"), ("appid", "steamid")),
-            "map": pick(body.get("map"), ("name", "phase")),
+    result = {"provider": pick(body.get("provider"), ("appid", "steamid")),
+            "map": pick(body.get("map"), ("name", "phase", "mode") if pictures else ("name", "phase")),
             "round": pick(body.get("round"), ("phase",)),
             "player_id": pick(player, ("steamid", "activity", "team") if include_team else ("steamid", "activity")),
             "player_state": pick(player.get("state"), ("health",))}
+    if pictures:
+        result['player'] = pick(player, ('steamid', 'activity', 'position', 'forward'))
+        if 'allplayers' in body:
+            result['allplayers'] = body['allplayers']
+    return result
 
 
 class AutoHide:

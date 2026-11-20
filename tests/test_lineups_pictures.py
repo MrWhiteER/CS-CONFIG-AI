@@ -176,4 +176,151 @@ class Pictures(unittest.TestCase):
             self.assertIn('TEST PICTURE', (runner.root/'0/aim.svg').read_text())
 
 
-if __name__ == '__main__': unittest.main()
+
+
+class PictureWiring(unittest.TestCase):
+    def state(self, row, kind='stand'):
+        state = Pictures().trial_state(row)
+        state['map']['mode'] = 'practice'
+        state['allplayers'] = {'local': {}}
+        pitch = math.radians(89 if kind == 'stand' else row['aim']['pitch'])
+        yaw = math.radians(row['aim']['yaw'])
+        state['player']['forward'] = ','.join(map(str, (math.cos(pitch)*math.cos(yaw), math.cos(pitch)*math.sin(yaw), -math.sin(pitch))))
+        return state
+
+    def test_offline_refuses_online_unknown_other_human(self):
+        state = self.state(load()['lineups'][0])
+        self.assertTrue(pictures.offline_ready(state))
+        for mode in ('casual', 'competitive', '', None):
+            state['map']['mode'] = mode
+            self.assertFalse(pictures.offline_ready(state))
+        state['map']['mode'] = 'offline'
+        state['allplayers']['human'] = {'name': 'Other'}
+        self.assertFalse(pictures.offline_ready(state))
+        state['allplayers'] = {'local': {}, 'BOT1': {}}
+        self.assertTrue(pictures.offline_ready(state))
+        state['provider']['steamid'] = 'different'
+        self.assertFalse(pictures.offline_ready(state))
+        self.assertFalse(pictures.offline_ready({}))
+
+    def test_cfg_two_views_binding_chain_undo(self):
+        doc = load(); doc['lineups'] = doc['lineups'][:1]
+        shots, undo = pictures.capture_cfg(doc, 'F9', '+lookatweapon')
+        row = doc['lineups'][0]
+        self.assertIn('sv_cheats 1', shots)
+        self.assertIn('setang 89 '+str(row['aim']['yaw']), shots)
+        self.assertIn('setang '+str(row['aim']['pitch']), shots)
+        self.assertIn('alias cs2cfg_picture cs2cfg_picture_1', shots)
+        self.assertIn('exec cs2cfg_lineup_shots_undo', shots)
+        self.assertIn('bind "F9" "cs2cfg_picture"', shots)
+        self.assertIn('bind "F9" "+lookatweapon"', undo)
+        self.assertIn('sv_cheats 0', undo)
+        self.assertIn('unbind "F8"', pictures.capture_cfg(doc)[1])
+        with self.assertRaises(ValueError): pictures.capture_cfg(doc, 'F8;quit')
+        self.assertIn('unbind', pictures.capture_cfg(doc, previous='quit;quit')[1])
+
+    def runner(self, tmp, capture=None):
+        doc = load(); doc['lineups'] = doc['lineups'][:1]
+        return pictures.PictureSession(doc, 'test-build', tmp, tmp,
+            capture or mock.Mock(return_value=(100,100,bytes([10,20,30,255])*10000)))
+
+    def test_order_status_cache_cleanup_and_no_relaunch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runner = self.runner(tmp); launch = mock.Mock()
+            self.assertFalse(runner.start(launch, running=True))
+            launch.assert_not_called(); self.assertEqual(list(Path(tmp).iterdir()), [])
+            self.assertTrue(runner.start(launch))
+            launch.assert_called_once_with('+map de_mirage +exec cs2cfg_lineup_shots')
+            row = runner.document['lineups'][0]
+            self.assertFalse(runner.feed(self.state(row, 'aim')))
+            self.assertEqual(runner.text, 'Picture 1 of 2 - press F8')
+            self.assertTrue(runner.feed(self.state(row)))
+            self.assertEqual(runner.text, 'Picture 2 of 2 - press F8')
+            self.assertFalse(runner.feed(self.state(row)))
+            self.assertTrue(runner.feed(self.state(row, 'aim')))
+            self.assertEqual(runner.text, 'Done - 2 pictures saved')
+            self.assertFalse(runner.active)
+            self.assertFalse((Path(tmp)/pictures.SHOTS_CFG).exists())
+            self.assertFalse((Path(tmp)/pictures.UNDO_CFG).exists())
+            pair = pictures.cached_pictures(runner.document, 'test-build', tmp)[row['id']]
+            self.assertEqual(set(pair), {'stand', 'aim'})
+            self.assertEqual(pictures.cached_pictures(runner.document, 'other-build', tmp), {})
+            self.assertIn('L50 50', (runner.root/'0/stand.svg').read_text())
+            self.assertIn('<circle cx="50" cy="50"', (runner.root/'0/aim.svg').read_text())
+
+    def test_abort_keeps_partial_pictures_and_removes_owned_cfgs(self):
+        for reason in ('online', 'left', 'closed', 'off'):
+            with self.subTest(reason=reason), tempfile.TemporaryDirectory() as tmp:
+                runner = self.runner(tmp); runner.start(mock.Mock())
+                row = runner.document['lineups'][0]; runner.feed(self.state(row))
+                if reason in ('online', 'left'):
+                    state = self.state(row)
+                    state['map']['mode' if reason == 'online' else 'name'] = 'competitive'
+                    runner.feed(state)
+                elif reason == 'closed':
+                    runner.game_running(True); runner.game_running(False)
+                else: runner.abort()
+                self.assertFalse(runner.active)
+                self.assertTrue((runner.root/'0/stand.svg').exists())
+                self.assertFalse((Path(tmp)/pictures.SHOTS_CFG).exists())
+                self.assertFalse((Path(tmp)/pictures.UNDO_CFG).exists())
+
+    def test_missing_pose_and_capture_failure_do_not_save(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            capture = mock.Mock(side_effect=OSError('Blank'))
+            runner = self.runner(tmp, capture); runner.start(mock.Mock())
+            state = self.state(runner.document['lineups'][0])
+            self.assertFalse(runner.feed(state)); self.assertEqual(runner.index, 0)
+            del state['player']['position']
+            self.assertFalse(runner.feed(state)); self.assertFalse(runner.active)
+            self.assertEqual(capture.call_count, 1)
+
+    def test_launch_failure_cleans_up_and_reads_binding_without_writing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)/'keys.txt'; path.write_text('"F8" "+lookatweapon"')
+            self.assertEqual(pictures.read_binding([path], 'F8'), '+lookatweapon')
+            runner = self.runner(tmp)
+            with self.assertRaises(OSError): runner.start(mock.Mock(side_effect=OSError()))
+            self.assertFalse((Path(tmp)/pictures.SHOTS_CFG).exists())
+            self.assertEqual(path.read_text(), '"F8" "+lookatweapon"')
+
+
+class CaptureFiles(unittest.TestCase):
+    def test_fake_screenshot_files_follow_pose_order(self):
+        from cs2cfg.lineups.native import decode_png
+        from cs2cfg.lineups.radar import png
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            files = []
+            for i in range(2):
+                path = directory/(str(i)+'.png')
+                path.write_bytes(png(100,100,bytes([i+10,20,30,255])*10000))
+                files.append(path)
+            capture = mock.Mock(side_effect=lambda: decode_png(files.pop(0).read_bytes()))
+            helper = PictureWiring(); runner = helper.runner(tmp, capture)
+            runner.start(mock.Mock()); row = runner.document['lineups'][0]
+            self.assertFalse(runner.feed({'provider': {'appid': 730}}))
+            self.assertTrue(runner.active)
+            self.assertEqual(capture.call_count, 0)
+            runner.feed(helper.state(row, 'aim'))
+            self.assertEqual(len(files), 2)
+            runner.feed(helper.state(row)); runner.feed(helper.state(row, 'aim'))
+            self.assertEqual(len(files), 0)
+            self.assertEqual(runner.text, 'Done - 2 pictures saved')
+
+    def test_gsi_capture_fields_are_optin_and_authenticated(self):
+        from cs2cfg.overlay.gsi import parse_payload
+        import json
+        state = PictureWiring().state(load()['lineups'][0])
+        state['auth'] = {'token': 'a'*64}
+        raw = json.dumps(state).encode()
+        ordinary = parse_payload(raw, 'a'*64)
+        self.assertNotIn('mode', ordinary['map'])
+        self.assertNotIn('player', ordinary)
+        capture = parse_payload(raw, 'a'*64, pictures=True)
+        self.assertTrue(pictures.offline_ready(capture))
+        self.assertIn('position', capture['player'])
+        with self.assertRaises(PermissionError): parse_payload(raw, 'b'*64, pictures=True)
+
+
+if __name__ == "__main__": unittest.main()

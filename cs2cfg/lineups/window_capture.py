@@ -1,4 +1,4 @@
-"""Experimental external GDI capture; never called by the app's fallback button.
+"""External GDI capture for player-triggered practice pictures.
 
 No game memory, input, hooks or injection. DirectX may return a blank frame;
 that is a capture failure, not a successful cached picture. Foreground window
