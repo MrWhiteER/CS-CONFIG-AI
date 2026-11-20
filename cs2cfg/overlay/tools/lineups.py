@@ -28,4 +28,4 @@ def data(state, args=None):
 
 
 TOOL = Tool('lineups', 'Lineups', 'globe', data, refresh_hz=1,
-            default_size=(900, 610), pinnable=True)
+            default_size=(1000, 620), pinnable=True)

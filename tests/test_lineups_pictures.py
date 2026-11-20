@@ -1,4 +1,4 @@
-﻿"""No real game discovery, config writes, capture, launch or waits."""
+﻿"""Fake-only picture tests; every filesystem write uses a temporary directory."""
 import copy
 import ctypes
 import math
@@ -130,12 +130,6 @@ class Pictures(unittest.TestCase):
         with self.assertRaises(OSError): runner.feed(1,self.trial_state(doc['lineups'][0]))
         self.assertEqual(runner.index,0)
         self.assertTrue(runner.waiting)
-
-    def test_action_never_touches_game_or_disk(self):
-        with mock.patch('pathlib.Path.write_text') as write:
-            self.assertFalse(pictures.request(enabled=False)['available'])
-            self.assertFalse(pictures.request(enabled=True)['available'])
-        write.assert_not_called()
 
     def test_annotations_and_escaping(self):
         frame=(100,100,bytes([0,0,0,255])*10000)
@@ -321,6 +315,43 @@ class CaptureFiles(unittest.TestCase):
         self.assertTrue(pictures.offline_ready(capture))
         self.assertIn('position', capture['player'])
         with self.assertRaises(PermissionError): parse_payload(raw, 'b'*64, pictures=True)
+
+
+class StrictPracticeLaunch(unittest.TestCase):
+    def test_no_argumentless_fallback_for_picture_launch(self):
+        from cs2cfg import launcher
+        with mock.patch.object(launcher, 'steam_exe', return_value=None), mock.patch.object(launcher.os, 'startfile', create=True) as start:
+            with self.assertRaises(launcher.LaunchError):
+                launcher.launch_via_steam('+map de_mirage +exec cs2cfg_lineup_shots', require_args=True)
+            start.assert_not_called()
+
+
+class PictureButton(unittest.TestCase):
+    def test_button_launches_only_from_closed_game_in_temporary_install(self):
+        from cs2cfg import webui
+        import threading
+        import types
+        with tempfile.TemporaryDirectory() as tmp:
+            install = Path(tmp)/'steamapps/common/CS2'
+            cfg = install/'game/csgo/cfg'; cfg.mkdir(parents=True)
+            overlay = types.SimpleNamespace(_lock=threading.RLock(), picture_session=None,
+                _settings={'overlay_enabled': True, 'overlay_tools': ['lineups']},
+                _configure_gsi=mock.Mock(), _gsi_token='a'*64, _gsi_notice='')
+            state = types.SimpleNamespace(overlay=overlay, cs2_install=install, users=[])
+            with mock.patch('cs2cfg.steam.cs2_running', return_value=True), mock.patch('cs2cfg.launcher.launch_via_steam') as launch:
+                self.assertFalse(webui._lineups_pictures(state, {})['available'])
+                self.assertEqual(list(cfg.iterdir()), []); launch.assert_not_called()
+            with mock.patch('cs2cfg.steam.cs2_running', return_value=False), mock.patch('cs2cfg.launcher.launch_via_steam') as launch, mock.patch('cs2cfg.lineups.pictures.game_build', return_value='test'), mock.patch('cs2cfg.paths.user_data_dir', return_value=Path(tmp)/'cache'):
+                self.assertTrue(webui._lineups_pictures(state, {'key': 'F8'})['available'])
+                launch.assert_called_once_with('+map de_mirage +exec cs2cfg_lineup_shots', require_args=True)
+                self.assertEqual(set(p.name for p in cfg.iterdir()), {pictures.SHOTS_CFG, pictures.UNDO_CFG})
+                session = overlay.picture_session
+                session.feed({'provider': {'appid': 730}, 'map': {'name': 'de_mirage', 'mode': 'casual'}})
+                self.assertFalse(session.active); self.assertEqual(list(cfg.iterdir()), [])
+            overlay._settings['overlay_enabled'] = False
+            with mock.patch('cs2cfg.steam.cs2_running') as running:
+                self.assertFalse(webui._lineups_pictures(state, {})['available'])
+                running.assert_not_called()
 
 
 if __name__ == "__main__": unittest.main()

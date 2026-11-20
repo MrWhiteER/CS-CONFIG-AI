@@ -5143,8 +5143,11 @@ def _lineups_pictures(state, body):
                 return {'available': False, 'text': 'Install CS2 in Steam first.'}
             key = body.get('key', 'F8')
             paths = []
+            from . import whoami
+            steam_root = getattr(state, 'steam_root', None)
+            account = whoami.current(steam_root, [u.account_id for u in state.users])[0] if steam_root else None
             for user in state.users:
-                if str(user.account_id) == str(_active_account(state)):
+                if str(user.account_id) == str(account):
                     paths.extend(sorted((user.path/'730/local/cfg').glob('cs2_user_keys*.vcfg')))
             session = PictureSession(load('mirage'), game_build(install), user_data_dir(),
                                      steam.cfg_dir(install), capture_cs2, key)
@@ -5160,8 +5163,9 @@ def _lineups_pictures(state, body):
             return {'available': True, 'text': session.text + ' Open Lineups in the overlay to follow progress. '
                     'Press the picture key once, then wait for the next picture number.'}
         except (OSError, ValueError, KeyError, steam.SteamError, LaunchError):
-            if state.overlay.picture_session and state.overlay.picture_session.active:
-                state.overlay.picture_session.abort()
+            if state.overlay.picture_session:
+                if state.overlay.picture_session.active:
+                    state.overlay.picture_session.abort()
                 state.overlay._configure_gsi(True)
             return {'available': False, 'text': 'Picture setup could not start. Close CS2 and try again.'}
 

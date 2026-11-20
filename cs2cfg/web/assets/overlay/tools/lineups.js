@@ -27,11 +27,12 @@
   };
   if(root.lineupsState&&root.querySelector('[data-query]')&&!d.map_request){updateRound();if(root.paintPictures)root.paintPictures(d.pictures||{});return;}
   const state=root.lineupsState||={query:'',side:'',kind:'',selected:null,map:d.document?.map||'mirage'};
-  const doc=d.document,rows=doc?.lineups||[];
+  const doc=d.document,rows=doc?.lineups||[];root.pictureImages=d.pictures||{};
   const options=(items,value)=>items.map(([key,label])=>'<option value="'+e(key)+'" '+(key===value?'selected':'')+'>'+e(label)+'</option>').join('');
   root.innerHTML='<p class="lineup-picture-status" role="status"></p><div class="lineup-round" hidden></div><div class="lineups-controls"><label>Find a lineup<input type="text" data-query placeholder="Search name, area or throw" value="'+e(state.query)+'"></label><label>Map<select data-map>'+options((d.maps||[]).map(m=>[m.id,m.name]),state.map)+'</select></label><label>Side<select data-side>'+options([['','Both sides'],['T','T side'],['CT','CT side']],state.side)+'</select></label><label>Throw<select data-kind>'+options([['','All throws'],...Object.entries(types)],state.kind)+'</select></label></div><div class="lineups-grid"><div><div class="lineup-count" aria-live="polite"></div><div class="lineups-results"></div></div><article class="lineup-detail"></article></div><details class="lineups-about"><summary>About Lineups</summary><p>Lineup data: Rene Rebsdorf · CS2-annotations · MIT license. Pictures come from your own CS2 files. Throws await checking in the game.</p></details>';
   const pictures=(images)=>{
    const slot=root.querySelector('.lineup-pictures');if(!slot)return;
+   root.pictureImages=images;
    const pair=images[state.selected]||{};
    slot.innerHTML=['stand','aim'].filter(k=>pair[k]).map(k=>'<button class="lineup-thumbnail" data-picture="'+k+'"><img alt="'+(k==='stand'?'Where to stand':'Where to aim')+'" src="'+e(pair[k])+'"><span>'+(k==='stand'?'Stand picture':'Aim picture')+'</span></button>').join('');
    for(const button of slot.querySelectorAll('[data-picture]'))button.onclick=()=>{
@@ -46,8 +47,8 @@
    root.querySelector('.lineup-count').textContent=found.length+' '+(found.length===1?'lineup':'lineups')+' · '+(doc?.name||'Choose a map');
    const list=root.querySelector('.lineups-results');
    list.innerHTML=found.map((r,i)=>'<button class="lineup-row" data-lineup="'+e(r.id)+'" aria-pressed="'+(r===selected)+'"><strong>'+e(r.name)+'</strong><small>'+e(types[r.type])+' · '+e(r.area+(['A','B'].includes(r.area)?' site':''))+' · '+e(r.side==='both'?'Both sides':r.side+' side')+'</small></button>').join('')||'<p>No lineups match. Try another search or side.</p>';
-   root.querySelector('.lineup-detail').innerHTML=selected?'<h4>'+e(selected.name)+'</h4><p class="lineup-meta">'+e(types[selected.type])+' · '+e(selected.throw[0].toUpperCase()+selected.throw.slice(1))+' · '+(selected.checked?'Checked in game':'Awaiting game check')+'</p>'+radar(d.art,[selected])+'<ol>'+selected.steps.map(s=>'<li>'+e(s)+'</li>').join('')+'</ol><div class="lineup-pictures"></div>':'<p>Choose a lineup to see where to stand and how to throw.</p>';
-   pictures(d.pictures||{});
+   root.querySelector('.lineup-detail').innerHTML=selected?'<h4>'+e(selected.name)+'</h4><p class="lineup-meta">'+e(types[selected.type])+' · '+e(selected.throw[0].toUpperCase()+selected.throw.slice(1))+' · '+(selected.checked?'Checked in game':'Awaiting game check')+'</p><div class="lineup-detail-body"><div class="lineup-visual">'+radar(d.art,[selected])+'<div class="lineup-pictures"></div></div><ol>'+selected.steps.map(s=>'<li>'+e(s)+'</li>').join('')+'</ol></div>':'<p>Choose a lineup to see where to stand and how to throw.</p>';
+   pictures(root.pictureImages||d.pictures||{});
    for(const button of list.querySelectorAll('[data-lineup]'))button.onclick=()=>{state.selected=button.dataset.lineup;paint();};
   };
   root.querySelector('[data-query]').oninput=event=>{state.query=event.target.value;paint();};

@@ -9,18 +9,6 @@ from pathlib import Path
 from . import validate
 from .radar import png
 
-UNAVAILABLE = ('Lineup pictures are not available in this build. '
-               'The app cannot confirm the practice player position and aim from game state yet. '
-               'Use the radar and written steps for now.')
-
-
-def request(*, enabled):
-    """Fail closed, without probing the game, launching it or writing any files."""
-    if not enabled:
-        return {'available': False, 'text': 'Turn on the overlay and Lineups first.'}
-    return {'available': False, 'text': UNAVAILABLE}
-
-
 SHOTS_CFG = 'cs2cfg_lineup_shots.cfg'
 UNDO_CFG = 'cs2cfg_lineup_shots_undo.cfg'
 KEYS = tuple('F' + str(n) for n in range(6, 12))
@@ -182,7 +170,10 @@ class PictureSession:
                            point=(frame[0]//2, frame[1]//2))
             folder = self.root/str(self.index//2)
             folder.mkdir(parents=True, exist_ok=True)
-            (folder/(kind+'.svg')).write_text(svg, encoding='utf-8')
+            target = folder/(kind+'.svg')
+            temporary = target.with_suffix('.tmp')
+            temporary.write_text(svg, encoding='utf-8')
+            temporary.replace(target)
         except (OSError, ValueError):
             self.text = 'Keep the practice game visible. Picture not saved yet; do not press the picture key again.'
             return False
@@ -232,9 +223,8 @@ def pose_matches(document, row, state):
 
     This does NOT establish offline provenance. Do not use it to authorize
     game control. A map/warmup event without position cannot authorize a shot.
-    The production parser intentionally remains unchanged while this trial is
-    disconnected. GSI positions are documented for observers, not a playing
-    practice client; silently treating absent values as zero would hide that.
+    GSI positions may be absent for a playing practice client. Missing pose
+    fails closed; camera coordinates are never supplied by the app.
     """
     try:
         if (state['provider']['appid'] != 730

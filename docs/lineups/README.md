@@ -11,7 +11,8 @@ The runtime radar reader supports PNG, RGBA8888, BGRA8888 (format 28), BC1 and
 BC3, including LZ4 and Zstandard mip data. BGRA channels are converted to RGBA.
 No Valve art is shipped. Radar pictures come from the player's own install.
 The detail radar is a small square zoomed around the stand and landing points;
-steps remain underneath in a scrollable detail pane. The curve is a direction
+steps sit beside a 156-pixel radar at the default panel size. Two picture
+thumbnails sit below the radar when available; only the catalogue scrolls. The curve is a direction
 guide, not a simulated flight path.
 
 Mid is displayed as Mid; only A and B get the word site. The validator rejects
@@ -41,7 +42,7 @@ a null pitch in every shipped record and check the replacement's model height.
 Settings -> Overlay -> Lineups now offers a picture key (F8 by default) and
 Make lineup pictures. Overlay and Lineups must be saved as enabled first.
 Close CS2 before pressing the button. The app writes only its two picture cfgs
-in the discovered install's game/csgo/cfg folder, reads the active account's
+in the discovered install's game/csgo/cfg folder, reads the signed-in Steam account's
 key config to restore a readable previous binding, and launches Mirage using
 the existing Steam launcher. Its strict argument mode refuses a launch if
 Steam cannot pass the map and cfg; the rungameid URL drops these arguments.
@@ -113,3 +114,14 @@ JavaScript/Chromium results and both cumulative snapshots are recorded under
 tmp/lineups-handoff. No git add, commit, push, PR, merge, release or tag was run.
 Real-game offline reports, camera reports, alias timing, GDI rendering, binding
 restoration, landmarks and throw accuracy remain untested.
+
+Final browser checks passed in Carbon and Daylight at an asserted 1000 x 620
+panel: all 18 detail cards, all three steps, radar, both thumbnails, status
+and larger picture view. The list alone scrolls. Regenerated carbon.png and
+daylight.png use labelled original preview diagrams and fake picture fixtures,
+not Valve artwork. Files with real in their names were untouched.
+
+Passed: node tools/lineups_preview.cjs --check, node tools/overlay_preview.cjs
+--check (six renderers, ten themes), tests/overlay_settings_harness.js,
+tests/overlay_panel_harness.js, tests/status_bar_harness.cjs,
+tests/rgb_settings_harness.js, and git diff --check.
