@@ -51,7 +51,7 @@ class Wording(Case):
         self.assertEqual(sens[0]["now"], "1.3")
 
     def test_titles(self):
-        self.assertEqual(history.title_for("bind Jump to Space"), "Key Space: Jump")
+        self.assertEqual(history.title_for("bind +jump to Space"), "Key Space: Jump")
         self.assertEqual(history.title_for("cs2 settings (web)"), "Game settings")
 
 
@@ -102,6 +102,21 @@ class AppChanges(Case):
         self.assertTrue(result["conflict"])
         self.assertTrue(history.swing(stamp, history.BACK, force=True)["ok"])
         self.assertEqual(self.file.read_text(), 'bind "e" "+use"\nfps_max "400"\n')
+
+    def test_keep_writes_nothing_even_when_later_changes_overlap(self):
+        stamp = self.change(self.file, 'bind "e" "+jump"\nfps_max "400"\n', "bind Jump to E")
+        self.change(self.file, 'bind "e" "+duck"\nfps_max "400"\n', "bind Duck to E")
+        self.assertTrue(history.swing(stamp, history.KEPT)["ok"])
+        self.assertEqual(self.file.read_text(), 'bind "e" "+duck"\nfps_max "400"\n')
+        entry = next(e for e in history.entries() if e["id"] == "app:" + stamp)
+        self.assertEqual(entry["status"], history.KEPT)
+
+    def test_no_code_in_the_list(self):
+        items = history.describe_diff(
+            '// made 2026-11-21 23:54\n-novid +exec mrwhiteer\\autoexec.vcfg\n----------\n',
+            '// made 2026-11-22 01:31\nbind c +smoke_left_click\n')
+        self.assertEqual(items, [{"what": "Key C", "was": None, "now": "Smoke left click"}])
+        self.assertEqual(history.title_for("bind +smoke_left_click to C"), "Key C: Smoke left click")
 
     def test_change_during_a_game_waits(self):
         history.session_started(time.time() - 3600 * 24 * 365 * 10)

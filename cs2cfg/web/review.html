@@ -148,7 +148,8 @@ async function answer(list) {
     $("note").textContent = "";
   }
   await load();
-  if (!view.entries.length && !(r.problems || []).length) close();
+  // Everything answered: the window has done its job, whatever else it said.
+  if (!view.entries.length) close();
 }
 
 function close() { post("/api/history/later"); }
