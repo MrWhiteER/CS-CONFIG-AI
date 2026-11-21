@@ -3498,7 +3498,20 @@ def _scriptgen_binding(body: Dict[str, Any]) -> str:
     return binding
 
 
-def _scriptgen_key(result, binding: str, entry: str) -> Dict[str, Any]:
+def _scriptgen_stock(state, binding: str) -> str:
+    """What CS2 itself binds to a key the config leaves alone (Mouse 1 fires)."""
+    from . import defaults, scriptgen
+
+    stock = ""
+    try:
+        if state is not None and getattr(state, "cs2_install", None):
+            stock = defaults.for_key(defaults.load(state.cs2_install), binding)
+    except Exception:
+        stock = ""
+    return stock or scriptgen.STOCK_FALLBACK.get(binding, "")
+
+
+def _scriptgen_key(result, binding: str, entry: str, state=None) -> Dict[str, Any]:
     """Whether the chosen key is free, and what it runs now if it is not."""
     from . import keys
 
@@ -3508,6 +3521,8 @@ def _scriptgen_key(result, binding: str, entry: str) -> Dict[str, Any]:
     runs = ""
     if entries:
         runs = (max(entries, key=lambda b: b.order).body or "").strip().strip(chr(34))
+    else:
+        runs = _scriptgen_stock(state, binding)
     free = not runs or (bool(entry) and runs.lower() == entry.lower())
     from . import scriptgen
 
@@ -3537,11 +3552,36 @@ def _scriptgen_check(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     binding = _scriptgen_binding(body)
     spec = dict(body.get("spec") or {})
     spec["binding"] = binding
-    key = _scriptgen_key(result, binding, "")
+    if spec.get("target"):
+        spec["target_stock"] = _scriptgen_stock(state, str(spec["target"]))
+    key = _scriptgen_key(result, binding, "", state)
     built = scriptgen.build(spec, result, key["label"])
-    key = _scriptgen_key(result, binding, built.entry)
+    key = _scriptgen_key(result, binding, built.entry, state)
     return {"ok": True, "built": built.as_dict(), "key": key,
             "folder": result is not None}
+
+
+def _scriptgen_saved(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Read-only: the scripts Script Builder has saved, to open them again."""
+    from . import keys, scriptgen
+
+    result = _rescan(state)
+    found = []
+    if result is not None:
+        for config in sorted(result.files.values(), key=lambda c: c.relative):
+            try:
+                text = config.path.read_bytes().decode(config.document.encoding, errors="replace")
+            except OSError:
+                continue
+            if scriptgen.MARK not in text:
+                continue
+            for block in scriptgen.own_blocks(text):
+                spec = block["spec"]
+                binding = spec.get("binding") or ""
+                found.append({"spec": spec, "file": config.relative,
+                              "key": keys.label(binding) if binding else "",
+                              "target": keys.label(spec["target"]) if spec.get("target") else ""})
+    return {"ok": True, "scripts": found}
 
 
 def _scriptgen_save(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -3558,14 +3598,16 @@ def _scriptgen_save(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     binding = _scriptgen_binding(body)
     spec = dict(body.get("spec") or {})
     spec["binding"] = binding
-    key = _scriptgen_key(result, binding, "")
+    if spec.get("target"):
+        spec["target_stock"] = _scriptgen_stock(state, str(spec["target"]))
+    key = _scriptgen_key(result, binding, "", state)
     built = scriptgen.build(spec, result, key["label"])
     if not built.ok:
         problems = [c.text for c in built.checks if c.level == "block"]
         return {"ok": False, "built": built.as_dict(),
                 "error": problems[0] if problems else "This script can't be saved yet."}
 
-    key = _scriptgen_key(result, binding, built.entry)
+    key = _scriptgen_key(result, binding, built.entry, state)
     if not key["free"] and not body.get("force"):
         return {"ok": False, "needs_confirm": True, "key": key,
                 "error": f"{key['label']} already does something else."}
@@ -6125,6 +6167,7 @@ def make_handler(state: State):
         "/api/scriptgen/steps": _scriptgen_steps,
         "/api/scriptgen/check": _scriptgen_check,
         "/api/scriptgen/save": _scriptgen_save,
+        "/api/scriptgen/saved": _scriptgen_saved,
         "/api/cfg/settings": _cfg_settings,
         "/api/cfg/settings/apply": _cfg_settings_apply,
         "/api/cfg/apply-script/status": _cfg_apply_script_status,

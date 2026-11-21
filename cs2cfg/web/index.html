@@ -5957,9 +5957,21 @@
 .sb-chk .ic { flex: none; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 800; color: var(--bg); margin-top: 1px; }
 .sb-chk.ok .ic { background: var(--good); } .sb-chk.warn .ic { background: var(--warn); } .sb-chk.block .ic { background: var(--bad); }
 .sb-chk .fix { margin-top: 5px; }
-.sb-lines { margin-top: 10px; border-top: 1px solid var(--line-soft); padding-top: 9px; }
-.sb-lines summary { color: var(--muted); cursor: pointer; }
-.sb-lines pre { background: var(--sunk); color: var(--ink); border-radius: 9px; padding: 9px 11px; font: 12px/1.5 Consolas, monospace; white-space: pre-wrap; word-break: break-all; margin: 8px 0 0; }
+.sb-lines-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.sb-lines-head h4 { margin: 3px 0 0; }
+.sb-lines-head .sp { flex: 1; }
+.sb-lines { display: flex; flex-direction: column; gap: 8px; }
+.sb-line { border: 1px solid var(--line); border-radius: 11px; background: var(--panel-2); overflow: hidden; }
+.sb-line-top { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--line-soft); color: var(--ink); }
+.sb-line-top b { font-weight: 600; font-size: 13px; }
+.sb-line-top code { margin-left: auto; font: 11px/1.3 Consolas, monospace; color: var(--faint); }
+.sb-cmd { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; padding: 6px 12px; align-items: baseline; }
+.sb-cmd + .sb-cmd { border-top: 1px dashed var(--line-soft); }
+.sb-cmd code { font: 12.5px/1.45 Consolas, monospace; color: var(--accent); word-break: break-all; }
+.sb-cmd span { color: var(--muted); font-size: 12.5px; }
+.sb-code { width: 100%; box-sizing: border-box; background: var(--sunk); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font: 12.5px/1.6 Consolas, monospace; resize: vertical; margin-bottom: 10px; white-space: pre; overflow-x: auto; }
+.sb-code:focus { outline: none; border-color: var(--accent); }
+.sb-keytag { font-size: 10.5px; padding: 1px 6px; border-radius: 6px; background: var(--accent-dim); color: var(--accent); margin-left: 4px; }
 .sb-btns { display: flex; gap: 9px; margin-top: 14px; }
 .sb-btns .primary { flex: 1; }
 .sb-ideas { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 7px; }
@@ -17056,6 +17068,7 @@ async function sbLoad(force) {
   await ensureScan(false);
   try {
     sb.data = await api("/api/scriptgen/steps", {});
+    try { sb.saved = (await api("/api/scriptgen/saved", {})).scripts || []; } catch (_) { sb.saved = []; }
     if (!sb.data.groups.some(g => g.id === sb.cat) && sb.data.groups.length) sb.cat = sb.data.groups[0].id;
     sbRender();
     sbCheck();
@@ -17126,7 +17139,10 @@ function sbSide() {
   const b = sb.built;
   let html = '<h4>What your script will do</h4>';
   const key = sb.keyLabel ? "<b>" + esc(sb.keyLabel) + "</b>" : "your key";
-  if (b && b.says && b.says.length) {
+  if (b && b.edited) {
+    html += '<div class="sb-says"><p>You edited the config lines by hand, so the steps on the left no longer decide what the key does. ' +
+      'Step 5 shows what every line does.</p></div>';
+  } else if (b && b.says && b.says.length) {
     const tgt = (b.target && b.target.label) ? "<b>" + esc(b.target.label) + "</b>" : "the other key";
     const lead = sb.spec.mode === "shift" ? (sb.spec.style === "hold"
         ? "While you hold " + key + ", pressing " + tgt + ":"
@@ -17161,11 +17177,6 @@ function sbSide() {
     if (c.fix === "valve") fix = '<div class="fix"><button class="btn small" data-sb-keepmove>Keep only the first one</button></div>';
     return '<div class="sb-chk ' + esc(c.level) + '"><span class="ic">' + (c.level === "ok" ? "&#10003;" : "!") + '</span><div>' + esc(c.text) + fix + '</div></div>';
   }).join("");
-  if (b && b.ok && b.lines && b.lines.length) {
-    const bindLine = sb.binding ? '\nbind "' + sb.binding + '" "' + b.entry + '"' : "";
-    html += '<details class="sb-lines"><summary>Show the config lines</summary><pre>' +
-      esc(b.lines.join("\n") + bindLine) + '</pre></details>';
-  }
   if (sb.confirm) {
     html += '<div class="sb-confirm">' + esc(sb.confirm) + '<div class="sb-btns" style="margin-top:8px">' +
       '<button class="btn" data-sb-cancel>Keep that key</button><button class="btn primary" data-sb-force>Replace it</button></div></div>';
@@ -17209,7 +17220,8 @@ function sbRender() {
         sb.built && sb.built.target && sb.built.target.binding ? {binding: 1, free: true, label: sb.built.target.label,
           note: sb.built.target.label + " does \u201c" + sb.built.target.normal + "\u201d right now."} : null) : "") +
     '</div></div></div>' +
-    '</section><section class="sb-card sb-side">' + sbSide() + '</section></div>';
+    sbLinesStep() +
+    '</section><section class="sb-card sb-side">' + sbSaved() + sbSide() + '</section></div>';
   if (keepSel && keepSel.attr.length) {
     const again = box.querySelector("[" + keepSel.attr[0] + "]");
     if (again) { again.focus(); try { if (keepSel.pos != null) again.setSelectionRange(keepSel.pos, keepSel.pos); } catch (_) {} }
@@ -17221,8 +17233,51 @@ function sbKeyRow(which, title, label, info) {
   const note = info && info.binding ? (info.note || (info.free ? info.label + " is free right now." : info.label + " is in use right now.")) : "";
   return '<div class="sb-key">' + (title ? '<span class="sub" style="min-width:110px">' + esc(title) + '</span>' : "") +
     '<button class="sb-kc' + (on ? " listening" : "") + '" data-sb-listen="' + which + '">' + (on ? "Press a key\u2026" : esc(label || "Pick")) + '</button>' +
-    '<span class="sub">' + (on ? "Press any key or mouse button. Esc cancels." : "Click, then press any key or mouse button.") + '</span>' +
+    '<span class="sub">' + (on ? "Press any key or mouse button (left and right click count too). Esc cancels." : "Click, then press any key or mouse button.") + '</span>' +
     (note ? '<span class="sb-hint" style="margin:0">' + esc(note) + '</span>' : "") + '</div>';
+}
+
+function sbSaved() {
+  if (!sb.saved || !sb.saved.length) return "";
+  return '<h4>Your saved scripts</h4><p class="sb-hint" style="margin:0 0 7px">Click one to open it and change it.</p><div class="sb-ideas" style="margin:0 0 16px">' +
+    sb.saved.map((x, i) => '<button class="sb-chip" data-sb-open="' + i + '" title="' + esc(x.file) + '">' + esc(x.spec.name) +
+      (x.key ? ' <span class="sb-keytag">' + esc(x.key) + '</span>' : "") + '</button>').join("") + '</div>';
+}
+
+function sbLinesStep() {
+  const b = sb.built;
+  const editing = typeof sb.spec.lines_text === "string";
+  let html = '<div class="sb-step"><span class="sb-num">5</span><div><div class="sb-lines-head"><h4>Your config lines</h4>' +
+    '<span class="sp"></span>' + (editing
+      ? '<button class="btn small" data-sb-unedit>Undo my edits</button>'
+      : (b && b.lines && b.lines.length ? '<button class="btn small" data-sb-edit>Edit the lines</button>' : "")) + '</div>';
+  if (editing) {
+    html += '<p class="sb-hint" style="margin:0 0 8px">One line per name: <code>alias "name" "command; command"</code>. ' +
+      'Every change is checked on the right before you can save.</p>' +
+      '<textarea class="sb-code" id="sb-lines-edit" spellcheck="false" rows="' + Math.max(4, sb.spec.lines_text.split("\n").length + 1) + '">' +
+      esc(sb.spec.lines_text) + '</textarea>';
+  }
+  const rows = b && b.explained || [];
+  if (!rows.length) {
+    html += editing ? "" : '<p class="sb-hint" style="margin:0">Add steps and pick a key, and the lines show up here.</p>';
+    return html + '</div></div>';
+  }
+  html += '<div class="sb-lines">' + rows.map(r =>
+    '<div class="sb-line"><div class="sb-line-top"><b>' + esc(r.role || "Part of this script") + '</b><code>' + esc(r.name) + '</code></div>' +
+    r.commands.map(c => '<div class="sb-cmd"><code>' + esc(c.text) + '</code><span>' + esc(c.says) + '</span></div>').join("") +
+    '</div>').join("");
+  if (sb.binding && b.entry) {
+    html += '<div class="sb-line"><div class="sb-line-top"><b>Puts it on ' + esc(sb.keyLabel || "your key") + '</b><code>bind</code></div>' +
+      '<div class="sb-cmd"><code>bind "' + esc(sb.binding) + '" "' + esc(b.entry) + '"</code><span>' +
+      esc((sb.keyLabel || "Your key") + " runs this script") + '</span></div></div>';
+  }
+  return html + '</div></div></div>';
+}
+
+function sbDropEdits() {
+  if (typeof sb.spec.lines_text !== "string") return;
+  delete sb.spec.lines_text;
+  status("Your hand edits were replaced, because the steps changed.");
 }
 
 function sbChanged() {
@@ -17280,12 +17335,26 @@ document.addEventListener("keydown", e => {
   if (!binding) { status("That key can't be used in CS2. Try another.", true); return; }
   sbSetKey(binding);
 }, true);
+// While a key box is listening, every mouse button counts -- left and right
+// click too, so Mouse 1 and Mouse 2 can be picked. The click and the menu
+// that follow the press are swallowed so they don't also press a button.
+let sbSwallow = {click: false, menu: false};
 document.addEventListener("mousedown", e => {
-  if (!sb.listening || e.target && e.target.closest && e.target.closest("[data-sb-listen]") && e.button === 0) return;
-  const map = {1: "mouse3", 3: "mouse4", 4: "mouse5"};
+  if (!sb.listening || sb.listening === "idea") return;
+  const map = {0: "mouse1", 1: "mouse3", 2: "mouse2", 3: "mouse4", 4: "mouse5"};
   if (!map[e.button]) return;
   e.preventDefault(); e.stopPropagation();
+  if (e.button === 0) sbSwallow.click = true;
+  if (e.button === 2) sbSwallow.menu = true;
   sbSetKey(map[e.button]);
+}, true);
+document.addEventListener("click", e => {
+  if (!sbSwallow.click) return;
+  sbSwallow.click = false; e.preventDefault(); e.stopPropagation();
+}, true);
+document.addEventListener("contextmenu", e => {
+  if (!sb.listening && !sbSwallow.menu) return;
+  sbSwallow.menu = false; e.preventDefault(); e.stopPropagation();
 }, true);
 document.addEventListener("wheel", e => {
   if (!sb.listening) return;
@@ -17300,19 +17369,19 @@ document.addEventListener("click", e => {
   if (!t) return;
   const d = t.dataset;
   if (d.sbListen) { sb.listening = sb.listening === d.sbListen ? false : d.sbListen; sbRender(); return; }
-  if (d.sbStyle) { sb.spec.style = d.sbStyle; sbRender(); sbChanged(); return; }
-  if (d.sbMode) { sb.spec.mode = d.sbMode; sbRender(); sbChanged(); return; }
+  if (d.sbStyle) { sbDropEdits(); sb.spec.style = d.sbStyle; sbRender(); sbChanged(); return; }
+  if (d.sbMode) { sbDropEdits(); sb.spec.mode = d.sbMode; sbRender(); sbChanged(); return; }
   if (d.sbCat) { sb.cat = d.sbCat; sb.find = ""; sbRender(); return; }
   if (d.sbAdd) {
     if (sb.spec.steps.length >= 12) { status("Up to 12 steps fit on one key.", true); return; }
-    sb.spec.steps.push(sbNewStep(d.sbAdd)); sbRender(); sbChanged(); return;
+    sbDropEdits(); sb.spec.steps.push(sbNewStep(d.sbAdd)); sbRender(); sbChanged(); return;
   }
-  if (d.sbDel) { sb.spec.steps.splice(+d.sbDel, 1); sbRender(); sbChanged(); return; }
+  if (d.sbDel) { sbDropEdits(); sb.spec.steps.splice(+d.sbDel, 1); sbRender(); sbChanged(); return; }
   if (d.sbMove) {
     const [i, dir] = d.sbMove.split(":").map(Number);
     const j = i + dir, list = sb.spec.steps;
     if (j < 0 || j >= list.length) return;
-    [list[i], list[j]] = [list[j], list[i]]; sbRender(); sbChanged(); return;
+    sbDropEdits(); [list[i], list[j]] = [list[j], list[i]]; sbRender(); sbChanged(); return;
   }
   if (d.sbKeepmove !== undefined) {
     let seen = false;
@@ -17322,9 +17391,20 @@ document.addEventListener("click", e => {
   if (d.sbIdea) {
     const idea = SB_IDEAS[+d.sbIdea];
     if (idea.keys) { sb.binding = idea.keys.binding; sb.target = idea.keys.target; sb.keyLabel = ""; sb.targetLabel = ""; sb.listening = "idea"; setTimeout(() => sbSetKey(""), 0); }
+    delete sb.spec.lines_text;
     sb.spec = {name: idea.spec.name, mode: idea.spec.mode, style: idea.spec.style,
       steps: idea.spec.steps.map(s => Object.assign(sbNewStep(s.id), s))};
     sbRender(); sbChanged(); return;
+  }
+  if (d.sbEdit !== undefined) { sb.spec.lines_text = (sb.built && sb.built.lines || []).join("\n"); sbRender(); sbChanged();
+    setTimeout(() => { const t = $("sb-lines-edit"); if (t) t.focus(); }, 0); return; }
+  if (d.sbUnedit !== undefined) { delete sb.spec.lines_text; sbRender(); sbChanged(); return; }
+  if (d.sbOpen !== undefined) {
+    const x = sb.saved[+d.sbOpen], sp = x.spec;
+    sb.spec = {name: sp.name, mode: sp.mode, style: sp.style, steps: (sp.steps || []).map(s => Object.assign(sbNewStep(s.id), s))};
+    if (sp.lines) sb.spec.lines_text = sp.lines.join("\n");
+    sb.binding = sp.binding || ""; sb.keyLabel = x.key || ""; sb.target = sp.target || ""; sb.targetLabel = x.target || "";
+    sb.confirm = null; sbRender(); sbChanged(); return;
   }
   if (d.sbClear !== undefined) { sb.spec = {name: "", mode: "press", steps: []}; sb.confirm = null; sbRender(); sbChanged(); return; }
   if (d.sbSave !== undefined) { sbSave(false); return; }
@@ -17338,9 +17418,10 @@ document.addEventListener("input", e => {
   const t = e.target, d = t.dataset;
   if (t.id === "sb-name") { sb.spec.name = t.value; sbChanged(); return; }
   if (t.id === "sb-find") { sb.find = t.value; sbRender(); return; }
-  if (d.sbText !== undefined) { sb.spec.steps[+d.sbText].text = t.value; sbChanged(); return; }
-  if (d.sbVal !== undefined) { sb.spec.steps[+d.sbVal].value = t.value === "" ? null : +t.value; sbChanged(); return; }
-  if (d.sbBack !== undefined) { sb.spec.steps[+d.sbBack].back = t.value === "" ? null : +t.value; sbChanged(); return; }
+  if (t.id === "sb-lines-edit") { sb.spec.lines_text = t.value; sbChanged(); return; }
+  if (d.sbText !== undefined) { sbDropEdits(); sb.spec.steps[+d.sbText].text = t.value; sbChanged(); return; }
+  if (d.sbVal !== undefined) { sbDropEdits(); sb.spec.steps[+d.sbVal].value = t.value === "" ? null : +t.value; sbChanged(); return; }
+  if (d.sbBack !== undefined) { sbDropEdits(); sb.spec.steps[+d.sbBack].back = t.value === "" ? null : +t.value; sbChanged(); return; }
 });
 
 let activeTab = "launcher";
