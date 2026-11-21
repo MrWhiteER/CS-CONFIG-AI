@@ -92,6 +92,11 @@ class State:
         # Inert until switched on in preferences; remembers the last board so
         # the lights come up at start without the keyboard tab being opened.
         self.rgb = RgbSync(cache=user_data_dir() / "rgb-board.json")
+        from .mouse import MouseControl
+
+        # Mouse speed and polling rate, set on the mouse itself. Touches the
+        # mouse only when asked, or at start when a speed was chosen.
+        self.mouse = MouseControl()
 
     def refresh(self, rescan: bool = False) -> None:
         if self.machine is None or rescan:
@@ -925,6 +930,39 @@ def _rgb_settings(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         except Exception:
             pass
     return _rgb(state, {})
+
+
+def _mouse(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """The mice plugged in, what each uses now, and what the player chose."""
+    from .cli import load_prefs
+    from .mouse import read_settings
+
+    state.mouse.find()
+    return {"ok": True, **state.mouse.status(read_settings(load_prefs().get("ui")))}
+
+
+def _mouse_settings(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Choose a mouse speed / polling rate, remember it, put it on the mouse.
+
+    0 means "leave the mouse as it is". The choice syncs with the player's
+    cloud copy, so the next PC they sign in on sets its mouse the same way.
+    """
+    from .cli import load_prefs, save_prefs
+    from .mouse import DEFAULTS, read_settings
+
+    prefs = load_prefs()
+    current = read_settings(prefs.get("ui"))
+    try:
+        wanted = read_settings({**current, **{k: body[k] for k in DEFAULTS if k in body}},
+                               strict=True)
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
+    profiles.remember(prefs, None, wanted)
+    save_prefs(prefs)
+    # Only what was just picked goes to the mouse, so picking a polling rate
+    # doesn't undo a speed the player set with the button on the mouse.
+    state.mouse.apply({k: (wanted[k] if k in body else 0) for k in DEFAULTS})
+    return {"ok": True, **state.mouse.status(wanted)}
 
 
 def _cfg_scan(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -5139,6 +5177,10 @@ def _after_pull(state: State, result: Dict[str, Any]) -> Dict[str, Any]:
             from .rgb import read_settings as rgb_read
             state.rgb.configure(rgb_read(ui))
             done["lighting"] = True
+        if any(k.startswith("mouse_") for k in changed):
+            from .mouse import read_settings as mouse_read
+            state.mouse.apply_later(mouse_read(ui))
+            done["mouse"] = True
     except Exception:
         pass
     if (changed & set(autosync.APPLY_PREFS) or result.get("written")) \
@@ -5979,6 +6021,8 @@ def make_handler(state: State):
         "/api/overlay/settings": _overlay_settings,
         "/api/rgb": _rgb,
         "/api/rgb/settings": _rgb_settings,
+        "/api/mouse": _mouse,
+        "/api/mouse/settings": _mouse_settings,
     }
 
     class Handler(BaseHTTPRequestHandler):
@@ -6541,4 +6585,12 @@ def serve(port: int = 8765, cfg_folder: str = "mrwhiteer",
         state.rgb.configure(rgb_settings(load_prefs().get("ui")))
     except Exception:
         pass                    # lighting is never worth failing to start over
+    try:
+        from .mouse import read_settings as mouse_settings
+
+        # The mouse keeps a speed in its own memory, but a new mouse, a new
+        # PC or the maker's app may have changed it: put the choice back.
+        state.mouse.apply_later(mouse_settings(load_prefs().get("ui")))
+    except Exception:
+        pass
     return server, state

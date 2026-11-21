@@ -56,6 +56,8 @@ MACHINE_KEYS = frozenset({
     # Lighting belongs to the keyboard and mouse on this desk, like the sound
     # devices above.
     "rgb_enabled", "rgb_free", "rgb_brightness", "rgb_vendor_apps",
+    # So does the mouse's speed and polling rate.
+    "mouse_dpi", "mouse_poll",
 })
 
 # The account whose settings are shown, which is itself machine-wide: it is a
