@@ -94,6 +94,11 @@ ITEMS = r'''
 			"loc_description"		"#musickit_valve_csgo_01_desc"
 			"image_inventory"		"econ/music_kits/valve_csgo_01"
 		}
+		"5"
+		{
+			"name"		"one_line_kit"
+			"loc_name"		"#musickit_one_line"
+		}
 		"4"
 		{
 			"name"		"no_text_kit"
@@ -112,6 +117,7 @@ TOKENS = {
     "stickerkit_plain_one": "Plain One",
     "musickit_valve_csgo_01": "CS:GO",
     "musickit_valve_csgo_01_desc": "Valve",
+    "musickit_one_line": "ALLEYCVT &amp; LEVEL UP, BELIEVE",
 }
 
 
@@ -158,6 +164,12 @@ class ReadingTheExtraItems(unittest.TestCase):
         self.assertEqual(kit["artist"], "Valve")
         self.assertNotIn("no_text_kit", self.by)
 
+    def test_an_artist_comma_song_name_is_split_and_unescaped(self):
+        kit = self.by["one_line_kit"]
+        self.assertEqual(kit["artist"], "ALLEYCVT & LEVEL UP")
+        self.assertEqual(kit["skin_name"], "BELIEVE")
+        self.assertEqual(kit["display_name"], "Music Kit | ALLEYCVT & LEVEL UP, BELIEVE")
+
     def test_no_visible_text_is_an_internal_token(self):
         for it in self.items:
             for field in ("skin_name", "display_name", "weapon_name", "rarity"):
@@ -167,6 +179,28 @@ class ReadingTheExtraItems(unittest.TestCase):
     def test_picture_names_are_safe(self):
         for it in self.items:
             self.assertRegex(it["art"], econ._SAFE_ID.pattern)
+
+
+class KnivesFromTheGamesOwnPictures(unittest.TestCase):
+    def test_only_pairs_with_a_shipped_picture_are_listed_with_plain_names(self):
+        gen = skins_catalog._GENERATED
+        index = {gen + n + "_light_png.vtex_c": "e" for n in (
+            "weapon_bayonet_aa_fade", "weapon_bayonet_am_ruby_marbleized",
+            "weapon_bayonet_am_doppler_phase2", "weapon_knife_css_aa_fade",
+            "weapon_knife_survival_bowie_aa_fade", "weapon_ak47_aa_fade")}
+        kits = {"am_ruby_marbleized": {"name_token": "pk_ruby"},
+                "am_doppler_phase2": {"name_token": "pk_dop"}, "aa_fade": {"name_token": "pk_fade"}}
+        tokens = {"pk_ruby": "Doppler", "pk_dop": "Doppler", "pk_fade": "Fade"}
+        with mock.patch.object(skins_catalog.vpk, "read_index", return_value=index):
+            found = skins_catalog._knife_finishes_from_pictures(Path("x"), tokens, kits)
+        self.assertEqual(sorted(found["weapon_bayonet"]), [
+            ("aa_fade", "Fade"), ("am_doppler_phase2", "Doppler (Phase 2)"),
+            ("am_ruby_marbleized", "Doppler (Ruby)")])
+        self.assertEqual(found["weapon_knife_css"], [("aa_fade", "Fade")])
+        self.assertEqual(found["weapon_knife_survival_bowie"], [("aa_fade", "Fade")])
+        self.assertNotIn("weapon_ak47", found)
+        entries = skins_catalog._knife_entries(found)
+        self.assertEqual(len(entries), 5)
 
 
 class CatalogCarriesPictures(unittest.TestCase):

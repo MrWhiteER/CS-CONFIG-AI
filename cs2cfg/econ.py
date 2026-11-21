@@ -12,6 +12,7 @@ these: a PC without CS2 gets the plain cards and no songs.
 
 from __future__ import annotations
 
+import html
 import re
 import struct
 import threading
@@ -107,7 +108,9 @@ def _style(name: str) -> str:
 
 
 def _say(tokens: Dict[str, str], token: str) -> str:
-    return tokens.get(token.lstrip("#").lower(), "")
+    # Some names carry HTML escapes ("ALLEYCVT &amp; LEVEL UP"); show the
+    # plain character.
+    return html.unescape(tokens.get(token.lstrip("#").lower(), ""))
 
 
 def _safe(text: str) -> str:
@@ -223,9 +226,12 @@ def music_kits(root: Pairs, tokens: Dict[str, str]) -> List[Dict[str, Any]]:
             # short line reads as an artist name.
             if len(artist) > 60 or "\n" in artist:
                 artist = ""
+            # The game names most kits "Artist, Song" in one line.
+            if not artist and ", " in title:
+                artist, title = title.split(", ", 1)
             picture = get(kit, "image_inventory") or f"econ/music_kits/{code}"
             entry = _entry("music", "music", "Music Kit", code, title,
-                           f"Music Kit | {title}", "rare",
+                           f"Music Kit | {artist + ', ' if artist else ''}{title}", "rare",
                            [f"panorama/images/{picture}_png.vtex_c"])
             entry["artist"] = artist
             out.append(entry)
