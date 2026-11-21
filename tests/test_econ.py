@@ -85,6 +85,23 @@ ITEMS = r'''
 			"item_rarity"		"rare"
 		}
 	}
+	"keychain_definitions"
+	{
+		"78"
+		{
+			"name"		"kc_db_8ball"
+			"loc_name"		"#keychain_kc_db_8ball"
+			"item_rarity"		"ancient"
+			"image_inventory"		"econ/keychains/drboom/kc_db_8ball"
+		}
+		"89"
+		{
+			"name"		"kc_cologne2026_st1asapinfernoace"
+			"base"		"kc_cologne2026"
+			"highlight_reel"		"cologne2026_st1asapinfernoace"
+			"loc_name"		"#HighlightReel_cologne2026_st1asapinfernoace"
+		}
+	}
 	"music_definitions"
 	{
 		"3"
@@ -117,6 +134,8 @@ TOKENS = {
     "stickerkit_plain_one": "Plain One",
     "musickit_valve_csgo_01": "CS:GO",
     "musickit_valve_csgo_01_desc": "Valve",
+    "keychain_kc_db_8ball": "8 Ball IGL",
+    "highlightreel_cologne2026_st1asapinfernoace": "asap ACE",
     "musickit_one_line": "ALLEYCVT &amp; LEVEL UP, BELIEVE",
 }
 
@@ -163,6 +182,14 @@ class ReadingTheExtraItems(unittest.TestCase):
         self.assertEqual(kit["skin_name"], "CS:GO")
         self.assertEqual(kit["artist"], "Valve")
         self.assertNotIn("no_text_kit", self.by)
+
+    def test_charms_and_highlight_charms_get_a_picture_path(self):
+        ball = self.by["kc_db_8ball"]
+        self.assertEqual(ball["kind"], "charm")
+        self.assertEqual(ball["_pictures"][0], "panorama/images/econ/keychains/drboom/kc_db_8ball_png.vtex_c")
+        ace = self.by["kc_cologne2026_st1asapinfernoace"]
+        self.assertEqual(ace["weapon_name"], "Tournament highlight")
+        self.assertIn("panorama/images/econ/keychains/cologne2026/kc_cologne2026_png.vtex_c", ace["_pictures"])
 
     def test_an_artist_comma_song_name_is_split_and_unescaped(self):
         kit = self.by["one_line_kit"]

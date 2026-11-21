@@ -204,7 +204,15 @@ def charms(root: Pairs, tokens: Dict[str, str]) -> List[Dict[str, Any]]:
                 continue
             pictures = [f"panorama/images/{picture}_png.vtex_c"] if picture else []
             pictures.append(f"panorama/images/econ/keychains/{code}_png.vtex_c")
-            out.append(_entry("charm", "charm", "Charm", code, label,
+            # Tournament highlight charms have no picture of their own: they
+            # show the event's charm ("base"), e.g. keychains/cologne2026/kc_cologne2026.
+            base = get(kc, "base")
+            if base:
+                event = base[3:] if base.startswith("kc_") else base
+                pictures.append(f"panorama/images/econ/keychains/{event}/{base}_png.vtex_c")
+                pictures.append(f"panorama/images/econ/keychains/{base}_png.vtex_c")
+            group = ("highlight", "Tournament highlight") if get(kc, "highlight_reel") else ("charm", "Charm")
+            out.append(_entry("charm", group[0], group[1], code, label,
                               f"Charm | {label}", get(kc, "item_rarity"), pictures))
     return out
 

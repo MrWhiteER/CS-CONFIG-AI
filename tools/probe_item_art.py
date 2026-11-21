@@ -1,6 +1,6 @@
 """Check All Skins pictures and music kit songs against this PC's CS2 files.
 
-Run from the repo folder:  python tools\\probe_item_art.py
+Run from the repo folder:  python tools\\probe_item_art.py  [--all]
 Prints how many items of each type got a real picture, and whether music
 kit songs could be cut out. Writes a few sample files to probe-item-art\\.
 Reads the game files only; changes nothing in CS2.
@@ -19,7 +19,7 @@ out.mkdir(exist_ok=True)
 items = skins_catalog.build(vpk)
 seen, found = Counter(), Counter()
 for it in items:
-    if seen[it["kind"]] >= 40:
+    if seen[it["kind"]] >= (100000 if "--all" in sys.argv else 40):
         continue
     seen[it["kind"]] += 1
     pic = econ.picture(vpk, out / "cache", it["art"], skins_catalog.pictures_for(vpk, it["art"]))
