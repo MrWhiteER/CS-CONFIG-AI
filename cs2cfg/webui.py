@@ -3544,6 +3544,29 @@ def _scriptgen_check(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
             "folder": result is not None}
 
 
+def _scriptgen_saved(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Read-only: the scripts Script Builder has saved, to open them again."""
+    from . import keys, scriptgen
+
+    result = _rescan(state)
+    found = []
+    if result is not None:
+        for config in sorted(result.files.values(), key=lambda c: c.relative):
+            try:
+                text = config.path.read_bytes().decode(config.document.encoding, errors="replace")
+            except OSError:
+                continue
+            if scriptgen.MARK not in text:
+                continue
+            for block in scriptgen.own_blocks(text):
+                spec = block["spec"]
+                binding = spec.get("binding") or ""
+                found.append({"spec": spec, "file": config.relative,
+                              "key": keys.label(binding) if binding else "",
+                              "target": keys.label(spec["target"]) if spec.get("target") else ""})
+    return {"ok": True, "scripts": found}
+
+
 def _scriptgen_save(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     """Write a Script Builder script into the config and put it on its key.
 
@@ -6086,6 +6109,7 @@ def make_handler(state: State):
         "/api/scriptgen/steps": _scriptgen_steps,
         "/api/scriptgen/check": _scriptgen_check,
         "/api/scriptgen/save": _scriptgen_save,
+        "/api/scriptgen/saved": _scriptgen_saved,
         "/api/cfg/settings": _cfg_settings,
         "/api/cfg/settings/apply": _cfg_settings_apply,
         "/api/cfg/apply-script/status": _cfg_apply_script_status,
