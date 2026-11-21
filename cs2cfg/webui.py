@@ -138,7 +138,8 @@ def _frame_goal(machine: Machine, value: Any) -> Optional[int]:
         wanted = int(value)
     except (TypeError, ValueError):
         return None
-    rates = {int(round(d.refresh)) for d in machine.displays if d.refresh}
+    displays = getattr(machine, "displays", None) or []
+    rates = {int(round(d.refresh)) for d in displays if d.refresh}
     return wanted if wanted in rates else None
 
 
@@ -336,7 +337,8 @@ def _record_verification(state, user, profile, launch, body, steps, generated=No
     receipt = {"checks": checks, "account": user.account_id,
                "intent": profile.intent, "applied_at": time.time(),
                "selection": {"intent": profile.intent,
-                             "target_fps": _frame_goal(state.machine, body.get("target_fps")),
+                             "target_fps": _frame_goal(getattr(state, "machine", None),
+                                                         body.get("target_fps")),
                              "load_bias": body.get("load_bias") or "auto",
                              "hide_crosshair": bool(body.get("hide_crosshair"))}}
     state.verification_receipt = receipt
