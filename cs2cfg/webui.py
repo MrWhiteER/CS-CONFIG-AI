@@ -4956,11 +4956,29 @@ def _skins_catalog(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     except (steam.SteamError, skins_catalog.CatalogError) as exc:
         return {"ok": False, "error": str(exc)}
 
-    groups: Dict[str, List[Dict[str, Any]]] = {}
+    # Items only: the page groups them itself. Sending a grouped copy as
+    # well doubled the answer once stickers (thousands of them) came in.
+    return {"ok": True, "items": items, "count": len(items)}
+
+
+def _skins_music(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Every music kit with the song parts the player's game files hold
+    (MVP song first). See cs2cfg.econ."""
+    from . import econ, skins_catalog
+
+    try:
+        vpk_path = _skins_vpk(state)
+        items = skins_catalog.build(vpk_path, force=bool(body.get("force")))
+    except (steam.SteamError, skins_catalog.CatalogError) as exc:
+        return {"ok": False, "error": str(exc)}
+    kits = []
     for it in items:
-        groups.setdefault(skins_catalog.group_of(it["weapon_class"]), []).append(it)
-    return {"ok": True, "items": items, "count": len(items),
-            "groups": [{"name": name, "items": entries} for name, entries in groups.items()]}
+        if it["kind"] != "music":
+            continue
+        kits.append({"kit": it["paintkit"], "name": it["skin_name"],
+                     "artist": it.get("artist", ""), "art": it["art"],
+                     "parts": econ.song_parts(vpk_path, it["paintkit"])})
+    return {"ok": True, "kits": kits}
 
 
 def _skins_tool_status(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
@@ -6183,6 +6201,7 @@ def make_handler(state: State):
         "/api/inventory": _inventory,
         "/api/inventory/inspect": _inventory_inspect,
         "/api/skins/catalog": _skins_catalog,
+        "/api/skins/music": _skins_music,
         "/api/skins/tool_status": _skins_tool_status,
         "/api/skins/tool_browse": _skins_tool_browse,
         "/api/skins/tool_set": _skins_tool_set,
@@ -6323,6 +6342,60 @@ def make_handler(state: State):
                 self.send_header("Content-Type", "image/png")
                 self.send_header("Content-Length", str(len(data)))
                 self.send_header("Cache-Control", "max-age=86400")
+                self.end_headers()
+                self.wfile.write(data)
+                return
+            if path.startswith("/item-art/"):
+                # An item's real inventory picture, cut out of the player's own
+                # CS2 files (cs2cfg.econ). Only names the catalog itself handed
+                # out are looked up, so no path can be asked for. 404 when CS2
+                # is not here: the page shows its plain card.
+                from . import econ, skins_catalog
+                from .paths import user_data_dir
+
+                wanted = path[len("/item-art/"):].removesuffix(".png")
+                art = None
+                try:
+                    dir_vpk = _skins_vpk(state)
+                    candidates = skins_catalog.pictures_for(dir_vpk, wanted)
+                    art = econ.picture(dir_vpk, user_data_dir(), wanted, candidates)
+                except Exception:  # noqa: BLE001 -- a missing picture is never an error
+                    art = None
+                if art is None:
+                    self._send_json({"error": "no picture"}, 404)
+                    return
+                data = art.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "image/png")
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Cache-Control", "max-age=86400")
+                self.end_headers()
+                self.wfile.write(data)
+                return
+            if path.startswith("/music-kit/"):
+                # One part of a music kit's songs (the MVP song first), cut
+                # from the player's own CS2 files. Only parts the kit really
+                # has are served (cs2cfg.econ.song_parts).
+                if self.headers.get("X-CS2CFG-Token") != state.token:
+                    self._send_json({"error": "bad or missing token"}, 403)
+                    return
+                from . import econ
+
+                bits = path[len("/music-kit/"):].split("/")
+                found = None
+                if len(bits) == 2 and all(re.fullmatch(r"[A-Za-z0-9_\-]{1,80}", b) for b in bits):
+                    try:
+                        found = econ.song(_skins_vpk(state), bits[0], bits[1])
+                    except Exception:  # noqa: BLE001
+                        found = None
+                if found is None:
+                    self._send_json({"error": "This song part could not be read from your game files."}, 404)
+                    return
+                data, kind = found
+                self.send_response(200)
+                self.send_header("Content-Type", kind)
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Cache-Control", "no-store")
                 self.end_headers()
                 self.wfile.write(data)
                 return
