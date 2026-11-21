@@ -140,7 +140,8 @@ def _raw(exe: Path) -> Optional[str]:
         from .pcstate import _reg_read
 
         return _reg_read(KEY, str(exe))
-    except OSError:
+    except (OSError, ValueError, TypeError):
+        # Never let the record-keeping stop the setting itself.
         return None
 
 
