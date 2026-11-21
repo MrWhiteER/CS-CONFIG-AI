@@ -5856,7 +5856,10 @@
 .sb-step h4, .sb-side h4 { margin: 3px 0 9px; font-size: 14px; color: var(--ink); }
 .sb-input { width: 100%; box-sizing: border-box; background: var(--chip); border: 1px solid var(--line); color: var(--ink); border-radius: 9px; padding: 8px 11px; font: inherit; }
 .sb-input:focus { outline: none; border-color: var(--accent); }
-.sb-modes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+.sb-modes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; }
+@media (max-width: 1250px) { .sb-modes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.sb-styles { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.sb-keys { display: flex; flex-direction: column; gap: 10px; }
 .sb-mode { text-align: left; border: 1px solid var(--line); border-radius: 11px; padding: 10px 12px; background: var(--panel-2); color: var(--ink); font: inherit; cursor: pointer; }
 .sb-mode b { display: block; margin-bottom: 2px; }
 .sb-mode small { color: var(--muted); font-size: 12px; line-height: 1.35; display: block; }
@@ -16669,6 +16672,7 @@ const SB_MODES = [
   ["press", "Press once", "Every press does all the steps."],
   ["hold", "While held", "Starts on press, everything undoes when you let go."],
   ["toggle", "On / off", "First press turns it on, next press turns it off."],
+  ["shift", "Shift key", "Press it, and another key does something different, then goes back."],
 ];
 const SB_IDEAS = [
   {label: "Drop the bomb + tell team", spec: {name: "Drop the bomb and tell my team", mode: "press",
@@ -16679,10 +16683,13 @@ const SB_IDEAS = [
     steps: [{id: "buy_flash"}, {id: "buy_smoke"}, {id: "buy_he"}, {id: "buy_molotov"}]}},
   {label: "Big radar while held", spec: {name: "Big radar while held", mode: "hold",
     steps: [{id: "radar_zoom", value: 0.3}]}},
+  {label: "Alt + 1 says something", spec: {name: "Alt one says hi", mode: "shift", style: "next",
+    steps: [{id: "say_team", text: "Rotating"}]}, keys: {binding: "scancode226", target: "scancode30"}},
   {label: "Game sound on / off", spec: {name: "Game sound on off", mode: "toggle",
     steps: [{id: "volume", value: 0}]}},
 ];
 const sb = {data: null, spec: {name: "", mode: "press", steps: []}, binding: "", keyLabel: "",
+            target: "", targetLabel: "",
             cat: "weapons", find: "", built: null, key: null, listening: false, confirm: null,
             saving: false, timer: 0};
 
@@ -16750,7 +16757,7 @@ function sbChips() {
   const chips = list.map(s => {
     let off = "";
     if (s.move && hasMove) { off = "CS2 allows only one moving or shooting action per key."; fadedMove = true; }
-    else if (s.hold && sb.spec.mode === "press") { off = "Only works on a “While held” or “On / off” key."; fadedHold = true; }
+    else if (s.hold && (sb.spec.mode === "press" || sb.spec.mode === "shift")) { off = "Only works on a “While held” or “On / off” key."; fadedHold = true; }
     return '<button class="sb-chip" data-sb-add="' + esc(s.id) + '"' + (off ? ' disabled title="' + esc(off) + '"' : (s.note ? ' title="' + esc(s.note) + '"' : "")) +
       '>' + esc(s.label) + '</button>';
   }).join("");
@@ -16765,10 +16772,18 @@ function sbSide() {
   let html = '<h4>What your script will do</h4>';
   const key = sb.keyLabel ? "<b>" + esc(sb.keyLabel) + "</b>" : "your key";
   if (b && b.says && b.says.length) {
-    const lead = sb.spec.mode === "hold" ? "While you hold " + key + ":" :
+    const tgt = (b.target && b.target.label) ? "<b>" + esc(b.target.label) + "</b>" : "the other key";
+    const lead = sb.spec.mode === "shift" ? (sb.spec.style === "hold"
+        ? "While you hold " + key + ", pressing " + tgt + ":"
+        : "Press " + key + ", then the next press of " + tgt + ":") :
+      sb.spec.mode === "hold" ? "While you hold " + key + ":" :
       sb.spec.mode === "toggle" ? "First press of " + key + ":" : "When you press " + key + ":";
     html += '<div class="sb-says"><p>' + lead + '</p><ol>' + b.says.map(t => "<li>" + esc(t) + "</li>").join("") + '</ol>';
-    if (sb.spec.mode !== "press") {
+    if (sb.spec.mode === "shift") {
+      html += '<p style="margin-top:8px">' + (sb.spec.style === "hold" ? "When you let go of " + key + ", " : "After that, ") +
+        tgt + " goes back to \u201c" + esc(b.target && b.target.normal || "what it does now") + "\u201d." +
+        (sb.spec.style === "hold" ? "" : " Changed your mind? Press " + key + " again to cancel.") + '</p>';
+    } else if (sb.spec.mode !== "press") {
       const undo = [];
       if (sb.spec.steps.some(s => (sbStep(s.id) || {}).hold)) undo.push("lets go of everything held");
       (b.release_says || []).forEach(t => undo.push(t));
@@ -16824,21 +16839,35 @@ function sbRender() {
       '<input class="sb-input" id="sb-name" maxlength="40" placeholder="For example: Drop the bomb and tell my team" value="' + esc(sb.spec.name) + '"></div></div>' +
     '<div class="sb-step"><span class="sb-num">2</span><div><h4>How the key works</h4><div class="sb-modes">' +
       SB_MODES.map(m => '<button class="sb-mode" data-sb-mode="' + m[0] + '" aria-pressed="' + (sb.spec.mode === m[0]) + '"><b>' +
-        m[1] + '</b><small>' + m[2] + '</small></button>').join("") + '</div></div></div>' +
+        m[1] + '</b><small>' + m[2] + '</small></button>').join("") + '</div>' +
+      (sb.spec.mode === "shift" ? '<div class="sb-styles">' +
+        [["next", "Only the next press"], ["hold", "While I hold the shift key"]].map(o =>
+          '<button class="sb-cat" data-sb-style="' + o[0] + '" aria-pressed="' + ((sb.spec.style || "next") === o[0]) + '">' + o[1] + '</button>').join("") +
+        '</div>' : "") + '</div></div>' +
     '<div class="sb-step"><span class="sb-num">3</span><div><h4>What it does, in order</h4><div class="sb-acts">' +
       sb.spec.steps.map(sbStepRow).join("") +
       '<div class="sb-add"><input class="sb-input" id="sb-find" placeholder="Add a step: search, e.g. jump, buy, volume, say…" value="' + esc(sb.find) + '">' +
       '<div class="sb-cats">' + cats + '</div>' + sbChips() + '</div></div></div></div>' +
-    '<div class="sb-step"><span class="sb-num">4</span><div><h4>Which key</h4><div class="sb-key">' +
-      '<button class="sb-kc' + (sb.listening ? " listening" : "") + '" id="sb-keybtn">' + (sb.listening ? "Press a key…" : esc(sb.keyLabel || "Pick")) + '</button>' +
-      '<span class="sub">' + (sb.listening ? "Press any key or mouse button. Esc cancels." : "Click, then press any key or mouse button.") + '</span>' +
-      (sb.key && sb.key.binding ? '<span class="sb-hint" style="margin:0">' + esc(sb.key.free ? sb.key.label + " is free right now." : sb.key.label + " is in use right now.") + '</span>' : "") +
+    '<div class="sb-step"><span class="sb-num">4</span><div><h4>' + (sb.spec.mode === "shift" ? "Which keys" : "Which key") + '</h4><div class="sb-keys">' +
+      sbKeyRow("key", sb.spec.mode === "shift" ? "Shift key" : "", sb.keyLabel, sb.key) +
+      (sb.spec.mode === "shift" ? sbKeyRow("target", "Key it changes", sb.targetLabel,
+        sb.built && sb.built.target && sb.built.target.binding ? {binding: 1, free: true, label: sb.built.target.label,
+          note: sb.built.target.label + " does \u201c" + sb.built.target.normal + "\u201d right now."} : null) : "") +
     '</div></div></div>' +
     '</section><section class="sb-card sb-side">' + sbSide() + '</section></div>';
   if (keepSel && keepSel.attr.length) {
     const again = box.querySelector("[" + keepSel.attr[0] + "]");
     if (again) { again.focus(); try { if (keepSel.pos != null) again.setSelectionRange(keepSel.pos, keepSel.pos); } catch (_) {} }
   }
+}
+
+function sbKeyRow(which, title, label, info) {
+  const on = sb.listening === which;
+  const note = info && info.binding ? (info.note || (info.free ? info.label + " is free right now." : info.label + " is in use right now.")) : "";
+  return '<div class="sb-key">' + (title ? '<span class="sub" style="min-width:110px">' + esc(title) + '</span>' : "") +
+    '<button class="sb-kc' + (on ? " listening" : "") + '" data-sb-listen="' + which + '">' + (on ? "Press a key\u2026" : esc(label || "Pick")) + '</button>' +
+    '<span class="sub">' + (on ? "Press any key or mouse button. Esc cancels." : "Click, then press any key or mouse button.") + '</span>' +
+    (note ? '<span class="sb-hint" style="margin:0">' + esc(note) + '</span>' : "") + '</div>';
 }
 
 function sbChanged() {
@@ -16849,7 +16878,7 @@ function sbChanged() {
 
 async function sbCheck() {
   try {
-    const r = await api("/api/scriptgen/check", {spec: sb.spec, binding: sb.binding});
+    const r = await api("/api/scriptgen/check", {spec: Object.assign({}, sb.spec, {target: sb.target}), binding: sb.binding});
     sb.built = r.built; sb.key = r.key;
   } catch (err) {
     sb.built = {ok: false, checks: [{level: "block", text: String(err && err.message || err)}]};
@@ -16860,7 +16889,7 @@ async function sbCheck() {
 async function sbSave(force) {
   sb.saving = true; sbRender();
   try {
-    const r = await api("/api/scriptgen/save", {spec: sb.spec, binding: sb.binding, force: !!force});
+    const r = await api("/api/scriptgen/save", {spec: Object.assign({}, sb.spec, {target: sb.target}), binding: sb.binding, force: !!force});
     sb.confirm = null;
     status((r.replaced ? "Updated “" : "Saved “") + sb.spec.name + "” on " + (r.key && r.key.label || sb.keyLabel) +
       ". Restart CS2 or press your Apply-now key to use it.");
@@ -16877,9 +16906,15 @@ async function sbSave(force) {
 }
 
 function sbSetKey(binding) {
+  const which = sb.listening;
   sb.listening = false;
-  if (binding) { sb.binding = binding; sb.keyLabel = ""; }
-  sbRender(); sbCheck().then(() => { if (sb.key) { sb.keyLabel = sb.key.label; sbRender(); } });
+  if (binding && which === "target") { sb.target = binding; sb.targetLabel = ""; }
+  else if (binding) { sb.binding = binding; sb.keyLabel = ""; }
+  sbRender(); sbCheck().then(() => {
+    if (sb.key) sb.keyLabel = sb.key.label;
+    if (sb.built && sb.built.target && sb.built.target.label) sb.targetLabel = sb.built.target.label;
+    sbRender();
+  });
 }
 
 document.addEventListener("keydown", e => {
@@ -16891,7 +16926,7 @@ document.addEventListener("keydown", e => {
   sbSetKey(binding);
 }, true);
 document.addEventListener("mousedown", e => {
-  if (!sb.listening || e.target && e.target.id === "sb-keybtn" && e.button === 0) return;
+  if (!sb.listening || e.target && e.target.closest && e.target.closest("[data-sb-listen]") && e.button === 0) return;
   const map = {1: "mouse3", 3: "mouse4", 4: "mouse5"};
   if (!map[e.button]) return;
   e.preventDefault(); e.stopPropagation();
@@ -16909,7 +16944,8 @@ document.addEventListener("click", e => {
   const t = e.target.closest("button");
   if (!t) return;
   const d = t.dataset;
-  if (t.id === "sb-keybtn") { sb.listening = !sb.listening; sbRender(); return; }
+  if (d.sbListen) { sb.listening = sb.listening === d.sbListen ? false : d.sbListen; sbRender(); return; }
+  if (d.sbStyle) { sb.spec.style = d.sbStyle; sbRender(); sbChanged(); return; }
   if (d.sbMode) { sb.spec.mode = d.sbMode; sbRender(); sbChanged(); return; }
   if (d.sbCat) { sb.cat = d.sbCat; sb.find = ""; sbRender(); return; }
   if (d.sbAdd) {
@@ -16930,7 +16966,8 @@ document.addEventListener("click", e => {
   }
   if (d.sbIdea) {
     const idea = SB_IDEAS[+d.sbIdea];
-    sb.spec = {name: idea.spec.name, mode: idea.spec.mode,
+    if (idea.keys) { sb.binding = idea.keys.binding; sb.target = idea.keys.target; sb.keyLabel = ""; sb.targetLabel = ""; sb.listening = "idea"; setTimeout(() => sbSetKey(""), 0); }
+    sb.spec = {name: idea.spec.name, mode: idea.spec.mode, style: idea.spec.style,
       steps: idea.spec.steps.map(s => Object.assign(sbNewStep(s.id), s))};
     sbRender(); sbChanged(); return;
   }
