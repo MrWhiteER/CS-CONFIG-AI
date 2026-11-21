@@ -2662,11 +2662,40 @@ def _cfg_plugins(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
 
     found = plugins.find(result)
     payload = plugins.as_dict(found)
+    _mark_made(result, payload["plugins"])
+    payload["suspect"] = sum(1 for c in payload["plugins"] if c.get("suspect"))
     payload["empty_sections"] = [
         {"file": f, "name": n, "line": ln}
         for f, n, ln in getattr(plugins.find, "empty_sections", [])
     ]
     return payload
+
+
+def _mark_made(result, cards: list) -> None:
+    """Say which Scripts-tab cards Script Builder made, so they get a tab of
+    their own and an Edit button that opens them in the builder again."""
+    from . import scriptgen
+
+    for config in result.files.values():
+        try:
+            text = config.path.read_bytes().decode(config.document.encoding, errors="replace")
+        except OSError:
+            continue
+        if scriptgen.MARK not in text:
+            continue
+        for block in scriptgen.own_blocks(text):
+            for card in cards:
+                if (card["file"] == config.relative and card["line"] <= block["last"]
+                        and card["end_line"] >= block["first"]):
+                    # Built and checked by the builder: a shift script that
+                    # rewires another key does so on purpose.
+                    if card.get("suspect"):
+                        card["suspect"] = False
+                        card["notes"] = [n for n in card.get("notes", [])
+                                         if n.get("code") != "state-redefines-other"]
+                    card["made"] = {"alias": block["spec"].get("alias", ""),
+                                    "name": block["spec"].get("name", ""),
+                                    "mode": block["spec"].get("mode", "")}
 
 
 def _unclaimed_keys(result, found) -> list:
@@ -3714,20 +3743,21 @@ def _scriptgen_saved(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
                 alias = str(spec.get("alias") or "")
                 plug = next((p for p in blocks if p.file == config.relative
                              and p.line <= block["last"] and p.end_line >= block["first"]), None)
-                on_keys = []
+                on_keys, on_bindings = [], []
                 for binding in sorted(result.binds):
                     winner = cfgscan._effective_bind(result, chain, binding)
                     if (winner is not None and winner.file in chain and alias
                             and scriptgen._runs_own(winner.body or "", alias)
                             and keys.label(binding) not in on_keys):
                         on_keys.append(keys.label(binding))
+                        on_bindings.append(binding)
                 binding = spec.get("binding") or ""
                 enabled = plug.enabled if plug is not None else True
                 found.append({
                     "spec": spec, "file": config.relative,
                     "id": f"{plug.file}:{plug.line}" if plug is not None else "",
                     "enabled": enabled,
-                    "keys": on_keys,
+                    "keys": on_keys, "binding_now": on_bindings[0] if on_bindings else "",
                     "key": ", ".join(on_keys) if on_keys else
                            (keys.label(binding) if binding and not enabled else ""),
                     "before": scriptgen.describe(spec["key_before"], result)

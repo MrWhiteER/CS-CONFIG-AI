@@ -462,6 +462,13 @@ class SyncCase(Base):
         self.assertIn('alias "+talk_alt" "+voicerecord; talk_alt_next"', again)
         self.assertIn('bind "mouse5" "+talk_alt"', again)
 
+    def test_scripts_tab_marks_builder_scripts(self):
+        self.save_shift()
+        cards = webui._cfg_plugins(self.state, {})["plugins"]
+        made = [c for c in cards if c.get("made")]
+        self.assertEqual([c["made"]["alias"] for c in made], ["talk_alt"])
+        self.assertFalse(made[0]["suspect"])
+
     def test_off_script_without_earlier_job_is_cleared(self):
         reply = webui._scriptgen_save(self.state, {
             "spec": spec("Drop it", "press", {"id": "drop_bomb"}), "binding": "scancode27"})

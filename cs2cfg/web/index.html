@@ -4634,6 +4634,8 @@
     font-size: 9px; min-width: 62px;
   }
   .plug code { font-size: 10.5px; color: var(--ink-dim); }
+  .plug-row.plug-made { align-items: center; gap: 9px; margin-top: 10px; }
+  .plug-row.plug-made .sub2 { flex: 1 1 160px; line-height: 1.4; }
   .plug-notes { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
   .plug-note {
     padding: 5px 8px; border-radius: 7px; font-size: 10.5px; line-height: 1.45;
@@ -6040,6 +6042,7 @@
 .sb-code:focus { outline: none; border-color: var(--accent); }
 .sb-keep { display: inline-flex; align-items: center; gap: 7px; color: var(--ink); font-size: 13px; margin-left: 6px; cursor: pointer; }
 .sb-keep input { accent-color: var(--accent); }
+.sb-offtag { font-size: 10.5px; padding: 1px 6px; border-radius: 6px; background: var(--bg-2, rgba(127,127,127,.15)); color: var(--muted); margin-left: 4px; }
 .sb-keytag { font-size: 10.5px; padding: 1px 6px; border-radius: 6px; background: var(--accent-dim); color: var(--accent); margin-left: 4px; }
 .sb-btns { display: flex; gap: 9px; margin-top: 14px; }
 .sb-btns .primary { flex: 1; }
@@ -11725,6 +11728,12 @@ function plugCard(p) {
     : p.drifts ? '<span class="fbadge warn">can lose track</span>' : "";
   const starred = favourites.has(p.id);
 
+  const editMade = p.made
+    ? '<div class="plug-row plug-made"><button class="btn small plug-edit" data-sb-edit-made="' +
+      esc(p.made.alias) + '" title="Open it in Script Builder to change it">Edit in Script Builder</button>' +
+      '<span class="sub2">' + (p.enabled ? "Switch it off above and it stops, in a match too once you press your apply key."
+        : "Switched off: its key does what it did before.") + "</span></div>"
+    : "";
   return '<div class="plug ' + state + (starred ? " fav" : "") + '">' +
     driftNote.replace("<p ", "<p data-hoist ") +
     '<div class="plug-top">' +
@@ -11742,7 +11751,8 @@ function plugCard(p) {
     "</div>" +
     '<div class="plug-meta">' + badge +
     '<span class="plug-kind" title="' + esc(kindWhy) + '">' + esc(kindName) + "</span>" +
-    (p.entry ? '<code>' + esc(p.entry) + "</code>" : "") +
+    (p.made ? '<span class="sub2">Made in Script Builder</span>'
+      : p.entry ? '<code>' + esc(p.entry) + "</code>" : "") +
     (p.states.length ? '<span class="sub2">' + p.states.length + " states</span>" : "") +
     "</div>" +
     (p.touches.length
@@ -11759,8 +11769,8 @@ function plugCard(p) {
           '<div class="plug-note ' + esc(n.severity) + '">' + esc(n.message) + "</div>").join("") +
         "</div>"
       : "") +
-    plugLayout(p) +
-    plugJump(p) +
+    (p.made ? "" : plugLayout(p)) +
+    plugJump(p) + editMade +
     // The key it is actually bound to, not the one its message claims -- the
     // two disagreed on several scripts. Click to put it on a different one.
     '<div class="plug-src">' +
@@ -11778,14 +11788,24 @@ function plugCard(p) {
 
 let plugTab = null;
 
+// The name on the "Generated scripts by ..." tab: the Steam account in use.
+function plugOwner() {
+  const active = (whoData && whoData.accounts || []).find(a => a.active);
+  return (active && active.name) || "you";
+}
+
 // Which pile each card belongs in. A card is only ever in one, so the counts
 // on the tabs add up to the number of cards.
 function plugGroups(list) {
   const starred = list.filter(p => favourites.has(p.id));
-  const rest = list.filter(p => !favourites.has(p.id));
+  const made = list.filter(p => !favourites.has(p.id) && p.made);
+  const rest = list.filter(p => !favourites.has(p.id) && !p.made);
   return [
     { id: "fav", label: "Favourites",
       items: starred },
+    // Script Builder's own scripts, on or off, in one place.
+    { id: "made", label: "Generated scripts by " + plugOwner(),
+      items: made },
     { id: "attention", label: "Needs attention",
       items: rest.filter(p => p.enabled && (p.broken || p.suspect)) },
     { id: "features", label: "Features",
@@ -11810,6 +11830,7 @@ function renderPlugins() {
     return;
   }
   if (!groups.some(g => g.id === plugTab)) plugTab = groups[0].id;
+  if (!whoData && groups.some(g => g.id === "made")) loadWho().then(renderPlugins);
 
   $("plug-summary").innerHTML =
     '<span class="chg-count">' + plugData.features + "</span>" +
@@ -15926,12 +15947,21 @@ document.addEventListener("change", async e => {
       // What the key does now matters more than how many lines moved, so it
       // is said first and in the key's own terms.
       const gave = (r.restored || []).map(k => k.label);
-      status((want ? "Switched on " : "Switched off ") + r.name +
-             (gave.length ? " \u2014 " + gave.join(", ") +
-                            " restored to CS2 defaults"
-                          : ". Your configuration has been updated") +
-             (r.backup ? ", backup " + r.backup : ""));
+      if (r.builder) {
+        // A Script Builder script: its key goes back to what it did before.
+        status((want ? "Switched on " : "Switched off ") + r.name +
+               (gave.length ? ". " + gave.join(", ") + " is back to what it did before" : "") +
+               ". In a match, press your apply key and it counts right away.");
+      } else {
+        status((want ? "Switched on " : "Switched off ") + r.name +
+               (gave.length ? " \u2014 " + gave.join(", ") +
+                              " restored to CS2 defaults"
+                            : ". Your configuration has been updated") +
+               (r.backup ? ", backup " + r.backup : ""));
+      }
     }
+    // The Keyboard tab and Script Builder read the same files: re-read them.
+    keyData = null; sb.saved = null;
     await loadPlugins(true);
   } catch (err) {
     box.checked = !want;
@@ -17246,6 +17276,26 @@ const sb = {data: null, spec: {name: "", mode: "press", steps: []}, binding: "",
             cat: "weapons", find: "", built: null, key: null, listening: false, confirm: null,
             saving: false, timer: 0};
 
+// The saved list is read again on every visit: a script switched off on the
+// Scripts tab, or moved to another key on the Keyboard tab, shows that here.
+async function sbRefreshSaved() {
+  try { sb.saved = (await api("/api/scriptgen/saved", {})).scripts || []; } catch (_) { return; }
+  if (activeTab === "builder" && sb.data) sbRender();
+}
+
+function sbOpenSaved(x) {
+  const sp = x.spec;
+  sb.spec = {name: sp.name, mode: sp.mode, style: sp.style, keep_own: sp.keep_own,
+    steps: (sp.steps || []).map(s => Object.assign(sbNewStep(s.id), s)),
+    release_steps: (sp.release_steps || []).map(s => Object.assign(sbNewStep(s.id), s))};
+  if (sp.lines) sb.spec.lines_text = sp.lines.join("\n");
+  // The key that really runs it now, which the Keyboard tab may have changed.
+  sb.binding = x.binding_now || sp.binding || "";
+  sb.keyLabel = (x.keys && x.keys[0]) || x.key || "";
+  sb.target = sp.target || ""; sb.targetLabel = x.target || "";
+  sb.confirm = null; sbRender(); sbChanged();
+}
+
 function sbStep(id) { return (sb.data && sb.data.steps || []).find(s => s.id === id); }
 
 async function sbLoad(force) {
@@ -17447,7 +17497,8 @@ function sbSaved() {
   if (!sb.saved || !sb.saved.length) return "";
   return '<h4>Your saved scripts</h4><p class="sb-hint" style="margin:0 0 7px">Click one to open it and change it.</p><div class="sb-ideas" style="margin:0 0 16px">' +
     sb.saved.map((x, i) => '<button class="sb-chip" data-sb-open="' + i + '" title="' + esc(x.file) + '">' + esc(x.spec.name) +
-      (x.key ? ' <span class="sb-keytag">' + esc(x.key) + '</span>' : "") + '</button>').join("") + '</div>';
+      (x.key ? ' <span class="sb-keytag">' + esc(x.key) + '</span>' : "") +
+      (x.enabled === false ? ' <span class="sb-offtag">switched off</span>' : "") + '</button>').join("") + '</div>';
 }
 
 function sbLinesStep() {
@@ -17610,18 +17661,23 @@ document.addEventListener("click", e => {
     setTimeout(() => { const t = $("sb-lines-edit"); if (t) t.focus(); }, 0); return; }
   if (d.sbUnedit !== undefined) { delete sb.spec.lines_text; sbRender(); sbChanged(); return; }
   if (d.sbOpen !== undefined) {
-    const x = sb.saved[+d.sbOpen], sp = x.spec;
-    sb.spec = {name: sp.name, mode: sp.mode, style: sp.style, keep_own: sp.keep_own,
-      steps: (sp.steps || []).map(s => Object.assign(sbNewStep(s.id), s)),
-      release_steps: (sp.release_steps || []).map(s => Object.assign(sbNewStep(s.id), s))};
-    if (sp.lines) sb.spec.lines_text = sp.lines.join("\n");
-    sb.binding = sp.binding || ""; sb.keyLabel = x.key || ""; sb.target = sp.target || ""; sb.targetLabel = x.target || "";
-    sb.confirm = null; sbRender(); sbChanged(); return;
+    sbOpenSaved(sb.saved[+d.sbOpen]); return;
   }
   if (d.sbClear !== undefined) { sb.spec = {name: "", mode: "press", steps: []}; sb.confirm = null; sbRender(); sbChanged(); return; }
   if (d.sbSave !== undefined) { sbSave(false); return; }
   if (d.sbForce !== undefined) { sbSave(true); return; }
   if (d.sbCancel !== undefined) { sb.confirm = null; sbRender(); return; }
+});
+
+document.addEventListener("click", async e => {
+  const btn = e.target.closest("[data-sb-edit-made]");
+  if (!btn) return;
+  const alias = btn.dataset.sbEditMade;
+  setTab("builder");
+  await sbLoad(false);
+  await sbRefreshSaved();
+  const x = (sb.saved || []).find(s => s.spec.alias === alias);
+  if (x) sbOpenSaved(x);
 });
 
 document.addEventListener("input", e => {
@@ -17655,7 +17711,7 @@ function setTab(name) {
   if (name === "skins") { if (!skinsToolStatus) loadSkinsToolStatus(); if (!skinsData) loadSkinsCatalog(false); }
   else if (musicNow) stopMusic();
   if (name === "scripts") loadPlugins(false);
-  if (name === "builder") sbLoad(false);
+  if (name === "builder") sbLoad(false).then(sbRefreshSaved);
   if (name === "keyboard") loadKeyboard(false);
   if (name === "fix") loadFixes(false);
   if (name === "settings") {
