@@ -2261,7 +2261,7 @@
 /* Section 5: a shared Settings grid and plan-backed preset reveal. */
 .settings-box .subpane { grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:stretch;padding:16px 18px; }
 .settings-box .subpane > :is(.panel,.card) { min-width:0;min-height:220px;padding:20px; }
-.settings-box #machine-card { grid-column:auto;order:0; }
+.settings-box #machine-card,.settings-box #nv-card { grid-column:1/-1;order:0; }
 .settings-box #setups-card { order:2; }
 .settings-box #results { display:contents; }
 .settings-box #results > .card { order:3;min-width:0;padding:20px;margin:0; }
@@ -2301,6 +2301,74 @@
 .hw-paused .bias-thumb,.hidden .bias-thumb { transition:none!important; }
 @media(prefers-reduced-motion:reduce) { .settings-box .bias .bias-thumb { transition:none!important; }.preset-row,.preset-veil { animation:none!important; } }
 
+
+/* NVIDIA tab and the live apply list (Edy, Nov 21). The mark is an original
+   eye-and-swirl shape in NVIDIA green, drawn as a mask so it takes any size. */
+.nv-mark,.nv-tab-mark,.nv-mini { display:inline-block; width:18px; height:18px; vertical-align:-3px; background:#76b900; -webkit-mask:var(--nv-eye) center/contain no-repeat; mask:var(--nv-eye) center/contain no-repeat; }
+:root { --nv-eye:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M2 16c4-7 9-10 14-10s10 3 14 10c-4 7-9 10-14 10S6 23 2 16Zm14-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13Zm0 3a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7Z' fill='%23000'/%3E%3C/svg%3E"); }
+.nv-tab-mark { width:14px; height:14px; vertical-align:-2px; }
+.nv-mini { width:11px; height:11px; vertical-align:-1px; margin-right:4px; }
+.nv-mark.big { width:30px; height:30px; }
+.nv-head { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:0 0 10px; }
+.nv-managed-by { display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px; font-size:11.5px; color:var(--ink); background:color-mix(in srgb,#76b900 14%,transparent); border:1px solid color-mix(in srgb,#76b900 45%,transparent); }
+.nv-managed-by svg { width:15px; height:15px; fill:none; stroke:#76b900; stroke-width:1.8; stroke-linejoin:round; stroke-linecap:round; }
+.nv-mode { margin:0 0 6px; }
+.nv-list { display:grid; }
+.nv-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(150px,auto) auto; gap:12px; align-items:center; padding:10px 0; border-top:1px solid var(--line); transition:opacity .2s; }
+.nv-row.saving { opacity:.55; pointer-events:none; }
+.nv-name { font-size:13px; min-width:0; overflow-wrap:anywhere; }
+.nv-name small { display:block; margin-top:3px; font-size:11px; color:var(--muted); }
+.nv-row.managed:not(.manual) .nv-name small { color:#8fd11a; }
+.nv-val { font-size:12.5px; color:var(--ink); justify-self:end; text-align:right; }
+.nv-pick { justify-self:end; max-width:240px; }
+.nv-manual { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); white-space:nowrap; cursor:pointer; }
+.nv-all-bar { display:flex; gap:10px; align-items:center; margin-top:14px; flex-wrap:wrap; }
+.nv-all-bar input { flex:1; min-width:180px; }
+#nv-all { margin-top:8px; max-height:520px; overflow:auto; padding-right:6px; }
+.nv-helper { display:flex; gap:12px; align-items:center; justify-content:space-between; padding:10px 12px; margin:0 0 10px; border-radius:9px; border:1px solid color-mix(in srgb,var(--warn) 45%,transparent); background:color-mix(in srgb,var(--warn) 10%,transparent); font-size:12.5px; }
+.bias-why { margin:8px 0 0; }
+@media(max-width:700px) { .nv-row { grid-template-columns:1fr; gap:6px; } .nv-val,.nv-pick { justify-self:start; } }
+
+.apply-feed { position:fixed; right:20px; bottom:20px; z-index:520; width:min(360px,calc(100vw - 40px)); max-height:min(460px,calc(100vh - 40px)); display:flex; flex-direction:column; color:var(--ink); border-radius:14px; border:1px solid var(--line); background:linear-gradient(var(--panel-2),var(--panel-2)),var(--bg); box-shadow:0 18px 50px rgba(0,0,0,.45); overflow:hidden; animation:af-in .32s cubic-bezier(.2,.9,.25,1.15) both; }
+.apply-feed.leaving { animation:af-out .25s ease both; }
+.apply-feed header { display:flex; align-items:center; gap:10px; padding:12px 14px; border-bottom:1px solid var(--line); font-size:13px; }
+.apply-feed header b { flex:1; font-weight:600; }
+.af-x { background:none; border:0; color:var(--muted); font-size:18px; line-height:1; cursor:pointer; padding:0 2px; }
+.af-spin { width:14px; height:14px; border-radius:50%; border:2px solid color-mix(in srgb,var(--accent) 30%,transparent); border-top-color:var(--accent); animation:af-spin .8s linear infinite; }
+.af-rows { list-style:none; margin:0; padding:6px 14px; overflow:auto; flex:1; min-height:0; }
+.af-row { display:grid; grid-template-columns:22px minmax(0,1fr); column-gap:10px; row-gap:2px; align-items:center; padding:7px 0; font-size:12.5px; animation:af-row .34s cubic-bezier(.2,.9,.25,1.1) both; }
+.af-row + .af-row { border-top:1px solid color-mix(in srgb,var(--line) 70%,transparent); }
+.af-ic { display:grid; place-items:center; width:22px; height:22px; border-radius:6px; color:var(--accent); background:color-mix(in srgb,var(--accent) 14%,transparent); }
+.af-ic svg { width:14px; height:14px; }
+.af-row.nv .af-ic { background:color-mix(in srgb,#76b900 16%,transparent); }
+.af-row.nv .af-ic .nv-mark { width:15px; height:15px; }
+.af-row.warn .af-ic { color:var(--warn); background:color-mix(in srgb,var(--warn) 16%,transparent); font-weight:700; }
+.af-name small { display:block; color:var(--muted); font-size:11px; margin-top:2px; }
+.af-move { grid-column:2; font-size:12px; }
+.af-move s { color:var(--muted); text-decoration-thickness:1px; margin-right:2px; }
+.af-move b { color:var(--good); font-weight:600; }
+.af-row.nv .af-move b { color:#8fd11a; }
+.af-end { position:relative; display:grid; grid-template-columns:auto auto minmax(0,1fr); gap:12px; align-items:center; padding:14px; border-top:1px solid var(--line); background:color-mix(in srgb,var(--good) 8%,transparent); }
+.af-end.nvidia { background:color-mix(in srgb,#76b900 12%,transparent); }
+.af-end.partly { background:color-mix(in srgb,var(--warn) 10%,transparent); }
+.nv-badge,.af-badge { display:grid; place-items:center; width:44px; height:44px; border-radius:12px; background:color-mix(in srgb,#76b900 20%,transparent); animation:af-pop .5s cubic-bezier(.2,1.4,.4,1) both; }
+.af-badge { display:none; }
+.af-end:not(.nvidia) { grid-template-columns:auto minmax(0,1fr); }
+.af-end .af-tick { display:block; width:30px; height:30px; fill:none; stroke:var(--good); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.af-end.nvidia .af-tick { stroke:#8fd11a; }
+.af-end.partly .af-tick { stroke:var(--warn); }
+.af-tick circle { stroke-dasharray:63; stroke-dashoffset:63; animation:af-draw .5s .15s ease-out forwards; }
+.af-tick path { stroke-dasharray:16; stroke-dashoffset:16; animation:af-draw .32s .55s ease-out forwards; }
+.af-done b { display:block; font-size:13.5px; }
+.af-done small { color:var(--muted); font-size:11.5px; }
+.af-done { animation:af-row .35s .3s both; }
+@keyframes af-in { from { opacity:0; transform:translate(24px,12px) scale(.97); } to { opacity:1; transform:none; } }
+@keyframes af-out { to { opacity:0; transform:translateX(30px); } }
+@keyframes af-row { from { opacity:0; transform:translateX(14px); } to { opacity:1; transform:none; } }
+@keyframes af-pop { 0% { transform:scale(.4) rotate(-12deg); opacity:0; } 100% { transform:none; opacity:1; } }
+@keyframes af-draw { to { stroke-dashoffset:0; } }
+@keyframes af-spin { to { transform:rotate(360deg); } }
+@media(prefers-reduced-motion:reduce) { .apply-feed,.apply-feed * { animation:none!important; } .af-tick circle,.af-tick path { stroke-dashoffset:0; } }
 </style>
 <style>
   /* ------------------------------------------------------------------------
@@ -6795,9 +6863,8 @@ const startup = (() => {
           <div class="eyebrow">Tuning &amp; tools</div>
           <h2>Settings</h2>
           <p>
-            Pick what the generated config should optimise for, then review and apply.
-            Below that, the configuration studio reads a folder of scripts to show how they
-            load and where the problems are &mdash; nothing is written until you ask.
+            Your graphics card and NVIDIA settings, Steam, lighting, look, sound and the
+            rest of the app. Picture settings follow the mode you pick in the Launcher.
           </p>
         </div>
       </div>
@@ -6870,8 +6937,8 @@ const startup = (() => {
       </section>
 
       <section class="panel wide" id="nv-card">
+        <h2>NVIDIA settings for CS2</h2>
         <div class="nv-head">
-          <h2><span class="nv-mark" aria-hidden="true"></span> NVIDIA settings for CS2</h2>
           <span class="nv-managed-by" title="These follow your Launcher mode"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 21 7v10l-9 5-9-5V7Z"/><path d="m8 12 3 3 5-6"/></svg> Managed by CS CONFIG</span>
         </div>
         <p class="sub" style="margin:0 0 10px">Only CS2's own NVIDIA profile is changed, never other games. Turn on <b>Set manually</b> to choose a value yourself; your Launcher mode then leaves it alone.</p>
@@ -8782,6 +8849,7 @@ const applyFeed = (() => {
     const trouble = r && ((r.skipped || []).length || (r.steps || []).some(s => !s.ok && !s.skipped));
     const end = box.querySelector('.af-end');
     box.querySelector('.af-spin').hidden = true;
+    if (r && r.intent) box.querySelector('header b').textContent = r.intent[0].toUpperCase() + r.intent.slice(1) + ' applied';
     end.hidden = false;
     end.className = 'af-end' + (nv && nv.ok ? ' nvidia' : '') + (trouble ? ' partly' : '');
     end.innerHTML = (nv && nv.ok
@@ -9369,6 +9437,7 @@ function setSettingsSub(name, restoring) {
     if (name === "apps") { loadCompanions(); loadAppTiles(); }
     if (name === "steam") { loadFixes(); loadWho(); }
     if (name === "account") loadCloud();
+    if (name === "nvidia") { loadMachine(); loadNvidia(); }
   }
   rememberPrefs();
 }
@@ -14759,6 +14828,124 @@ document.addEventListener("click", async e => {
   btn.disabled = false;
 });
 
+/* Settings -> NVIDIA: CS2's own NVIDIA profile (Edy, Nov 21).
+
+   Top: the settings each Launcher mode looks after, marked "Managed by CS
+   CONFIG", each with a Set manually switch. Switched on, the player picks the
+   value and every mode leaves it alone; switched off, the mode takes it back.
+   "Show all settings" opens every NVIDIA 3D setting the driver knows, each
+   editable the same way. Changes save at once, through the one-time helper
+   where the driver wants an administrator -- never a prompt here. */
+let nvData = null, nvAllOpen = false, nvBusy = false;
+async function loadNvidia() {
+  const box = $('nv-out');
+  if (!box) return;
+  try { nvData = await api('/api/nvidia', {intent}); }
+  catch (err) { nvData = {available:false, reason:String(err && err.message || err)}; }
+  renderNvidia();
+}
+function nvValueControl(r) {
+  const choices = r.choices || [];
+  const now = r.value;
+  if (choices.length) {
+    const known = choices.some(c => c.value === now);
+    return '<select class="nv-pick" data-nv-pick="' + esc(r.id) + '" aria-label="' + esc(r.name) + '">' +
+      (now == null || !known ? '<option value="" selected>' + esc(r.label) + '</option>' : '') +
+      choices.map(c => '<option value="' + c.value + '"' + (c.value === now ? ' selected' : '') + '>' + esc(c.label) + '</option>').join('') + '</select>';
+  }
+  const range = r.range || [0, 4294967295];
+  return '<input class="nv-pick" type="number" inputmode="numeric" min="' + range[0] + '" max="' + range[1] + '" data-nv-pick="' + esc(r.id) + '" value="' + (now == null ? '' : now) + '" placeholder="' + esc(r.label) + '" aria-label="' + esc(r.name) + '">';
+}
+function nvRow(r) {
+  const manual = r.manual;
+  const value = manual ? nvValueControl(r)
+    : '<span class="nv-val">' + esc(r.label) + '</span>';
+  return '<div class="nv-row' + (manual ? ' manual' : '') + (r.managed ? ' managed' : '') + '" data-nv-row="' + esc(r.id) + '">' +
+    '<span class="nv-name">' + esc(r.name) + (r.managed && !manual ? '<small><span class="nv-mini" aria-hidden="true"></span>Managed by CS CONFIG</small>' : manual ? '<small>Set by you</small>' : '') + '</span>' +
+    value +
+    '<label class="nv-manual"><input type="checkbox" data-nv-manual="' + esc(r.id) + '"' + (manual ? ' checked' : '') + '> Set manually</label></div>';
+}
+function renderNvidia() {
+  const box = $('nv-out'), all = $('nv-all'), more = $('nv-show-all'), filter = $('nv-filter');
+  if (!box) return;
+  const d = nvData;
+  if (!d) { box.innerHTML = '<span class="sub">Reading NVIDIA settings&hellip;</span>'; return; }
+  if (!d.available) {
+    box.innerHTML = '<p class="sub">' + (d.no_driver ? 'This PC has no NVIDIA graphics card, so there is nothing to set here.' : 'NVIDIA settings could not be read: ' + esc(d.reason || 'unknown reason')) + '</p>';
+    more.hidden = true; all.hidden = true; filter.hidden = true;
+    return;
+  }
+  const helper = d.helper || {};
+  const ask = !(helper.installed && helper.current) && helper.supported
+    ? '<div class="nv-helper" data-helper-warning><span>NVIDIA saves settings only with administrator rights. Allow it once and the app never asks again.</span><button class="btn small" id="nv-allow" type="button">Allow once</button></div>' : '';
+  const mode = d.intent ? d.intent[0].toUpperCase() + d.intent.slice(1) : '';
+  box.innerHTML = ask + '<p class="sub2 nv-mode">Following your <b>' + esc(mode) + '</b> mode &middot; driver ' + esc(d.driver || '') + '</p>' +
+    '<div class="nv-list">' + (d.managed || []).map(nvRow).join('') + '</div>';
+  more.hidden = false;
+  more.textContent = nvAllOpen ? 'Hide all settings' : 'Show all settings (' + (d.all || []).length + ')';
+  more.setAttribute('aria-expanded', String(nvAllOpen));
+  filter.hidden = !nvAllOpen;
+  all.hidden = !nvAllOpen;
+  if (nvAllOpen) renderNvidiaAll();
+}
+function renderNvidiaAll() {
+  const all = $('nv-all');
+  const words = ($('nv-filter').value || '').trim().toLowerCase();
+  const rows = (nvData.all || []).filter(r => !words || r.name.toLowerCase().includes(words));
+  all.innerHTML = rows.length ? '<div class="nv-list">' + rows.map(nvRow).join('') + '</div>'
+    : '<p class="sub">No setting by that name.</p>';
+}
+async function nvSave(id, body, row) {
+  if (nvBusy) return;
+  nvBusy = true;
+  row?.classList.add('saving');
+  try {
+    const r = await api('/api/nvidia/set', Object.assign({id, intent}, body));
+    if (!r.ok) throw new Error(r.error || 'NVIDIA did not take the change');
+    const c = (r.changed || [])[0];
+    status(c ? c.name + ': ' + c.after : 'Saved.', {kind:'done'});
+  } catch (err) {
+    status(String(err && err.message || err), true);
+  } finally {
+    nvBusy = false;
+    await loadNvidia();
+  }
+}
+document.addEventListener('change', e => {
+  const sw = e.target.closest('[data-nv-manual]');
+  if (sw) {
+    const id = sw.dataset.nvManual;
+    const row = [...(nvData.managed || []), ...(nvData.all || [])].find(r => r.id === id);
+    // Nothing set yet and nothing managed: open the picker, save on the pick.
+    if (sw.checked && row && row.value == null && !row.managed) {
+      (nvData.all || []).concat(nvData.managed || []).forEach(r => { if (r.id === id) r.manual = true; });
+      renderNvidia();
+      return;
+    }
+    nvSave(id, sw.checked ? {manual:true, keep_current:true} : {manual:false}, sw.closest('.nv-row'));
+    return;
+  }
+  const pick = e.target.closest('[data-nv-pick]');
+  if (pick && pick.value !== '') {
+    const value = Number(pick.value);
+    if (Number.isInteger(value) && value >= 0) nvSave(pick.dataset.nvPick, {manual:true, value}, pick.closest('.nv-row'));
+  }
+});
+document.addEventListener('click', async e => {
+  if (e.target.closest('#nv-show-all')) { nvAllOpen = !nvAllOpen; renderNvidia(); if (nvAllOpen) $('nv-filter').focus(); return; }
+  const allow = e.target.closest('#nv-allow');
+  if (allow) {
+    allow.disabled = true; allow.textContent = 'Waiting for Windows…';
+    try {
+      const r = await api('/api/helper/install', {});
+      updateHelperStatus(r);
+      if (!r.ok) status(r.declined ? 'Windows was not allowed, so NVIDIA settings stay as they are.' : (r.error || 'Windows could not finish.'), true);
+    } catch (err) { status(String(err && err.message || err), true); }
+    loadNvidia();
+  }
+});
+document.addEventListener('input', e => { if (e.target.id === 'nv-filter' && nvData) renderNvidiaAll(); });
+
 /* Named setups.
 
    Switching one is only a write of preferences, so it goes through the same
@@ -16879,6 +17066,7 @@ function setTab(name) {
       loadSetups(); loadCrosshairX();
       loadCompanions(); startCompanionsWatch();
       loadMachine(); loadCloud();
+      if (settingsSub === "nvidia") loadNvidia();
     }
     renderThemes();
   }

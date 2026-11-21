@@ -771,6 +771,14 @@ def write_cs2(changes: Dict[int, object], record: bool = True) -> dict:
     except (NvApiError, OSError) as exc:
         return {"ok": False, "error": str(exc)}
 
+    # The change-history watcher (cs2cfg/nvwatch.py, when present) must not
+    # report the app's own write back as a change made outside the app.
+    try:
+        from . import nvwatch
+        nvwatch.accept_current()
+    except Exception:
+        pass
+
     known = known_settings()
     changed = []
     for setting_id, value in changes.items():
