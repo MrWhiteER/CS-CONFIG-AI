@@ -84,8 +84,9 @@ class TheSettingRow(unittest.TestCase):
         like "NVIDIA Reflex Low Latency" wrapped onto three lines and the list
         became a scroll -- and a name, the value being left and the value being
         taken have to sit on one line or the arrow between them means nothing."""
-        self.assertIn('<div id="results" class="wide">', self.page)
-        self.assertIn("#results {", self.page)
+        # Since Nov 21 the changes of an apply are listed live, bottom right,
+        # one row each, name on the left and before -> after on the right.
+        self.assertIn(".af-row { display:grid; grid-template-columns:22px minmax(0,1fr);", self.page)
         self.assertIn("minmax(460px, 1fr)", self.page)
 
     def test_a_focusable_row_shows_that_it_is_focused(self):

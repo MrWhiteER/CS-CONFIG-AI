@@ -262,6 +262,12 @@ def set_refresh(device: str, refresh: int, apply: bool = False,
                 "note": f"{refresh} Hz is accepted by {device}; not applied"}
 
     now = _current_mode(device)
+    from . import pcstate
+
+    pcstate.note("refresh", device,
+                 [previous.width, previous.height, previous.refresh],
+                 [now.width, now.height, now.refresh] if now else
+                 [previous.width, previous.height, refresh])
     return {"ok": True, "changed": True, "previous": str(previous),
             "current": str(now) if now else "",
             "note": f"{device} set to {refresh} Hz"}
