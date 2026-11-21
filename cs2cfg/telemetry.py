@@ -451,3 +451,35 @@ def summarise(sessions: List[Dict[str, Any]]) -> Dict[str, Any]:
         "borderless": stats(borderless) if borderless else None,
         "exclusive": stats(exclusive) if exclusive else None,
     }
+
+
+def measured_fps(sessions: List[Dict[str, Any]], *, games: int = 10,
+                 min_seconds: float = 120.0, min_frames: int = 1000) -> Optional[Dict[str, Any]]:
+    """What CS2 really ran at on this PC, from recent games with frame data.
+
+    Only games long enough to mean something count: a two-second launch
+    that sat in the menu says nothing about a match. The middle value of the
+    per-game averages is used, so one odd game cannot move the answer.
+    Returns None when no game has frame data yet.
+    """
+    averages: List[float] = []
+    lows: List[float] = []
+    for session in sessions:
+        overlay = session.get("overlay") or {}
+        average = overlay.get("avg_fps")
+        if average is None or (session.get("duration") or 0) < min_seconds:
+            continue
+        if (overlay.get("frame_count") or 0) < min_frames:
+            continue
+        averages.append(float(average))
+        if overlay.get("one_percent_low"):
+            lows.append(float(overlay["one_percent_low"]))
+        if len(averages) >= games:
+            break
+    if not averages:
+        return None
+    return {
+        "games": len(averages),
+        "average": round(statistics.median(averages)),
+        "low": round(statistics.median(lows)) if lows else None,
+    }

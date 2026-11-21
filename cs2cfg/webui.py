@@ -92,6 +92,11 @@ class State:
         # Inert until switched on in preferences; remembers the last board so
         # the lights come up at start without the keyboard tab being opened.
         self.rgb = RgbSync(cache=user_data_dir() / "rgb-board.json")
+        from .mouse import MouseControl
+
+        # Mouse speed and polling rate, set on the mouse itself. Touches the
+        # mouse only when asked, or at start when a speed was chosen.
+        self.mouse = MouseControl()
 
     def refresh(self, rescan: bool = False) -> None:
         if self.machine is None or rescan:
@@ -116,6 +121,33 @@ class State:
         return self.users[0]
 
 
+def _measured_fps() -> Optional[Dict[str, Any]]:
+    """The frame rate CS2 really reached in recent games, or None."""
+    try:
+        from . import telemetry
+        return telemetry.measured_fps(telemetry.load_sessions(40))
+    except Exception:
+        return None
+
+
+def _frame_goal(machine: Machine, value: Any) -> Optional[int]:
+    """A chosen frame rate goal, kept only if it is a real monitor's refresh rate.
+
+    The goal used to be typed freely, so 400 could be asked of a PC that
+    reaches 250: the plan then dropped every setting to its lowest for frames
+    that never came. Only a rate an attached monitor really runs at is kept;
+    anything else (including a number saved by an older version) falls back
+    to the main monitor's refresh rate.
+    """
+    try:
+        wanted = int(value)
+    except (TypeError, ValueError):
+        return None
+    displays = getattr(machine, "displays", None) or []
+    rates = {int(round(d.refresh)) for d in displays if d.refresh}
+    return wanted if wanted in rates else None
+
+
 def _machine_payload(machine: Machine, state: State) -> Dict[str, Any]:
     cpu, gpu = machine.cpu, machine.gpu
     return {
@@ -136,6 +168,7 @@ def _machine_payload(machine: Machine, state: State) -> Dict[str, Any]:
              "primary": d.primary, "confident": d.confident_refresh}
             for d in machine.displays
         ],
+        "measured_fps": _measured_fps(),
         "cs2_install": str(state.cs2_install) if state.cs2_install else None,
         "steam_path": str(state.steam_root) if state.steam_root else None,
         "steam_running": steam.steam_running(),
@@ -158,7 +191,7 @@ def _plan_payload(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     profile = build_profile(
         state.machine, kb,
         intent=body.get("intent", "balanced"),
-        target_fps=int(target) if target else None,
+        target_fps=_frame_goal(state.machine, target),
         current_video=current_video,
         hide_crosshair=bool(body.get("hide_crosshair")),
         load_bias=str(body.get("load_bias") or "auto"),
@@ -309,7 +342,8 @@ def _record_verification(state, user, profile, launch, body, steps, generated=No
     receipt = {"checks": checks, "account": user.account_id,
                "intent": profile.intent, "applied_at": time.time(),
                "selection": {"intent": profile.intent,
-                             "target_fps": body.get("target_fps") or None,
+                             "target_fps": _frame_goal(getattr(state, "machine", None),
+                                                         body.get("target_fps")),
                              "load_bias": body.get("load_bias") or "auto",
                              "hide_crosshair": bool(body.get("hide_crosshair"))}}
     state.verification_receipt = receipt
@@ -338,7 +372,7 @@ def _apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     profile = build_profile(
         state.machine, kb,
         intent=body.get("intent", "balanced"),
-        target_fps=int(target) if target else None,
+        target_fps=_frame_goal(state.machine, target),
         current_video=steam.read_video_cfg(user),
         hide_crosshair=bool(body.get("hide_crosshair")),
         load_bias=str(body.get("load_bias") or "auto"),
@@ -1028,6 +1062,39 @@ def _rgb_settings(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         except Exception:
             pass
     return _rgb(state, {})
+
+
+def _mouse(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """The mice plugged in, what each uses now, and what the player chose."""
+    from .cli import load_prefs
+    from .mouse import read_settings
+
+    state.mouse.find()
+    return {"ok": True, **state.mouse.status(read_settings(load_prefs().get("ui")))}
+
+
+def _mouse_settings(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Choose a mouse speed / polling rate, remember it, put it on the mouse.
+
+    0 means "leave the mouse as it is". The choice syncs with the player's
+    cloud copy, so the next PC they sign in on sets its mouse the same way.
+    """
+    from .cli import load_prefs, save_prefs
+    from .mouse import DEFAULTS, read_settings
+
+    prefs = load_prefs()
+    current = read_settings(prefs.get("ui"))
+    try:
+        wanted = read_settings({**current, **{k: body[k] for k in DEFAULTS if k in body}},
+                               strict=True)
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
+    profiles.remember(prefs, None, wanted)
+    save_prefs(prefs)
+    # Only what was just picked goes to the mouse, so picking a polling rate
+    # doesn't undo a speed the player set with the button on the mouse.
+    state.mouse.apply({k: (wanted[k] if k in body else 0) for k in DEFAULTS})
+    return {"ok": True, **state.mouse.status(wanted)}
 
 
 def _cfg_scan(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -3839,10 +3906,23 @@ def _ingame_watcher(state: State):
     folder = user.video_cfg.parent
     if not folder.is_dir():
         return None
-    watcher = gamewatch.Watcher(folder, user.account_id)
+    watcher = gamewatch.Watcher(folder, user.account_id, on_found=_ingame_found)
     watcher.start()
     state.ingame = watcher
     return watcher
+
+
+def _ingame_found(account_id: str, payload: Dict[str, Any]) -> None:
+    """A finding from CS2's own files goes straight into the change history.
+
+    The review window is asked for here only when the game is already gone;
+    while it runs, the session watcher asks the moment it closes.
+    """
+    from . import history, sessionwatch
+
+    history.add_game_finding(account_id, payload)
+    if not sessionwatch.game_running():
+        history.request_review()
 
 
 def _ingame(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -3920,8 +4000,6 @@ def _ingame_resolve(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     undone by the next launch anyway. Put back writes the value from before
     the session, so the next launch and the apply key both bring it back.
     """
-    from . import defaults as keydefaults
-
     found = _ingame(state, {"account": body.get("account")})
     if not found or found.get("first_run") or not found.get("count"):
         _ingame_ack(state, {"account": body.get("account")})
@@ -3935,49 +4013,192 @@ def _ingame_resolve(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
             wanted[(str(item.get("source")), str(item.get("key")))] = (
                 "back" if item.get("choice") == "back" else "keep")
 
-    kept, put_back, problems = 0, 0, []
-    settings: List[Dict[str, Any]] = []
+    items = []
     for source, changes in (found.get("sources") or {}).items():
-        if source not in _RESOLVABLE:
-            continue
         for change in changes:
             key = str(change.get("key") or "")
-            choice = wanted.get((source, key), "keep")
-            value = change.get("was") if choice == "back" else change.get("now")
-            if source == "Key binds":
-                binding = keydefaults.normalise(key)
-                if state.cfg_scan is None:
-                    continue
-                if value is None or not str(value).strip():
-                    answer = _cfg_bind(state, {"binding": binding, "unbind": True, "force": True})
-                    if not answer.get("ok") and "not bound" in str(answer.get("error", "")):
-                        answer = {"ok": True}
-                else:
-                    answer = _cfg_bind(state, {"binding": binding, "command": str(value),
-                                               "force": True})
-                if not answer.get("ok"):
-                    problems.append(f"{key}: {answer.get('error')}")
-                    continue
-            elif value is None:
-                # A setting that did not exist before cannot be "put back" to
-                # anything; one the game dropped is simply left to the game.
+            items.append({**change, "source": source, "key": key,
+                          "choice": wanted.get((source, key), "keep")})
+    kept, put_back, problems = _game_write(state, body.get("account"), items)
+    _ingame_ack(state, {"account": body.get("account")})
+    return {"ok": True, "kept": kept, "put_back": put_back, "problems": problems}
+
+
+def _game_write(state: State, account: Any,
+                items: List[Dict[str, Any]]) -> Tuple[int, int, List[str]]:
+    """Write CS2-menu changes into the player's config, kept or put back.
+
+    Each item has source, key, was, now and choice ("keep" or "back").
+    Returns (kept, put back, problems).
+    """
+    from . import defaults as keydefaults
+
+    kept, put_back, problems = 0, 0, []
+    settings: List[Dict[str, Any]] = []
+    for change in items:
+        source = str(change.get("source") or "")
+        if source not in _RESOLVABLE:
+            continue
+        key = str(change.get("key") or "")
+        choice = "back" if change.get("choice") == "back" else "keep"
+        value = change.get("was") if choice == "back" else change.get("now")
+        if source == "Key binds":
+            binding = keydefaults.normalise(key)
+            if state.cfg_scan is None:
                 continue
+            if value is None or not str(value).strip():
+                answer = _cfg_bind(state, {"binding": binding, "unbind": True, "force": True})
+                if not answer.get("ok") and "not bound" in str(answer.get("error", "")):
+                    answer = {"ok": True}
             else:
-                settings.append({"name": key, "value": str(value),
-                                 **({"source": "video"} if source == "Picture quality" else {})})
-            if choice == "back":
-                put_back += 1
-            else:
-                kept += 1
+                answer = _cfg_bind(state, {"binding": binding, "command": str(value),
+                                           "force": True})
+            if not answer.get("ok"):
+                problems.append(f"{key}: {answer.get('error')}")
+                continue
+        elif value is None:
+            # A setting that did not exist before cannot be "put back" to
+            # anything; one the game dropped is simply left to the game.
+            continue
+        else:
+            settings.append({"name": key, "value": str(value),
+                             **({"source": "video"} if source == "Picture quality" else {})})
+        if choice == "back":
+            put_back += 1
+        else:
+            kept += 1
 
     if settings and state.cfg_scan is not None:
         answer = _cfg_settings_apply(state, {"changes": settings,
-                                             "account": body.get("account")})
+                                             "account": account})
         if not answer.get("ok"):
             problems.append(str(answer.get("error")))
+    return kept, put_back, problems
 
-    _ingame_ack(state, {"account": body.get("account")})
-    return {"ok": True, "kept": kept, "put_back": put_back, "problems": problems}
+
+def _history(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """The change history, newest first. ``waiting`` limits it to the ones
+    still to be answered, which is what the review window shows."""
+    from . import history, sessionwatch
+
+    found = history.waiting() if body.get("waiting") else history.entries()
+    waiting = sum(1 for e in found if e["status"] == history.WAITING)
+    return {"entries": found, "waiting": waiting,
+            "game_running": sessionwatch.game_running()}
+
+
+def _history_answer(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Keep or Put back, for one change, one line of a change, or many.
+
+    Body: {"answers": [{"id": entry or line id, "choice": "keep"|"back",
+    "force": bool}]} -- or a single {"id", "choice"}.
+    """
+    from . import cfgscan, history, sessionwatch
+
+    answers = body.get("answers")
+    if not isinstance(answers, list):
+        answers = [body]
+    running = sessionwatch.game_running()
+    done, problems, conflicts = 0, [], []
+    by_entry = {e["id"]: e for e in history.entries(200)}
+    game_writes: Dict[str, List[Dict[str, Any]]] = {}
+
+    for answer in answers:
+        if not isinstance(answer, dict):
+            continue
+        target = str(answer.get("id") or "")
+        choice = history.BACK if answer.get("choice") == "back" else history.KEPT
+        entry_id, _, line = target.partition("#")
+        entry = by_entry.get(entry_id)
+        if entry is None:
+            problems.append("That change is no longer in the history.")
+            continue
+
+        if entry["kind"] == "app":
+            if running and any(i.get("file") == "cs2_video.txt" for i in entry["items"]):
+                problems.append(f"{entry['title']}: close CS2 first. It rewrites its "
+                                "picture settings when it quits.")
+                continue
+            with backup.marked("answer"):
+                result = history.swing(entry_id.split(":", 1)[1], choice,
+                                       force=bool(answer.get("force")))
+            if result.get("ok"):
+                done += 1
+            elif result.get("conflict"):
+                conflicts.append({"id": entry_id, "title": entry["title"],
+                                  "error": result.get("error")})
+            else:
+                problems.append(f"{entry['title']}: {result.get('error')}")
+            continue
+
+        # Changes made outside the app: answered line by line.
+        lines = [i for i in entry["items"] if not line or i["id"] == target]
+        event = history.event(entry_id) or {}
+        raw_items = event.get("items") or []
+        for item in lines:
+            index = int(item["id"].rsplit("#", 1)[1])
+            if choice == history.BACK and not item["can_put_back"]:
+                if not line:
+                    continue        # "put all of it back": the rest is done
+                if entry["kind"] == "nvidia":
+                    problems.append(f"{item['what']}: change it back in the NVIDIA app. "
+                                    "This app only reads NVIDIA settings for now.")
+                else:
+                    problems.append(f"{item['what']}: this one can't be put back from here.")
+                continue
+            if (entry["kind"] == "nvidia" and choice == history.BACK
+                    and index < len(raw_items)):
+                from . import nvwatch
+
+                written = nvwatch.put_back(raw_items[index])
+                if not written.get("ok"):
+                    problems.append(f"{item['what']}: " + str(
+                        written.get("error") or "the NVIDIA setting could not be written."))
+                    continue
+            if entry["kind"] == "game" and index < len(raw_items):
+                if running and raw_items[index].get("source") == "Picture quality":
+                    problems.append(f"{item['what']}: close CS2 first.")
+                    continue
+                game_writes.setdefault(event.get("account", ""), []).append(
+                    {**raw_items[index], "choice": "back" if choice == history.BACK else "keep"})
+            history.set_answer(item["id"], choice)
+            done += 1
+
+    for account, items in game_writes.items():
+        with backup.marked("answer"):
+            _kept, _back, trouble = _game_write(state, account or None, items)
+        problems.extend(trouble)
+    if game_writes and state.ingame is not None:
+        state.ingame.clear()
+
+    result = getattr(state, "cfg_scan", None)
+    if result is not None and done:
+        try:
+            state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+        except Exception:
+            pass
+    left = len(history.waiting())
+    if not left:
+        history.review_done()
+    return {"ok": not problems and not conflicts, "done": done, "problems": problems,
+            "conflicts": conflicts, "waiting": left,
+            **({"error": problems[0]} if problems and not conflicts else {})}
+
+
+def _history_later(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Close the review window without answering. Nothing is lost: the
+    changes stay waiting on Settings, Editing."""
+    from . import history
+
+    history.review_done()
+    return {"waiting": len(history.waiting())}
+
+
+def _history_review(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Bring the review window up now, if anything is waiting."""
+    from . import history
+
+    return {"shown": history.request_review()}
 
 
 def _play_fix(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
@@ -4339,14 +4560,120 @@ def _steam_hooks(state: State) -> None:
     """After the shared Steam sign-in, read the match history straight away."""
     from . import steamweb
 
-    steamweb.on_signed_in[:] = [lambda: _steam_history_start(state)]
+    def cloud_too() -> None:
+        state._cloud_quiet_tried = False
+        _cloud_quietly(state)
+
+    steamweb.on_signed_in[:] = [lambda: _steam_history_start(state), cloud_too]
 
 
 def _steam_state() -> Dict[str, Any]:
     from . import steamhistory, steamweb
 
     return {"linked": steamweb.linked(), "available": steamweb.available(),
-            **steamhistory.status}
+            **steamhistory.status, "connection": _steam_connected()}
+
+
+def _cloud_claim_later(state: State, started: Dict[str, Any]) -> None:
+    """Finish a cloud sign-in on the app's side, without the page polling.
+
+    The Steam window does the visible half; this collects the session once
+    Steam hands back, then starts the settings sync straight away.
+    """
+    from . import cloud
+
+    state._steam_login = started
+
+    def run() -> None:
+        try:
+            answer = cloud.wait_for_login(
+                started["state"], started["verifier"],
+                should_stop=lambda: getattr(state, "_steam_login", None) is not started)
+        except cloud.CloudError:
+            return
+        finally:
+            if getattr(state, "_steam_login", None) is started:
+                state._steam_login = None
+        cloud.forget_me()
+        if answer.get("ok", True) and cloud.signed_in():
+            _sync_loop(state).nudge()
+
+    threading.Thread(target=run, name="cloud-claim", daemon=True).start()
+
+
+def _cloud_quietly(state: State) -> None:
+    """Settings sync with nothing for the player to do.
+
+    Once Steam is connected in the app, the app's own cloud signs in with
+    that same Steam session in a hidden window. Tried once per launch; if it
+    does not work the next "Connect Steam" covers it.
+    """
+    from . import cloud, cloudconfig, steamweb
+
+    if getattr(state, "_cloud_quiet_tried", False):
+        return
+    if not (cloudconfig.configured() and steamweb.available() and steamweb.linked()):
+        return
+    if cloud.signed_in() or getattr(state, "_steam_login", None):
+        return
+    if steamweb.mark().get("cloud_off"):
+        return  # signed out of the cloud on purpose, in Settings
+    state._cloud_quiet_tried = True
+
+    def run() -> None:
+        try:
+            started = cloud.begin_login("steam")
+        except cloud.CloudError:
+            return
+        _cloud_claim_later(state, started)
+        if not steamweb.quiet_openid(started["url"]):
+            # Nothing came back: stop asking the cloud about it.
+            if getattr(state, "_steam_login", None) is started:
+                state._steam_login = None
+
+    threading.Thread(target=run, name="cloud-quiet", daemon=True).start()
+
+
+def _steam_connected() -> Dict[str, Any]:
+    """The one Steam connection: Steam's website plus the app's cloud."""
+    from . import cloud, cloudconfig, steamweb
+
+    web = steamweb.linked()
+    has_cloud = cloud.signed_in()
+    return {"web": web, "cloud": has_cloud,
+            "cloud_configured": cloudconfig.configured(),
+            "connected": web and (has_cloud or not cloudconfig.configured())}
+
+
+def _steam_connect(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Connect Steam once: match history, settings sync and anything else.
+
+    One Steam window. When the app's cloud is not signed in yet, the window
+    opens on Steam's OpenID page for it: signing in there also signs Steam's
+    website in for the app, so both are done in one go. When only the
+    website half is missing, Steam's own login page is shown instead.
+    """
+    from . import cloud, cloudconfig, steamweb
+
+    if not steamweb.available():
+        return {**_steam_state(), "ok": False,
+                "error": "Open the app's own window to connect Steam."}
+    _steam_hooks(state)
+    steamweb.mark({"cloud_off": False})
+    if cloudconfig.configured() and not cloud.signed_in():
+        try:
+            started = cloud.begin_login("steam")
+        except cloud.CloudError:
+            started = None
+        if started and steamweb.sign_in(started["url"]):
+            _cloud_claim_later(state, started)
+            return {"ok": True, "opened": True, **_steam_state()}
+    if not steamweb.linked():
+        if not steamweb.sign_in():
+            return {**_steam_state(), "ok": False,
+                    "error": "Open the app's own window to connect Steam."}
+        return {"ok": True, "opened": True, **_steam_state()}
+    return {"ok": True, "opened": False, **_steam_state()}
 
 
 def _stats_steam(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -4361,6 +4688,8 @@ def _stats_steam(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
                     **_steam_state()}
     elif action == "sync" and not _steam_history_start(state):
         return {"ok": False, "error": "Steam account not found", **_steam_state()}
+    elif action == "status":
+        _cloud_quietly(state)
     return {"ok": True, **_steam_state()}
 
 
@@ -4730,11 +5059,29 @@ def _skins_catalog(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     except (steam.SteamError, skins_catalog.CatalogError) as exc:
         return {"ok": False, "error": str(exc)}
 
-    groups: Dict[str, List[Dict[str, Any]]] = {}
+    # Items only: the page groups them itself. Sending a grouped copy as
+    # well doubled the answer once stickers (thousands of them) came in.
+    return {"ok": True, "items": items, "count": len(items)}
+
+
+def _skins_music(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Every music kit with the song parts the player's game files hold
+    (MVP song first). See cs2cfg.econ."""
+    from . import econ, skins_catalog
+
+    try:
+        vpk_path = _skins_vpk(state)
+        items = skins_catalog.build(vpk_path, force=bool(body.get("force")))
+    except (steam.SteamError, skins_catalog.CatalogError) as exc:
+        return {"ok": False, "error": str(exc)}
+    kits = []
     for it in items:
-        groups.setdefault(skins_catalog.group_of(it["weapon_class"]), []).append(it)
-    return {"ok": True, "items": items, "count": len(items),
-            "groups": [{"name": name, "items": entries} for name, entries in groups.items()]}
+        if it["kind"] != "music":
+            continue
+        kits.append({"kit": it["paintkit"], "name": it["skin_name"],
+                     "artist": it.get("artist", ""), "art": it["art"],
+                     "parts": econ.song_parts(vpk_path, it["paintkit"])})
+    return {"ok": True, "kits": kits}
 
 
 def _skins_tool_status(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
@@ -5039,7 +5386,7 @@ def _configs_prepare(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     target = ui.get("target_fps")
     profile = build_profile(state.machine, state.kb,
                             intent=ui.get("intent") or "balanced",
-                            target_fps=int(target) if target else None,
+                            target_fps=_frame_goal(state.machine, target),
                             current_video=steam.read_video_cfg(user) if user else {},
                             hide_crosshair=bool(ui.get("hide_crosshair")),
                             load_bias=str(ui.get("load_bias") or "auto"))
@@ -5118,9 +5465,54 @@ def _sync_round(state: State, force: bool = False) -> Dict[str, Any]:
     if not cloud.signed_in():
         return {"ok": False, "action": "none", "at": time.time(),
                 "reason": "sign in with Steam to sync"}
-    return autosync.run(_active_account(state), _game_cfg_root(state),
-                        state.cfg_folder, load_prefs=load_prefs,
-                        save_prefs=save_prefs, force=force)
+    result = autosync.run(_active_account(state), _game_cfg_root(state),
+                          state.cfg_folder, load_prefs=load_prefs,
+                          save_prefs=save_prefs, force=force)
+    if result.get("action") == "pull" and result.get("ok"):
+        result["applied"] = _after_pull(state, result)
+    return result
+
+
+def _after_pull(state: State, result: Dict[str, Any]) -> Dict[str, Any]:
+    """Put settings that came from another PC to work here, straight away.
+
+    Overlay and lighting take their new settings live. When the cloud brought
+    the player's picture/config choices, the normal apply runs for this PC's
+    own hardware with them -- the same thing the Apply button does, backups
+    included -- so a new PC is ready without anybody pressing anything.
+    """
+    from . import autosync, profiles
+    from .cli import load_prefs
+
+    done: Dict[str, Any] = {}
+    prefs = load_prefs()
+    ui = profiles.ui_for(prefs, _active_account(state))
+    changed = set(result.get("prefs") or [])
+    try:
+        if any(k.startswith("overlay_") for k in changed):
+            from .overlay.settings import read as overlay_read
+            state.overlay.configure(overlay_read(ui))
+            done["overlay"] = True
+        if any(k.startswith("rgb_") for k in changed):
+            from .rgb import read_settings as rgb_read
+            state.rgb.configure(rgb_read(ui))
+            done["lighting"] = True
+        if any(k.startswith("mouse_") for k in changed):
+            from .mouse import read_settings as mouse_read
+            state.mouse.apply_later(mouse_read(ui))
+            done["mouse"] = True
+    except Exception:
+        pass
+    if (changed & set(autosync.APPLY_PREFS) or result.get("written")) \
+            and ui.get(autosync.CFG_WRITE_KEY):
+        body = {k: ui[k] for k in autosync.APPLY_PREFS if k in ui}
+        body["account"] = _active_account(state)
+        try:
+            applied = _apply(state, body)
+            done["apply"] = bool(applied.get("ok"))
+        except Exception:
+            done["apply"] = False
+    return done
 
 
 def _sync_loop(state: State):
@@ -5439,7 +5831,12 @@ def _cloud_password(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
 def _cloud_logout(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     from . import cloud
 
+    from . import steamweb
+
     state._login = None
+    state._steam_login = None
+    # Signing out here is a choice: do not sign the cloud back in quietly.
+    steamweb.mark({"cloud_off": True})
     return cloud.sign_out()
 
 
@@ -5792,7 +6189,7 @@ _CONFIG_WRITERS = {
     _cfg_layouts_delete, _cfg_layouts_remove, _cfg_layouts_import,
     _cfg_layouts_sync_pull, _cfg_starter, _cfg_convert, _cfg_polish_apply,
     _cfg_rename_apply, _goxlr_bind, _profile_use, _scriptgen_save,
-    _configs_prepare, _firstrun_finish, _ingame_resolve,
+    _configs_prepare, _firstrun_finish, _ingame_resolve, _history_answer,
 }
 
 
@@ -5814,6 +6211,10 @@ def make_handler(state: State):
         "/api/ingame": _ingame,
         "/api/ingame/ack": _ingame_ack,
         "/api/ingame/resolve": _ingame_resolve,
+        "/api/history": _history,
+        "/api/history/answer": _history_answer,
+        "/api/history/later": _history_later,
+        "/api/history/review": _history_review,
         "/api/prefs": _save_prefs,
         "/api/cfg/scan": _cfg_scan,
         "/api/cfg/tree": _cfg_tree,
@@ -5889,6 +6290,7 @@ def make_handler(state: State):
         "/api/faceit/forget": _faceit_forget,
         "/api/stats": _stats,
         "/api/stats/steam": _stats_steam,
+        "/api/steam/connect": _steam_connect,
         "/api/match/state": _match_state,
         "/api/match/accept": _match_accept,
         "/api/match/dismiss": _match_dismiss,
@@ -5927,6 +6329,7 @@ def make_handler(state: State):
         "/api/inventory": _inventory,
         "/api/inventory/inspect": _inventory_inspect,
         "/api/skins/catalog": _skins_catalog,
+        "/api/skins/music": _skins_music,
         "/api/skins/tool_status": _skins_tool_status,
         "/api/skins/tool_browse": _skins_tool_browse,
         "/api/skins/tool_set": _skins_tool_set,
@@ -5952,6 +6355,8 @@ def make_handler(state: State):
         "/api/overlay/settings": _overlay_settings,
         "/api/rgb": _rgb,
         "/api/rgb/settings": _rgb_settings,
+        "/api/mouse": _mouse,
+        "/api/mouse/settings": _mouse_settings,
     }
 
     class Handler(BaseHTTPRequestHandler):
@@ -6065,6 +6470,60 @@ def make_handler(state: State):
                 self.send_header("Content-Type", "image/png")
                 self.send_header("Content-Length", str(len(data)))
                 self.send_header("Cache-Control", "max-age=86400")
+                self.end_headers()
+                self.wfile.write(data)
+                return
+            if path.startswith("/item-art/"):
+                # An item's real inventory picture, cut out of the player's own
+                # CS2 files (cs2cfg.econ). Only names the catalog itself handed
+                # out are looked up, so no path can be asked for. 404 when CS2
+                # is not here: the page shows its plain card.
+                from . import econ, skins_catalog
+                from .paths import user_data_dir
+
+                wanted = path[len("/item-art/"):].removesuffix(".png")
+                art = None
+                try:
+                    dir_vpk = _skins_vpk(state)
+                    candidates = skins_catalog.pictures_for(dir_vpk, wanted)
+                    art = econ.picture(dir_vpk, user_data_dir(), wanted, candidates)
+                except Exception:  # noqa: BLE001 -- a missing picture is never an error
+                    art = None
+                if art is None:
+                    self._send_json({"error": "no picture"}, 404)
+                    return
+                data = art.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "image/png")
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Cache-Control", "max-age=86400")
+                self.end_headers()
+                self.wfile.write(data)
+                return
+            if path.startswith("/music-kit/"):
+                # One part of a music kit's songs (the MVP song first), cut
+                # from the player's own CS2 files. Only parts the kit really
+                # has are served (cs2cfg.econ.song_parts).
+                if self.headers.get("X-CS2CFG-Token") != state.token:
+                    self._send_json({"error": "bad or missing token"}, 403)
+                    return
+                from . import econ
+
+                bits = path[len("/music-kit/"):].split("/")
+                found = None
+                if len(bits) == 2 and all(re.fullmatch(r"[A-Za-z0-9_\-]{1,80}", b) for b in bits):
+                    try:
+                        found = econ.song(_skins_vpk(state), bits[0], bits[1])
+                    except Exception:  # noqa: BLE001
+                        found = None
+                if found is None:
+                    self._send_json({"error": "This song part could not be read from your game files."}, 404)
+                    return
+                data, kind = found
+                self.send_response(200)
+                self.send_header("Content-Type", kind)
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Cache-Control", "no-store")
                 self.end_headers()
                 self.wfile.write(data)
                 return
@@ -6449,6 +6908,35 @@ def make_handler(state: State):
     return Handler
 
 
+def _history_watchers(state: State) -> None:
+    from . import history, nvwatch, sessionwatch
+
+    def game_closed() -> None:
+        # Read CS2's settings files the moment the game is gone, so the review
+        # has the game's own changes in it rather than waiting for the timer.
+        try:
+            with state.lock:
+                watcher = _ingame_watcher(state)
+            if watcher is not None:
+                watcher.check_now()
+        except Exception:
+            pass
+
+    def nvidia_moved(items: List[Dict[str, Any]]) -> None:
+        history.add_event("nvidia", items)
+        if not sessionwatch.game_running():
+            history.request_review()
+
+    try:
+        sessionwatch.start(on_closed=game_closed)
+    except Exception:
+        pass
+    try:
+        nvwatch.Watcher(nvidia_moved).start()
+    except Exception:
+        pass
+
+
 def serve(port: int = 8765, cfg_folder: str = "mrwhiteer",
           cfg_name: str = "autoperf.vcfg") -> Tuple[ThreadingHTTPServer, State]:
     state = State(cfg_folder, cfg_name)
@@ -6467,6 +6955,16 @@ def serve(port: int = 8765, cfg_folder: str = "mrwhiteer",
     except Exception:
         pass                    # never let a sound preference stop the app
 
+    # The hardware graph on the System page keeps its own history from the
+    # moment the app starts, so it opens full rather than filling in from
+    # the right. The last two minutes survive a restart too.
+    try:
+        from . import monitor, paths
+
+        monitor.shared().start(paths.user_data_dir() / monitor.HISTORY_FILE)
+    except Exception:
+        pass
+
     # Sensors that need administrator, read through the helper setup put in
     # place. Started here because it no longer costs a prompt.
     try:
@@ -6476,6 +6974,10 @@ def serve(port: int = 8765, cfg_folder: str = "mrwhiteer",
             temps.start_helper()
     except Exception:
         pass
+
+    # The change history's two outside eyes: CS2 closing (however it was
+    # closed) and NVIDIA's settings file moving.
+    _history_watchers(state)
 
     # Settings follow the Steam account between PCs without a button. The
     # loop does nothing until somebody is signed in, and never raises.
@@ -6514,4 +7016,12 @@ def serve(port: int = 8765, cfg_folder: str = "mrwhiteer",
         state.rgb.configure(rgb_settings(load_prefs().get("ui")))
     except Exception:
         pass                    # lighting is never worth failing to start over
+    try:
+        from .mouse import read_settings as mouse_settings
+
+        # The mouse keeps a speed in its own memory, but a new mouse, a new
+        # PC or the maker's app may have changed it: put the choice back.
+        state.mouse.apply_later(mouse_settings(load_prefs().get("ui")))
+    except Exception:
+        pass
     return server, state

@@ -10,10 +10,12 @@ from __future__ import annotations
 
 import json
 import shutil
+import threading
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, Iterator, List, Optional
 
 from .kb import user_data_dir
 
@@ -22,12 +24,31 @@ def backups_root() -> Path:
     return user_data_dir() / "backups"
 
 
+# Why a write happened, for the change history. Most writes are something the
+# player did and are listed; a write that only carries out an answer given in
+# the history ("put this back") is marked so it is not listed a second time as
+# a change of its own.
+_ORIGIN = threading.local()
+
+
+@contextmanager
+def marked(origin: str) -> Iterator[None]:
+    """Tag every backup set started on this thread inside the block."""
+    previous = getattr(_ORIGIN, "value", "")
+    _ORIGIN.value = origin
+    try:
+        yield
+    finally:
+        _ORIGIN.value = previous
+
+
 @dataclass
 class BackupSet:
     stamp: str
     path: Path
     files: Dict[str, str]
     note: str = ""
+    origin: str = ""
 
     @property
     def when(self) -> str:
@@ -49,6 +70,7 @@ class BackupSession:
         self.dir = backups_root() / self.stamp
         self.files: Dict[str, str] = {}
         self.note = note
+        self.origin = getattr(_ORIGIN, "value", "")
         self._started = False
 
     def _start(self) -> None:
@@ -96,6 +118,8 @@ class BackupSession:
             "created": datetime.now().isoformat(timespec="seconds"),
             "files": self.files,
         }
+        if self.origin:
+            manifest["origin"] = self.origin
         (self.dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
     @property
@@ -123,6 +147,7 @@ def list_sets() -> List[BackupSet]:
             path=entry,
             files=data.get("files", {}),
             note=data.get("note", ""),
+            origin=data.get("origin", ""),
         ))
     return out
 
@@ -159,7 +184,7 @@ def restore(backup: BackupSet) -> List[str]:
     return report
 
 
-def prune(keep: int = 20) -> int:
+def prune(keep: int = 120) -> int:
     """Delete all but the newest ``keep`` sets. Returns how many went."""
     sets = list_sets()
     removed = 0

@@ -79,7 +79,23 @@ SYNCED_PREFS = tuple(dict.fromkeys(portable.CARRIED + (
     "demo_key",
     "demo_once",
     "win_graphics_auto",
+    # The keyboard tab's own choices for this account.
+    "kb_profile_icons",
+    # In-game overlay and lighting: how the player likes them, not what this
+    # PC is. Machine-wide here, but they follow the player to a new PC too.
+    "overlay_enabled", "overlay_corner", "overlay_fields", "overlay_hotkey",
+    "overlay_panel_hotkey", "overlay_layout", "overlay_tools", "overlay_dim_game",
+    "overlay_hide_in_rounds", "overlay_always_visible", "overlay_hide_from_capture",
+    "rgb_enabled", "rgb_free", "rgb_brightness",
+    "mouse_dpi", "mouse_poll",
 )))
+
+# Synced choices that the app uses when it builds this PC's own picture,
+# launch options and config. A pull that changes any of them re-applies, so
+# a new PC is set up for its own hardware with the player's choices.
+APPLY_PREFS = ("intent", "target_fps", "stretch_mode", "patch_video", "write_video",
+               "write_cfg", "write_launch", "link_autoexec", "fix_scaling",
+               "hide_crosshair", "load_bias")
 
 # Config files the game reads, and nothing else. A cfg folder also collects
 # logs and screenshots of console output; those are not settings.

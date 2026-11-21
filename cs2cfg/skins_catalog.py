@@ -16,9 +16,9 @@ from __future__ import annotations
 import re
 import time
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
-from . import vpk
+from . import econ, vpk
 
 ITEMS_GAME_PATH = "scripts/items/items_game.txt"
 LOCALIZATION_PATH = "resource/csgo_english.txt"
@@ -264,7 +264,58 @@ KNIFE_MODELS = {
 }
 
 
-def _knife_entries() -> List[Dict[str, Any]]:
+_GENERATED = "panorama/images/econ/default_generated/"
+_VARIANT = (("blackpearl", "Black Pearl"), ("ruby", "Ruby"), ("sapphire", "Sapphire"),
+            ("emerald", "Emerald"))
+
+
+def _knife_label(paintkit: str, tokens: Dict[str, str], paint_kits: Dict[str, Dict[str, Any]]) -> str:
+    """The plain name of a knife finish: the known list first, then the
+    game's own name, with the Doppler phase or gem added (the game names
+    all of them just "Doppler")."""
+    if paintkit in KNIFE_FINISHES:
+        return KNIFE_FINISHES[paintkit]
+    kit = paint_kits.get(paintkit) or {}
+    label = tokens.get(kit.get("name_token", ""), "")
+    if not label or _looks_like_a_leaked_token(label):
+        return ""
+    phase = re.search(r"phase(\d)", paintkit)
+    if phase:
+        return f"{label} (Phase {phase.group(1)})"
+    for key, word in _VARIANT:
+        if key in paintkit:
+            return f"{label} ({word})"
+    return label
+
+
+def _knife_finishes_from_pictures(dir_vpk: Path, tokens: Dict[str, str],
+                                  paint_kits: Dict[str, Dict[str, Any]]) -> Dict[str, List[tuple]]:
+    """Every knife/finish pair CS2 really sells, read from the inventory
+    pictures it ships (one ``<knife>_<finish>_light_png`` per real pair).
+    Empty when the game files cannot be listed; the fixed list is used then."""
+    try:
+        index = vpk.read_index(dir_vpk)
+    except (OSError, vpk.VpkError):
+        return {}
+    out: Dict[str, List[tuple]] = {}
+    classes = sorted(KNIFE_MODELS, key=len, reverse=True)   # longest name wins
+    for path in index:
+        if not (path.startswith(_GENERATED) and path.endswith("_light_png.vtex_c")):
+            continue
+        name = path[len(_GENERATED):-len("_light_png.vtex_c")]
+        knife = next((c for c in classes if name.startswith(c + "_")), None)
+        if knife is None:
+            continue
+        paintkit = name[len(knife) + 1:]
+        if paintkit not in paint_kits and paintkit not in KNIFE_FINISHES:
+            continue
+        label = _knife_label(paintkit, tokens, paint_kits)
+        if label:
+            out.setdefault(knife, []).append((paintkit, label))
+    return out
+
+
+def _knife_entries(found: Optional[Dict[str, List[tuple]]] = None) -> List[Dict[str, Any]]:
     # A knife is always ★ Covert -- that is the knife's own rarity as an
     # item, independent of whichever tier the same finish happens to sit at
     # on a gun (reusing the gun's tier here would have shown "Consumer
@@ -272,7 +323,8 @@ def _knife_entries() -> List[Dict[str, Any]]:
     rarity_name, rarity_color = RARITY["legendary"]
     out: List[Dict[str, Any]] = []
     for weapon_class, (weapon_label, model) in KNIFE_MODELS.items():
-        for paintkit_name, skin_label in KNIFE_FINISHES.items():
+        finishes = found.get(weapon_class, []) if found else list(KNIFE_FINISHES.items())
+        for paintkit_name, skin_label in finishes:
             out.append({
                 "kind": "knife",
                 "weapon_class": weapon_class,
@@ -466,10 +518,33 @@ def build(dir_vpk: Path, force: bool = False) -> List[Dict[str, Any]]:
         }
 
     out = sorted(by_combo.values(), key=lambda it: (it["weapon_name"], it["skin_name"]))
-    out += sorted(_knife_entries(), key=lambda it: (it["weapon_name"], it["skin_name"]))
+    knives = _knife_finishes_from_pictures(dir_vpk, tokens, paint_kits)
+    out += sorted(_knife_entries(knives), key=lambda it: (it["weapon_name"], it["skin_name"]))
     out += sorted(_glove_entries(), key=lambda it: (it["weapon_name"], it["skin_name"]))
-    _CACHE[key] = {"at": time.time(), "data": out}
+
+    # Where each item's real picture sits in the game files. Kept here on
+    # the server: the page only ever gets a short picture name, so it can
+    # never ask for an arbitrary file.
+    pictures: Dict[str, List[str]] = {}
+    for it in out:
+        it["art"] = f"{it['kind']}__{it['weapon_class']}__{it['paintkit']}".lower()
+        pictures[it["art"]] = econ.finish_pictures(it["kind"], it["weapon_class"], it["paintkit"])
+    try:
+        extra = econ.extra_items(items_text, tokens)
+    except Exception:  # noqa: BLE001 -- the guns must still show if this breaks
+        extra = []
+    for it in extra:
+        pictures[it["art"]] = it.pop("_pictures")
+    out += extra
+    _CACHE[key] = {"at": time.time(), "data": out, "pictures": pictures}
     return out
+
+
+def pictures_for(dir_vpk: Path, art_id: str) -> List[str]:
+    """The in-game picture paths behind one item's picture name."""
+    build(dir_vpk)
+    cached = _CACHE.get(str(dir_vpk)) or {}
+    return list((cached.get("pictures") or {}).get(art_id, []))
 
 
 def forget_all() -> None:
