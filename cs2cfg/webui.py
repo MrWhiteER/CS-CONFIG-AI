@@ -6567,6 +6567,16 @@ def serve(port: int = 8765, cfg_folder: str = "mrwhiteer",
     except Exception:
         pass                    # never let a sound preference stop the app
 
+    # The hardware graph on the System page keeps its own history from the
+    # moment the app starts, so it opens full rather than filling in from
+    # the right. The last two minutes survive a restart too.
+    try:
+        from . import monitor, paths
+
+        monitor.shared().start(paths.user_data_dir() / monitor.HISTORY_FILE)
+    except Exception:
+        pass
+
     # Sensors that need administrator, read through the helper setup put in
     # place. Started here because it no longer costs a prompt.
     try:
