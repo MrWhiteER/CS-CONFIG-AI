@@ -16,11 +16,15 @@ Code: `cs2cfg/pcstate.py`. Tests: `tests/test_pcstate.py`.
 | Power plan | `powercfg`, then the helper's existing `power.set` job |
 | Windows Security exclusion of the CS2 folder | the helper's existing `defender.cs2` job |
 | NVIDIA scaling | NVAPI, once CS2 is closed |
+| NVIDIA 3D settings for CS2 (`nvidia_3d`) | NVAPI or the helper's `nvidia.set`, once CS2 is closed |
 | Refresh rate | display API, once CS2 is closed |
 | Desktop resolution while stretched | `deskmode` (already existed) |
 
-The NVIDIA 3D profile is read-only in this app (`cs2cfg/nvidia.py`), so there is
-nothing there to put back. No new helper jobs, so no new permission prompt.
+NVIDIA 3D settings in CS2's own program profile (Settings → NVIDIA, and each
+Launcher mode) are kind `nvidia_3d`, one part per setting id, put back with
+`nvidia.write_cs2` once CS2 is closed. They save through the helper's
+`nvidia.set` job (helper version 3, one more prompt per PC); without the helper
+the put-back reports a plain error and never prompts.
 
 ## How
 
