@@ -332,6 +332,7 @@ def write_launch_options(
         session.add(path)
 
     text = path.read_text(encoding="utf-8", errors="replace")
+    before = vdf.read_value(text, LAUNCH_PATH, "LaunchOptions") or ""
     lines = text.splitlines(keepends=True)
     location = vdf.find_key_line(text, LAUNCH_PATH, "LaunchOptions")
     escaped = _escape(value)
@@ -356,6 +357,11 @@ def write_launch_options(
         )
 
     path.write_text("".join(lines), encoding="utf-8")
+    # Steam's launch options go back to the player's own when the app is not
+    # running; see cs2cfg/pcstate.py.
+    from . import pcstate
+
+    pcstate.note("launch_options", str(user.path), before, value)
     return action
 
 
@@ -426,4 +432,11 @@ def write_video_cfg(
 
     body = vdf.dumps({root_key: root})
     path.write_text(body + "\n", encoding="utf-8")
+    # Only the window-mode keys count as a PC setting the app borrows; every
+    # other picture setting is the player's game config and stays.
+    from . import pcstate
+
+    for key, (was, now) in diff.items():
+        if key in pcstate.WINDOW_KEYS:
+            pcstate.note("window_mode", f"{user.path}|{key}", was, now)
     return diff

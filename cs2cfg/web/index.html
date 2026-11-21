@@ -1024,6 +1024,18 @@
   }
   .wg-row .sub2 { flex: 1 1 220px; min-width: 0; margin: 0; line-height: 1.45; }
 
+  /* PC settings that go back when the app is quit. */
+  .pcs-list { list-style: none; margin: 10px 0 0; padding: 0; }
+  .pcs-list li {
+    display: flex; align-items: baseline; gap: 10px; padding: 8px 0;
+    border-top: 1px solid var(--line);
+  }
+  .pcs-list li:first-child { border-top: 0; }
+  .pcs-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--muted); transform: translateY(-1px); }
+  .pcs-list li.on .pcs-dot { background: var(--good); box-shadow: 0 0 8px color-mix(in srgb, var(--good) 60%, transparent); }
+  .pcs-name { font-weight: 600; flex: 0 0 auto; }
+  .pcs-text { color: var(--muted); font-size: 12px; line-height: 1.45; }
+
   /* The rules note. Bordered rather than buried, because it is the one thing
      on the card this application cannot answer for somebody. */
   .xh-rules {
@@ -6819,6 +6831,17 @@ const startup = (() => {
           <!-- The verdict belongs under the hardware it is a verdict on,
                rather than in a card of its own further down the page. -->
           <div id="assessment-out"></div>
+        </section>
+        <section class="panel" id="pcstate-card">
+          <h2>When you quit the app</h2>
+          <p class="sub" style="margin:0">
+            Settings the app changes outside the game, like Steam launch options,
+            the borderless window for Alt+Tab, NVIDIA scaling and the power plan,
+            are only on while the app is running. When you quit it, restart the PC
+            or uninstall it, your PC goes back to how it was before. Your game
+            configs and picture settings stay as they are.
+          </p>
+          <div id="pcstate-out"><span class="sub">&hellip;</span></div>
         </section>
       </div>
 
@@ -14573,6 +14596,43 @@ const BIAS = [
   ["cpu", "Lean on CPU",
    "Reduces graphics detail for a weaker GPU. Does not move work between parts."],
 ];
+
+async function loadPcState() {
+  const box = $("pcstate-out");
+  if (!box) return;
+  let data;
+  try { data = await api("/api/pcstate", {}); }
+  catch (err) { box.innerHTML = '<p class="sub">Could not read this right now.</p>'; return; }
+  const items = data.items || [];
+  let html = items.length
+    ? '<ul class="pcs-list">' + items.map(it =>
+        '<li class="' + (it.on ? 'on' : '') + '"><i class="pcs-dot" aria-hidden="true"></i>' +
+        '<div><div class="pcs-name">' + esc(it.label) + '</div>' +
+        '<div class="pcs-text">' + esc(it.text) + '</div></div></li>').join('') + '</ul>'
+    : '<p class="sub" style="margin:10px 0 0">The app has not changed any PC settings yet.</p>';
+  if (items.some(it => it.on)) {
+    html += '<div class="wg-row"><span class="sub2">Want your own settings back without quitting? ' +
+            'The app sets its own again the next time it starts.</span>' +
+            '<button class="btn small" id="pcs-restore">Put my PC back now</button></div>';
+  }
+  box.innerHTML = html;
+}
+
+document.addEventListener("click", async e => {
+  if (e.target.closest('[data-sub="this-pc"].seg-item')) { loadPcState(); return; }
+  const go = e.target.closest("#pcs-restore");
+  if (!go) return;
+  go.disabled = true;
+  go.textContent = "Putting back…";
+  try {
+    const r = await api("/api/pcstate/restore", {});
+    const waiting = (r.items || []).filter(it => it.result === "waiting");
+    status(waiting.length
+      ? "Done. Steam launch options and the CS2 window go back once Steam and CS2 are closed."
+      : "Your PC is back to its own settings.");
+  } catch (err) { status(String(err && err.message || err), true); }
+  loadPcState();
+});
 
 async function loadMachine() {
   try { wgData = await api("/api/wingraphics", {}); }

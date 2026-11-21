@@ -134,6 +134,23 @@ def describe(install: Optional[Path], multi_gpu: bool = True) -> Dict[str, Any]:
     }
 
 
+def _raw(exe: Path) -> Optional[str]:
+    """The value exactly as stored, or None when there is none."""
+    try:
+        from .pcstate import _reg_read
+
+        return _reg_read(KEY, str(exe))
+    except OSError:
+        return None
+
+
+def _note(exe: Path, raw_before: Optional[str]) -> None:
+    """Tell cs2cfg.pcstate, which puts it back whenever the app is not running."""
+    from . import pcstate
+
+    pcstate.note("win_graphics", str(exe), raw_before, _raw(exe))
+
+
 def apply(install: Optional[Path]) -> Dict[str, Any]:
     """Write both settings. Only ever called because somebody asked."""
     exe = exe_path(install)
@@ -147,6 +164,7 @@ def apply(install: Optional[Path]) -> Dict[str, Any]:
     if current == target:
         return {"ok": True, "changed": False, "exe": str(exe),
                 "detail": "Windows already has CS2 set to high performance"}
+    raw_before = _raw(exe)
     try:
         import winreg
 
@@ -155,6 +173,7 @@ def apply(install: Optional[Path]) -> Dict[str, Any]:
             winreg.SetValueEx(key, str(exe), 0, winreg.REG_SZ, render(target))
     except OSError as exc:
         return {"ok": False, "error": f"could not write the setting: {exc}"}
+    _note(exe, raw_before)
     return {"ok": True, "changed": True, "exe": str(exe), "was": render(current),
             "now": render(target),
             "detail": "Windows will run CS2 on the high performance card, "
@@ -174,6 +193,7 @@ def clear(install: Optional[Path]) -> Dict[str, Any]:
     if not current:
         return {"ok": True, "changed": False, "detail": "nothing was set"}
     left = {k: v for k, v in current.items() if k not in (GPU_PREFERENCE, WINDOWED)}
+    raw_before = _raw(exe)
     try:
         import winreg
 
@@ -185,4 +205,5 @@ def clear(install: Optional[Path]) -> Dict[str, Any]:
                 winreg.DeleteValue(key, str(exe))
     except OSError as exc:
         return {"ok": False, "error": f"could not clear the setting: {exc}"}
+    _note(exe, raw_before)
     return {"ok": True, "changed": True, "detail": "Windows decides again"}

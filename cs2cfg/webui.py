@@ -4884,6 +4884,22 @@ def _win_graphics_apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     return wingraphics.apply(state.cs2_install)
 
 
+def _pc_state(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """The PC settings the app has changed, and whether each is on right now."""
+    from . import pcstate
+
+    return pcstate.status()
+
+
+def _pc_state_restore(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Give the PC its own settings back now, without quitting. Never prompts."""
+    from . import pcstate
+
+    result = pcstate.put_back_now()
+    result["ok"] = True
+    return result
+
+
 def _settle_win_graphics(state: State, wanted: bool) -> Dict[str, Any]:
     """Keep Windows in step with the switch, on the way into a launch.
 
@@ -5539,6 +5555,11 @@ def _update_install(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         script = updates.install(release, relaunch=bool(body.get("relaunch", True)))
     except Exception as exc:
         return {"ok": False, "error": str(exc)}
+    # The new version opens a moment later and would set every PC setting
+    # again, so the put-back is skipped for an update (cs2cfg/pcstate.py).
+    from . import pcstate
+
+    pcstate.mark_updating()
     return {"ok": True, "installing": True, "script": str(script),
             "version": release.version}
 
@@ -5792,6 +5813,8 @@ def make_handler(state: State):
         "/api/cloud/password": _cloud_password,
         "/api/cloud/logout": _cloud_logout,
         "/api/wingraphics": _win_graphics,
+        "/api/pcstate": _pc_state,
+        "/api/pcstate/restore": _pc_state_restore,
         "/api/wingraphics/apply": _win_graphics_apply,
         "/api/crosshairx": _crosshairx,
         "/api/crosshairx/start": _crosshairx_start,
