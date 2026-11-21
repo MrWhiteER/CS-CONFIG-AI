@@ -3976,6 +3976,15 @@ def _history_answer(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
                 else:
                     problems.append(f"{item['what']}: this one can't be put back from here.")
                 continue
+            if (entry["kind"] == "nvidia" and choice == history.BACK
+                    and index < len(raw_items)):
+                from . import nvwatch
+
+                written = nvwatch.put_back(raw_items[index])
+                if not written.get("ok"):
+                    problems.append(f"{item['what']}: " + str(
+                        written.get("error") or "the NVIDIA setting could not be written."))
+                    continue
             if entry["kind"] == "game" and index < len(raw_items):
                 if running and raw_items[index].get("source") == "Picture quality":
                     problems.append(f"{item['what']}: close CS2 first.")

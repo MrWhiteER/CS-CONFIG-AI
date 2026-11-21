@@ -91,7 +91,7 @@
             "Put back anyway</button></div>"
         : "") +
       (nvidiaOnly && entry.status === "waiting"
-        ? '<div class="chist-note">To undo one of these, change it back in the NVIDIA app. ' +
+        ? '<div class="chist-note">To undo these, change them back in the NVIDIA app. ' +
           "Keep just tells this app you meant it.</div>"
         : "") +
       "</article>";

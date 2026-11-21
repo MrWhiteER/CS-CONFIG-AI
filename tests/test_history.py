@@ -139,6 +139,33 @@ class Outside(Case):
             self.assertEqual(len(nvwatch.check(lambda: snap2)), 1)
 
 
+class NvidiaPutBack(Case):
+    def test_cs2_profile_lines_can_go_back_when_a_writer_exists(self):
+        from cs2cfg import nvidia
+        written = {}
+
+        def write_cs2(values, record=True):
+            written.update(values)
+            return {"ok": True}
+
+        with mock.patch.object(nvidia, "write_cs2", write_cs2, create=True), \
+                mock.patch.object(nvwatch, "accept_current", lambda: None):
+            before = {"Counter-Strike 2": {"0x00A879CF": {"name": "Vertical sync", "value": "Off", "raw": 0}}}
+            after = {"Counter-Strike 2": {"0x00A879CF": {"name": "Vertical sync", "value": "On", "raw": 1}}}
+            item = nvwatch.compare(before, after)[0]
+            self.assertTrue(item["can_put_back"])
+            self.assertTrue(nvwatch.put_back(item)["ok"])
+            self.assertEqual(written, {0x00A879CF: 0})
+
+    def test_without_a_writer_it_is_keep_only(self):
+        from cs2cfg import nvidia
+        if hasattr(nvidia, "write_cs2"):
+            self.skipTest("writer present")
+        before = {"Counter-Strike 2": {"0x1": {"name": "V", "value": "Off", "raw": 0}}}
+        after = {"Counter-Strike 2": {"0x1": {"name": "V", "value": "On", "raw": 1}}}
+        self.assertFalse(nvwatch.compare(before, after)[0]["can_put_back"])
+
+
 class Session(Case):
     def test_closing_however_it_closed_asks_for_review(self):
         up = {"v": True}

@@ -24,6 +24,7 @@ from typing import Callable, Dict, List, Optional
 from .kb import user_data_dir
 
 EXECUTABLES = ("cs2.exe",)
+CS2_PROFILE = "Counter-Strike 2"
 
 
 def drs_files() -> List[Path]:
@@ -56,8 +57,44 @@ def read_now() -> Optional[Dict[str, Dict[str, dict]]]:
 
     take("Every game", result.global_profile)
     for exe, view in result.app_profiles.items():
-        take("Counter-Strike 2" if exe == "cs2.exe" else exe, view)
+        take(CS2_PROFILE if exe == "cs2.exe" else exe, view)
+
+    # The raw values of CS2's own profile, in the form the writer takes, so a
+    # change there can be put back. Only when the NVIDIA tab's writer exists.
+    reader = getattr(nvidia, "read_cs2", None)
+    if reader is not None and out.get(CS2_PROFILE):
+        try:
+            raw = reader([int(k, 16) for k in out[CS2_PROFILE]]) or {}
+        except Exception:
+            raw = {}
+        for key, entry in out[CS2_PROFILE].items():
+            for form in (int(key, 16), key, key.lower()):
+                if form in raw:
+                    entry["raw"] = raw[form]
+                    break
     return out
+
+
+def can_write() -> bool:
+    from . import nvidia
+
+    return getattr(nvidia, "write_cs2", None) is not None
+
+
+def put_back(item: dict) -> dict:
+    """Write an item's old value into CS2's NVIDIA profile again."""
+    from . import nvidia
+
+    writer = getattr(nvidia, "write_cs2", None)
+    if writer is None or item.get("profile") != CS2_PROFILE:
+        return {"ok": False, "error": "This one can only be changed back in the NVIDIA app."}
+    try:
+        result = writer({int(str(item["key"]), 16): item.get("raw_was")}, record=False) or {}
+    except Exception as exc:
+        return {"ok": False, "error": f"Could not write the NVIDIA setting: {exc}"}
+    if result.get("ok"):
+        accept_current()
+    return result
 
 
 def compare(before: Dict[str, Dict[str, dict]], after: Dict[str, Dict[str, dict]]) -> List[dict]:
@@ -70,12 +107,17 @@ def compare(before: Dict[str, Dict[str, dict]], after: Dict[str, Dict[str, dict]
             now = b.get("value") if b else None
             if was == now:
                 continue
+            # Put back only into CS2's own profile (the only one the app
+            # writes), and only when the old value is known in writable form.
+            writable = (profile == CS2_PROFILE and can_write()
+                        and (a is None or "raw" in a))
             items.append({"profile": profile, "key": sid,
                           "name": (b or a or {}).get("name") or sid,
                           # None reads better as the driver's own default.
                           "was": was if was is not None else "NVIDIA default",
                           "now": now if now is not None else "NVIDIA default",
-                          "can_put_back": False})
+                          "raw_was": a.get("raw") if a else None,
+                          "can_put_back": writable})
     return items
 
 
