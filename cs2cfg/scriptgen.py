@@ -36,7 +36,10 @@ from typing import Any, Dict, List, Optional, Tuple
 # without ever touching one the player wrote by hand.
 MARK = "// Made with Script Builder: "
 
-MODES = ("press", "hold", "toggle")
+MODES = ("press", "hold", "toggle", "shift")
+# How a shift key works: "next" = press it, and only the next press of the
+# other key does the new thing; "hold" = while it is held down.
+SHIFT_STYLES = ("next", "hold")
 
 # Movement and attack actions, without their sign. CS2 runs at most one of
 # these from one key since the August 2024 update. "speed" is the old name of
@@ -218,6 +221,17 @@ def describe(command: str, scan=None) -> str:
     return "something else"
 
 
+def normal_bind(scan, binding: str) -> str:
+    """What a key runs now, by the bind that loads last."""
+    if scan is None or not binding:
+        return ""
+    entries = scan.binds.get(binding) or []
+    if not entries:
+        return ""
+    winner = max(entries, key=lambda b: b.order)
+    return (winner.body or "").strip().strip('"').strip()
+
+
 def _number(text: Any, fallback: Any) -> Any:
     try:
         return float(text)
@@ -276,6 +290,7 @@ class Built:
     checks: List[Check] = field(default_factory=list)
     replaces: Optional[Dict[str, Any]] = None
     spec: Dict[str, Any] = field(default_factory=dict)
+    target: Dict[str, Any] = field(default_factory=dict)
 
     def as_dict(self) -> Dict[str, Any]:
         return {
@@ -284,6 +299,7 @@ class Built:
             "release_says": self.release_says,
             "checks": [c.__dict__ for c in self.checks],
             "replaces": self.replaces, "spec": self.spec,
+            "target": self.target,
         }
 
 
@@ -431,7 +447,7 @@ def build(spec: Dict[str, Any], scan=None, key_label: str = "") -> Built:
             fill["value"] = _fmt(value)
             fill["pct"] = f"{round(value * 100)}%"
             kept["value"] = value
-            if mode != "press":
+            if mode in ("hold", "toggle"):
                 back = _number(raw.get("back"), None)
                 if back is None or not low <= back <= high:
                     checks.append(Check("block", f"“{step['label']}” needs a number to go back to, from {_fmt(low)} to {_fmt(high)}."))
@@ -456,7 +472,7 @@ def build(spec: Dict[str, Any], scan=None, key_label: str = "") -> Built:
             says.append(said)
         elif step.get("release"):
             press.append(command)
-            if mode != "press":
+            if mode in ("hold", "toggle"):
                 release.append(step["release"].format(**fill))
                 release_says.append(f"puts {step['label'].lower().replace('set ', '')} back to {fill['back']}")
             says.append(said)
@@ -467,6 +483,12 @@ def build(spec: Dict[str, Any], scan=None, key_label: str = "") -> Built:
 
     # A hold action on a press-once key is the stuck-crouch bug: it is
     # pressed and nothing ever releases it.
+    if holds and mode == "shift":
+        checks.append(Check(
+            "block",
+            f"\u201c{holds[0]}\u201d only works while a key is held down, so it can't be the "
+            "shift key's other action. Pick steps that finish on their own."))
+        block = True
     if holds and mode == "press":
         checks.append(Check(
             "block",
@@ -495,7 +517,8 @@ def build(spec: Dict[str, Any], scan=None, key_label: str = "") -> Built:
         clash = alias in _taken_names() or alias.lstrip("+-") in _taken_names()
         users = []
         if scan is not None:
-            for candidate in (alias, "+" + alias, "-" + alias, alias + "_on", alias + "_off"):
+            for candidate in (alias, "+" + alias, "-" + alias, alias + "_on", alias + "_off",
+                              alias + "_do", alias + "_arm", alias + "_normal"):
                 if scan.effective_alias(candidate) is not None:
                     users.append(candidate)
         if own is not None:
@@ -514,10 +537,63 @@ def build(spec: Dict[str, Any], scan=None, key_label: str = "") -> Built:
         checks.append(Check("block", "Pick a key."))
         block = True
 
+    # The shift key's second key, and how to give that key its own job back.
+    target = str(spec.get("target") or "").strip() if mode == "shift" else ""
+    style = spec.get("style") if spec.get("style") in SHIFT_STYLES else "next"
+    restore = ""
+    normal_lines: List[str] = []
+    target_label = keys.label(target) if target else ""
+    normal_said = ""
+    if mode == "shift":
+        if not target:
+            checks.append(Check("block", "Pick the key the shift key changes."))
+            block = True
+        elif target == binding:
+            checks.append(Check("block", "The shift key and the key it changes must be two different keys."))
+            block = True
+        else:
+            normal = normal_bind(scan, target)
+            normal_said = describe(normal, scan) if normal else "nothing"
+            if not normal:
+                restore = f"unbind {target}"
+            elif re.fullmatch(r"[^\s\";]+", normal):
+                restore = f"bind {target} {normal}"
+            elif '"' not in normal and not re.search(r"(^|;)\s*[+-]", normal):
+                # Several commands: kept in an alias of its own, because a
+                # bind inside an alias cannot hold a second pair of quotes.
+                normal_lines = [f'alias "{alias}_normal" "{normal}"']
+                restore = f"bind {target} {alias}_normal"
+            else:
+                checks.append(Check(
+                    "block",
+                    f"{target_label} runs several things at once, including a held action, so the "
+                    "app can't give it back safely. Put a single action on that key first."))
+                block = True
+            if restore:
+                checks.append(Check(
+                    "ok", f"{target_label} always goes back to \u201c{normal_said}\u201d. "
+                    f"If you change what {target_label} does later, save this script again."))
+
     # Lines
     lines: List[str] = []
     entry = alias
-    if alias and press:
+    if alias and press and mode == "shift":
+        if restore and style == "hold":
+            entry = "+" + alias
+            lines = normal_lines + [
+                f'alias "{alias}_do" "{"; ".join(press)}"',
+                f'alias "+{alias}" "bind {target} {alias}_do"',
+                f'alias "-{alias}" "{restore}"']
+        elif restore:
+            lines = normal_lines + [
+                f'alias "{alias}_do" "{"; ".join(press + [restore, f"alias {alias} {alias}_arm"])}"',
+                f'alias "{alias}_arm" "bind {target} {alias}_do; alias {alias} {alias}_off"',
+                f'alias "{alias}_off" "{restore}; alias {alias} {alias}_arm"',
+                f'alias "{alias}" "{alias}_arm"']
+        if any(len(line) > MAX_LINE for line in lines):
+            checks.append(Check("block", "Too much for one key. Remove a step or shorten the text."))
+            block = True
+    elif alias and press:
         if mode == "hold":
             entry = "+" + alias
             lines = [f'alias "+{alias}" "{"; ".join(press)}"',
@@ -540,8 +616,13 @@ def build(spec: Dict[str, Any], scan=None, key_label: str = "") -> Built:
             checks.insert(1, Check("ok", "Nothing can get stuck. Every step finishes on its own."))
         elif mode == "hold":
             checks.insert(1, Check("ok", "Letting go undoes everything that was held or changed."))
-        else:
+        elif mode == "toggle":
             checks.insert(1, Check("ok", "The second press undoes everything the first one turned on."))
+        elif style == "hold":
+            checks.insert(1, Check("ok", f"Letting go of the shift key gives {target_label} its own job back."))
+        else:
+            checks.insert(1, Check("ok", f"{target_label} does the new thing once, then goes back by itself. "
+                                         "Pressing the shift key again before that cancels it."))
 
     if mode == "hold" and not release:
         checks.append(Check("warn", "Nothing here needs undoing, so “Press once” does the same job.",
@@ -549,9 +630,13 @@ def build(spec: Dict[str, Any], scan=None, key_label: str = "") -> Built:
 
     stored = {"v": 1, "name": name, "mode": mode, "steps": clean_steps,
               "binding": binding, "alias": alias}
+    if mode == "shift":
+        stored.update(target=target, style=style)
     return Built(ok=not block, alias=alias, entry=entry, lines=lines,
                  says=says, release_says=release_says, checks=checks,
-                 replaces=replaces, spec=stored)
+                 replaces=replaces, spec=stored,
+                 target={"binding": target, "label": target_label,
+                         "normal": normal_said} if mode == "shift" else {})
 
 
 def block_lines(built: Built, key_label: str) -> List[str]:
