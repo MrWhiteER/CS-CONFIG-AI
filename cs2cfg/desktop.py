@@ -780,6 +780,16 @@ def run(
             )
         return 0
 
+    # The PC settings the app changes are only in place while it runs: set
+    # them again now, and start the watcher that gives them back when this
+    # process ends, however it ends (cs2cfg/pcstate.py).
+    try:
+        from . import pcstate
+
+        pcstate.on_app_start()
+    except Exception:
+        pass
+
     server: Optional[BackgroundServer] = None
     try:
         try:
@@ -853,6 +863,12 @@ def run(
     finally:
         if server is not None:
             server.stop()
+        try:
+            from . import pcstate
+
+            pcstate.on_app_exit()
+        except Exception:
+            pass
         instance.release()
 
 
