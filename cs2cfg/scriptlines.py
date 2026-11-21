@@ -84,7 +84,7 @@ def role_of(name: str, base: str, mode: str, key: str, target: str) -> str:
     key = key or "your key"
     target = target or "the other key"
     if name == "+" + base:
-        return f"While you hold {target} is changed" if mode == "shift" else f"When you press {key}"
+        return f"When you press {key}"
     if name == "-" + base:
         return f"When you let go of {key}"
     if name == base + "_on":
@@ -96,6 +96,10 @@ def role_of(name: str, base: str, mode: str, key: str, target: str) -> str:
         return f"What {target} does once it's changed"
     if name == base + "_arm":
         return f"When you press {key}"
+    if name == base + "_next":
+        return f"Switches {target} over, or cancels"
+    if name == base + "_own":
+        return f"What {key} normally does"
     if name == base + "_normal":
         return f"What {target} normally does"
     if name == base:

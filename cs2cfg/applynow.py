@@ -121,6 +121,62 @@ def _active_profile(result: cfgscan.ScanResult) -> Optional[str]:
     return None
 
 
+_BUILDER = re.compile(r"^// Script Builder: (\S+) (on|off)$")
+
+
+def _builder_groups(result: cfgscan.ScanResult) -> List[Tuple[str, bool, List[str]]]:
+    """Script Builder scripts as (name, on, lines to send).
+
+    CS2 keeps an alias for as long as it runs, so a script switched off in
+    the app would go on working until the next launch. A switched-off script
+    sends every one of its names emptied instead, which makes it do nothing
+    right away. A shift script's other key is sent its normal bind too, in
+    case the script was armed the moment it was switched off.
+    """
+    from . import plugins, scriptgen
+
+    chain = cfgscan.startup_chain(result)
+    try:
+        found = plugins.find(result)
+    except Exception:
+        return []
+    groups = []
+    for config in result.files.values():
+        if config.relative not in chain:
+            continue
+        try:
+            text = config.path.read_bytes().decode(config.document.encoding, errors="replace")
+        except OSError:
+            continue
+        if scriptgen.MARK not in text:
+            continue
+        for block in scriptgen.own_blocks(text):
+            spec = block["spec"]
+            alias = str(spec.get("alias") or "")
+            plug = next((p for p in found if p.file == config.relative
+                         and p.line <= block["last"] and p.end_line >= block["first"]), None)
+            if not alias or plug is None:
+                continue
+            lines = []
+            for name in sorted(plug.aliases, key=lambda n: plug.spelled.get(n, n)):
+                spelled = plug.spelled.get(name, name)
+                if plug.enabled:
+                    winner = result.effective_alias(name)
+                    if winner is not None:
+                        lines.append(f'alias "{winner.name}" "{winner.body}"')
+                else:
+                    lines.append(f'alias "{spelled}" ""')
+            target = str(spec.get("target") or "")
+            if target:
+                winner = cfgscan._effective_bind(result, chain, target)
+                if winner is not None and winner.file in chain:
+                    lines.append(f'bind "{winner.key}" "{winner.body}"')
+                else:
+                    lines.append(f'unbind "{target}"')
+            groups.append((alias, plug.enabled, lines))
+    return groups
+
+
 def render(result: cfgscan.ScanResult, previous: str = "") -> str:
     """The full current state of the startup configs, as one config file."""
     chain = cfgscan.startup_chain(result)
@@ -176,9 +232,16 @@ def render(result: cfgscan.ScanResult, previous: str = "") -> str:
         "// the key more than once is harmless.",
         "",
     ]
+    groups = _builder_groups(result)
+    made = {line for _, _, block in groups for line in block}
+    aliases = [a for a in aliases if f'alias "{a.name}" "{a.body}"' not in made]
     if aliases:
         lines.append("// Scripts")
         lines += [f'alias "{a.name}" "{a.body}"' for a in aliases]
+        lines.append("")
+    for name, on, block in groups:
+        lines.append(f"// Script Builder: {name} {'on' if on else 'off'}")
+        lines += block
         lines.append("")
     if settings:
         lines.append("// Settings")
@@ -204,6 +267,10 @@ def _entries(text: str) -> Dict[str, str]:
     and physical key -- in file order."""
     out: Dict[str, str] = {}
     for line in (text or "").splitlines():
+        made = _BUILDER.match(line.strip())
+        if made:
+            out[f"made:{made.group(1)}"] = line.strip()
+            continue
         if not line.strip() or line.lstrip().startswith("//"):
             continue
         match = _ENTRY.match(line)
@@ -253,7 +320,7 @@ def _save_baseline(target: Path, entries: Dict[str, str]) -> None:
     path.write_text(json.dumps(data, indent=1), encoding="utf-8")
 
 
-def render_changes(full_text: str, baseline: Dict[str, str]) -> str:
+def render_changes(full_text: str, baseline: Dict[str, str], previous: str = "") -> str:
     """Only what differs from what CS2 loaded when it started.
 
     Pressing the key sends a handful of commands instead of the whole
@@ -261,7 +328,34 @@ def render_changes(full_text: str, baseline: Dict[str, str]) -> str:
     flood. Still safe to press any number of times.
     """
     now = _entries(full_text)
-    changed = [line for what, line in now.items() if baseline.get(what) != line]
+    # Also anything the last press sent that has since gone back to how CS2
+    # started: the game holds what that press gave it, not the start.
+    sent = _entries(previous)
+    changed = [line for what, line in now.items()
+               if not what.startswith("made:")
+               and (baseline.get(what) != line or sent.get(what, line) != line)]
+    # A Script Builder script switched off or back on since CS2 started sends
+    # all of its lines, even ones that look unchanged: the game still holds
+    # whatever the last press of the apply key gave it.
+    # Once sent, it keeps being sent until CS2 restarts, so switching it back
+    # again mid-match lands too.
+    flipped = {what[5:] for what, line in now.items()
+               if what.startswith("made:") and baseline.get(what, line) != line}
+    flipped |= {m.group(1) for m in map(_BUILDER.match, (previous or "").splitlines()) if m}
+    headers = {}
+    group = None
+    for line in full_text.splitlines():
+        made = _BUILDER.match(line.strip())
+        if made:
+            group = made.group(1)
+            if group in flipped:
+                headers[group] = line.strip()
+            continue
+        if not line.strip() or line.lstrip().startswith("//"):
+            group = None
+            continue
+        if group in flipped and line not in changed:
+            changed.append(line)
     gone = []
     for what, line in baseline.items():
         if what.startswith("key:") and what not in now:
@@ -279,6 +373,9 @@ def render_changes(full_text: str, baseline: Dict[str, str]) -> str:
     scripts = [l for l in changed if l.lstrip().lower().startswith("alias")]
     keys = [l for l in changed if l.lstrip().lower().startswith(("bind", "unbind"))]
     settings = [l for l in changed if l not in scripts and l not in keys]
+    if headers:
+        # Kept as comments so the next rewrite knows these are still owed.
+        lines += list(headers.values()) + [""]
     for title, block in (("// Scripts", scripts), ("// Settings", settings),
                          ("// Keys", gone + keys)):
         if block:
@@ -321,7 +418,7 @@ def refresh(result: Optional[cfgscan.ScanResult],
     baseline = _load_baseline(target)
     full = render(result, previous + "\n" + "\n".join((baseline or {}).values()))
     if running and baseline is not None:
-        text = render_changes(full, baseline)
+        text = render_changes(full, baseline, previous)
     else:
         text = full
         _save_baseline(target, _entries(full))
