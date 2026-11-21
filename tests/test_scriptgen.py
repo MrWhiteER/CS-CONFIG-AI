@@ -202,6 +202,61 @@ class ShiftCase(Base):
         self.assertFalse(self.shift("next", "scancode226").ok)
 
 
+class EditCase(Base):
+    def edit(self, mode, text, *steps):
+        body = spec("Mine", mode, *(steps or ({"id": "cmd:slot1"},)))
+        body["lines_text"] = text
+        return scriptgen.build(body, self.scan)
+
+    def blocks(self, built):
+        return [c.text for c in built.checks if c.level == "block"]
+
+    def test_explained_in_plain_words(self):
+        built = scriptgen.build(spec("Drop it", "press", {"id": "drop_bomb"},
+                                     {"id": "say_team", "text": "bomb"}), self.scan)
+        rows = built.explained
+        self.assertEqual(rows[0]["name"], "drop_it")
+        self.assertTrue(rows[0]["role"].startswith("When you press"))
+        said = [c["says"] for c in rows[0]["commands"]]
+        self.assertEqual(said[0], "Takes out the bomb")
+        self.assertEqual(said[2], "Writes \u201cbomb\u201d in team chat")
+
+    def test_good_edit_is_saved_as_written(self):
+        built = self.edit("hold", 'alias "+mine" "+duck; say_team down"\nalias "-mine" "-duck"')
+        self.assertTrue(built.ok, self.blocks(built))
+        self.assertEqual(built.lines, ['alias "+mine" "+duck; say_team down"', 'alias "-mine" "-duck"'])
+        self.assertEqual(built.spec["lines"], built.lines)
+
+    def test_edit_that_leaves_crouch_held_is_refused(self):
+        built = self.edit("hold", 'alias "+mine" "+duck"\nalias "-mine" "say_team up"')
+        self.assertTrue(any("never let go" in t for t in self.blocks(built)))
+
+    def test_edit_missing_release_half(self):
+        built = self.edit("hold", 'alias "+mine" "say_team hi"')
+        self.assertTrue(any("-mine" in t for t in self.blocks(built)))
+
+    def test_edit_breaking_quotes(self):
+        built = self.edit("press", 'alias "mine" "say_team "hi""')
+        self.assertTrue(any("Quotes" in t for t in self.blocks(built)))
+
+    def test_edit_cannot_touch_other_names(self):
+        built = self.edit("press", 'alias "mine" "slot1"\nalias "hi" "say bye"')
+        self.assertTrue(any("start with mine" in t for t in self.blocks(built)))
+
+    def test_edit_double_move(self):
+        built = self.edit("hold", 'alias "+mine" "+jump; +duck"\nalias "-mine" "-jump; -duck"')
+        self.assertTrue(any("CS2 has only allowed one" in t for t in self.blocks(built)))
+
+    def test_edit_typo_is_a_warning(self):
+        built = self.edit("press", 'alias "mine" "slott1"')
+        self.assertTrue(built.ok)
+        self.assertTrue(any(c.level == "warn" and "slott1" in c.text for c in built.checks))
+
+    def test_edit_bind_line_refused(self):
+        built = self.edit("press", 'alias "mine" "slot1"\nbind "x" "mine"')
+        self.assertTrue(any("step 4" in t for t in self.blocks(built)))
+
+
 class SaveCase(Base):
     def setUp(self):
         super().setUp()
@@ -236,6 +291,16 @@ class SaveCase(Base):
         reply = self.save({"spec": spec("Drop it", "press", {"id": "drop_bomb"}),
                            "binding": "mouse4", "force": True})
         self.assertTrue(reply["ok"], reply)
+
+    def test_saved_list_and_edited_save(self):
+        body = spec("Mine", "press", {"id": "cmd:slot1"})
+        body["lines_text"] = 'alias "mine" "slot1; say_team switching"'
+        reply = self.save({"spec": body, "binding": "scancode27"})
+        self.assertTrue(reply["ok"], reply)
+        self.assertIn('alias "mine" "slot1; say_team switching"', self.all_text())
+        saved = webui._scriptgen_saved(self.state, {})["scripts"]
+        self.assertEqual([s["spec"]["name"] for s in saved], ["Mine"])
+        self.assertEqual(saved[0]["spec"]["lines"], ['alias "mine" "slot1; say_team switching"'])
 
     def test_saving_again_replaces_own_script(self):
         self.save({"spec": spec("Drop it", "press", {"id": "drop_bomb"}), "binding": "scancode27"})
