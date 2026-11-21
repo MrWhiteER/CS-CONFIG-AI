@@ -6,12 +6,16 @@ popover without changing the nav layout. In the icon-only rail, only the main
 avatar remains and the panel opens to its right with names and actions visible.
 The panel uses the browser top layer so the rail cannot clip it.
 
-The panel contains the current Steam account, every other local account from
-`whoData.accounts`, Steam web / match history, Cloud sync, and FACEIT. Local
-Steam rows use the existing `data-use` account switch and reload handler. Manage
-on the current Steam row opens the existing Settings switcher. Connect, sign-in,
-Follow, and polling retain their existing behavior. The header counts linked
-identities against all displayed identities.
+The panel contains the current Steam account and every other local account
+from `whoData.accounts`. Steam is one connection: the current Steam row also
+carries the Steam sign-in that powers match history and settings sync (the
+app's cloud signs in with the same Steam session, with nothing for the player
+to do). When it is not connected the row says so and clicking it connects;
+once connected, clicking it opens the existing Settings switcher. Local Steam
+rows use the existing `data-use` account switch and reload handler. FACEIT and
+cloud sync are not in the dock: FACEIT lives in Settings with the other apps,
+and cloud sync is built in. The header counts linked identities against all
+displayed identities.
 
 Click the main row again, click outside, or press Escape to close. Opening moves
 focus to the first account; closing returns focus to the main row. Closed rows

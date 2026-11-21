@@ -3028,7 +3028,7 @@
     .updc-veil, .updc-dialog { animation: none; }
   }
 
-  /* The target frame rate, at the head of the settings it governs.
+  /* The frame rate goal, at the head of the settings it governs.
 
      Given a box of its own rather than a row in a list because it is the one
      number on the page that every other setting is chosen to reach: the
@@ -3063,33 +3063,29 @@
   .fps-copy h3 { margin: 0; font-size: 14px; font-weight: 650; color: var(--ink); }
   .fps-copy p { margin: 3px 0 0; font-size: 11.5px; color: var(--muted); line-height: 1.45; }
 
-  /* The number itself, sized to be the thing you look at. */
+  /* The goal itself, sized to be the thing you look at. Read only: it is
+     the monitor's refresh rate, not a number to type. A typed goal let
+     anyone ask for 400 from a PC that reaches 250, and the plan then
+     dropped every setting to its lowest for frames that never came. */
   .fps-set {
     grid-area: set; display: flex; align-items: baseline; gap: 7px;
     padding: 7px 14px; border-radius: 12px;
     background: rgba(0, 0, 0, .34);
     border: 1px solid var(--line);
-    transition: border-color .2s ease, box-shadow .2s ease;
   }
-  .fps-set:focus-within {
-    border-color: var(--violet);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--violet) 22%, transparent);
-  }
-  .fps-set input {
-    appearance: none; -moz-appearance: textfield;
-    border: 0; background: none; padding: 0; margin: 0;
-    width: 4.2ch; text-align: right;
+  .fps-set strong {
     font-family: var(--mono); font-size: 25px; font-weight: 600;
-    color: var(--ink);
+    color: var(--ink); min-width: 3ch; text-align: right;
   }
-  .fps-set input::-webkit-outer-spin-button,
-  .fps-set input::-webkit-inner-spin-button { appearance: none; margin: 0; }
-  .fps-set input:focus { outline: none; }
-  .fps-set input::placeholder { color: var(--faint); font-size: 19px; }
+  .fps-set strong.fps-auto { font-family: inherit; font-size: 15px; color: var(--muted); }
+  /* What the game really ran at, from the player's own games. */
+  .fps-copy p.fps-real { color: var(--ink-dim); }
+  .fps-copy p.fps-real b { color: var(--ink); font-weight: 650; }
+  .fps-copy p.fps-real.fps-none { color: var(--faint); }
   .fps-unit { font-size: 11px; color: var(--faint); letter-spacing: .08em; }
 
-  /* The rates people actually pick, since they are their monitor's, not
-     arbitrary. Filled in from the displays we detected. */
+  /* With two or more monitors at different rates, which one CS2 runs on.
+     Only real monitor rates are offered: nothing arbitrary. */
   /* The consequence of the number, beside the number. */
   .fps-effect {
     display: inline-block; margin-left: 2px; font-weight: 600;
@@ -4211,6 +4207,13 @@
   #rgb-out .row .v { font-family: inherit; font-variant-numeric: normal; font-size: 12px; color: var(--muted); }
   #rgb-out .row .v.live { color: var(--good); }
   #rgb-out > .sub2 { margin: 2px 0 8px; color: var(--muted); font-size: 12px; }
+  #mouse-out .seg button { flex: 0 1 auto; }
+  #mouse-out .row .v { font-family: inherit; font-variant-numeric: normal; font-size: 12px; color: var(--muted); }
+  #mouse-out .row .v.live { color: var(--good); }
+  #mouse-out .sub2 { margin: 2px 0 8px; color: var(--muted); font-size: 12px; }
+  #mouse-out .sub2.warn { color: var(--warn); }
+  .mouse-dpi { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .mouse-dpi input[type=number] { width: 96px; }
   .rgb-brightness { display: flex; align-items: center; gap: 12px; }
   .rgb-brightness input { min-width: 80px; width: 160px; max-width: 100%; }
   .kb-legend .dot { width: 9px; height: 9px; border-radius: 3px; }
@@ -5854,7 +5857,10 @@
 .sb-step h4, .sb-side h4 { margin: 3px 0 9px; font-size: 14px; color: var(--ink); }
 .sb-input { width: 100%; box-sizing: border-box; background: var(--chip); border: 1px solid var(--line); color: var(--ink); border-radius: 9px; padding: 8px 11px; font: inherit; }
 .sb-input:focus { outline: none; border-color: var(--accent); }
-.sb-modes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+.sb-modes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; }
+@media (max-width: 1250px) { .sb-modes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.sb-styles { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.sb-keys { display: flex; flex-direction: column; gap: 10px; }
 .sb-mode { text-align: left; border: 1px solid var(--line); border-radius: 11px; padding: 10px 12px; background: var(--panel-2); color: var(--ink); font: inherit; cursor: pointer; }
 .sb-mode b { display: block; margin-bottom: 2px; }
 .sb-mode small { color: var(--muted); font-size: 12px; line-height: 1.35; display: block; }
@@ -6458,7 +6464,7 @@ const startup = (() => {
               <svg id="hardware-chart" viewBox="0 0 600 180" preserveAspectRatio="none" aria-hidden="true"></svg>
               <div class="hardware-tooltip" id="hardware-tooltip" role="tooltip" hidden></div>
             </div>
-            <div class="hardware-times sub"><span>~2 min ago</span><span id="hardware-state">Waiting for samples</span><span>Now</span></div>
+            <div class="hardware-times sub"><span id="hardware-since">~2 min ago</span><span id="hardware-state">Waiting for samples</span><span>Now</span></div>
           </div>
           <div class="sub" id="live-note" style="margin-top:8px">&nbsp;</div>
           <!-- Last in the card on purpose. It is an offer, not a reading, and
@@ -6603,13 +6609,15 @@ const startup = (() => {
           </svg>
         </div>
         <div class="fps-copy">
-          <h3>Target frame rate</h3>
-          <p id="fps-say">Use your refresh rate as the settings target.</p>
+          <h3>Frame rate goal</h3>
+          <p id="fps-say">Settings aim for your monitor's refresh rate.</p>
+          <p id="fps-real" class="fps-real"></p>
         </div>
-        <div class="fps-set">
-          <input type="number" id="target" min="30" max="1000" placeholder="auto"
-                 aria-label="Target frames per second">
+        <div class="fps-set" title="Your monitor's refresh rate">
+          <strong id="fps-goal" class="fps-auto">Auto</strong>
           <span class="fps-unit">fps</span>
+          <!-- Kept for the saved choice of monitor; never typed into. -->
+          <input type="hidden" id="target" value="">
         </div>
         <div class="fps-quick" id="fps-quick"></div>
       </section>
@@ -6803,6 +6811,7 @@ const startup = (() => {
           <button class="seg-item" data-sub="apply" role="tab" aria-selected="true"><span data-hardware-icon="apply"></span> Apply</button>
           <button class="seg-item" data-sub="this-pc" role="tab" aria-selected="false"><span data-hardware-icon="display"></span> This PC</button>
           <button class="seg-item" data-sub="lighting" role="tab" aria-selected="false"><span data-hardware-icon="lighting"></span> Lighting</button>
+          <button class="seg-item" data-sub="mouse" role="tab" aria-selected="false"><span data-hardware-icon="mouse"></span> Mouse</button>
           <button class="seg-item" data-sub="steam" role="tab" aria-selected="false"><span data-hardware-icon="steam"></span> Steam</button>
           <button class="seg-item" data-sub="account" role="tab" aria-selected="false"><span data-hardware-icon="accounts"></span> Accounts</button>
           <button class="seg-item" data-sub="apps" role="tab" aria-selected="false"><span data-hardware-icon="apps"></span> Apps</button>
@@ -6836,6 +6845,21 @@ const startup = (() => {
             software from the maker has to be running.
           </p>
           <div id="rgb-out"></div>
+        </section>
+      </div>
+
+      <!-- Mouse speed and polling rate, set on the mouse itself. -->
+      <div class="subpane hidden" data-sub="mouse">
+        <section class="panel" id="mouse-card">
+          <h2><span data-hardware-icon="mouse"></span> Mouse</h2>
+          <p class="sub" style="margin:0 0 10px">
+            Set how fast your mouse moves (DPI) and how often it reports to the
+            PC. The app talks to the mouse directly, so no software from the
+            maker has to be installed or running. Your choice is saved with
+            your Steam account, so any PC you sign in on sets your mouse the
+            same way.
+          </p>
+          <div id="mouse-out"></div>
         </section>
       </div>
 
@@ -7793,20 +7817,29 @@ function hardwarePaintSelection() {
   });
   $('hardware-all').setAttribute('aria-pressed', String(!key));
 }
+/* Samples in the current view. Until the window is full (the first seconds after a
+   cold start, when nothing was saved from a recent run) the real samples are
+   spread across the whole width, so the graph is never an empty box that
+   fills in from the right. */
+function hardwareCount() { return Math.max(0, ...hardwareSeries().map(([key]) => Math.min(60, hardwareValues(key).length))); }
+function hardwareStep() { const n = hardwareCount(); return n >= 60 ? 600 / 59 : 600 / Math.max(1, n - 1); }
 function hardwareDraw() {
-  const g = hardwareGraph, max = g.mode === 'usage' ? 100 : 120, step = 600 / 59;
+  const g = hardwareGraph, max = g.mode === 'usage' ? 100 : 120, step = hardwareStep(), n = hardwareCount();
   let svg = '<defs>' + hardwareSeries().map(([key,,tone]) => '<linearGradient id="hardware-fill-' + key + '" x1="0" y1="0" x2="0" y2="1"><stop stop-color="' + tone + '" stop-opacity=".26"/><stop offset="1" stop-color="' + tone + '" stop-opacity=".01"/></linearGradient>').join('') + '</defs><g class="hardware-grid">';
   for (let y = 0; y <= 180; y += 45) svg += '<path d="M0 ' + y + 'H600"/>';
   svg += '</g><g id="hardware-scroll">';
   let known = 0;
   for (const [key,,tone] of hardwareSeries()) {
-    const values = hardwareValues(key).slice(-61), segments = []; let part = [];
+    const values = hardwareValues(key).slice(n >= 60 ? -61 : -n), segments = []; let part = [];
+    const last = n >= 60 ? 59 : n - 1;
     values.forEach((value, i) => {
       if (!Number.isFinite(value)) { if (part.length) segments.push(part); part = []; return; }
       known++;
-      part.push([(60 - values.length + i) * step, 180 - Math.max(0, Math.min(max, value)) / max * 180]);
+      part.push([(last - values.length + 1 + i) * step, 180 - Math.max(0, Math.min(max, value)) / max * 180]);
     });
     if (part.length) segments.push(part);
+    // The very first reading on its own: hold it across the width as a line.
+    if (n === 1 && segments.length === 1) segments[0] = [[0, segments[0][0][1]], [600, segments[0][0][1]]];
     const line = segments.map(homeSmoothPath).join(' ');
     const area = segments.map(p => homeSmoothPath(p) + ' L' + p.at(-1)[0] + ' 180 L' + p[0][0] + ' 180 Z').join(' ');
     svg += '<g data-hardware="' + key + '" style="--series:' + tone + '"><path class="hardware-area" fill="url(#hardware-fill-' + key + ')" d="' + area + '"/><path class="hardware-line" stroke="' + tone + '" d="' + line + '"/>' + segments.filter(p => p.length === 1).map(p => '<circle cx="' + p[0][0] + '" cy="' + p[0][1] + '" r="3" fill="' + tone + '"/>').join('') + '<path class="hardware-hit" data-hardware-line="' + key + '" d="' + line + '"/></g>';
@@ -7814,6 +7847,9 @@ function hardwareDraw() {
   svg += '</g><path id="hardware-crosshair" class="hardware-crosshair" visibility="hidden"/>';
   $('hardware-chart').innerHTML = svg;
   $('hardware-state').textContent = known ? (g.mode === 'usage' ? 'Usage · %' : 'Temperature · °C') : 'No readings available';
+  // The left edge says how far back the drawn samples really go.
+  const span = n >= 60 ? 118 : Math.max(0, n - 1) * 2;
+  $('hardware-since').textContent = n >= 60 ? '~2 min ago' : span ? '~' + span + 's ago' : 'Now';
   $('hardware-axis').innerHTML = max + hardwareUnit() + '<br>' + max / 2 + hardwareUnit() + '<br>0' + hardwareUnit();
   hardwareLegend(); hardwarePaintSelection(); hardwareTranslate();
 }
@@ -7838,7 +7874,10 @@ function hardwarePause() {
 function hardwareUpdate(d) {
   const g = hardwareGraph;
   if (d.at != null && g.at === d.at) return;
-  const animate = g.at !== null && Number(d.at) > g.at && Number(d.at) - g.at < 4 && homeVisible() && !homeMotion.reduced.matches;
+  // Slide only between two full windows; while it is still spreading out the
+  // new sample simply redraws in place.
+  const full = hardwareCount() >= 60 && hardwareSeries().some(([key]) => (d.history?.[key] || []).length >= 60);
+  const animate = full && g.at !== null && Number(d.at) > g.at && Number(d.at) - g.at < 4 && homeVisible() && !homeMotion.reduced.matches;
   const previous = g.data;
   g.data = {};
   for (const [key] of g.usage) {
@@ -7846,7 +7885,8 @@ function hardwareUpdate(d) {
     // Retain the point leaving the left edge until its translation finishes.
     if (animate && g.data[key].length === 60 && previous[key]?.length >= 60) g.data[key].unshift(previous[key].at(-60));
   }
-  // Temperatures have no server history: begin collecting at this page's first poll.
+  // Temperatures come from the same server history; collecting here is only
+  // the fallback for an app that does not send it.
   const parts = (d.temps?.parts || []).filter(p => ['cpu', 'gpu', 'system'].includes(p.part));
   if (!parts.some(p => p.part === 'gpu')) parts.push({part:'gpu', label:'GPU', celsius:d.gpu?.temperature, known:Number.isFinite(d.gpu?.temperature)});
   for (const p of parts) {
@@ -7855,6 +7895,12 @@ function hardwareUpdate(d) {
   }
   for (const [key] of g.thermal) {
     const p = parts.find(p => key === 'temp-' + p.part);
+    if (Array.isArray(d.history?.[key])) {
+      const keep = animate ? g.temperatures[key] : null;
+      g.temperatures[key] = d.history[key].slice(-60);
+      if (keep && g.temperatures[key].length === 60 && keep.length >= 60) g.temperatures[key].unshift(keep.at(-60));
+      continue;
+    }
     const values = g.temperatures[key] ||= [];
     if (g.at !== null && Number(d.at) - g.at >= 4) values.push(null);
     values.push(p?.known && Number.isFinite(p.celsius) ? p.celsius : null);
@@ -7868,7 +7914,7 @@ function hardwareUpdate(d) {
 }
 function hardwareInspect(x) {
   const g = hardwareGraph; g.cursor = Math.max(0, Math.min(600, x));
-  const age = Math.max(0, Math.min(59, Math.round((600 - g.cursor + g.offset) / (600 / 59))));
+  const age = Math.max(0, Math.min(Math.max(0, hardwareCount() - 1), Math.round((600 - g.cursor + g.offset) / hardwareStep())));
   const cross = $('hardware-crosshair');
   cross?.setAttribute('d', 'M' + g.cursor + ' 0V180'); cross?.setAttribute('visibility', 'visible');
   const tip = $('hardware-tooltip'); tip.hidden = false;
@@ -7899,7 +7945,7 @@ $('hardware-plot').addEventListener('blur', hardwareClearCursor);
 $('hardware-plot').addEventListener('keydown', e => {
   if (e.key === 'Escape') hardwareClearCursor();
   else if (['ArrowLeft','ArrowRight','Home','End'].includes(e.key)) {
-    e.preventDefault(); hardwareInspect(e.key === 'Home' ? 0 : e.key === 'End' ? 600 : (hardwareGraph.cursor ?? 600) + (e.key === 'ArrowLeft' ? -1 : 1) * 600 / 59);
+    e.preventDefault(); hardwareInspect(e.key === 'Home' ? 0 : e.key === 'End' ? 600 : (hardwareGraph.cursor ?? 600) + (e.key === 'ArrowLeft' ? -1 : 1) * hardwareStep());
   }
 });
 document.addEventListener('visibilitychange', hardwarePause);
@@ -7933,7 +7979,7 @@ function renderPlan(p) {
   // The profile's description used to print under the band. The band and the
   // three names say the same thing, so the sentence was reading it back.
 
-  // What the target actually cost, said where the target is typed.
+  // What the goal led to, said beside the goal.
   const level = (p.settings || []).find(x => /gpu level|overall quality/i.test(x.name || ""));
   fpsEffect = level && level.after ? "Picture " + esc(String(level.after)) : "";
   renderFps();
@@ -8290,10 +8336,9 @@ $("confirm-veil").addEventListener("keydown", e => {
   const target = $("target");
   if (target) {
     let was = target.value;
-    target.addEventListener("focus", () => { was = target.value; });
     target.addEventListener("change", () => {
       const before = was;
-      noteChange("Target fps → " + (target.value || "auto"),
+      noteChange("Frame rate goal: " + (target.value ? target.value + " Hz monitor" : "main monitor"),
                  () => { target.value = before; rememberPrefs(); });
       was = target.value;
     });
@@ -9300,6 +9345,7 @@ function setSettingsSub(name, restoring) {
   if (prefsReady && startup.finished) {
     if (name === "overlay") loadOverlay();
     if (name === "lighting") loadRgb();
+    if (name === "mouse") loadMouse();
     if (name === "sound") { loadAudio(false); loadGoxlr(true); }
     if (name === "logs") loadHistory();
     if (name === "config" || name === "editing") ensureScan(false);
@@ -9326,6 +9372,102 @@ async function loadOverlay() {
   }
   catch (err) { box.innerHTML = '<p class="sub warn">' + esc(err.message || String(err)) + '</p>'; }
 }
+
+// Mouse speed and polling rate. Read from the mouse when the tab opens;
+// nothing polls in the background.
+let mouseData = null;
+let mouseError = '';
+let mouseBusy = false;
+const MOUSE_PRESETS = [400, 800, 1600, 3200];
+
+function mouseLine(m) {
+  const bits = [];
+  if (m.dpi) bits.push(m.dpi + ' DPI');
+  if (m.poll) bits.push(m.poll + ' Hz');
+  const how = m.connection === 'wireless' ? ' (wireless)' : m.connection === 'cable' ? ' (on its cable)' : '';
+  return '<div class="row"><span class="k">' + esc(m.name + how) + '</span><span class="v' +
+    (m.problem ? '' : ' live') + '">' + esc(m.problem ||
+    ('Now using ' + bits.join(' at ') + (m.tested ? '' : ' · this model has not been tried with the app yet'))) +
+    '</span></div>';
+}
+
+function renderMouse() {
+  const box = $('mouse-out');
+  if (!box) return;
+  if (mouseError && !mouseData) { box.innerHTML = '<p class="sub2 warn">' + esc(mouseError) + '</p>'; return; }
+  if (!mouseData) { box.innerHTML = '<p class="sub2">Looking for your mouse…</p>'; return; }
+  const s = mouseData.settings || {};
+  const mice = mouseData.mice || [];
+  const off = mouseBusy || !mice.length ? ' disabled' : '';
+  const first = mice[0] || {};
+  const maxDpi = Math.max(...mice.map(m => m.max_dpi || 0), 0) || 20000;
+  const rates = [...new Set(mice.flatMap(m => m.rates || []))].sort((a, b) => a - b);
+  const shownDpi = s.mouse_dpi || first.dpi || 800;
+  let html = '';
+  if (!mice.length) {
+    html += '<p class="sub2">' + esc(mouseData.problem ||
+      'No mouse the app can set was found. Razer mice work now; SteelSeries and HyperX are coming.') + '</p>';
+  }
+  html += mice.map(mouseLine).join('');
+  html += '<div class="row"><label class="k" for="mouse-dpi">Speed (DPI)</label><div class="mouse-dpi">' +
+    '<div class="seg" role="group" aria-label="Common speeds">' + MOUSE_PRESETS.map(v =>
+      '<button type="button" data-mouse-dpi="' + v + '" aria-pressed="' + (s.mouse_dpi === v) + '"' + off + '>' + v + '</button>').join('') +
+    '</div><input type="number" id="mouse-dpi" min="100" max="' + maxDpi + '" step="50" value="' + shownDpi + '"' + off + '>' +
+    '<button type="button" class="btn" id="mouse-dpi-set"' + off + '>Set</button></div></div>';
+  if (rates.length) {
+    html += '<div class="row"><span class="k" id="mouse-poll-label">Polling rate</span>' +
+      '<div class="seg" role="group" aria-labelledby="mouse-poll-label">' + rates.map(hz =>
+        '<button type="button" data-mouse-poll="' + hz + '" aria-pressed="' + (s.mouse_poll === hz) + '"' + off + '>' + hz + ' Hz</button>').join('') +
+      '</div></div>';
+  }
+  html += '<p class="sub2">' + (s.mouse_dpi || s.mouse_poll ?
+    'Saved: ' + [s.mouse_dpi ? s.mouse_dpi + ' DPI' : '', s.mouse_poll ? s.mouse_poll + ' Hz' : ''].filter(Boolean).join(' at ') +
+    '. The app puts this back on your mouse each time it starts.</p>' +
+    '<p class="sub2"><button type="button" class="btn" id="mouse-forget"' + (mouseBusy ? ' disabled' : '') + '>Leave my mouse as it is</button>' :
+    'Nothing chosen yet, so the app leaves your mouse exactly as it is.') + '</p>' +
+    '<p class="sub2">A different speed changes how far your aim moves in CS2. Lower your in-game sensitivity when you raise the speed to keep the same feel.</p>';
+  if (mouseError) html += '<p class="sub2 warn" role="status">' + esc(mouseError) + '</p>';
+  box.innerHTML = html;
+}
+
+async function loadMouse() {
+  if (mouseBusy) return;
+  try {
+    const d = await api('/api/mouse', {});
+    if (!d || d.ok === false) throw new Error(d?.error || 'The mouse could not be read');
+    mouseData = d; mouseError = '';
+  } catch (err) { mouseError = err.message || String(err); }
+  renderMouse();
+}
+
+async function saveMouse(settings) {
+  if (mouseBusy) return;
+  mouseBusy = true; mouseError = ''; renderMouse();
+  try {
+    const d = await api('/api/mouse/settings', settings);
+    if (!d || d.ok === false) throw new Error(d?.error || 'The mouse setting was not saved');
+    mouseData = d;
+  } catch (err) { mouseError = err.message || String(err); }
+  finally { mouseBusy = false; renderMouse(); }
+}
+
+document.addEventListener('click', e => {
+  const dpi = e.target.closest('[data-mouse-dpi]');
+  if (dpi && !dpi.disabled) return saveMouse({mouse_dpi: Number(dpi.dataset.mouseDpi)});
+  const poll = e.target.closest('[data-mouse-poll]');
+  if (poll && !poll.disabled) return saveMouse({mouse_poll: Number(poll.dataset.mousePoll)});
+  if (e.target.id === 'mouse-dpi-set') {
+    const input = $('mouse-dpi');
+    const value = Math.round(Number(input.value) / 50) * 50;
+    const max = Number(input.max) || 20000;
+    if (!(value >= 100 && value <= max)) { mouseError = 'Pick a speed between 100 and ' + max + ' DPI.'; renderMouse(); return; }
+    return saveMouse({mouse_dpi: value});
+  }
+  if (e.target.id === 'mouse-forget') saveMouse({mouse_dpi: 0, mouse_poll: 0});
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.id === 'mouse-dpi') $('mouse-dpi-set')?.click();
+});
 
 // Both lighting entry points display the same confirmed server snapshot.
 let rgbData = null;
@@ -10874,44 +11016,85 @@ function loadIngame() { loadChanges(); }
    a second: a dropdown in the Optimise-for box that could disagree with it,
    which meant the answer depended on which control you had touched last.
 */
-/* The line under the heading, and the rates worth one click.
+/* The goal, and what the game really did.
 
-   The offers are the refresh rates of the monitors actually attached, plus the
-   nothing-in-particular option, because a target that is not a rate this
-   machine can present is a number with no meaning behind it.
+   The goal is no longer typed. Nothing on a PC can say ahead of time how
+   many frames CS2 will give, so a typed number was a wish: ask 400 of a PC
+   that reaches 250 and the plan dropped every setting to its lowest for
+   frames that never came. The one number that is known and means something
+   is the monitor's refresh rate -- the most frames it can show -- so that is
+   the goal. With monitors at different rates, the player says which one CS2
+   is on; nothing else can be picked.
+
+   Under it, the frame rate this PC really reached in the player's own games,
+   measured while the performance overlay was on. That is the honest answer
+   to "how much can my PC do", and it is only shown once it exists.
 */
-/* What the last plan made of the target. The estimate cannot show this: it is
-   the machine's ceiling for the chosen profile and does not depend on the
-   target at all, so it reads the same at 144 and at 1000 -- which makes typing
-   a number look like it did nothing, though it may have moved the whole plan
-   from Very High to Low. */
+/* What the last plan made of the goal: the picture level it led to. */
 let fpsEffect = "";
 
-function renderFps() {
-  const box = $("fps-quick"), field = $("target"), say = $("fps-say");
-  if (!field) return;
-  const now = field.value.trim();
-
-  if (say) {
-    say.innerHTML = (now
-      ? "Settings target: " + esc(now) + " fps."
-      : "Use your refresh rate as the settings target.") +
-      (fpsEffect ? ' <b class="fps-effect">' + fpsEffect + "</b>" : "");
-  }
-  if (!box) return;
-
+function fpsRates() {
   const rates = [];
   ((lastScan && lastScan.displays) || []).forEach(d => {
     const hz = Math.round(d.refresh || 0);
     if (hz >= 30 && !rates.includes(hz)) rates.push(hz);
   });
-  rates.sort((a, b) => a - b);
+  return rates.sort((a, b) => a - b);
+}
 
-  box.innerHTML =
-    '<button data-fps="" aria-pressed="' + (!now) + '">Refresh rate</button>' +
-    rates.map(hz =>
+function renderFps() {
+  const box = $("fps-quick"), field = $("target"), say = $("fps-say");
+  const goal = $("fps-goal"), real = $("fps-real");
+  if (!field) return;
+  const shown = (lastScan && lastScan.displays) || [];
+  const rates = fpsRates();
+  // A number saved by an older version, or a monitor that is gone, is not a
+  // goal any more: fall back to the main monitor.
+  if (field.value && lastScan && !rates.includes(Number(field.value))) field.value = "";
+  const main = shown.find(d => d.primary) || shown[0];
+  const mainHz = main ? Math.round(main.refresh || 0) : 0;
+  // Picking the main monitor's own rate is the same as no pick.
+  if (field.value && Number(field.value) === mainHz) field.value = "";
+  const now = field.value.trim();
+  const aim = Number(now) || mainHz;
+
+  if (goal) {
+    goal.textContent = aim ? String(aim) : "Auto";
+    goal.classList.toggle("fps-auto", !aim);
+  }
+  if (say) {
+    const line = now
+      ? "Settings aim for your " + now + " Hz monitor, the most frames it can show."
+      : aim
+        ? "Settings aim for your monitor's " + aim + " Hz, the most frames it can show."
+        : "Settings aim for your monitor's refresh rate, the most frames it can show.";
+    say.innerHTML = esc(line) +
+      (fpsEffect ? ' <b class="fps-effect">' + fpsEffect + "</b>" : "");
+  }
+  if (real) {
+    const m = lastScan && lastScan.measured_fps;
+    real.classList.toggle("fps-none", !m);
+    if (m && m.average) {
+      const games = m.games === 1 ? "your last game" : "your last " + m.games + " games";
+      real.innerHTML = "In " + games + ", CS2 really ran at about <b>" + esc(m.average) +
+        " FPS</b>" + (m.low ? ", dropping to " + esc(m.low) + " in the busiest moments" : "") + "." +
+        (aim && m.average < aim
+          ? " That is below your monitor's " + aim + " Hz: the Competitive profile gives the most frames."
+          : "");
+    } else {
+      real.textContent = "To see the frame rate this PC really reaches, turn on the performance " +
+        "overlay in Settings, Overlay and play one game.";
+    }
+  }
+  if (!box) return;
+
+  // One monitor: nothing to choose, so no buttons.
+  box.innerHTML = rates.length < 2 ? "" :
+    '<button data-fps="" aria-pressed="' + (!now || Number(now) === mainHz) + '">Main monitor' +
+    (mainHz ? ", " + mainHz + " Hz" : "") + "</button>" +
+    rates.filter(hz => hz !== mainHz).map(hz =>
       '<button data-fps="' + hz + '" aria-pressed="' + (now === String(hz)) + '">' +
-      hz + " fps</button>").join("");
+      hz + " Hz monitor</button>").join("");
 }
 
 document.addEventListener("click", e => {
@@ -10924,9 +11107,6 @@ document.addEventListener("click", e => {
   renderFps();
 });
 
-document.addEventListener("input", e => {
-  if (e.target.id === "target") renderFps();
-});
 
 function currentAccount() {
   return (whoData && whoData.account) || null;
@@ -16549,6 +16729,7 @@ const SB_MODES = [
   ["press", "Press once", "Every press does all the steps."],
   ["hold", "While held", "Starts on press, everything undoes when you let go."],
   ["toggle", "On / off", "First press turns it on, next press turns it off."],
+  ["shift", "Shift key", "Press it, and another key does something different, then goes back."],
 ];
 const SB_IDEAS = [
   {label: "Drop the bomb + tell team", spec: {name: "Drop the bomb and tell my team", mode: "press",
@@ -16559,10 +16740,13 @@ const SB_IDEAS = [
     steps: [{id: "buy_flash"}, {id: "buy_smoke"}, {id: "buy_he"}, {id: "buy_molotov"}]}},
   {label: "Big radar while held", spec: {name: "Big radar while held", mode: "hold",
     steps: [{id: "radar_zoom", value: 0.3}]}},
+  {label: "Alt + 1 says something", spec: {name: "Alt one says hi", mode: "shift", style: "next",
+    steps: [{id: "say_team", text: "Rotating"}]}, keys: {binding: "scancode226", target: "scancode30"}},
   {label: "Game sound on / off", spec: {name: "Game sound on off", mode: "toggle",
     steps: [{id: "volume", value: 0}]}},
 ];
 const sb = {data: null, spec: {name: "", mode: "press", steps: []}, binding: "", keyLabel: "",
+            target: "", targetLabel: "",
             cat: "weapons", find: "", built: null, key: null, listening: false, confirm: null,
             saving: false, timer: 0};
 
@@ -16630,7 +16814,7 @@ function sbChips() {
   const chips = list.map(s => {
     let off = "";
     if (s.move && hasMove) { off = "CS2 allows only one moving or shooting action per key."; fadedMove = true; }
-    else if (s.hold && sb.spec.mode === "press") { off = "Only works on a “While held” or “On / off” key."; fadedHold = true; }
+    else if (s.hold && (sb.spec.mode === "press" || sb.spec.mode === "shift")) { off = "Only works on a “While held” or “On / off” key."; fadedHold = true; }
     return '<button class="sb-chip" data-sb-add="' + esc(s.id) + '"' + (off ? ' disabled title="' + esc(off) + '"' : (s.note ? ' title="' + esc(s.note) + '"' : "")) +
       '>' + esc(s.label) + '</button>';
   }).join("");
@@ -16645,10 +16829,18 @@ function sbSide() {
   let html = '<h4>What your script will do</h4>';
   const key = sb.keyLabel ? "<b>" + esc(sb.keyLabel) + "</b>" : "your key";
   if (b && b.says && b.says.length) {
-    const lead = sb.spec.mode === "hold" ? "While you hold " + key + ":" :
+    const tgt = (b.target && b.target.label) ? "<b>" + esc(b.target.label) + "</b>" : "the other key";
+    const lead = sb.spec.mode === "shift" ? (sb.spec.style === "hold"
+        ? "While you hold " + key + ", pressing " + tgt + ":"
+        : "Press " + key + ", then the next press of " + tgt + ":") :
+      sb.spec.mode === "hold" ? "While you hold " + key + ":" :
       sb.spec.mode === "toggle" ? "First press of " + key + ":" : "When you press " + key + ":";
     html += '<div class="sb-says"><p>' + lead + '</p><ol>' + b.says.map(t => "<li>" + esc(t) + "</li>").join("") + '</ol>';
-    if (sb.spec.mode !== "press") {
+    if (sb.spec.mode === "shift") {
+      html += '<p style="margin-top:8px">' + (sb.spec.style === "hold" ? "When you let go of " + key + ", " : "After that, ") +
+        tgt + " goes back to \u201c" + esc(b.target && b.target.normal || "what it does now") + "\u201d." +
+        (sb.spec.style === "hold" ? "" : " Changed your mind? Press " + key + " again to cancel.") + '</p>';
+    } else if (sb.spec.mode !== "press") {
       const undo = [];
       if (sb.spec.steps.some(s => (sbStep(s.id) || {}).hold)) undo.push("lets go of everything held");
       (b.release_says || []).forEach(t => undo.push(t));
@@ -16704,21 +16896,35 @@ function sbRender() {
       '<input class="sb-input" id="sb-name" maxlength="40" placeholder="For example: Drop the bomb and tell my team" value="' + esc(sb.spec.name) + '"></div></div>' +
     '<div class="sb-step"><span class="sb-num">2</span><div><h4>How the key works</h4><div class="sb-modes">' +
       SB_MODES.map(m => '<button class="sb-mode" data-sb-mode="' + m[0] + '" aria-pressed="' + (sb.spec.mode === m[0]) + '"><b>' +
-        m[1] + '</b><small>' + m[2] + '</small></button>').join("") + '</div></div></div>' +
+        m[1] + '</b><small>' + m[2] + '</small></button>').join("") + '</div>' +
+      (sb.spec.mode === "shift" ? '<div class="sb-styles">' +
+        [["next", "Only the next press"], ["hold", "While I hold the shift key"]].map(o =>
+          '<button class="sb-cat" data-sb-style="' + o[0] + '" aria-pressed="' + ((sb.spec.style || "next") === o[0]) + '">' + o[1] + '</button>').join("") +
+        '</div>' : "") + '</div></div>' +
     '<div class="sb-step"><span class="sb-num">3</span><div><h4>What it does, in order</h4><div class="sb-acts">' +
       sb.spec.steps.map(sbStepRow).join("") +
       '<div class="sb-add"><input class="sb-input" id="sb-find" placeholder="Add a step: search, e.g. jump, buy, volume, say…" value="' + esc(sb.find) + '">' +
       '<div class="sb-cats">' + cats + '</div>' + sbChips() + '</div></div></div></div>' +
-    '<div class="sb-step"><span class="sb-num">4</span><div><h4>Which key</h4><div class="sb-key">' +
-      '<button class="sb-kc' + (sb.listening ? " listening" : "") + '" id="sb-keybtn">' + (sb.listening ? "Press a key…" : esc(sb.keyLabel || "Pick")) + '</button>' +
-      '<span class="sub">' + (sb.listening ? "Press any key or mouse button. Esc cancels." : "Click, then press any key or mouse button.") + '</span>' +
-      (sb.key && sb.key.binding ? '<span class="sb-hint" style="margin:0">' + esc(sb.key.free ? sb.key.label + " is free right now." : sb.key.label + " is in use right now.") + '</span>' : "") +
+    '<div class="sb-step"><span class="sb-num">4</span><div><h4>' + (sb.spec.mode === "shift" ? "Which keys" : "Which key") + '</h4><div class="sb-keys">' +
+      sbKeyRow("key", sb.spec.mode === "shift" ? "Shift key" : "", sb.keyLabel, sb.key) +
+      (sb.spec.mode === "shift" ? sbKeyRow("target", "Key it changes", sb.targetLabel,
+        sb.built && sb.built.target && sb.built.target.binding ? {binding: 1, free: true, label: sb.built.target.label,
+          note: sb.built.target.label + " does \u201c" + sb.built.target.normal + "\u201d right now."} : null) : "") +
     '</div></div></div>' +
     '</section><section class="sb-card sb-side">' + sbSide() + '</section></div>';
   if (keepSel && keepSel.attr.length) {
     const again = box.querySelector("[" + keepSel.attr[0] + "]");
     if (again) { again.focus(); try { if (keepSel.pos != null) again.setSelectionRange(keepSel.pos, keepSel.pos); } catch (_) {} }
   }
+}
+
+function sbKeyRow(which, title, label, info) {
+  const on = sb.listening === which;
+  const note = info && info.binding ? (info.note || (info.free ? info.label + " is free right now." : info.label + " is in use right now.")) : "";
+  return '<div class="sb-key">' + (title ? '<span class="sub" style="min-width:110px">' + esc(title) + '</span>' : "") +
+    '<button class="sb-kc' + (on ? " listening" : "") + '" data-sb-listen="' + which + '">' + (on ? "Press a key\u2026" : esc(label || "Pick")) + '</button>' +
+    '<span class="sub">' + (on ? "Press any key or mouse button. Esc cancels." : "Click, then press any key or mouse button.") + '</span>' +
+    (note ? '<span class="sb-hint" style="margin:0">' + esc(note) + '</span>' : "") + '</div>';
 }
 
 function sbChanged() {
@@ -16729,7 +16935,7 @@ function sbChanged() {
 
 async function sbCheck() {
   try {
-    const r = await api("/api/scriptgen/check", {spec: sb.spec, binding: sb.binding});
+    const r = await api("/api/scriptgen/check", {spec: Object.assign({}, sb.spec, {target: sb.target}), binding: sb.binding});
     sb.built = r.built; sb.key = r.key;
   } catch (err) {
     sb.built = {ok: false, checks: [{level: "block", text: String(err && err.message || err)}]};
@@ -16740,7 +16946,7 @@ async function sbCheck() {
 async function sbSave(force) {
   sb.saving = true; sbRender();
   try {
-    const r = await api("/api/scriptgen/save", {spec: sb.spec, binding: sb.binding, force: !!force});
+    const r = await api("/api/scriptgen/save", {spec: Object.assign({}, sb.spec, {target: sb.target}), binding: sb.binding, force: !!force});
     sb.confirm = null;
     status((r.replaced ? "Updated “" : "Saved “") + sb.spec.name + "” on " + (r.key && r.key.label || sb.keyLabel) +
       ". Restart CS2 or press your Apply-now key to use it.");
@@ -16757,9 +16963,15 @@ async function sbSave(force) {
 }
 
 function sbSetKey(binding) {
+  const which = sb.listening;
   sb.listening = false;
-  if (binding) { sb.binding = binding; sb.keyLabel = ""; }
-  sbRender(); sbCheck().then(() => { if (sb.key) { sb.keyLabel = sb.key.label; sbRender(); } });
+  if (binding && which === "target") { sb.target = binding; sb.targetLabel = ""; }
+  else if (binding) { sb.binding = binding; sb.keyLabel = ""; }
+  sbRender(); sbCheck().then(() => {
+    if (sb.key) sb.keyLabel = sb.key.label;
+    if (sb.built && sb.built.target && sb.built.target.label) sb.targetLabel = sb.built.target.label;
+    sbRender();
+  });
 }
 
 document.addEventListener("keydown", e => {
@@ -16771,7 +16983,7 @@ document.addEventListener("keydown", e => {
   sbSetKey(binding);
 }, true);
 document.addEventListener("mousedown", e => {
-  if (!sb.listening || e.target && e.target.id === "sb-keybtn" && e.button === 0) return;
+  if (!sb.listening || e.target && e.target.closest && e.target.closest("[data-sb-listen]") && e.button === 0) return;
   const map = {1: "mouse3", 3: "mouse4", 4: "mouse5"};
   if (!map[e.button]) return;
   e.preventDefault(); e.stopPropagation();
@@ -16789,7 +17001,8 @@ document.addEventListener("click", e => {
   const t = e.target.closest("button");
   if (!t) return;
   const d = t.dataset;
-  if (t.id === "sb-keybtn") { sb.listening = !sb.listening; sbRender(); return; }
+  if (d.sbListen) { sb.listening = sb.listening === d.sbListen ? false : d.sbListen; sbRender(); return; }
+  if (d.sbStyle) { sb.spec.style = d.sbStyle; sbRender(); sbChanged(); return; }
   if (d.sbMode) { sb.spec.mode = d.sbMode; sbRender(); sbChanged(); return; }
   if (d.sbCat) { sb.cat = d.sbCat; sb.find = ""; sbRender(); return; }
   if (d.sbAdd) {
@@ -16810,7 +17023,8 @@ document.addEventListener("click", e => {
   }
   if (d.sbIdea) {
     const idea = SB_IDEAS[+d.sbIdea];
-    sb.spec = {name: idea.spec.name, mode: idea.spec.mode,
+    if (idea.keys) { sb.binding = idea.keys.binding; sb.target = idea.keys.target; sb.keyLabel = ""; sb.targetLabel = ""; sb.listening = "idea"; setTimeout(() => sbSetKey(""), 0); }
+    sb.spec = {name: idea.spec.name, mode: idea.spec.mode, style: idea.spec.style,
       steps: idea.spec.steps.map(s => Object.assign(sbNewStep(s.id), s))};
     sbRender(); sbChanged(); return;
   }
@@ -17003,7 +17217,7 @@ function applyPrefs(ui) {
     intent = ui.intent;
     paintIntent(intent);
   }
-  if (ui.target_fps) $("target").value = ui.target_fps;
+  $("target").value = ui.target_fps || "";
   // Preferences arrive after the scan, so the line and the chips were
   // describing an empty field that has just been filled in.
   renderFps();

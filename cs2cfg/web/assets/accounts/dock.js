@@ -8,32 +8,47 @@ let dockSteamNotice = '';
 let dockExpanded = false;
 let dockCloseTimer;
 const DOCK_ICONS = {
-  steam:'<circle cx="15.5" cy="8" r="4"/><circle cx="15.5" cy="8" r="2"/><circle cx="6.5" cy="16" r="3"/><path d="m2 13 5 2m2 3 7-6M8 13l4-5"/>',
-  web:'<circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/>',
-  cloud:'<path d="M7 18h11a4 4 0 0 0 0-8 6 6 0 0 0-11-2 5 5 0 0 0 0 10Z"/><path d="m9 13 2 2 4-4"/>',
-  faceit:'<path d="M3 10h12l5-5v14L3 10Z"/>'
+  steam:'<circle cx="15.5" cy="8" r="4"/><circle cx="15.5" cy="8" r="2"/><circle cx="6.5" cy="16" r="3"/><path d="m2 13 5 2m2 3 7-6M8 13l4-5"/>'
 };
+
+/* One Steam connection: Steam's website (match history) and the app's cloud
+   (settings sync) are signed in together, so the dock shows a single row. */
+function dockSteamRow() {
+  const pc = whoData?.accounts?.find(a=>a.active);
+  const web = dockSteam;
+  const conn = web?.connection || {};
+  const pcError = whoData?.ok === false;
+  const unavailable = !!web && (web.available===false || web.state==='unavailable');
+  const connected = !!conn.connected && web?.state!=='signed_out';
+  const needsConnect = !!web && !unavailable && !connected;
+  let detail, state = 'idle', action = '';
+  if (dockSteamNotice) { detail = dockSteamNotice; state = 'error'; action = needsConnect ? 'Connect' : ''; }
+  else if (dockSteamWaiting) { detail = 'Finish signing in on Steam’s page'; state = 'waiting'; }
+  else if (!whoData) detail = 'Checking your account…';
+  else if (pcError) { detail = 'Could not read your Steam account'; state = 'error'; }
+  else if (!web) detail = 'Checking the connection…';
+  else if (unavailable) detail = 'Open the app window to connect Steam';
+  else if (web.state==='reading') { detail = 'Reading your match history'; state = 'reading'; }
+  else if (web.state==='error' && web.linked) { detail = 'Could not read match history'; state = 'error'; action = 'Retry'; }
+  else if (connected) { detail = 'Connected · '+(web.found ?? 0)+' past matches'; state = 'linked'; action = 'Manage'; }
+  else if (web.state==='signed_out') { detail = 'Steam sign-in ended · connect again'; action = 'Connect'; }
+  else { detail = pc ? 'Not connected yet' : 'No Steam account on this PC'; action = 'Connect'; }
+  const tip = connected ? 'Match history and settings sync are on' : 'Connect once for match history and settings sync on every PC';
+  return {id:'steam', label:'Steam', name:pc?.name, detail, state, action, picture:pc?.picture,
+    tip, connect:needsConnect, retry:action==='Retry', disabled:dockSteamOpening, updated:web?.updated};
+}
 
 function renderAccountsDock() {
   const box = $('dock-rows');
   if (!box) return;
   const pc = whoData?.accounts?.find(a=>a.active);
-  const web = dockSteam;
-  const cloud = cloudData;
-  const player = fcData?.player;
-  const pcError = whoData?.ok === false;
-  const rows = [
-    {id:'steam', label:'Steam (this PC)', name:pc?.name, detail:pc ? (whoData.following?'Following Steam':'Pinned account') : whoData ? (pcError?'Could not read account':'No Steam account') : 'Checking account…', state:pc?'linked':pcError?'error':'idle', action:pc?'Manage':'Open', picture:pc?.picture, error:whoData?.error},
-    {id:'web', label:'Steam web', detail:dockSteamNotice || (dockSteamWaiting?'Finish sign-in in Steam':!web?'Checking session…':web.state==='reading'?'Reading match history':web.error?web.error:web.state==='unavailable'||web.available===false?'Open in the desktop app':web.state==='signed_out'?'Session expired':web.linked?'Match history · '+(web.found ?? 0)+' matches':'Older CS2 match history'), state:dockSteamWaiting?'waiting':web?.state==='reading'?'reading':web?.error||web?.state==='error'?'error':web?.linked&&web.state!=='signed_out'?'linked':'idle', action:dockSteamWaiting?'':web?.state==='reading'?'':web?.state==='error'&&web.linked?'Retry':web && (!web.linked||web.state==='signed_out')?'Connect':'', disabled:!web||web.available===false||web.state==='unavailable'||dockSteamOpening, updated:web?.updated},
-    {id:'cloud', label:'Cloud sync', name:cloud?.signed_in?(cloud.name||cloud.display_name||cloud.email||'Signed in'):null, detail:!cloud?'Checking account…':cloud.error?'Cloud unavailable':cloud.signed_in?'Signed in':cloud.configured===false?'Cloud not configured':'Settings across PCs', state:cloud?.error?'error':cloud?.signed_in?'linked':'idle', action:cloud&&!cloud.signed_in&&cloud.configured!==false?'Sign in':'', picture:cloud?.signed_in?(cloud.avatar||cloud.avatar_url):null, error:cloud?.error},
-    {id:'faceit', label:'FACEIT', name:player?.nickname, detail:player?(player.level?'Following · Level '+player.level:'Following player'):fcData?.error?'Could not read player':fcData?'ELO & match history':'Checking player…', state:fcData?.error?'error':player?'linked':'idle', action:fcData&&!player?'Follow':'', picture:player?.avatar, error:fcData?.error}
-  ];
+  const rows = [dockSteamRow()];
   const others = (whoData?.accounts || []).filter(a=>!a.active).map((a,i)=>({
     id:'local-'+i, label:'Steam account', name:a.name || a.login || a.account,
     detail:a.signed_in?'Signed in to Steam':'Available on this PC', state:a.signed_in?'linked':'idle',
     picture:a.picture, action:'Switch', account:a.account
   }));
-  rows.splice(1,0,...others);
+  rows.push(...others);
   const wanted = new Set(rows.map(r=>'dock-'+r.id));
   for (const old of [...box.children]) if (!wanted.has(old.id)) old.remove();
   for (const [index,row] of rows.entries()) {
@@ -60,7 +75,7 @@ function renderAccountsDock() {
     button.dataset.state = row.state;
     button.disabled = !!row.disabled;
     const updated = row.updated ? ' · Updated '+new Date(row.updated*1000).toLocaleString() : '';
-    button.title = row.label+(row.name?' · '+row.name:'')+' · '+(row.error||row.detail)+updated+(row.action?' · '+row.action:'');
+    button.title = row.label+(row.name?' · '+row.name:'')+' · '+row.detail+(row.tip?' · '+row.tip:'')+updated+(row.action?' · '+row.action:'');
     button.setAttribute('aria-label',button.title);
   }
   const main = $('dock-main');
@@ -73,7 +88,7 @@ function renderAccountsDock() {
     main._dockContent = mainSignature;
   }
   main.dataset.state = rows[0].state;
-  main.setAttribute('aria-label',(pc?.name || 'Steam (this PC)')+' \u00b7 '+rows[0].detail+' \u00b7 '+rows.length+' accounts');
+  main.setAttribute('aria-label',(pc?.name || 'Steam')+' \u00b7 '+rows[0].detail+' \u00b7 '+rows.length+' accounts');
   main.title = dockExpanded?'Hide accounts':'Show accounts';
   if (dockExpanded) dockPosition();
   $('dock-summary').textContent = rows.filter(r=>r.state==='linked'||r.state==='reading').length+' / '+rows.length;
@@ -125,10 +140,11 @@ function loadDockSteam() {
     try {
       const wasReading = dockSteam?.state==='reading';
       dockSteam = await api('/api/stats/steam',{});
-      if (dockSteam.linked && dockSteam.state!=='signed_out') {
+      if (dockSteam.connection?.connected && dockSteam.state!=='signed_out') {
         const wasWaiting = !!dockSteamWaiting;
         dockSteamWaiting = 0;
         dockSteamNotice = '';
+        if (wasWaiting && typeof loadCloud==='function') loadCloud();
         if (wasWaiting || (wasReading && dockSteam.state==='done')) loadFaceit();
       }
     } catch (err) {
@@ -136,7 +152,7 @@ function loadDockSteam() {
     }
     if (dockSteamWaiting && Date.now() >= dockSteamWaiting) {
       dockSteamWaiting = 0;
-      dockSteamNotice = 'Sign-in timed out · try again';
+      dockSteamNotice = 'Steam sign-in was not finished · try again';
     }
     renderAccountsDock();
     dockScheduleSteam();
@@ -150,32 +166,22 @@ document.addEventListener('click',async e=>{
   if (e.target.closest('#dock-panel [data-use]')) { dockToggle(false); return; }
   const button = e.target.closest('[data-dock]');
   if (!button) return;
-  if (button.dataset.dock!=='web') dockToggle(false);
-  if (button.dataset.dock==='steam') {
-    setTab('settings'); setSettingsSub('steam'); whoOpen(true); $('who')?.focus();
-  } else if (button.dataset.dock==='cloud') {
-    setTab('settings'); setSettingsSub('account');
-    $('account-out')?.scrollIntoView({block:'nearest'});
-    // The existing entry owns all authentication options and polling.
-    setTimeout(()=>$('account-out')?.querySelector('button')?.focus(),0);
-  } else if (button.dataset.dock==='faceit') {
-    setTab('faceit');
-    // setTab can trigger an async refresh; the dashboard preserves this draft/focus.
-    const target = $('fc-nick') || $('fc-refresh');
-    target?.scrollIntoView({block:'nearest'}); target?.focus();
-  } else if (button.dataset.dock==='web' && !dockSteamWaiting && !dockSteamOpening && dockSteam?.state!=='reading' && (!dockSteam?.linked||dockSteam?.state==='signed_out'||dockSteam?.state==='error')) {
+  const row = dockSteamRow();
+  if (row.connect || row.retry) {
+    if (dockSteamWaiting || dockSteamOpening) return;
     dockSteamOpening = true; dockSteamNotice = ''; renderAccountsDock();
     try {
-      const action = dockSteam?.linked && dockSteam.state==='error' ? 'sync' : 'signin';
-      const result = await api('/api/stats/steam',{action});
-      if (result.ok===false || result.available===false || result.state==='unavailable' || result.error) throw Error(result.error||'Open in the desktop app');
-      if (action==='signin') dockSteamWaiting = Date.now()+10*60*1000;
+      const result = row.retry ? await api('/api/stats/steam',{action:'sync'}) : await api('/api/steam/connect',{});
+      if (result.ok===false || result.error) throw Error(result.error||'Steam could not be opened');
+      if (result.opened) dockSteamWaiting = Date.now()+10*60*1000;
     } catch (err) { dockSteamNotice = String(err.message||err); }
     dockSteamOpening = false;
     await loadDockSteam();
-  } else if (button.dataset.dock==='web' && dockSteam?.linked && !dockSteamWaiting) {
-    setTab('faceit');
+    return;
   }
+  if (dockSteamWaiting) return;
+  dockToggle(false);
+  setTab('settings'); setSettingsSub('steam'); whoOpen(true); $('who')?.focus();
 });
 document.addEventListener('visibilitychange',()=>{
   dockPauseMotion();

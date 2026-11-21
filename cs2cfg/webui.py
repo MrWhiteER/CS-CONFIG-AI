@@ -92,6 +92,11 @@ class State:
         # Inert until switched on in preferences; remembers the last board so
         # the lights come up at start without the keyboard tab being opened.
         self.rgb = RgbSync(cache=user_data_dir() / "rgb-board.json")
+        from .mouse import MouseControl
+
+        # Mouse speed and polling rate, set on the mouse itself. Touches the
+        # mouse only when asked, or at start when a speed was chosen.
+        self.mouse = MouseControl()
 
     def refresh(self, rescan: bool = False) -> None:
         if self.machine is None or rescan:
@@ -116,6 +121,33 @@ class State:
         return self.users[0]
 
 
+def _measured_fps() -> Optional[Dict[str, Any]]:
+    """The frame rate CS2 really reached in recent games, or None."""
+    try:
+        from . import telemetry
+        return telemetry.measured_fps(telemetry.load_sessions(40))
+    except Exception:
+        return None
+
+
+def _frame_goal(machine: Machine, value: Any) -> Optional[int]:
+    """A chosen frame rate goal, kept only if it is a real monitor's refresh rate.
+
+    The goal used to be typed freely, so 400 could be asked of a PC that
+    reaches 250: the plan then dropped every setting to its lowest for frames
+    that never came. Only a rate an attached monitor really runs at is kept;
+    anything else (including a number saved by an older version) falls back
+    to the main monitor's refresh rate.
+    """
+    try:
+        wanted = int(value)
+    except (TypeError, ValueError):
+        return None
+    displays = getattr(machine, "displays", None) or []
+    rates = {int(round(d.refresh)) for d in displays if d.refresh}
+    return wanted if wanted in rates else None
+
+
 def _machine_payload(machine: Machine, state: State) -> Dict[str, Any]:
     cpu, gpu = machine.cpu, machine.gpu
     return {
@@ -136,6 +168,7 @@ def _machine_payload(machine: Machine, state: State) -> Dict[str, Any]:
              "primary": d.primary, "confident": d.confident_refresh}
             for d in machine.displays
         ],
+        "measured_fps": _measured_fps(),
         "cs2_install": str(state.cs2_install) if state.cs2_install else None,
         "steam_path": str(state.steam_root) if state.steam_root else None,
         "steam_running": steam.steam_running(),
@@ -158,7 +191,7 @@ def _plan_payload(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     profile = build_profile(
         state.machine, kb,
         intent=body.get("intent", "balanced"),
-        target_fps=int(target) if target else None,
+        target_fps=_frame_goal(state.machine, target),
         current_video=current_video,
         hide_crosshair=bool(body.get("hide_crosshair")),
         load_bias=str(body.get("load_bias") or "auto"),
@@ -309,7 +342,8 @@ def _record_verification(state, user, profile, launch, body, steps, generated=No
     receipt = {"checks": checks, "account": user.account_id,
                "intent": profile.intent, "applied_at": time.time(),
                "selection": {"intent": profile.intent,
-                             "target_fps": body.get("target_fps") or None,
+                             "target_fps": _frame_goal(getattr(state, "machine", None),
+                                                         body.get("target_fps")),
                              "load_bias": body.get("load_bias") or "auto",
                              "hide_crosshair": bool(body.get("hide_crosshair"))}}
     state.verification_receipt = receipt
@@ -338,7 +372,7 @@ def _apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     profile = build_profile(
         state.machine, kb,
         intent=body.get("intent", "balanced"),
-        target_fps=int(target) if target else None,
+        target_fps=_frame_goal(state.machine, target),
         current_video=steam.read_video_cfg(user),
         hide_crosshair=bool(body.get("hide_crosshair")),
         load_bias=str(body.get("load_bias") or "auto"),
@@ -925,6 +959,39 @@ def _rgb_settings(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         except Exception:
             pass
     return _rgb(state, {})
+
+
+def _mouse(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """The mice plugged in, what each uses now, and what the player chose."""
+    from .cli import load_prefs
+    from .mouse import read_settings
+
+    state.mouse.find()
+    return {"ok": True, **state.mouse.status(read_settings(load_prefs().get("ui")))}
+
+
+def _mouse_settings(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Choose a mouse speed / polling rate, remember it, put it on the mouse.
+
+    0 means "leave the mouse as it is". The choice syncs with the player's
+    cloud copy, so the next PC they sign in on sets its mouse the same way.
+    """
+    from .cli import load_prefs, save_prefs
+    from .mouse import DEFAULTS, read_settings
+
+    prefs = load_prefs()
+    current = read_settings(prefs.get("ui"))
+    try:
+        wanted = read_settings({**current, **{k: body[k] for k in DEFAULTS if k in body}},
+                               strict=True)
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
+    profiles.remember(prefs, None, wanted)
+    save_prefs(prefs)
+    # Only what was just picked goes to the mouse, so picking a polling rate
+    # doesn't undo a speed the player set with the button on the mouse.
+    state.mouse.apply({k: (wanted[k] if k in body else 0) for k in DEFAULTS})
+    return {"ok": True, **state.mouse.status(wanted)}
 
 
 def _cfg_scan(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -4390,14 +4457,120 @@ def _steam_hooks(state: State) -> None:
     """After the shared Steam sign-in, read the match history straight away."""
     from . import steamweb
 
-    steamweb.on_signed_in[:] = [lambda: _steam_history_start(state)]
+    def cloud_too() -> None:
+        state._cloud_quiet_tried = False
+        _cloud_quietly(state)
+
+    steamweb.on_signed_in[:] = [lambda: _steam_history_start(state), cloud_too]
 
 
 def _steam_state() -> Dict[str, Any]:
     from . import steamhistory, steamweb
 
     return {"linked": steamweb.linked(), "available": steamweb.available(),
-            **steamhistory.status}
+            **steamhistory.status, "connection": _steam_connected()}
+
+
+def _cloud_claim_later(state: State, started: Dict[str, Any]) -> None:
+    """Finish a cloud sign-in on the app's side, without the page polling.
+
+    The Steam window does the visible half; this collects the session once
+    Steam hands back, then starts the settings sync straight away.
+    """
+    from . import cloud
+
+    state._steam_login = started
+
+    def run() -> None:
+        try:
+            answer = cloud.wait_for_login(
+                started["state"], started["verifier"],
+                should_stop=lambda: getattr(state, "_steam_login", None) is not started)
+        except cloud.CloudError:
+            return
+        finally:
+            if getattr(state, "_steam_login", None) is started:
+                state._steam_login = None
+        cloud.forget_me()
+        if answer.get("ok", True) and cloud.signed_in():
+            _sync_loop(state).nudge()
+
+    threading.Thread(target=run, name="cloud-claim", daemon=True).start()
+
+
+def _cloud_quietly(state: State) -> None:
+    """Settings sync with nothing for the player to do.
+
+    Once Steam is connected in the app, the app's own cloud signs in with
+    that same Steam session in a hidden window. Tried once per launch; if it
+    does not work the next "Connect Steam" covers it.
+    """
+    from . import cloud, cloudconfig, steamweb
+
+    if getattr(state, "_cloud_quiet_tried", False):
+        return
+    if not (cloudconfig.configured() and steamweb.available() and steamweb.linked()):
+        return
+    if cloud.signed_in() or getattr(state, "_steam_login", None):
+        return
+    if steamweb.mark().get("cloud_off"):
+        return  # signed out of the cloud on purpose, in Settings
+    state._cloud_quiet_tried = True
+
+    def run() -> None:
+        try:
+            started = cloud.begin_login("steam")
+        except cloud.CloudError:
+            return
+        _cloud_claim_later(state, started)
+        if not steamweb.quiet_openid(started["url"]):
+            # Nothing came back: stop asking the cloud about it.
+            if getattr(state, "_steam_login", None) is started:
+                state._steam_login = None
+
+    threading.Thread(target=run, name="cloud-quiet", daemon=True).start()
+
+
+def _steam_connected() -> Dict[str, Any]:
+    """The one Steam connection: Steam's website plus the app's cloud."""
+    from . import cloud, cloudconfig, steamweb
+
+    web = steamweb.linked()
+    has_cloud = cloud.signed_in()
+    return {"web": web, "cloud": has_cloud,
+            "cloud_configured": cloudconfig.configured(),
+            "connected": web and (has_cloud or not cloudconfig.configured())}
+
+
+def _steam_connect(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Connect Steam once: match history, settings sync and anything else.
+
+    One Steam window. When the app's cloud is not signed in yet, the window
+    opens on Steam's OpenID page for it: signing in there also signs Steam's
+    website in for the app, so both are done in one go. When only the
+    website half is missing, Steam's own login page is shown instead.
+    """
+    from . import cloud, cloudconfig, steamweb
+
+    if not steamweb.available():
+        return {**_steam_state(), "ok": False,
+                "error": "Open the app's own window to connect Steam."}
+    _steam_hooks(state)
+    steamweb.mark({"cloud_off": False})
+    if cloudconfig.configured() and not cloud.signed_in():
+        try:
+            started = cloud.begin_login("steam")
+        except cloud.CloudError:
+            started = None
+        if started and steamweb.sign_in(started["url"]):
+            _cloud_claim_later(state, started)
+            return {"ok": True, "opened": True, **_steam_state()}
+    if not steamweb.linked():
+        if not steamweb.sign_in():
+            return {**_steam_state(), "ok": False,
+                    "error": "Open the app's own window to connect Steam."}
+        return {"ok": True, "opened": True, **_steam_state()}
+    return {"ok": True, "opened": False, **_steam_state()}
 
 
 def _stats_steam(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -4412,6 +4585,8 @@ def _stats_steam(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
                     **_steam_state()}
     elif action == "sync" and not _steam_history_start(state):
         return {"ok": False, "error": "Steam account not found", **_steam_state()}
+    elif action == "status":
+        _cloud_quietly(state)
     return {"ok": True, **_steam_state()}
 
 
@@ -5074,7 +5249,7 @@ def _configs_prepare(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     target = ui.get("target_fps")
     profile = build_profile(state.machine, state.kb,
                             intent=ui.get("intent") or "balanced",
-                            target_fps=int(target) if target else None,
+                            target_fps=_frame_goal(state.machine, target),
                             current_video=steam.read_video_cfg(user) if user else {},
                             hide_crosshair=bool(ui.get("hide_crosshair")),
                             load_bias=str(ui.get("load_bias") or "auto"))
@@ -5153,9 +5328,54 @@ def _sync_round(state: State, force: bool = False) -> Dict[str, Any]:
     if not cloud.signed_in():
         return {"ok": False, "action": "none", "at": time.time(),
                 "reason": "sign in with Steam to sync"}
-    return autosync.run(_active_account(state), _game_cfg_root(state),
-                        state.cfg_folder, load_prefs=load_prefs,
-                        save_prefs=save_prefs, force=force)
+    result = autosync.run(_active_account(state), _game_cfg_root(state),
+                          state.cfg_folder, load_prefs=load_prefs,
+                          save_prefs=save_prefs, force=force)
+    if result.get("action") == "pull" and result.get("ok"):
+        result["applied"] = _after_pull(state, result)
+    return result
+
+
+def _after_pull(state: State, result: Dict[str, Any]) -> Dict[str, Any]:
+    """Put settings that came from another PC to work here, straight away.
+
+    Overlay and lighting take their new settings live. When the cloud brought
+    the player's picture/config choices, the normal apply runs for this PC's
+    own hardware with them -- the same thing the Apply button does, backups
+    included -- so a new PC is ready without anybody pressing anything.
+    """
+    from . import autosync, profiles
+    from .cli import load_prefs
+
+    done: Dict[str, Any] = {}
+    prefs = load_prefs()
+    ui = profiles.ui_for(prefs, _active_account(state))
+    changed = set(result.get("prefs") or [])
+    try:
+        if any(k.startswith("overlay_") for k in changed):
+            from .overlay.settings import read as overlay_read
+            state.overlay.configure(overlay_read(ui))
+            done["overlay"] = True
+        if any(k.startswith("rgb_") for k in changed):
+            from .rgb import read_settings as rgb_read
+            state.rgb.configure(rgb_read(ui))
+            done["lighting"] = True
+        if any(k.startswith("mouse_") for k in changed):
+            from .mouse import read_settings as mouse_read
+            state.mouse.apply_later(mouse_read(ui))
+            done["mouse"] = True
+    except Exception:
+        pass
+    if (changed & set(autosync.APPLY_PREFS) or result.get("written")) \
+            and ui.get(autosync.CFG_WRITE_KEY):
+        body = {k: ui[k] for k in autosync.APPLY_PREFS if k in ui}
+        body["account"] = _active_account(state)
+        try:
+            applied = _apply(state, body)
+            done["apply"] = bool(applied.get("ok"))
+        except Exception:
+            done["apply"] = False
+    return done
 
 
 def _sync_loop(state: State):
@@ -5474,7 +5694,12 @@ def _cloud_password(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
 def _cloud_logout(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     from . import cloud
 
+    from . import steamweb
+
     state._login = None
+    state._steam_login = None
+    # Signing out here is a choice: do not sign the cloud back in quietly.
+    steamweb.mark({"cloud_off": True})
     return cloud.sign_out()
 
 
@@ -5921,6 +6146,7 @@ def make_handler(state: State):
         "/api/faceit/forget": _faceit_forget,
         "/api/stats": _stats,
         "/api/stats/steam": _stats_steam,
+        "/api/steam/connect": _steam_connect,
         "/api/match/state": _match_state,
         "/api/match/accept": _match_accept,
         "/api/match/dismiss": _match_dismiss,
@@ -5982,6 +6208,8 @@ def make_handler(state: State):
         "/api/overlay/settings": _overlay_settings,
         "/api/rgb": _rgb,
         "/api/rgb/settings": _rgb_settings,
+        "/api/mouse": _mouse,
+        "/api/mouse/settings": _mouse_settings,
     }
 
     class Handler(BaseHTTPRequestHandler):
@@ -6526,6 +6754,16 @@ def serve(port: int = 8765, cfg_folder: str = "mrwhiteer",
     except Exception:
         pass                    # never let a sound preference stop the app
 
+    # The hardware graph on the System page keeps its own history from the
+    # moment the app starts, so it opens full rather than filling in from
+    # the right. The last two minutes survive a restart too.
+    try:
+        from . import monitor, paths
+
+        monitor.shared().start(paths.user_data_dir() / monitor.HISTORY_FILE)
+    except Exception:
+        pass
+
     # Sensors that need administrator, read through the helper setup put in
     # place. Started here because it no longer costs a prompt.
     try:
@@ -6577,4 +6815,12 @@ def serve(port: int = 8765, cfg_folder: str = "mrwhiteer",
         state.rgb.configure(rgb_settings(load_prefs().get("ui")))
     except Exception:
         pass                    # lighting is never worth failing to start over
+    try:
+        from .mouse import read_settings as mouse_settings
+
+        # The mouse keeps a speed in its own memory, but a new mouse, a new
+        # PC or the maker's app may have changed it: put the choice back.
+        state.mouse.apply_later(mouse_settings(load_prefs().get("ui")))
+    except Exception:
+        pass
     return server, state

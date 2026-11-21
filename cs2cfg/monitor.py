@@ -12,7 +12,9 @@ invents a number is worse than a gauge that admits it does not have one.
 
 from __future__ import annotations
 
+import atexit
 import ctypes
+import json
 import shutil
 import subprocess
 import threading
@@ -22,10 +24,17 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional
 
-kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+# Windows only; elsewhere (the test machines) every reading is simply unknown.
+kernel32 = ctypes.WinDLL("kernel32", use_last_error=True) if hasattr(ctypes, "WinDLL") else None
 
 GPU_CACHE_SECONDS = 2.0
 HISTORY_LENGTH = 60          # ~2 minutes at a 2s poll
+SAMPLE_SECONDS = 2.0         # one slot of history
+SAVE_SECONDS = 10.0          # how often the window is written to disk
+HISTORY_FILE = "hardware-history.json"
+# Every line the System graph can draw. Temperatures sit next to usage so the
+# graph's second view is just as full as the first.
+SERIES = ("cpu", "gpu", "ram", "vram", "temp-cpu", "temp-gpu", "temp-system")
 
 
 class FILETIME(ctypes.Structure):
@@ -51,6 +60,8 @@ class MEMORYSTATUSEX(ctypes.Structure):
 
 
 def _system_times() -> Optional[tuple]:
+    if kernel32 is None:
+        return None
     idle, kernel, user = FILETIME(), FILETIME(), FILETIME()
     if not kernel32.GetSystemTimes(ctypes.byref(idle), ctypes.byref(kernel), ctypes.byref(user)):
         return None
@@ -60,7 +71,7 @@ def _system_times() -> Optional[tuple]:
 def memory() -> Dict[str, Optional[float]]:
     status = MEMORYSTATUSEX()
     status.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
-    if not kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+    if kernel32 is None or not kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
         return {"percent": None, "used_gb": None, "total_gb": None}
     total = status.ullTotalPhys
     used = total - status.ullAvailPhys
@@ -98,8 +109,15 @@ class Monitor:
     _nvml: object = None
     _nvml_checked: bool = False
     history: Dict[str, List[Optional[float]]] = field(default_factory=lambda: {
-        "cpu": [], "gpu": [], "ram": [], "vram": [],
+        key: [] for key in SERIES
     })
+    _history_at: Optional[float] = None       # wall time of the newest slot
+    _reading: Optional[Dict[str, object]] = None
+    _reading_at: float = 0.0
+    _thread: Optional[threading.Thread] = None
+    _stop: threading.Event = field(default_factory=threading.Event)
+    _store: Optional[Path] = None
+    _saved_at: float = 0.0
 
     # -- cpu ---------------------------------------------------------------
     def cpu_percent(self) -> Optional[float]:
@@ -227,28 +245,154 @@ class Monitor:
         }
 
     # -- combined ----------------------------------------------------------
-    def sample(self) -> Dict[str, object]:
-        cpu = self.cpu_percent()
-        ram = memory()
-        gpu = self.gpu()
+    def _measure(self) -> Dict[str, object]:
+        return {"cpu": {"percent": self.cpu_percent()}, "ram": memory(), "gpu": self.gpu()}
 
+    @staticmethod
+    def _temperatures(gpu: Dict[str, Optional[float]]) -> Dict[str, Optional[float]]:
+        """CPU and System from the sensor reader, GPU from the reading just taken.
+
+        Only asks the sensor reader for a fresh reading when the administrator
+        helper is publishing them, which is a file read. Without it a refresh
+        starts PowerShell, and that is not something to do every few seconds
+        in the background while somebody is playing; the last held reading
+        is used instead, and only while it is recent.
+        """
+        found: Dict[str, Optional[float]] = {"temp-cpu": None, "temp-system": None,
+                                             "temp-gpu": gpu.get("temperature")}
+        try:
+            from . import temps
+
+            watcher = temps.shared()
+            if temps._published():
+                held = watcher.read()
+            else:
+                held = watcher._held
+            if time.time() - held.at <= 2 * temps.REFRESH:
+                for part in held.parts:
+                    key = "temp-" + part.part
+                    if key in found and part.known and part.celsius is not None:
+                        found[key] = part.celsius
+        except Exception:
+            pass
+        return found
+
+    def _record(self, reading: Dict[str, object], at: float) -> None:
+        gpu = reading.get("gpu") or {}
+        values = {"cpu": (reading.get("cpu") or {}).get("percent"),
+                  "gpu": gpu.get("percent"),
+                  "ram": (reading.get("ram") or {}).get("percent"),
+                  "vram": gpu.get("vram_percent"),
+                  **self._temperatures(gpu)}
         with self._lock:
-            for key, value in (("cpu", cpu), ("gpu", gpu.get("percent")),
-                               ("ram", ram.get("percent")), ("vram", gpu.get("vram_percent"))):
-                series = self.history[key]
-                series.append(value)
-                if len(series) > HISTORY_LENGTH:
-                    del series[0:len(series) - HISTORY_LENGTH]
+            self._append(values, at)
+            self._reading, self._reading_at = reading, at
+
+    def _append(self, values: Dict[str, Optional[float]], at: float) -> None:
+        """One slot per two seconds. Time the app was closed stays a gap."""
+        if self._history_at is not None:
+            missed = int(round((at - self._history_at) / SAMPLE_SECONDS)) - 1
+            for _ in range(max(0, min(missed, HISTORY_LENGTH))):
+                for key in SERIES:
+                    self.history[key].append(None)
+        for key in SERIES:
+            series = self.history[key]
+            series.append(values.get(key))
+            if len(series) > HISTORY_LENGTH:
+                del series[0:len(series) - HISTORY_LENGTH]
+        self._history_at = at
+
+    def sample(self) -> Dict[str, object]:
+        """The newest reading and the window of history behind it.
+
+        With the background sampler running this only reads what it last
+        measured, so any number of pages polling never bends the timeline.
+        """
+        with self._lock:
+            reading, at = self._reading, self._reading_at
+            running = self._thread is not None and self._thread.is_alive()
+        if not running or reading is None or time.time() - at > 2 * SAMPLE_SECONDS:
+            at = time.time()
+            reading = self._measure()
+            self._record(reading, at)
+        with self._lock:
             history = {k: list(v) for k, v in self.history.items()}
 
         return {
-            "cpu": {"percent": cpu},
-            "ram": ram,
-            "gpu": gpu,
+            **reading,
             "game": self.game(),
             "history": history,
-            "at": time.time(),
+            "at": at,
         }
+
+    # -- background ------------------------------------------------------------
+    def start(self, store: Optional[Path] = None) -> None:
+        """Measure from the moment the app starts, not from when a page asks.
+
+        The graph on the System page then opens already full. The window is
+        also kept on disk, so a restart -- an update, say -- picks up where it
+        left off instead of starting from nothing.
+        """
+        with self._lock:
+            if self._thread is not None and self._thread.is_alive():
+                return
+            self._store = store
+        if store is not None:
+            self._load(store)
+            atexit.register(self.save)
+        self._stop.clear()
+        self._thread = threading.Thread(target=self._run, name="hardware-history", daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+        self.save()
+
+    def _run(self) -> None:
+        # Primes the CPU counter, so the first slot is a real load figure.
+        self.cpu_percent()
+        while not self._stop.wait(SAMPLE_SECONDS if self._reading is not None else 0.5):
+            try:
+                self._record(self._measure(), time.time())
+                if time.time() - self._saved_at >= SAVE_SECONDS:
+                    self.save()
+            except Exception:
+                pass                # a missed sample is a gap, never a crash
+
+    def save(self) -> None:
+        with self._lock:
+            store, at = self._store, self._history_at
+            history = {k: list(v) for k, v in self.history.items()}
+        if store is None or at is None:
+            return
+        self._saved_at = time.time()
+        try:
+            temp = store.with_suffix(".tmp")
+            temp.write_text(json.dumps({"at": at, "step": SAMPLE_SECONDS,
+                                        "history": history}), encoding="utf-8")
+            temp.replace(store)
+        except OSError:
+            pass
+
+    def _load(self, store: Path) -> None:
+        """Bring back whatever of the saved window is still inside it now."""
+        try:
+            saved = json.loads(store.read_text(encoding="utf-8"))
+            at = float(saved["at"])
+            history = saved["history"]
+        except (OSError, ValueError, KeyError, TypeError):
+            return
+        if not 0 <= time.time() - at < HISTORY_LENGTH * SAMPLE_SECONDS:
+            return
+        with self._lock:
+            for key in SERIES:
+                values = history.get(key) or []
+                self.history[key] = [v if isinstance(v, (int, float)) else None
+                                     for v in values][-HISTORY_LENGTH:]
+            length = max(len(v) for v in self.history.values())
+            for key in SERIES:      # every line the same length, oldest padded
+                self.history[key][:0] = [None] * (length - len(self.history[key]))
+            self._history_at = at
 
 
 _monitor: Optional[Monitor] = None

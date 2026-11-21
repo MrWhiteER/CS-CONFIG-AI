@@ -122,3 +122,59 @@ def sign_in(url: Optional[str] = None) -> bool:
     threading.Thread(target=_finished, name="steam-sign-in", daemon=True,
                      args=(win, _left_steam if openid else _signed_in_page)).start()
     return True
+
+
+# Steam's OpenID page for somebody already signed in: one "Sign in" button in
+# a form. Submitting it is the same click the person would make; it only
+# happens for the app's own cloud, and only once they have signed in to Steam
+# in the app themselves.
+_OPENID_SUBMIT_JS = r"""
+(function () {
+  var form = document.getElementById('openidForm');
+  if (!form) return 'no-form';
+  var button = document.getElementById('imageLogin');
+  if (button && button.click) { button.click(); return 'clicked'; }
+  form.submit();
+  return 'submitted';
+})()
+"""
+
+
+def _openid_page(url: str) -> bool:
+    return COMMUNITY in url and "/openid/" in url
+
+
+def quiet_openid(url: str, timeout: float = 90) -> bool:
+    """Finish a cloud OpenID sign-in in a hidden window, with no clicks.
+
+    Only works when this PC's app windows already hold a Steam sign-in: then
+    Steam's page is a single "Sign in" button, which this presses. Without a
+    Steam session Steam shows its login form instead, and this gives up
+    rather than asking -- the visible "Connect Steam" covers that case.
+    Blocks; run it on a thread.
+    """
+    if window_factory is None or not linked():
+        return False
+    win = window(url, hidden=True, title="Steam")
+    try:
+        if not wait_for(win, _openid_page, 30):
+            return False
+        answer = ""
+        for _ in range(10):  # the page may still be building its form
+            try:
+                answer = str(win.evaluate_js(_OPENID_SUBMIT_JS) or "")
+            except Exception:
+                answer = ""
+            if answer in ("clicked", "submitted"):
+                break
+            time.sleep(1)
+        if answer not in ("clicked", "submitted"):
+            return False
+        ok = wait_for(win, _left_steam, timeout)
+        time.sleep(2)  # the cloud's callback page needs a moment to answer
+        return ok
+    finally:
+        try:
+            win.destroy()
+        except Exception:
+            pass
