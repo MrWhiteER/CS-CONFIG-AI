@@ -6455,7 +6455,7 @@ const startup = (() => {
               <svg id="hardware-chart" viewBox="0 0 600 180" preserveAspectRatio="none" aria-hidden="true"></svg>
               <div class="hardware-tooltip" id="hardware-tooltip" role="tooltip" hidden></div>
             </div>
-            <div class="hardware-times sub"><span>~2 min ago</span><span id="hardware-state">Waiting for samples</span><span>Now</span></div>
+            <div class="hardware-times sub"><span id="hardware-since">~2 min ago</span><span id="hardware-state">Waiting for samples</span><span>Now</span></div>
           </div>
           <div class="sub" id="live-note" style="margin-top:8px">&nbsp;</div>
           <!-- Last in the card on purpose. It is an offer, not a reading, and
@@ -7771,20 +7771,29 @@ function hardwarePaintSelection() {
   });
   $('hardware-all').setAttribute('aria-pressed', String(!key));
 }
+/* Samples in the current view. Until the window is full (the first seconds after a
+   cold start, when nothing was saved from a recent run) the real samples are
+   spread across the whole width, so the graph is never an empty box that
+   fills in from the right. */
+function hardwareCount() { return Math.max(0, ...hardwareSeries().map(([key]) => Math.min(60, hardwareValues(key).length))); }
+function hardwareStep() { const n = hardwareCount(); return n >= 60 ? 600 / 59 : 600 / Math.max(1, n - 1); }
 function hardwareDraw() {
-  const g = hardwareGraph, max = g.mode === 'usage' ? 100 : 120, step = 600 / 59;
+  const g = hardwareGraph, max = g.mode === 'usage' ? 100 : 120, step = hardwareStep(), n = hardwareCount();
   let svg = '<defs>' + hardwareSeries().map(([key,,tone]) => '<linearGradient id="hardware-fill-' + key + '" x1="0" y1="0" x2="0" y2="1"><stop stop-color="' + tone + '" stop-opacity=".26"/><stop offset="1" stop-color="' + tone + '" stop-opacity=".01"/></linearGradient>').join('') + '</defs><g class="hardware-grid">';
   for (let y = 0; y <= 180; y += 45) svg += '<path d="M0 ' + y + 'H600"/>';
   svg += '</g><g id="hardware-scroll">';
   let known = 0;
   for (const [key,,tone] of hardwareSeries()) {
-    const values = hardwareValues(key).slice(-61), segments = []; let part = [];
+    const values = hardwareValues(key).slice(n >= 60 ? -61 : -n), segments = []; let part = [];
+    const last = n >= 60 ? 59 : n - 1;
     values.forEach((value, i) => {
       if (!Number.isFinite(value)) { if (part.length) segments.push(part); part = []; return; }
       known++;
-      part.push([(60 - values.length + i) * step, 180 - Math.max(0, Math.min(max, value)) / max * 180]);
+      part.push([(last - values.length + 1 + i) * step, 180 - Math.max(0, Math.min(max, value)) / max * 180]);
     });
     if (part.length) segments.push(part);
+    // The very first reading on its own: hold it across the width as a line.
+    if (n === 1 && segments.length === 1) segments[0] = [[0, segments[0][0][1]], [600, segments[0][0][1]]];
     const line = segments.map(homeSmoothPath).join(' ');
     const area = segments.map(p => homeSmoothPath(p) + ' L' + p.at(-1)[0] + ' 180 L' + p[0][0] + ' 180 Z').join(' ');
     svg += '<g data-hardware="' + key + '" style="--series:' + tone + '"><path class="hardware-area" fill="url(#hardware-fill-' + key + ')" d="' + area + '"/><path class="hardware-line" stroke="' + tone + '" d="' + line + '"/>' + segments.filter(p => p.length === 1).map(p => '<circle cx="' + p[0][0] + '" cy="' + p[0][1] + '" r="3" fill="' + tone + '"/>').join('') + '<path class="hardware-hit" data-hardware-line="' + key + '" d="' + line + '"/></g>';
@@ -7792,6 +7801,9 @@ function hardwareDraw() {
   svg += '</g><path id="hardware-crosshair" class="hardware-crosshair" visibility="hidden"/>';
   $('hardware-chart').innerHTML = svg;
   $('hardware-state').textContent = known ? (g.mode === 'usage' ? 'Usage · %' : 'Temperature · °C') : 'No readings available';
+  // The left edge says how far back the drawn samples really go.
+  const span = n >= 60 ? 118 : Math.max(0, n - 1) * 2;
+  $('hardware-since').textContent = n >= 60 ? '~2 min ago' : span ? '~' + span + 's ago' : 'Now';
   $('hardware-axis').innerHTML = max + hardwareUnit() + '<br>' + max / 2 + hardwareUnit() + '<br>0' + hardwareUnit();
   hardwareLegend(); hardwarePaintSelection(); hardwareTranslate();
 }
@@ -7816,7 +7828,10 @@ function hardwarePause() {
 function hardwareUpdate(d) {
   const g = hardwareGraph;
   if (d.at != null && g.at === d.at) return;
-  const animate = g.at !== null && Number(d.at) > g.at && Number(d.at) - g.at < 4 && homeVisible() && !homeMotion.reduced.matches;
+  // Slide only between two full windows; while it is still spreading out the
+  // new sample simply redraws in place.
+  const full = hardwareCount() >= 60 && hardwareSeries().some(([key]) => (d.history?.[key] || []).length >= 60);
+  const animate = full && g.at !== null && Number(d.at) > g.at && Number(d.at) - g.at < 4 && homeVisible() && !homeMotion.reduced.matches;
   const previous = g.data;
   g.data = {};
   for (const [key] of g.usage) {
@@ -7824,7 +7839,8 @@ function hardwareUpdate(d) {
     // Retain the point leaving the left edge until its translation finishes.
     if (animate && g.data[key].length === 60 && previous[key]?.length >= 60) g.data[key].unshift(previous[key].at(-60));
   }
-  // Temperatures have no server history: begin collecting at this page's first poll.
+  // Temperatures come from the same server history; collecting here is only
+  // the fallback for an app that does not send it.
   const parts = (d.temps?.parts || []).filter(p => ['cpu', 'gpu', 'system'].includes(p.part));
   if (!parts.some(p => p.part === 'gpu')) parts.push({part:'gpu', label:'GPU', celsius:d.gpu?.temperature, known:Number.isFinite(d.gpu?.temperature)});
   for (const p of parts) {
@@ -7833,6 +7849,12 @@ function hardwareUpdate(d) {
   }
   for (const [key] of g.thermal) {
     const p = parts.find(p => key === 'temp-' + p.part);
+    if (Array.isArray(d.history?.[key])) {
+      const keep = animate ? g.temperatures[key] : null;
+      g.temperatures[key] = d.history[key].slice(-60);
+      if (keep && g.temperatures[key].length === 60 && keep.length >= 60) g.temperatures[key].unshift(keep.at(-60));
+      continue;
+    }
     const values = g.temperatures[key] ||= [];
     if (g.at !== null && Number(d.at) - g.at >= 4) values.push(null);
     values.push(p?.known && Number.isFinite(p.celsius) ? p.celsius : null);
@@ -7846,7 +7868,7 @@ function hardwareUpdate(d) {
 }
 function hardwareInspect(x) {
   const g = hardwareGraph; g.cursor = Math.max(0, Math.min(600, x));
-  const age = Math.max(0, Math.min(59, Math.round((600 - g.cursor + g.offset) / (600 / 59))));
+  const age = Math.max(0, Math.min(Math.max(0, hardwareCount() - 1), Math.round((600 - g.cursor + g.offset) / hardwareStep())));
   const cross = $('hardware-crosshair');
   cross?.setAttribute('d', 'M' + g.cursor + ' 0V180'); cross?.setAttribute('visibility', 'visible');
   const tip = $('hardware-tooltip'); tip.hidden = false;
@@ -7877,7 +7899,7 @@ $('hardware-plot').addEventListener('blur', hardwareClearCursor);
 $('hardware-plot').addEventListener('keydown', e => {
   if (e.key === 'Escape') hardwareClearCursor();
   else if (['ArrowLeft','ArrowRight','Home','End'].includes(e.key)) {
-    e.preventDefault(); hardwareInspect(e.key === 'Home' ? 0 : e.key === 'End' ? 600 : (hardwareGraph.cursor ?? 600) + (e.key === 'ArrowLeft' ? -1 : 1) * 600 / 59);
+    e.preventDefault(); hardwareInspect(e.key === 'Home' ? 0 : e.key === 'End' ? 600 : (hardwareGraph.cursor ?? 600) + (e.key === 'ArrowLeft' ? -1 : 1) * hardwareStep());
   }
 });
 document.addEventListener('visibilitychange', hardwarePause);
