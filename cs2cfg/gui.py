@@ -87,12 +87,10 @@ class App(ttk.Frame):
 
         target = ttk.Frame(options)
         target.grid(row=3, column=0, sticky="ew", pady=(PAD, 0))
-        ttk.Label(target, text="Target fps").grid(row=0, column=0, sticky="w")
-        self.target_var = tk.StringVar(value=str(getattr(self.args, "target_fps", "") or ""))
-        entry = ttk.Entry(target, textvariable=self.target_var, width=8)
-        entry.grid(row=0, column=1, sticky="w", padx=(6, 0))
-        entry.bind("<FocusOut>", lambda _e: self._invalidate())
-        ttk.Label(target, text="blank = refresh rate", foreground="#777").grid(row=0, column=2, padx=(6, 0))
+        # No typed number: a goal the PC cannot reach only dropped every
+        # setting to its lowest. The goal is the monitor's refresh rate.
+        ttk.Label(target, text="Frame rate goal: your monitor's refresh rate",
+                  foreground="#777").grid(row=0, column=0, sticky="w")
 
         writes = ttk.LabelFrame(side, text="Write", padding=PAD)
         writes.grid(row=3, column=0, sticky="ew", pady=(PAD, 0))
@@ -251,8 +249,7 @@ class App(ttk.Frame):
         self.apply_btn.configure(state="disabled")
 
     def _target_fps(self) -> Optional[int]:
-        raw = self.target_var.get().strip()
-        return int(raw) if raw.isdigit() else None
+        return getattr(self.args, "target_fps", None) or None
 
     # -- tasks ------------------------------------------------------------
     def _task_scan(self) -> None:

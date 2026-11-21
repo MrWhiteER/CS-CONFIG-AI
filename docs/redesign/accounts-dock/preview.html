@@ -62,7 +62,7 @@
       cloudData=empty?{configured:true,signed_in:false}:{configured:true,signed_in:true,name:'Edy',avatar:avatar('E')};
       fcData=empty?{linked:false}:{linked:true,player:{nickname:'edy',level:9,country:'AE',elo:2100,avatar:avatar('e')},matches:[]};
       dockSteamWaiting=0;dockSteamNotice='';
-      dockSteam=empty?{linked:false,available:true,state:'idle'}:{linked:true,available:true,state:state==='reading'?'reading':'done',found:128,updated:1794902400};
+      dockSteam=empty?{linked:false,available:true,state:'idle',connection:{web:false,cloud:false,connected:false}}:{linked:true,available:true,state:state==='reading'?'reading':'done',found:128,updated:1794902400,connection:{web:true,cloud:true,connected:true}};
       fcSteamReply=structuredClone(dockSteam);
       statsData={faceit:{linked:!empty,player:fcData.player},cs2:{recording:true},counts:{all:24,cs2:16,faceit:8},summary:{matches:24,wins:16,win_rate:67,kd:1.24,adr:86.4,hs_percent:52},matches:Array.from({length:4},(_,i)=>({source:i%2?'cs2':'faceit',match_id:'preview-'+i,map:['mirage','inferno','nuke','ancient'][i],won:i!==2,score:i===2?'9 / 13':'13 / 8',rounds:21,kills:23,deaths:16,assists:5,kd:1.44,adr:89.2,hs_percent:52,elo_delta:25,mode:'Premier',played_at:1794902400-i*86400}))};
       setTab('faceit');

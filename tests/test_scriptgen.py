@@ -31,6 +31,9 @@ FILES = {
     ),
     "me/binds.vcfg": (
         'bind "mouse4" "player_ping"\n'
+        'bind "scancode30" "slot1"\n'
+        'bind "scancode31" "slot2; say_team pistol"\n'
+        'bind "scancode32" "+jump; say hi"\n'
     ),
     "me/settings.vcfg": (
         'sensitivity "1.1"\n'
@@ -148,6 +151,55 @@ class BuildCase(Base):
         self.assertEqual(len(found), 1)
         self.assertEqual(found[0].entry, "drop_it")
         self.assertEqual(found[0].key, "X")
+
+
+class ShiftCase(Base):
+    def shift(self, style, target="scancode30", *steps):
+        body = spec("Alt one", "shift", *(steps or ({"id": "say_team", "text": "alt"},)),
+                    binding="scancode226")
+        body.update(target=target, style=style)
+        return scriptgen.build(body, self.scan)
+
+    def test_next_press_only_then_back(self):
+        built = self.shift("next")
+        self.assertTrue(built.ok, self.blocks(built))
+        self.assertEqual(built.entry, "alt_one")
+        self.assertEqual(built.lines, [
+            'alias "alt_one_do" "say_team alt; bind scancode30 slot1; alias alt_one alt_one_arm"',
+            'alias "alt_one_arm" "bind scancode30 alt_one_do; alias alt_one alt_one_off"',
+            'alias "alt_one_off" "bind scancode30 slot1; alias alt_one alt_one_arm"',
+            'alias "alt_one" "alt_one_arm"'])
+        self.assertEqual(built.target["normal"], scriptgen.describe("slot1", self.scan))
+        self.assertNotEqual(built.target["normal"], "something else")
+
+    def test_while_held(self):
+        built = self.shift("hold")
+        self.assertTrue(built.ok, self.blocks(built))
+        self.assertEqual(built.entry, "+alt_one")
+        self.assertEqual(built.lines, [
+            'alias "alt_one_do" "say_team alt"',
+            'alias "+alt_one" "bind scancode30 alt_one_do"',
+            'alias "-alt_one" "bind scancode30 slot1"'])
+
+    def test_multi_command_key_kept_in_alias(self):
+        built = self.shift("next", "scancode31")
+        self.assertTrue(built.ok, self.blocks(built))
+        self.assertEqual(built.lines[0], 'alias "alt_one_normal" "slot2; say_team pistol"')
+        self.assertIn("bind scancode31 alt_one_normal", built.lines[1])
+
+    def test_unbound_key_is_unbound_again(self):
+        built = self.shift("next", "scancode33")
+        self.assertTrue(built.ok, self.blocks(built))
+        self.assertIn("unbind scancode33", built.lines[0])
+
+    def test_held_normal_with_extras_refused(self):
+        self.assertFalse(self.shift("next", "scancode32").ok)
+
+    def test_held_alt_action_refused(self):
+        self.assertFalse(self.shift("next", "scancode30", {"id": "cmd:+duck"}).ok)
+
+    def test_same_key_refused(self):
+        self.assertFalse(self.shift("next", "scancode226").ok)
 
 
 class SaveCase(Base):
