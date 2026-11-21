@@ -186,7 +186,7 @@ def answer_of(target: str) -> Optional[str]:
 _ROUTINE = ("play:", "enable read-only cs2 server detection")
 
 _TITLES: Tuple[Tuple[str, str], ...] = (
-    (r"^bind (.+) to (.+)$", "Key {1}: {0}"),
+    (r"^bind (.+) to (.+)$", "BIND"),
     (r"^cs2 settings", "Game settings"),
     (r"^(web|gui) apply (.+)$", "Applied a settings preset"),
     (r"^apply (.+)$", "Applied a settings preset"),
@@ -219,6 +219,8 @@ def title_for(note: str) -> str:
     text = re.sub(r"\s*\((web|gui)\)\s*$", "", note or "").strip()
     for pattern, template in _TITLES:
         m = re.match(pattern, text, re.IGNORECASE)
+        if m and template == "BIND":
+            return f"Key {m.group(2)}: {_command_words(m.group(1))}"
         if m:
             try:
                 return template.format(*m.groups())
@@ -293,15 +295,55 @@ _PAIR = re.compile(r'^\s*"?([A-Za-z_][\w.]*)"?\s+"?([^"/]*?)"?\s*(//.*)?$')
 _labels_cache: Optional[Dict[str, str]] = None
 
 
+# Groups whose labels are too short to stand alone ("Length", "Style"):
+# these get the group's name in front, so "Crosshair length".
+_NAMED_GROUPS = ("crosshair_main", "input_viewmodel", "game_radar")
+
+
+def _load_labels() -> Dict[str, str]:
+    path = Path(__file__).with_name("knowledge") / "cfg_settings.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    groups = {}
+    for section in data.get("sections") or []:
+        for group in section.get("groups") or []:
+            groups[group.get("id")] = group.get("label") or ""
+    out = {}
+    for name, spec in (data.get("settings") or {}).items():
+        label = str(spec.get("label") or "")
+        if not label:
+            continue
+        group = groups.get(spec.get("group"), "")
+        if spec.get("group") in _NAMED_GROUPS and group and group.lower() not in label.lower():
+            label = f"{group} {label[:1].lower()}{label[1:]}"
+        out[name.lower()] = label
+    return out
+
+
 def _setting_label(name: str) -> str:
     global _labels_cache
     if _labels_cache is None:
-        try:
-            from .gamewatch import _labels
-            _labels_cache = _labels()
-        except Exception:
-            _labels_cache = {}
+        _labels_cache = _load_labels()
     return _labels_cache.get(name.lower(), "")
+
+
+_PREFIXES = ("cl_", "r_", "snd_", "sv_", "mat_", "net_", "cq_", "hud_", "m_",
+             "setting.", "voice_", "ui_", "joy_", "rate", "fps_")
+
+
+def _setting_words(name: str) -> str:
+    label = _setting_label(name)
+    if label:
+        return label
+    bare = name
+    for prefix in _PREFIXES:
+        if bare.lower().startswith(prefix) and len(bare) > len(prefix):
+            bare = bare[len(prefix):]
+            break
+    bare = bare.replace("_", " ").replace(".", " ").strip()
+    return (bare[:1].upper() + bare[1:]) if bare else name
 
 
 def _key_label(binding: str) -> str:
@@ -313,12 +355,18 @@ def _key_label(binding: str) -> str:
 
 
 def _command_words(command: str) -> str:
+    """A command in words: "+jump" -> "Jump", "+smoke_left_click" -> "Smoke left click"."""
+    command = (command or "").strip().strip('"')
     try:
-        from .scriptnames import describe_body
+        from .scriptnames import describe_body, readable_alias
         said = describe_body(command, {})
+        if said and said != command:
+            return said
+        if command and " " not in command and ";" not in command:
+            return readable_alias(command)
     except Exception:
-        said = None
-    return said or command
+        pass
+    return command
 
 
 def _parse_line(line: str) -> Optional[Tuple[str, str, str]]:
@@ -334,10 +382,18 @@ def _parse_line(line: str) -> Optional[Tuple[str, str, str]]:
     if m:
         return ("bind:" + m.group(1).lower(), "Key " + _key_label(m.group(1)), "nothing")
     m = _PAIR.match(text)
-    if m and m.group(1).lower() not in ("exec", "alias", "echo", "say", "say_team"):
+    if m and m.group(1).lower() not in ("exec", "alias", "echo", "say", "say_team",
+                                         "host_writeconfig", "unbindall"):
         name = m.group(1)
-        return ("set:" + name.lower(), _setting_label(name) or name, m.group(2))
-    return ("line:" + text, "Line", text)
+        return ("set:" + name.lower(), _setting_words(name), m.group(2))
+    # Comments, separators, script lines, generated dates: not a setting a
+    # person changed, and showing them would be showing code.
+    return None
+
+
+def _settings_file(path: str) -> bool:
+    name = Path(path).name.lower()
+    return name.endswith((".cfg", ".vcfg")) or name == "cs2_video.txt"
 
 
 def describe_diff(before: Optional[str], after: Optional[str]) -> List[dict]:
@@ -345,9 +401,9 @@ def describe_diff(before: Optional[str], after: Optional[str]) -> List[dict]:
     if before is None and after is None:
         return []
     if before is None:
-        return [{"what": "New file", "was": None, "now": "created"}]
+        before = ""
     if after is None:
-        return [{"what": "File", "was": "there", "now": "deleted"}]
+        after = ""
     old_lines, new_lines = before.splitlines(), after.splitlines()
     items: List[dict] = []
     matcher = difflib.SequenceMatcher(a=old_lines, b=new_lines, autojunk=False)
@@ -445,6 +501,11 @@ def swing(stamp: str, direction: str, force: bool = False) -> dict:
     ``force`` goes all the way back to the file as it was before the change,
     which also undoes later changes to the same lines.
     """
+    if direction != BACK and answer_of("app:" + stamp) != BACK:
+        # Keeping a change that is still in place: nothing to write. Only a
+        # change that was put back needs bringing back.
+        set_answer("app:" + stamp, KEPT)
+        return {"ok": True, "files": 0}
     sets = [s for s in backup.list_sets()]
     index = next((i for i, s in enumerate(sets) if s.stamp == stamp), None)
     if index is None:
@@ -503,6 +564,8 @@ def _app_entries(data: dict, limit: int) -> List[dict]:
         status = answer or (WAITING if during_game else KEPT)
         items: List[dict] = []
         for original, (before, after) in _before_after(sets, index).items():
+            if not _settings_file(original):
+                continue
             for item in describe_diff(before, after):
                 item["file"] = Path(original).name
                 items.append(item)
@@ -534,7 +597,7 @@ def _game_item_words(item: dict) -> dict:
         was = _command_words(item["was"]) if item.get("was") else None
         now = _command_words(item["now"]) if item.get("now") else None
     else:
-        what = item.get("label") or _setting_label(key) or key
+        what = _setting_label(key) or item.get("label") or _setting_words(key)
         was, now = item.get("was"), item.get("now")
     return {"what": what, "was": was, "now": now, "group": source}
 
