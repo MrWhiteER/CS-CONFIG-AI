@@ -20,6 +20,7 @@ factory spectrum effect back straight away.
 
 from __future__ import annotations
 
+import threading
 import time
 from dataclasses import dataclass
 from typing import Dict, List, Optional
@@ -35,6 +36,11 @@ NOSTORE = 0x00
 ZERO_LED = 0x00
 EFFECT_STATIC, EFFECT_SPECTRUM, EFFECT_CUSTOM = 0x01, 0x03, 0x08
 STATUS_BUSY, STATUS_OK = 0x01, 0x02
+
+# Lighting and mouse settings (cs2cfg.mouse) can talk to the same device from
+# different threads. A Razer device answers the last report it was sent, so
+# one exchange has to finish before the next starts.
+IO_LOCK = threading.RLock()
 
 
 @dataclass(frozen=True)
@@ -106,27 +112,35 @@ def keyboard_rows(frame: Frame, rows: int, cols: int) -> List[List[RGB]]:
     return grid
 
 
+def exchange(handle, data: bytes) -> bytes:
+    """Send one report and return the device's answer (90 bytes, or b"").
+
+    The firmware answers "busy" (0x01) while it works; a wireless mouse
+    stays busy for several milliseconds, a wired keyboard for about one.
+    Sending the next report before then drops it, so the answer is read
+    back until it is anything but busy, for at most ~50 ms.
+    """
+    with IO_LOCK:
+        handle.set_feature(b"\0" + data)
+        answer = b""
+        for _ in range(25):
+            time.sleep(0.002)
+            try:
+                answer = bytes(handle.get_feature(REPORT_LEN + 1))[1:]
+            except OSError:
+                return b""
+            if not answer or answer[0] != STATUS_BUSY:
+                return answer
+        return answer
+
+
 class _Device:
     def __init__(self, handle, model: Model, pid: int, known: bool) -> None:
         self.handle, self.model, self.pid, self.known = handle, model, pid, known
 
     def send(self, data: bytes) -> None:
-        """Send one report and wait until the device has taken it.
-
-        The firmware answers "busy" (0x01) while it works; a wireless mouse
-        stays busy for several milliseconds, a wired keyboard for about one.
-        Sending the next report before then drops it, so the answer is read
-        back until it is anything but busy, for at most ~50 ms.
-        """
-        self.handle.set_feature(b"\0" + data)
-        for _ in range(25):
-            time.sleep(0.002)
-            try:
-                status = self.handle.get_feature(REPORT_LEN + 1)[1]
-            except (OSError, IndexError):
-                return
-            if status != STATUS_BUSY:
-                return
+        """Send one report and wait until the device has taken it."""
+        exchange(self.handle, data)
 
     @property
     def label(self) -> str:

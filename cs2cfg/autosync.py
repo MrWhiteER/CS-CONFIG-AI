@@ -87,6 +87,7 @@ SYNCED_PREFS = tuple(dict.fromkeys(portable.CARRIED + (
     "overlay_panel_hotkey", "overlay_layout", "overlay_tools", "overlay_dim_game",
     "overlay_hide_in_rounds", "overlay_always_visible", "overlay_hide_from_capture",
     "rgb_enabled", "rgb_free", "rgb_brightness",
+    "mouse_dpi", "mouse_poll",
 )))
 
 # Synced choices that the app uses when it builds this PC's own picture,

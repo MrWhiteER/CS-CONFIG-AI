@@ -4210,6 +4210,13 @@
   #rgb-out .row .v { font-family: inherit; font-variant-numeric: normal; font-size: 12px; color: var(--muted); }
   #rgb-out .row .v.live { color: var(--good); }
   #rgb-out > .sub2 { margin: 2px 0 8px; color: var(--muted); font-size: 12px; }
+  #mouse-out .seg button { flex: 0 1 auto; }
+  #mouse-out .row .v { font-family: inherit; font-variant-numeric: normal; font-size: 12px; color: var(--muted); }
+  #mouse-out .row .v.live { color: var(--good); }
+  #mouse-out .sub2 { margin: 2px 0 8px; color: var(--muted); font-size: 12px; }
+  #mouse-out .sub2.warn { color: var(--warn); }
+  .mouse-dpi { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .mouse-dpi input[type=number] { width: 96px; }
   .rgb-brightness { display: flex; align-items: center; gap: 12px; }
   .rgb-brightness input { min-width: 80px; width: 160px; max-width: 100%; }
   .kb-legend .dot { width: 9px; height: 9px; border-radius: 3px; }
@@ -6800,6 +6807,7 @@ const startup = (() => {
           <button class="seg-item" data-sub="apply" role="tab" aria-selected="true">Apply</button>
           <button class="seg-item" data-sub="this-pc" role="tab" aria-selected="false"><span data-hardware-icon="display"></span> This PC</button>
           <button class="seg-item" data-sub="lighting" role="tab" aria-selected="false"><span data-hardware-icon="lighting"></span> Lighting</button>
+          <button class="seg-item" data-sub="mouse" role="tab" aria-selected="false"><span data-hardware-icon="mouse"></span> Mouse</button>
           <button class="seg-item" data-sub="steam" role="tab" aria-selected="false">Steam</button>
           <button class="seg-item" data-sub="account" role="tab" aria-selected="false">Account</button>
           <button class="seg-item" data-sub="apps" role="tab" aria-selected="false">Apps</button>
@@ -6833,6 +6841,21 @@ const startup = (() => {
             software from the maker has to be running.
           </p>
           <div id="rgb-out"></div>
+        </section>
+      </div>
+
+      <!-- Mouse speed and polling rate, set on the mouse itself. -->
+      <div class="subpane hidden" data-sub="mouse">
+        <section class="panel" id="mouse-card">
+          <h2><span data-hardware-icon="mouse"></span> Mouse</h2>
+          <p class="sub" style="margin:0 0 10px">
+            Set how fast your mouse moves (DPI) and how often it reports to the
+            PC. The app talks to the mouse directly, so no software from the
+            maker has to be installed or running. Your choice is saved with
+            your Steam account, so any PC you sign in on sets your mouse the
+            same way.
+          </p>
+          <div id="mouse-out"></div>
         </section>
       </div>
 
@@ -9352,6 +9375,7 @@ function setSettingsSub(name, restoring) {
   if (prefsReady && startup.finished) {
     if (name === "overlay") loadOverlay();
     if (name === "lighting") loadRgb();
+    if (name === "mouse") loadMouse();
     if (name === "sound") { loadAudio(false); loadGoxlr(true); }
     if (name === "logs") loadHistory();
     if (name === "config" || name === "editing") ensureScan(false);
@@ -9377,6 +9401,102 @@ async function loadOverlay() {
   }
   catch (err) { box.innerHTML = '<p class="sub warn">' + esc(err.message || String(err)) + '</p>'; }
 }
+
+// Mouse speed and polling rate. Read from the mouse when the tab opens;
+// nothing polls in the background.
+let mouseData = null;
+let mouseError = '';
+let mouseBusy = false;
+const MOUSE_PRESETS = [400, 800, 1600, 3200];
+
+function mouseLine(m) {
+  const bits = [];
+  if (m.dpi) bits.push(m.dpi + ' DPI');
+  if (m.poll) bits.push(m.poll + ' Hz');
+  const how = m.connection === 'wireless' ? ' (wireless)' : m.connection === 'cable' ? ' (on its cable)' : '';
+  return '<div class="row"><span class="k">' + esc(m.name + how) + '</span><span class="v' +
+    (m.problem ? '' : ' live') + '">' + esc(m.problem ||
+    ('Now using ' + bits.join(' at ') + (m.tested ? '' : ' · this model has not been tried with the app yet'))) +
+    '</span></div>';
+}
+
+function renderMouse() {
+  const box = $('mouse-out');
+  if (!box) return;
+  if (mouseError && !mouseData) { box.innerHTML = '<p class="sub2 warn">' + esc(mouseError) + '</p>'; return; }
+  if (!mouseData) { box.innerHTML = '<p class="sub2">Looking for your mouse…</p>'; return; }
+  const s = mouseData.settings || {};
+  const mice = mouseData.mice || [];
+  const off = mouseBusy || !mice.length ? ' disabled' : '';
+  const first = mice[0] || {};
+  const maxDpi = Math.max(...mice.map(m => m.max_dpi || 0), 0) || 20000;
+  const rates = [...new Set(mice.flatMap(m => m.rates || []))].sort((a, b) => a - b);
+  const shownDpi = s.mouse_dpi || first.dpi || 800;
+  let html = '';
+  if (!mice.length) {
+    html += '<p class="sub2">' + esc(mouseData.problem ||
+      'No mouse the app can set was found. Razer mice work now; SteelSeries and HyperX are coming.') + '</p>';
+  }
+  html += mice.map(mouseLine).join('');
+  html += '<div class="row"><label class="k" for="mouse-dpi">Speed (DPI)</label><div class="mouse-dpi">' +
+    '<div class="seg" role="group" aria-label="Common speeds">' + MOUSE_PRESETS.map(v =>
+      '<button type="button" data-mouse-dpi="' + v + '" aria-pressed="' + (s.mouse_dpi === v) + '"' + off + '>' + v + '</button>').join('') +
+    '</div><input type="number" id="mouse-dpi" min="100" max="' + maxDpi + '" step="50" value="' + shownDpi + '"' + off + '>' +
+    '<button type="button" class="btn" id="mouse-dpi-set"' + off + '>Set</button></div></div>';
+  if (rates.length) {
+    html += '<div class="row"><span class="k" id="mouse-poll-label">Polling rate</span>' +
+      '<div class="seg" role="group" aria-labelledby="mouse-poll-label">' + rates.map(hz =>
+        '<button type="button" data-mouse-poll="' + hz + '" aria-pressed="' + (s.mouse_poll === hz) + '"' + off + '>' + hz + ' Hz</button>').join('') +
+      '</div></div>';
+  }
+  html += '<p class="sub2">' + (s.mouse_dpi || s.mouse_poll ?
+    'Saved: ' + [s.mouse_dpi ? s.mouse_dpi + ' DPI' : '', s.mouse_poll ? s.mouse_poll + ' Hz' : ''].filter(Boolean).join(' at ') +
+    '. The app puts this back on your mouse each time it starts.</p>' +
+    '<p class="sub2"><button type="button" class="btn" id="mouse-forget"' + (mouseBusy ? ' disabled' : '') + '>Leave my mouse as it is</button>' :
+    'Nothing chosen yet, so the app leaves your mouse exactly as it is.') + '</p>' +
+    '<p class="sub2">A different speed changes how far your aim moves in CS2. Lower your in-game sensitivity when you raise the speed to keep the same feel.</p>';
+  if (mouseError) html += '<p class="sub2 warn" role="status">' + esc(mouseError) + '</p>';
+  box.innerHTML = html;
+}
+
+async function loadMouse() {
+  if (mouseBusy) return;
+  try {
+    const d = await api('/api/mouse', {});
+    if (!d || d.ok === false) throw new Error(d?.error || 'The mouse could not be read');
+    mouseData = d; mouseError = '';
+  } catch (err) { mouseError = err.message || String(err); }
+  renderMouse();
+}
+
+async function saveMouse(settings) {
+  if (mouseBusy) return;
+  mouseBusy = true; mouseError = ''; renderMouse();
+  try {
+    const d = await api('/api/mouse/settings', settings);
+    if (!d || d.ok === false) throw new Error(d?.error || 'The mouse setting was not saved');
+    mouseData = d;
+  } catch (err) { mouseError = err.message || String(err); }
+  finally { mouseBusy = false; renderMouse(); }
+}
+
+document.addEventListener('click', e => {
+  const dpi = e.target.closest('[data-mouse-dpi]');
+  if (dpi && !dpi.disabled) return saveMouse({mouse_dpi: Number(dpi.dataset.mouseDpi)});
+  const poll = e.target.closest('[data-mouse-poll]');
+  if (poll && !poll.disabled) return saveMouse({mouse_poll: Number(poll.dataset.mousePoll)});
+  if (e.target.id === 'mouse-dpi-set') {
+    const input = $('mouse-dpi');
+    const value = Math.round(Number(input.value) / 50) * 50;
+    const max = Number(input.max) || 20000;
+    if (!(value >= 100 && value <= max)) { mouseError = 'Pick a speed between 100 and ' + max + ' DPI.'; renderMouse(); return; }
+    return saveMouse({mouse_dpi: value});
+  }
+  if (e.target.id === 'mouse-forget') saveMouse({mouse_dpi: 0, mouse_poll: 0});
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.id === 'mouse-dpi') $('mouse-dpi-set')?.click();
+});
 
 // Both lighting entry points display the same confirmed server snapshot.
 let rgbData = null;
