@@ -141,7 +141,7 @@ def _raw(exe: Path) -> Optional[str]:
 
         return _reg_read(KEY, str(exe))
     except (OSError, ValueError, TypeError):
-        # Reading what was there before must never stop the write itself.
+        # Never let the record-keeping stop the setting itself.
         return None
 
 

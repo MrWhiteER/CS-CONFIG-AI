@@ -221,6 +221,12 @@ def describe(command: str, scan=None) -> str:
     return "something else"
 
 
+# What CS2 itself puts on the keys that matter most, for when the game's own
+# defaults file can't be read. Restoring one of these to "nothing" would take
+# away firing, so a key with no bind in the config falls back to these.
+STOCK_FALLBACK = {"mouse1": "+attack", "mouse2": "+attack2"}
+
+
 def normal_bind(scan, binding: str) -> str:
     """What a key runs now, by the bind that loads last."""
     if scan is None or not binding:
@@ -291,6 +297,9 @@ class Built:
     replaces: Optional[Dict[str, Any]] = None
     spec: Dict[str, Any] = field(default_factory=dict)
     target: Dict[str, Any] = field(default_factory=dict)
+    explained: List[Dict[str, Any]] = field(default_factory=list)
+    generated: List[str] = field(default_factory=list)
+    edited: bool = False
 
     def as_dict(self) -> Dict[str, Any]:
         return {
@@ -299,7 +308,8 @@ class Built:
             "release_says": self.release_says,
             "checks": [c.__dict__ for c in self.checks],
             "replaces": self.replaces, "spec": self.spec,
-            "target": self.target,
+            "target": self.target, "explained": self.explained,
+            "generated": self.generated, "edited": self.edited,
         }
 
 
@@ -510,6 +520,7 @@ def build(spec: Dict[str, Any], scan=None, key_label: str = "") -> Built:
         checks.append(Check("warn", "Removed quotes, semicolons or // from your text. They would break the script."))
 
     # Names
+    step_end = len(checks)
     alias = slug(name) if name else ""
     replaces = None
     if alias:
@@ -552,7 +563,8 @@ def build(spec: Dict[str, Any], scan=None, key_label: str = "") -> Built:
             checks.append(Check("block", "The shift key and the key it changes must be two different keys."))
             block = True
         else:
-            normal = normal_bind(scan, target)
+            normal = (normal_bind(scan, target) or str(spec.get("target_stock") or "").strip()
+                      or STOCK_FALLBACK.get(target, ""))
             normal_said = describe(normal, scan) if normal else "nothing"
             if not normal:
                 restore = f"unbind {target}"
@@ -575,6 +587,8 @@ def build(spec: Dict[str, Any], scan=None, key_label: str = "") -> Built:
                     f"If you change what {target_label} does later, save this script again."))
 
     # Lines
+    head_checks = checks[step_end:]
+    name_checks = [c for c in checks[:step_end] if c.text == "Give your script a name."]
     lines: List[str] = []
     entry = alias
     if alias and press and mode == "shift":
@@ -628,15 +642,43 @@ def build(spec: Dict[str, Any], scan=None, key_label: str = "") -> Built:
         checks.append(Check("warn", "Nothing here needs undoing, so “Press once” does the same job.",
                             fix="mode:press"))
 
+    if alias and (mode == "hold" or (mode == "shift" and style == "hold")):
+        entry = "+" + alias
+
+    # Lines the player edited by hand replace the generated ones, and are
+    # checked on their own: the steps no longer say what the key does.
+    edited = spec.get("lines_text")
+    generated = list(lines)
+    if isinstance(edited, str) and alias:
+        from . import scriptlines
+
+        lines, problems = scriptlines.lint(edited, scan, alias, entry)
+        checks = name_checks + head_checks
+        checks += [Check(p.level, (f"Line {p.line}: " if p.line else "") + p.text) for p in problems]
+        block = any(c.level == "block" for c in checks)
+        if not block:
+            checks.insert(0, Check("ok", "Your edited lines passed every check: quotes, names, "
+                                         "nothing left held, and the CS2 movement rule."))
+
+    explained = []
+    if alias and lines:
+        from . import scriptlines
+
+        explained = scriptlines.explain(lines, scan, alias, mode, label, target_label)
+
     stored = {"v": 1, "name": name, "mode": mode, "steps": clean_steps,
               "binding": binding, "alias": alias}
     if mode == "shift":
         stored.update(target=target, style=style)
+    if isinstance(edited, str) and alias:
+        stored["lines"] = lines
     return Built(ok=not block, alias=alias, entry=entry, lines=lines,
                  says=says, release_says=release_says, checks=checks,
                  replaces=replaces, spec=stored,
                  target={"binding": target, "label": target_label,
-                         "normal": normal_said} if mode == "shift" else {})
+                         "normal": normal_said} if mode == "shift" else {},
+                 explained=explained, generated=generated,
+                 edited=isinstance(edited, str))
 
 
 def block_lines(built: Built, key_label: str) -> List[str]:
