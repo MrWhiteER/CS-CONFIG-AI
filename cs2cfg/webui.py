@@ -116,6 +116,32 @@ class State:
         return self.users[0]
 
 
+def _measured_fps() -> Optional[Dict[str, Any]]:
+    """The frame rate CS2 really reached in recent games, or None."""
+    try:
+        from . import telemetry
+        return telemetry.measured_fps(telemetry.load_sessions(40))
+    except Exception:
+        return None
+
+
+def _frame_goal(machine: Machine, value: Any) -> Optional[int]:
+    """A chosen frame rate goal, kept only if it is a real monitor's refresh rate.
+
+    The goal used to be typed freely, so 400 could be asked of a PC that
+    reaches 250: the plan then dropped every setting to its lowest for frames
+    that never came. Only a rate an attached monitor really runs at is kept;
+    anything else (including a number saved by an older version) falls back
+    to the main monitor's refresh rate.
+    """
+    try:
+        wanted = int(value)
+    except (TypeError, ValueError):
+        return None
+    rates = {int(round(d.refresh)) for d in machine.displays if d.refresh}
+    return wanted if wanted in rates else None
+
+
 def _machine_payload(machine: Machine, state: State) -> Dict[str, Any]:
     cpu, gpu = machine.cpu, machine.gpu
     return {
@@ -136,6 +162,7 @@ def _machine_payload(machine: Machine, state: State) -> Dict[str, Any]:
              "primary": d.primary, "confident": d.confident_refresh}
             for d in machine.displays
         ],
+        "measured_fps": _measured_fps(),
         "cs2_install": str(state.cs2_install) if state.cs2_install else None,
         "steam_path": str(state.steam_root) if state.steam_root else None,
         "steam_running": steam.steam_running(),
@@ -158,7 +185,7 @@ def _plan_payload(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     profile = build_profile(
         state.machine, kb,
         intent=body.get("intent", "balanced"),
-        target_fps=int(target) if target else None,
+        target_fps=_frame_goal(state.machine, target),
         current_video=current_video,
         hide_crosshair=bool(body.get("hide_crosshair")),
         load_bias=str(body.get("load_bias") or "auto"),
@@ -309,7 +336,7 @@ def _record_verification(state, user, profile, launch, body, steps, generated=No
     receipt = {"checks": checks, "account": user.account_id,
                "intent": profile.intent, "applied_at": time.time(),
                "selection": {"intent": profile.intent,
-                             "target_fps": body.get("target_fps") or None,
+                             "target_fps": _frame_goal(state.machine, body.get("target_fps")),
                              "load_bias": body.get("load_bias") or "auto",
                              "hide_crosshair": bool(body.get("hide_crosshair"))}}
     state.verification_receipt = receipt
@@ -338,7 +365,7 @@ def _apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     profile = build_profile(
         state.machine, kb,
         intent=body.get("intent", "balanced"),
-        target_fps=int(target) if target else None,
+        target_fps=_frame_goal(state.machine, target),
         current_video=steam.read_video_cfg(user),
         hide_crosshair=bool(body.get("hide_crosshair")),
         load_bias=str(body.get("load_bias") or "auto"),
@@ -4920,7 +4947,7 @@ def _configs_prepare(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     target = ui.get("target_fps")
     profile = build_profile(state.machine, state.kb,
                             intent=ui.get("intent") or "balanced",
-                            target_fps=int(target) if target else None,
+                            target_fps=_frame_goal(state.machine, target),
                             current_video=steam.read_video_cfg(user) if user else {},
                             hide_crosshair=bool(ui.get("hide_crosshair")),
                             load_bias=str(ui.get("load_bias") or "auto"))

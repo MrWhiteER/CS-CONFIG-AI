@@ -3027,7 +3027,7 @@
     .updc-veil, .updc-dialog { animation: none; }
   }
 
-  /* The target frame rate, at the head of the settings it governs.
+  /* The frame rate goal, at the head of the settings it governs.
 
      Given a box of its own rather than a row in a list because it is the one
      number on the page that every other setting is chosen to reach: the
@@ -3062,33 +3062,29 @@
   .fps-copy h3 { margin: 0; font-size: 14px; font-weight: 650; color: var(--ink); }
   .fps-copy p { margin: 3px 0 0; font-size: 11.5px; color: var(--muted); line-height: 1.45; }
 
-  /* The number itself, sized to be the thing you look at. */
+  /* The goal itself, sized to be the thing you look at. Read only: it is
+     the monitor's refresh rate, not a number to type. A typed goal let
+     anyone ask for 400 from a PC that reaches 250, and the plan then
+     dropped every setting to its lowest for frames that never came. */
   .fps-set {
     grid-area: set; display: flex; align-items: baseline; gap: 7px;
     padding: 7px 14px; border-radius: 12px;
     background: rgba(0, 0, 0, .34);
     border: 1px solid var(--line);
-    transition: border-color .2s ease, box-shadow .2s ease;
   }
-  .fps-set:focus-within {
-    border-color: var(--violet);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--violet) 22%, transparent);
-  }
-  .fps-set input {
-    appearance: none; -moz-appearance: textfield;
-    border: 0; background: none; padding: 0; margin: 0;
-    width: 4.2ch; text-align: right;
+  .fps-set strong {
     font-family: var(--mono); font-size: 25px; font-weight: 600;
-    color: var(--ink);
+    color: var(--ink); min-width: 3ch; text-align: right;
   }
-  .fps-set input::-webkit-outer-spin-button,
-  .fps-set input::-webkit-inner-spin-button { appearance: none; margin: 0; }
-  .fps-set input:focus { outline: none; }
-  .fps-set input::placeholder { color: var(--faint); font-size: 19px; }
+  .fps-set strong.fps-auto { font-family: inherit; font-size: 15px; color: var(--muted); }
+  /* What the game really ran at, from the player's own games. */
+  .fps-copy p.fps-real { color: var(--ink-dim); }
+  .fps-copy p.fps-real b { color: var(--ink); font-weight: 650; }
+  .fps-copy p.fps-real.fps-none { color: var(--faint); }
   .fps-unit { font-size: 11px; color: var(--faint); letter-spacing: .08em; }
 
-  /* The rates people actually pick, since they are their monitor's, not
-     arbitrary. Filled in from the displays we detected. */
+  /* With two or more monitors at different rates, which one CS2 runs on.
+     Only real monitor rates are offered: nothing arbitrary. */
   /* The consequence of the number, beside the number. */
   .fps-effect {
     display: inline-block; margin-left: 2px; font-weight: 600;
@@ -6600,13 +6596,15 @@ const startup = (() => {
           </svg>
         </div>
         <div class="fps-copy">
-          <h3>Target frame rate</h3>
-          <p id="fps-say">Use your refresh rate as the settings target.</p>
+          <h3>Frame rate goal</h3>
+          <p id="fps-say">Settings aim for your monitor's refresh rate.</p>
+          <p id="fps-real" class="fps-real"></p>
         </div>
-        <div class="fps-set">
-          <input type="number" id="target" min="30" max="1000" placeholder="auto"
-                 aria-label="Target frames per second">
+        <div class="fps-set" title="Your monitor's refresh rate">
+          <strong id="fps-goal" class="fps-auto">Auto</strong>
           <span class="fps-unit">fps</span>
+          <!-- Kept for the saved choice of monitor; never typed into. -->
+          <input type="hidden" id="target" value="">
         </div>
         <div class="fps-quick" id="fps-quick"></div>
       </section>
@@ -7911,7 +7909,7 @@ function renderPlan(p) {
   // The profile's description used to print under the band. The band and the
   // three names say the same thing, so the sentence was reading it back.
 
-  // What the target actually cost, said where the target is typed.
+  // What the goal led to, said beside the goal.
   const level = (p.settings || []).find(x => /gpu level|overall quality/i.test(x.name || ""));
   fpsEffect = level && level.after ? "Picture " + esc(String(level.after)) : "";
   renderFps();
@@ -8342,10 +8340,9 @@ $("confirm-veil").addEventListener("keydown", e => {
   const target = $("target");
   if (target) {
     let was = target.value;
-    target.addEventListener("focus", () => { was = target.value; });
     target.addEventListener("change", () => {
       const before = was;
-      noteChange("Target fps → " + (target.value || "auto"),
+      noteChange("Frame rate goal: " + (target.value ? target.value + " Hz monitor" : "main monitor"),
                  () => { target.value = before; rememberPrefs(); });
       was = target.value;
     });
@@ -10839,44 +10836,85 @@ async function loadIngame(quiet) {
    a second: a dropdown in the Optimise-for box that could disagree with it,
    which meant the answer depended on which control you had touched last.
 */
-/* The line under the heading, and the rates worth one click.
+/* The goal, and what the game really did.
 
-   The offers are the refresh rates of the monitors actually attached, plus the
-   nothing-in-particular option, because a target that is not a rate this
-   machine can present is a number with no meaning behind it.
+   The goal is no longer typed. Nothing on a PC can say ahead of time how
+   many frames CS2 will give, so a typed number was a wish: ask 400 of a PC
+   that reaches 250 and the plan dropped every setting to its lowest for
+   frames that never came. The one number that is known and means something
+   is the monitor's refresh rate -- the most frames it can show -- so that is
+   the goal. With monitors at different rates, the player says which one CS2
+   is on; nothing else can be picked.
+
+   Under it, the frame rate this PC really reached in the player's own games,
+   measured while the performance overlay was on. That is the honest answer
+   to "how much can my PC do", and it is only shown once it exists.
 */
-/* What the last plan made of the target. The estimate cannot show this: it is
-   the machine's ceiling for the chosen profile and does not depend on the
-   target at all, so it reads the same at 144 and at 1000 -- which makes typing
-   a number look like it did nothing, though it may have moved the whole plan
-   from Very High to Low. */
+/* What the last plan made of the goal: the picture level it led to. */
 let fpsEffect = "";
 
-function renderFps() {
-  const box = $("fps-quick"), field = $("target"), say = $("fps-say");
-  if (!field) return;
-  const now = field.value.trim();
-
-  if (say) {
-    say.innerHTML = (now
-      ? "Settings target: " + esc(now) + " fps."
-      : "Use your refresh rate as the settings target.") +
-      (fpsEffect ? ' <b class="fps-effect">' + fpsEffect + "</b>" : "");
-  }
-  if (!box) return;
-
+function fpsRates() {
   const rates = [];
   ((lastScan && lastScan.displays) || []).forEach(d => {
     const hz = Math.round(d.refresh || 0);
     if (hz >= 30 && !rates.includes(hz)) rates.push(hz);
   });
-  rates.sort((a, b) => a - b);
+  return rates.sort((a, b) => a - b);
+}
 
-  box.innerHTML =
-    '<button data-fps="" aria-pressed="' + (!now) + '">Refresh rate</button>' +
-    rates.map(hz =>
+function renderFps() {
+  const box = $("fps-quick"), field = $("target"), say = $("fps-say");
+  const goal = $("fps-goal"), real = $("fps-real");
+  if (!field) return;
+  const shown = (lastScan && lastScan.displays) || [];
+  const rates = fpsRates();
+  // A number saved by an older version, or a monitor that is gone, is not a
+  // goal any more: fall back to the main monitor.
+  if (field.value && lastScan && !rates.includes(Number(field.value))) field.value = "";
+  const main = shown.find(d => d.primary) || shown[0];
+  const mainHz = main ? Math.round(main.refresh || 0) : 0;
+  // Picking the main monitor's own rate is the same as no pick.
+  if (field.value && Number(field.value) === mainHz) field.value = "";
+  const now = field.value.trim();
+  const aim = Number(now) || mainHz;
+
+  if (goal) {
+    goal.textContent = aim ? String(aim) : "Auto";
+    goal.classList.toggle("fps-auto", !aim);
+  }
+  if (say) {
+    const line = now
+      ? "Settings aim for your " + now + " Hz monitor, the most frames it can show."
+      : aim
+        ? "Settings aim for your monitor's " + aim + " Hz, the most frames it can show."
+        : "Settings aim for your monitor's refresh rate, the most frames it can show.";
+    say.innerHTML = esc(line) +
+      (fpsEffect ? ' <b class="fps-effect">' + fpsEffect + "</b>" : "");
+  }
+  if (real) {
+    const m = lastScan && lastScan.measured_fps;
+    real.classList.toggle("fps-none", !m);
+    if (m && m.average) {
+      const games = m.games === 1 ? "your last game" : "your last " + m.games + " games";
+      real.innerHTML = "In " + games + ", CS2 really ran at about <b>" + esc(m.average) +
+        " FPS</b>" + (m.low ? ", dropping to " + esc(m.low) + " in the busiest moments" : "") + "." +
+        (aim && m.average < aim
+          ? " That is below your monitor's " + aim + " Hz: the Competitive profile gives the most frames."
+          : "");
+    } else {
+      real.textContent = "To see the frame rate this PC really reaches, turn on the performance " +
+        "overlay in Settings, Overlay and play one game.";
+    }
+  }
+  if (!box) return;
+
+  // One monitor: nothing to choose, so no buttons.
+  box.innerHTML = rates.length < 2 ? "" :
+    '<button data-fps="" aria-pressed="' + (!now || Number(now) === mainHz) + '">Main monitor' +
+    (mainHz ? ", " + mainHz + " Hz" : "") + "</button>" +
+    rates.filter(hz => hz !== mainHz).map(hz =>
       '<button data-fps="' + hz + '" aria-pressed="' + (now === String(hz)) + '">' +
-      hz + " fps</button>").join("");
+      hz + " Hz monitor</button>").join("");
 }
 
 document.addEventListener("click", e => {
@@ -10889,9 +10927,6 @@ document.addEventListener("click", e => {
   renderFps();
 });
 
-document.addEventListener("input", e => {
-  if (e.target.id === "target") renderFps();
-});
 
 function currentAccount() {
   return (whoData && whoData.account) || null;
@@ -16968,7 +17003,7 @@ function applyPrefs(ui) {
     intent = ui.intent;
     paintIntent(intent);
   }
-  if (ui.target_fps) $("target").value = ui.target_fps;
+  $("target").value = ui.target_fps || "";
   // Preferences arrive after the scan, so the line and the chips were
   // describing an empty field that has just been filled in.
   renderFps();
