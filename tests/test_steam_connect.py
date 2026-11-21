@@ -117,3 +117,39 @@ class CloudWithNothingToDo(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ANewPcIsSetUpOnItsOwn(unittest.TestCase):
+    """Edy: signing in on a friend's PC brings the whole setup and applies it."""
+
+    def _state(self):
+        return types.SimpleNamespace(overlay=mock.Mock(), rgb=mock.Mock(),
+                                     refresh=lambda *a, **k: None)
+
+    def test_overlay_and_lighting_settings_travel(self):
+        from cs2cfg import autosync
+        for key in ("overlay_enabled", "overlay_hotkey", "rgb_enabled", "rgb_brightness"):
+            self.assertIn(key, autosync.SYNCED_PREFS)
+
+    def test_a_pull_with_picture_choices_applies_for_this_pc(self):
+        state = self._state()
+        prefs = {"ui": {"cfg_write_ok": True, "overlay_enabled": True},
+                 "accounts": {"1": {"intent": "competitive", "target_fps": 400}}}
+        with mock.patch("cs2cfg.cli.load_prefs", return_value=prefs), \
+             mock.patch.object(webui, "_active_account", return_value="1"), \
+             mock.patch.object(webui, "_apply", return_value={"ok": True}) as apply:
+            done = webui._after_pull(state, {"prefs": ["intent", "overlay_enabled"]})
+        self.assertTrue(done["apply"])
+        self.assertTrue(done["overlay"])
+        body = apply.call_args[0][1]
+        self.assertEqual(body["intent"], "competitive")
+        self.assertEqual(body["account"], "1")
+        state.overlay.configure.assert_called_once()
+
+    def test_nothing_is_written_before_setup_allowed_it(self):
+        prefs = {"ui": {}, "accounts": {"1": {"intent": "competitive"}}}
+        with mock.patch("cs2cfg.cli.load_prefs", return_value=prefs), \
+             mock.patch.object(webui, "_active_account", return_value="1"), \
+             mock.patch.object(webui, "_apply") as apply:
+            webui._after_pull(self._state(), {"prefs": ["intent"]})
+        apply.assert_not_called()

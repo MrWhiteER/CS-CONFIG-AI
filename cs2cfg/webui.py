@@ -5107,9 +5107,50 @@ def _sync_round(state: State, force: bool = False) -> Dict[str, Any]:
     if not cloud.signed_in():
         return {"ok": False, "action": "none", "at": time.time(),
                 "reason": "sign in with Steam to sync"}
-    return autosync.run(_active_account(state), _game_cfg_root(state),
-                        state.cfg_folder, load_prefs=load_prefs,
-                        save_prefs=save_prefs, force=force)
+    result = autosync.run(_active_account(state), _game_cfg_root(state),
+                          state.cfg_folder, load_prefs=load_prefs,
+                          save_prefs=save_prefs, force=force)
+    if result.get("action") == "pull" and result.get("ok"):
+        result["applied"] = _after_pull(state, result)
+    return result
+
+
+def _after_pull(state: State, result: Dict[str, Any]) -> Dict[str, Any]:
+    """Put settings that came from another PC to work here, straight away.
+
+    Overlay and lighting take their new settings live. When the cloud brought
+    the player's picture/config choices, the normal apply runs for this PC's
+    own hardware with them -- the same thing the Apply button does, backups
+    included -- so a new PC is ready without anybody pressing anything.
+    """
+    from . import autosync, profiles
+    from .cli import load_prefs
+
+    done: Dict[str, Any] = {}
+    prefs = load_prefs()
+    ui = profiles.ui_for(prefs, _active_account(state))
+    changed = set(result.get("prefs") or [])
+    try:
+        if any(k.startswith("overlay_") for k in changed):
+            from .overlay.settings import read as overlay_read
+            state.overlay.configure(overlay_read(ui))
+            done["overlay"] = True
+        if any(k.startswith("rgb_") for k in changed):
+            from .rgb import read_settings as rgb_read
+            state.rgb.configure(rgb_read(ui))
+            done["lighting"] = True
+    except Exception:
+        pass
+    if (changed & set(autosync.APPLY_PREFS) or result.get("written")) \
+            and ui.get(autosync.CFG_WRITE_KEY):
+        body = {k: ui[k] for k in autosync.APPLY_PREFS if k in ui}
+        body["account"] = _active_account(state)
+        try:
+            applied = _apply(state, body)
+            done["apply"] = bool(applied.get("ok"))
+        except Exception:
+            done["apply"] = False
+    return done
 
 
 def _sync_loop(state: State):
