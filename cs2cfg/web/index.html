@@ -17173,7 +17173,7 @@ function sbKeyRow(which, title, label, info) {
   const note = info && info.binding ? (info.note || (info.free ? info.label + " is free right now." : info.label + " is in use right now.")) : "";
   return '<div class="sb-key">' + (title ? '<span class="sub" style="min-width:110px">' + esc(title) + '</span>' : "") +
     '<button class="sb-kc' + (on ? " listening" : "") + '" data-sb-listen="' + which + '">' + (on ? "Press a key\u2026" : esc(label || "Pick")) + '</button>' +
-    '<span class="sub">' + (on ? "Press any key or mouse button. Esc cancels." : "Click, then press any key or mouse button.") + '</span>' +
+    '<span class="sub">' + (on ? "Press any key or mouse button (left and right click count too). Esc cancels." : "Click, then press any key or mouse button.") + '</span>' +
     (note ? '<span class="sb-hint" style="margin:0">' + esc(note) + '</span>' : "") + '</div>';
 }
 
@@ -17275,12 +17275,26 @@ document.addEventListener("keydown", e => {
   if (!binding) { status("That key can't be used in CS2. Try another.", true); return; }
   sbSetKey(binding);
 }, true);
+// While a key box is listening, every mouse button counts -- left and right
+// click too, so Mouse 1 and Mouse 2 can be picked. The click and the menu
+// that follow the press are swallowed so they don't also press a button.
+let sbSwallow = {click: false, menu: false};
 document.addEventListener("mousedown", e => {
-  if (!sb.listening || e.target && e.target.closest && e.target.closest("[data-sb-listen]") && e.button === 0) return;
-  const map = {1: "mouse3", 3: "mouse4", 4: "mouse5"};
+  if (!sb.listening || sb.listening === "idea") return;
+  const map = {0: "mouse1", 1: "mouse3", 2: "mouse2", 3: "mouse4", 4: "mouse5"};
   if (!map[e.button]) return;
   e.preventDefault(); e.stopPropagation();
+  if (e.button === 0) sbSwallow.click = true;
+  if (e.button === 2) sbSwallow.menu = true;
   sbSetKey(map[e.button]);
+}, true);
+document.addEventListener("click", e => {
+  if (!sbSwallow.click) return;
+  sbSwallow.click = false; e.preventDefault(); e.stopPropagation();
+}, true);
+document.addEventListener("contextmenu", e => {
+  if (!sb.listening && !sbSwallow.menu) return;
+  sbSwallow.menu = false; e.preventDefault(); e.stopPropagation();
 }, true);
 document.addEventListener("wheel", e => {
   if (!sb.listening) return;

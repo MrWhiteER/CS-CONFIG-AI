@@ -198,6 +198,25 @@ class ShiftCase(Base):
     def test_held_alt_action_refused(self):
         self.assertFalse(self.shift("next", "scancode30", {"id": "cmd:+duck"}).ok)
 
+    def test_mouse1_keeps_firing_when_config_leaves_it_alone(self):
+        built = self.shift("next", "mouse1")
+        self.assertTrue(built.ok, self.blocks(built))
+        self.assertIn("bind mouse1 +attack", built.lines[0])
+        self.assertNotIn("unbind mouse1", "".join(built.lines))
+
+    def test_mouse2_as_shift_key(self):
+        body = spec("Alt one", "shift", {"id": "say_team", "text": "alt"}, binding="mouse2")
+        body.update(target="scancode30", style="hold")
+        built = scriptgen.build(body, self.scan)
+        self.assertTrue(built.ok, self.blocks(built))
+        self.assertEqual(built.entry, "+alt_one")
+
+    def test_stock_from_the_game_wins(self):
+        body = spec("Alt one", "shift", {"id": "say_team", "text": "alt"}, binding="scancode226")
+        body.update(target="mouse5", style="next", target_stock="+voicerecord")
+        built = scriptgen.build(body, self.scan)
+        self.assertIn("bind mouse5 +voicerecord", built.lines[0])
+
     def test_same_key_refused(self):
         self.assertFalse(self.shift("next", "scancode226").ok)
 
@@ -301,6 +320,11 @@ class SaveCase(Base):
         saved = webui._scriptgen_saved(self.state, {})["scripts"]
         self.assertEqual([s["spec"]["name"] for s in saved], ["Mine"])
         self.assertEqual(saved[0]["spec"]["lines"], ['alias "mine" "slot1; say_team switching"'])
+
+    def test_mouse1_counts_as_taken(self):
+        reply = self.save({"spec": spec("Drop it", "press", {"id": "drop_bomb"}),
+                           "binding": "mouse1"})
+        self.assertTrue(reply.get("needs_confirm"), reply)
 
     def test_saving_again_replaces_own_script(self):
         self.save({"spec": spec("Drop it", "press", {"id": "drop_bomb"}), "binding": "scancode27"})

@@ -221,6 +221,12 @@ def describe(command: str, scan=None) -> str:
     return "something else"
 
 
+# What CS2 itself puts on the keys that matter most, for when the game's own
+# defaults file can't be read. Restoring one of these to "nothing" would take
+# away firing, so a key with no bind in the config falls back to these.
+STOCK_FALLBACK = {"mouse1": "+attack", "mouse2": "+attack2"}
+
+
 def normal_bind(scan, binding: str) -> str:
     """What a key runs now, by the bind that loads last."""
     if scan is None or not binding:
@@ -557,7 +563,8 @@ def build(spec: Dict[str, Any], scan=None, key_label: str = "") -> Built:
             checks.append(Check("block", "The shift key and the key it changes must be two different keys."))
             block = True
         else:
-            normal = normal_bind(scan, target)
+            normal = (normal_bind(scan, target) or str(spec.get("target_stock") or "").strip()
+                      or STOCK_FALLBACK.get(target, ""))
             normal_said = describe(normal, scan) if normal else "nothing"
             if not normal:
                 restore = f"unbind {target}"
