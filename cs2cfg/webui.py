@@ -3657,9 +3657,13 @@ def _scriptgen_check(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     spec["binding"] = binding
     if spec.get("target"):
         spec["target_stock"] = _scriptgen_stock(state, str(spec["target"]))
+    if binding:
+        spec["key_stock"] = _scriptgen_stock(state, binding)
     key = _scriptgen_key(result, binding, "", state)
     built = scriptgen.build(spec, result, key["label"])
     key = _scriptgen_key(result, binding, built.entry, state)
+    if (built.target or {}).get("own"):
+        key["free"] = True
     return {"ok": True, "built": built.as_dict(), "key": key,
             "folder": result is not None}
 
@@ -3703,6 +3707,8 @@ def _scriptgen_save(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     spec["binding"] = binding
     if spec.get("target"):
         spec["target_stock"] = _scriptgen_stock(state, str(spec["target"]))
+    if binding:
+        spec["key_stock"] = _scriptgen_stock(state, binding)
     key = _scriptgen_key(result, binding, "", state)
     built = scriptgen.build(spec, result, key["label"])
     if not built.ok:
@@ -3711,6 +3717,8 @@ def _scriptgen_save(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
                 "error": problems[0] if problems else "This script can't be saved yet."}
 
     key = _scriptgen_key(result, binding, built.entry, state)
+    if (built.target or {}).get("own"):
+        key["free"] = True      # the shift key keeps its own job, nothing is lost
     if not key["free"] and not body.get("force"):
         return {"ok": False, "needs_confirm": True, "key": key,
                 "error": f"{key['label']} already does something else."}

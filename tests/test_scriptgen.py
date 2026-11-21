@@ -34,6 +34,7 @@ FILES = {
         'bind "scancode30" "slot1"\n'
         'bind "scancode31" "slot2; say_team pistol"\n'
         'bind "scancode32" "+jump; say hi"\n'
+        'bind "mouse5" "+voicerecord"\n'
     ),
     "me/settings.vcfg": (
         'sensitivity "1.1"\n'
@@ -274,6 +275,58 @@ class EditCase(Base):
     def test_edit_bind_line_refused(self):
         built = self.edit("press", 'alias "mine" "slot1"\nbind "x" "mine"')
         self.assertTrue(any("step 4" in t for t in self.blocks(built)))
+
+
+class ReleaseAndOwnCase(Base):
+    def blocks(self, built):
+        return [c.text for c in built.checks if c.level == "block"]
+
+    def test_fire_on_press_knife_on_release(self):
+        body = spec("Shoot then knife", "hold", {"id": "cmd:+attack"})
+        body["release_steps"] = [{"id": "cmd:slot3"}, {"id": "say_team", "text": "knife"}]
+        built = scriptgen.build(body, self.scan)
+        self.assertTrue(built.ok, self.blocks(built))
+        self.assertEqual(built.lines, [
+            'alias "+shoot_then_knife" "+attack"',
+            'alias "-shoot_then_knife" "-attack; slot3; say_team knife"'])
+        self.assertEqual(built.spec["release_steps"][0]["id"], "cmd:slot3")
+
+    def test_held_let_go_step_refused(self):
+        body = spec("x", "hold", {"id": "cmd:slot1"})
+        body["release_steps"] = [{"id": "cmd:+duck"}]
+        self.assertFalse(scriptgen.build(body, self.scan).ok)
+
+    def shift(self, style, keep=True):
+        body = spec("Talk alt", "shift", {"id": "say_team", "text": "alt"}, binding="mouse5")
+        body.update(target="scancode30", style=style, keep_own=keep)
+        return scriptgen.build(body, self.scan)
+
+    def test_shift_key_keeps_voice_chat_next_press(self):
+        built = self.shift("next")
+        self.assertTrue(built.ok, self.blocks(built))
+        self.assertEqual(built.entry, "+talk_alt")
+        self.assertIn('alias "+talk_alt" "+voicerecord; talk_alt_next"', built.lines)
+        self.assertIn('alias "-talk_alt" "-voicerecord"', built.lines)
+        self.assertTrue(built.target["own"])
+
+    def test_shift_key_keeps_voice_chat_while_held(self):
+        built = self.shift("hold")
+        self.assertTrue(built.ok, self.blocks(built))
+        self.assertIn('alias "+talk_alt" "+voicerecord; bind scancode30 talk_alt_do"', built.lines)
+        self.assertIn('alias "-talk_alt" "-voicerecord; bind scancode30 slot1"', built.lines)
+
+    def test_shift_key_own_job_can_be_turned_off(self):
+        built = self.shift("next", keep=False)
+        self.assertTrue(built.ok, self.blocks(built))
+        self.assertEqual(built.entry, "talk_alt")
+        self.assertFalse(any("voicerecord" in l for l in built.lines))
+
+    def test_saved_without_asking_when_kept(self):
+        state = mock.Mock(); state.cfg_scan = self.scan
+        body = spec("Talk alt", "shift", {"id": "say_team", "text": "alt"}, binding="mouse5")
+        body.update(target="scancode30", style="next")
+        reply = webui._scriptgen_save(state, {"spec": body, "binding": "mouse5"})
+        self.assertTrue(reply["ok"], reply)
 
 
 class SaveCase(Base):

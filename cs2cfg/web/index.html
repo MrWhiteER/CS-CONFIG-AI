@@ -6038,6 +6038,8 @@
 .sb-cmd span { color: var(--muted); font-size: 12.5px; }
 .sb-code { width: 100%; box-sizing: border-box; background: var(--sunk); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font: 12.5px/1.6 Consolas, monospace; resize: vertical; margin-bottom: 10px; white-space: pre; overflow-x: auto; }
 .sb-code:focus { outline: none; border-color: var(--accent); }
+.sb-keep { display: inline-flex; align-items: center; gap: 7px; color: var(--ink); font-size: 13px; margin-left: 6px; cursor: pointer; }
+.sb-keep input { accent-color: var(--accent); }
 .sb-keytag { font-size: 10.5px; padding: 1px 6px; border-radius: 6px; background: var(--accent-dim); color: var(--accent); margin-left: 4px; }
 .sb-btns { display: flex; gap: 9px; margin-top: 14px; }
 .sb-btns .primary { flex: 1; }
@@ -17232,6 +17234,8 @@ const SB_IDEAS = [
     steps: [{id: "buy_flash"}, {id: "buy_smoke"}, {id: "buy_he"}, {id: "buy_molotov"}]}},
   {label: "Big radar while held", spec: {name: "Big radar while held", mode: "hold",
     steps: [{id: "radar_zoom", value: 0.3}]}},
+  {label: "Shoot, then knife on let go", spec: {name: "Shoot then knife", mode: "hold",
+    steps: [{id: "cmd:+attack"}], release_steps: [{id: "cmd:slot3"}]}},
   {label: "Alt + 1 says something", spec: {name: "Alt one says hi", mode: "shift", style: "next",
     steps: [{id: "say_team", text: "Rotating"}]}, keys: {binding: "scancode226", target: "scancode30"}},
   {label: "Game sound on / off", spec: {name: "Game sound on off", mode: "toggle",
@@ -17272,28 +17276,39 @@ function sbHasMove() {
   return sb.spec.steps.some(s => (sbStep(s.id) || {}).move);
 }
 
-function sbStepRow(picked, i) {
+// Steps live in two lists on a "While held" key: what the press does and
+// what letting go does. A row's index carries an "r" for the let-go list.
+function sbArr(ref) {
+  const r = String(ref);
+  if (r[0] === "r") { sb.spec.release_steps = sb.spec.release_steps || []; return [sb.spec.release_steps, +r.slice(1)]; }
+  return [sb.spec.steps, +r];
+}
+function sbReleaseRow(picked, i) { return sbStepRow(picked, i, "r"); }
+
+function sbStepRow(picked, i, pre) {
+  pre = typeof pre === "string" ? pre : "";
   const step = sbStep(picked.id) || {label: picked.id, group_name: ""};
-  const n = sb.spec.steps.length;
+  const n = (pre ? sb.spec.release_steps || [] : sb.spec.steps).length;
+  const ref = pre + i;
   const bad = sb.built && !sb.built.ok && ((step.move && sb.spec.steps.filter(s => (sbStep(s.id) || {}).move).length > 1) ||
     (step.hold && sb.spec.mode === "press"));
   let extra = "";
   if (step.input === "text") {
-    extra = '<input type="text" maxlength="100" data-sb-text="' + i + '" placeholder="' + esc(step.placeholder || "") +
+    extra = '<input type="text" maxlength="100" data-sb-text="' + ref + '" placeholder="' + esc(step.placeholder || "") +
       '" value="' + esc(picked.text || "") + '">';
   } else if (step.input === "number") {
     extra = '<label>Set to <input type="number" step="' + step.step + '" min="' + step.min + '" max="' + step.max +
-      '" data-sb-val="' + i + '" value="' + esc(picked.value) + '"></label>';
-    if (sb.spec.mode !== "press") {
+      '" data-sb-val="' + ref + '" value="' + esc(picked.value) + '"></label>';
+    if (sb.spec.mode !== "press" && sb.spec.mode !== "shift" && !pre) {
       extra += '<label>then back to <input type="number" step="' + step.step + '" min="' + step.min + '" max="' + step.max +
-        '" data-sb-back="' + i + '" value="' + esc(picked.back) + '"></label>';
+        '" data-sb-back="' + ref + '" value="' + esc(picked.back) + '"></label>';
     }
   }
   return '<div class="sb-act' + (bad ? " bad" : "") + '"><span class="n">' + (i + 1) + '</span><b>' + esc(step.label) + '</b>' +
     extra + '<span class="tag">' + esc(step.group_name || "") + '</span><span class="sp"></span>' +
-    '<button class="sb-mini" data-sb-move="' + i + ':-1" title="Move up"' + (i === 0 ? " disabled" : "") + '>&#8593;</button>' +
-    '<button class="sb-mini" data-sb-move="' + i + ':1" title="Move down"' + (i === n - 1 ? " disabled" : "") + '>&#8595;</button>' +
-    '<button class="sb-mini" data-sb-del="' + i + '" title="Remove this step">&#10005;</button></div>';
+    '<button class="sb-mini" data-sb-move="' + ref + ':-1" title="Move up"' + (i === 0 ? " disabled" : "") + '>&#8593;</button>' +
+    '<button class="sb-mini" data-sb-move="' + ref + ':1" title="Move down"' + (i === n - 1 ? " disabled" : "") + '>&#8595;</button>' +
+    '<button class="sb-mini" data-sb-del="' + ref + '" title="Remove this step">&#10005;</button></div>';
 }
 
 function sbChips() {
@@ -17306,7 +17321,9 @@ function sbChips() {
   let fadedMove = false, fadedHold = false;
   const chips = list.map(s => {
     let off = "";
-    if (s.move && hasMove) { off = "CS2 allows only one moving or shooting action per key."; fadedMove = true; }
+    const toRelease = sb.spec.mode === "hold" && sb.addTo === "release";
+    if (toRelease && (s.hold || s.move)) { off = "Letting go can't start something that has to be held."; fadedHold = true; }
+    else if (s.move && hasMove) { off = "CS2 allows only one moving or shooting action per key."; fadedMove = true; }
     else if (s.hold && (sb.spec.mode === "press" || sb.spec.mode === "shift")) { off = "Only works on a “While held” or “On / off” key."; fadedHold = true; }
     return '<button class="sb-chip" data-sb-add="' + esc(s.id) + '"' + (off ? ' disabled title="' + esc(off) + '"' : (s.note ? ' title="' + esc(s.note) + '"' : "")) +
       '>' + esc(s.label) + '</button>';
@@ -17335,6 +17352,7 @@ function sbSide() {
     if (sb.spec.mode === "shift") {
       html += '<p style="margin-top:8px">' + (sb.spec.style === "hold" ? "When you let go of " + key + ", " : "After that, ") +
         tgt + " goes back to \u201c" + esc(b.target && b.target.normal || "what it does now") + "\u201d." +
+        (b.target && b.target.own ? " " + key + " still does \u201c" + esc(b.target.own) + "\u201d every time you press it." : "") +
         (sb.spec.style === "hold" ? "" : " Changed your mind? Press " + key + " again to cancel.") + '</p>';
     } else if (sb.spec.mode !== "press") {
       const undo = [];
@@ -17391,10 +17409,16 @@ function sbRender() {
       (sb.spec.mode === "shift" ? '<div class="sb-styles">' +
         [["next", "Only the next press"], ["hold", "While I hold the shift key"]].map(o =>
           '<button class="sb-cat" data-sb-style="' + o[0] + '" aria-pressed="' + ((sb.spec.style || "next") === o[0]) + '">' + o[1] + '</button>').join("") +
+        '<label class="sb-keep"><input type="checkbox" data-sb-keepown' + (sb.spec.keep_own === false ? "" : " checked") + '> The shift key keeps its own job too</label>' +
         '</div>' : "") + '</div></div>' +
-    '<div class="sb-step"><span class="sb-num">3</span><div><h4>What it does, in order</h4><div class="sb-acts">' +
-      sb.spec.steps.map(sbStepRow).join("") +
-      '<div class="sb-add"><input class="sb-input" id="sb-find" placeholder="Add a step: search, e.g. jump, buy, volume, say…" value="' + esc(sb.find) + '">' +
+    '<div class="sb-step"><span class="sb-num">3</span><div><h4>' + (sb.spec.mode === "hold" ? "When you press the key" : "What it does, in order") + '</h4><div class="sb-acts">' +
+      (sb.spec.steps.length ? sb.spec.steps.map((x, i) => sbStepRow(x, i)).join("") : (sb.spec.mode === "hold" ? '<p class="sb-hint" style="margin:0">Nothing yet.</p>' : "")) +
+      (sb.spec.mode === "hold" ? '</div><h4 style="margin-top:14px">When you let go</h4>' +
+        '<p class="sb-hint" style="margin:-4px 0 8px">Anything held is let go first, then these run. For example: shoot while held, switch to the knife when you let go.</p><div class="sb-acts">' +
+        ((sb.spec.release_steps || []).length ? sb.spec.release_steps.map(sbReleaseRow).join("") : '<p class="sb-hint" style="margin:0">Nothing extra.</p>') : "") +
+      '<div class="sb-add">' + (sb.spec.mode === "hold" ? '<div class="sb-styles" style="margin:0 0 9px"><span class="sub" style="align-self:center">Add steps to:</span>' +
+        [["press", "When you press"], ["release", "When you let go"]].map(o => '<button class="sb-cat" data-sb-addto="' + o[0] + '" aria-pressed="' + ((sb.addTo || "press") === o[0]) + '">' + o[1] + '</button>').join("") + '</div>' : "") +
+      '<input class="sb-input" id="sb-find" placeholder="Add a step: search, e.g. jump, buy, volume, say…" value="' + esc(sb.find) + '">' +
       '<div class="sb-cats">' + cats + '</div>' + sbChips() + '</div></div></div></div>' +
     '<div class="sb-step"><span class="sb-num">4</span><div><h4>' + (sb.spec.mode === "shift" ? "Which keys" : "Which key") + '</h4><div class="sb-keys">' +
       sbKeyRow("key", sb.spec.mode === "shift" ? "Shift key" : "", sb.keyLabel, sb.key) +
@@ -17554,14 +17578,17 @@ document.addEventListener("click", e => {
   if (d.sbStyle) { sbDropEdits(); sb.spec.style = d.sbStyle; sbRender(); sbChanged(); return; }
   if (d.sbMode) { sbDropEdits(); sb.spec.mode = d.sbMode; sbRender(); sbChanged(); return; }
   if (d.sbCat) { sb.cat = d.sbCat; sb.find = ""; sbRender(); return; }
+  if (d.sbAddto) { sb.addTo = d.sbAddto; sbRender(); return; }
   if (d.sbAdd) {
-    if (sb.spec.steps.length >= 12) { status("Up to 12 steps fit on one key.", true); return; }
-    sbDropEdits(); sb.spec.steps.push(sbNewStep(d.sbAdd)); sbRender(); sbChanged(); return;
+    const [list] = sbArr(sb.spec.mode === "hold" && sb.addTo === "release" ? "r0" : "0");
+    if (list.length >= 12) { status("Up to 12 steps fit here.", true); return; }
+    sbDropEdits(); list.push(sbNewStep(d.sbAdd)); sbRender(); sbChanged(); return;
   }
-  if (d.sbDel) { sbDropEdits(); sb.spec.steps.splice(+d.sbDel, 1); sbRender(); sbChanged(); return; }
+  if (d.sbDel) { const [list, i] = sbArr(d.sbDel); sbDropEdits(); list.splice(i, 1); sbRender(); sbChanged(); return; }
   if (d.sbMove) {
-    const [i, dir] = d.sbMove.split(":").map(Number);
-    const j = i + dir, list = sb.spec.steps;
+    const [ref, dirText] = d.sbMove.split(":");
+    const [list, i] = sbArr(ref), dir = +dirText;
+    const j = i + dir;
     if (j < 0 || j >= list.length) return;
     sbDropEdits(); [list[i], list[j]] = [list[j], list[i]]; sbRender(); sbChanged(); return;
   }
@@ -17575,6 +17602,7 @@ document.addEventListener("click", e => {
     if (idea.keys) { sb.binding = idea.keys.binding; sb.target = idea.keys.target; sb.keyLabel = ""; sb.targetLabel = ""; sb.listening = "idea"; setTimeout(() => sbSetKey(""), 0); }
     delete sb.spec.lines_text;
     sb.spec = {name: idea.spec.name, mode: idea.spec.mode, style: idea.spec.style,
+      release_steps: (idea.spec.release_steps || []).map(x => Object.assign(sbNewStep(x.id), x)),
       steps: idea.spec.steps.map(s => Object.assign(sbNewStep(s.id), s))};
     sbRender(); sbChanged(); return;
   }
@@ -17583,7 +17611,9 @@ document.addEventListener("click", e => {
   if (d.sbUnedit !== undefined) { delete sb.spec.lines_text; sbRender(); sbChanged(); return; }
   if (d.sbOpen !== undefined) {
     const x = sb.saved[+d.sbOpen], sp = x.spec;
-    sb.spec = {name: sp.name, mode: sp.mode, style: sp.style, steps: (sp.steps || []).map(s => Object.assign(sbNewStep(s.id), s))};
+    sb.spec = {name: sp.name, mode: sp.mode, style: sp.style, keep_own: sp.keep_own,
+      steps: (sp.steps || []).map(s => Object.assign(sbNewStep(s.id), s)),
+      release_steps: (sp.release_steps || []).map(s => Object.assign(sbNewStep(s.id), s))};
     if (sp.lines) sb.spec.lines_text = sp.lines.join("\n");
     sb.binding = sp.binding || ""; sb.keyLabel = x.key || ""; sb.target = sp.target || ""; sb.targetLabel = x.target || "";
     sb.confirm = null; sbRender(); sbChanged(); return;
@@ -17601,9 +17631,10 @@ document.addEventListener("input", e => {
   if (t.id === "sb-name") { sb.spec.name = t.value; sbChanged(); return; }
   if (t.id === "sb-find") { sb.find = t.value; sbRender(); return; }
   if (t.id === "sb-lines-edit") { sb.spec.lines_text = t.value; sbChanged(); return; }
-  if (d.sbText !== undefined) { sbDropEdits(); sb.spec.steps[+d.sbText].text = t.value; sbChanged(); return; }
-  if (d.sbVal !== undefined) { sbDropEdits(); sb.spec.steps[+d.sbVal].value = t.value === "" ? null : +t.value; sbChanged(); return; }
-  if (d.sbBack !== undefined) { sbDropEdits(); sb.spec.steps[+d.sbBack].back = t.value === "" ? null : +t.value; sbChanged(); return; }
+  if (d.sbKeepown !== undefined) { sbDropEdits(); sb.spec.keep_own = t.checked; sbRender(); sbChanged(); return; }
+  if (d.sbText !== undefined) { const [l, i] = sbArr(d.sbText); sbDropEdits(); l[i].text = t.value; sbChanged(); return; }
+  if (d.sbVal !== undefined) { const [l, i] = sbArr(d.sbVal); sbDropEdits(); l[i].value = t.value === "" ? null : +t.value; sbChanged(); return; }
+  if (d.sbBack !== undefined) { const [l, i] = sbArr(d.sbBack); sbDropEdits(); l[i].back = t.value === "" ? null : +t.value; sbChanged(); return; }
 });
 
 let activeTab = "launcher";
