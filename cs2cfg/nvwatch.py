@@ -51,7 +51,7 @@ def read_now() -> Optional[Dict[str, Dict[str, dict]]]:
     def take(label: str, view) -> None:
         if view is None:
             return
-        out[label] = {f"0x{s.id:08X}": {"name": s.name or f"Setting 0x{s.id:08X}",
+        out[label] = {f"0x{s.id:08X}": {"name": s.name or "Another NVIDIA setting",
                                         "value": s.value}
                       for s in view.settings}
 
