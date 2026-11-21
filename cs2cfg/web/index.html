@@ -855,6 +855,53 @@
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
   }
   .skin-card .rr { font-size: 10px; margin-top: 2px; }
+  .skin-card .art {
+    height: 96px; margin: -2px -2px 4px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(circle at 50% 60%, rgba(var(--lift), .10), transparent 70%);
+  }
+  .skin-card .art img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .skin-card .art.none { display: none; }
+  .skins-more { display: flex; justify-content: center; margin-top: 14px; }
+  .skin-picture { max-width: 92%; max-height: 92%; object-fit: contain; filter: drop-shadow(0 10px 24px rgba(0,0,0,.45)); }
+
+  /* Music kits: the kit's picture, its name, and its song parts to play. */
+  .mk-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+  .mk-card {
+    background: var(--chip); border: 1px solid var(--line); border-radius: 12px;
+    padding: 12px; display: flex; flex-direction: column; gap: 8px;
+  }
+  .mk-card.playing { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .mk-top { display: flex; gap: 10px; align-items: center; }
+  .mk-top .art { width: 64px; height: 64px; flex: 0 0 64px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: rgba(var(--lift), .06); }
+  .mk-top .art img { max-width: 100%; max-height: 100%; }
+  .mk-top .art.none img { display: none; }
+  .mk-name b { display: block; font-size: 13px; color: var(--ink); line-height: 1.25; }
+  .mk-name span { font-size: 11px; color: var(--muted); }
+  .mk-mvp { width: 100%; }
+  .mk-parts { display: flex; flex-wrap: wrap; gap: 5px; }
+  .mk-part {
+    background: transparent; border: 1px solid var(--line); color: var(--muted);
+    border-radius: 999px; padding: 3px 9px; font-size: 11px; cursor: pointer;
+  }
+  .mk-part:hover, .mk-part.on { color: var(--ink); border-color: rgba(var(--lift), .4); }
+  .mk-none { font-size: 11px; color: var(--muted); }
+  .mk-player {
+    position: sticky; bottom: 0; margin-top: 14px; z-index: 5;
+    display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.35);
+  }
+  .mk-player.hidden { display: none; }
+  .mk-stop { background: var(--accent); color: #fff; border: 0; border-radius: 999px; width: 30px; height: 30px; cursor: pointer; font-size: 11px; }
+  .mk-now { display: flex; flex-direction: column; min-width: 0; flex: 0 1 240px; }
+  .mk-now b { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mk-now span { font-size: 11px; color: var(--muted); }
+  .mk-bar { flex: 1; height: 4px; border-radius: 4px; background: rgba(var(--lift), .14); overflow: hidden; cursor: pointer; }
+  .mk-bar i { display: block; height: 100%; width: 0; background: var(--accent); }
+  .mk-time { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .mk-vol { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+  .mk-vol input { width: 90px; }
   .skins-count { font-size: 11px; color: var(--muted); margin: -4px 0 12px; }
 
   .skin-viewer-overlay {
@@ -6532,8 +6579,10 @@ const startup = (() => {
           <div class="eyebrow">Every finish, owned or not</div>
           <h2>All <em>Skins</em></h2>
           <p>
-            Every weapon and finish CS2 has ever released, read fresh from the
-            game's own files &mdash; not just what is in your inventory.
+            Every weapon, knife, glove, agent, sticker, graffiti and music kit
+            CS2 has ever released, with its real picture, read fresh from the
+            game's own files &mdash; not just what is in your inventory. Music
+            kits play their MVP song right here, so you can hear it before you buy.
             <b>View in 3D</b> is a look, nothing more: the model is exported on
             the spot through a tool you install yourself, shown once, and never
             written anywhere or kept.
@@ -6546,8 +6595,12 @@ const startup = (() => {
           <button class="skins-kind-tab active" data-kind="gun" role="tab" aria-selected="true">Guns</button>
           <button class="skins-kind-tab" data-kind="knife" role="tab" aria-selected="false">Knives</button>
           <button class="skins-kind-tab" data-kind="glove" role="tab" aria-selected="false">Gloves</button>
-          <button class="skins-kind-tab" disabled title="Agents are full player-character models &mdash; a different export pipeline than a weapon, not built yet.">Agents</button>
-          <button class="skins-kind-tab" disabled title="Stickers are a 2D decal composited onto a specific spot on the model, not a texture override &mdash; not built yet.">Stickers</button>
+          <button class="skins-kind-tab" data-kind="agent" role="tab" aria-selected="false">Agents</button>
+          <button class="skins-kind-tab" data-kind="sticker" role="tab" aria-selected="false">Stickers</button>
+          <button class="skins-kind-tab" data-kind="graffiti" role="tab" aria-selected="false">Graffiti</button>
+          <button class="skins-kind-tab" data-kind="patch" role="tab" aria-selected="false">Patches</button>
+          <button class="skins-kind-tab" data-kind="charm" role="tab" aria-selected="false">Charms</button>
+          <button class="skins-kind-tab" data-kind="music" role="tab" aria-selected="false">Music kits</button>
         </div>
         <div class="skins-toolbar">
           <input type="search" id="skins-search" placeholder="Search by weapon or finish&hellip;">
@@ -6556,6 +6609,13 @@ const startup = (() => {
           <button class="btn small" id="skins-reload">Re-read</button>
         </div>
         <div id="skins-out"><span class="sub"><span class="spin"></span> Reading&hellip;</span></div>
+        <div class="mk-player hidden" id="mk-player" role="status">
+          <button class="mk-stop" id="mk-stop" title="Stop">&#9632;</button>
+          <span class="mk-now"><b id="mk-now-kit"></b><span id="mk-now-part"></span></span>
+          <span class="mk-bar"><i id="mk-bar-fill"></i></span>
+          <span class="mk-time" id="mk-time">0:00</span>
+          <label class="mk-vol" title="Volume"><span>Volume</span><input type="range" id="mk-volume" min="0" max="100" value="60"></label>
+        </div>
       </section>
     </div>
 
@@ -13557,15 +13617,35 @@ function filteredSkins() {
     if (it.kind !== skinsFilters.kind) return false;
     if (skinsFilters.weapon && it.weapon_class !== skinsFilters.weapon) return false;
     if (skinsFilters.rarity && it.rarity !== skinsFilters.rarity) return false;
-    if (q && !it.display_name.toLowerCase().includes(q)) return false;
+    if (q && !(it.display_name + " " + (it.artist || "")).toLowerCase().includes(q)) return false;
     return true;
   });
 }
 
+// The game's own inventory picture for an item, cut out of the player's
+// CS2 files by the server (cs2cfg.econ). No CS2, no picture: the card just
+// shows its text, as before.
+function skinArt(it) {
+  if (!it.art) return "";
+  return '<span class="art"><img src="/item-art/' + encodeURIComponent(it.art) + '.png" alt="" ' +
+    'loading="lazy" decoding="async" onerror="this.parentNode.classList.add(\'none\')"></span>';
+}
+
+const SKINS_PAGE = 240;
+let skinsShown = SKINS_PAGE;
+const SKINS_3D = new Set(["gun", "knife", "glove"]);
+const SKINS_SEARCH_HINT = { gun: "Search by weapon or finish\u2026", knife: "Search by knife or finish\u2026",
+  glove: "Search by glove or finish\u2026", agent: "Search agents\u2026", sticker: "Search stickers\u2026",
+  graffiti: "Search graffiti\u2026", patch: "Search patches\u2026", charm: "Search charms\u2026",
+  music: "Search music kits or artists\u2026" };
+const SKINS_FILTER_LABEL = { gun: "All weapons", knife: "All knives", glove: "All gloves",
+  agent: "Both sides", sticker: "All styles" };
+
 function skinCard(it) {
   return '<div class="skin-card" style="border-left-color:' + esc(it.rarity_color) + '" ' +
+    'data-kind="' + esc(it.kind) + '" data-art="' + esc(it.art || "") + '" ' +
     'data-weapon="' + esc(it.weapon_class) + '" data-paintkit="' + esc(it.paintkit) + '" ' +
-    'data-name="' + esc(it.display_name) + '">' +
+    'data-name="' + esc(it.display_name) + '">' + skinArt(it) +
     '<span class="wn">' + (it.kind === "knife" || it.kind === "glove" ? "★ " : "") + esc(it.weapon_name) + '</span>' +
     '<span class="sn">' + esc(it.skin_name) + '</span>' +
     '<span class="rr" style="color:' + esc(it.rarity_color) + '">' + esc(it.rarity) + '</span>' +
@@ -13580,11 +13660,16 @@ function fillSkinsFilterOptions() {
   const weapons = [...new Map(items.map(it => [it.weapon_class, it.weapon_name])).entries()]
     .sort((a, b) => a[1].localeCompare(b[1]));
   const rarities = [...new Set(items.map(it => it.rarity))].filter(Boolean);
-  weaponSel.innerHTML = '<option value="">All weapons</option>' +
+  // One group only (graffiti, patches...): a filter with one choice is noise.
+  weaponSel.classList.toggle("hidden", weapons.length < 2);
+  raritySel.classList.toggle("hidden", skinsFilters.kind === "music");
+  weaponSel.innerHTML = '<option value="">' + (SKINS_FILTER_LABEL[skinsFilters.kind] || "All") + '</option>' +
     weapons.map(([cls, name]) => '<option value="' + esc(cls) + '">' + esc(name) + "</option>").join("");
   raritySel.innerHTML = '<option value="">All rarities</option>' +
     rarities.map(r => '<option value="' + esc(r) + '">' + esc(r) + "</option>").join("");
   weaponSel.dataset.filledFor = skinsFilters.kind;
+  const search = $("skins-search");
+  if (search) search.placeholder = SKINS_SEARCH_HINT[skinsFilters.kind] || "Search\u2026";
 }
 
 function renderSkins() {
@@ -13596,21 +13681,168 @@ function renderSkins() {
       '<div class="actions"><button class="btn" id="skins-reload-inline">Try again</button></div>';
     return;
   }
+  // Hide a tab this game version has nothing for (charms on an older install).
+  document.querySelectorAll(".skins-kind-tab[data-kind]").forEach(t => {
+    t.classList.toggle("hidden", !d.items.some(it => it.kind === t.dataset.kind));
+  });
   fillSkinsFilterOptions();
   const items = filteredSkins();
-  box.innerHTML = '<p class="skins-count">' + items.length + " of " + d.count + " shown</p>" +
-    '<div class="skins-grid">' + items.map(skinCard).join("") + "</div>";
+  if (skinsFilters.kind === "music") { renderMusicKits(box, items); return; }
+  const total = d.items.filter(it => it.kind === skinsFilters.kind).length;
+  const shown = items.slice(0, skinsShown);
+  box.innerHTML = '<p class="skins-count">' + items.length + " of " + total + " shown</p>" +
+    '<div class="skins-grid">' + shown.map(skinCard).join("") + "</div>" +
+    (items.length > shown.length
+      ? '<div class="skins-more"><button class="btn small" id="skins-more">Show more (' +
+        (items.length - shown.length) + ' left)</button></div>' : "");
+}
+
+/* Music kits. Each card plays the kit's own songs straight from the
+   player's CS2 files: the MVP song (what everyone hears when you are the
+   round's MVP) first, then the other moments the kit covers. One song plays
+   at a time; the bar at the bottom shows it and stops it. */
+let musicKits = null;          // kit id -> { parts: [...] }
+let musicAudio = null, musicUrl = null, musicNow = null, musicAbort = null;
+
+async function loadMusicKits() {
+  try {
+    const r = await api("/api/skins/music", {});
+    musicKits = {};
+    (r.kits || []).forEach(k => { musicKits[k.kit] = k; });
+  } catch (err) {
+    musicKits = {};
+  }
+  if (skinsFilters.kind === "music") renderSkins();
+}
+
+function musicCard(it) {
+  const kit = musicKits && musicKits[it.paintkit];
+  const parts = (kit && kit.parts) || [];
+  const mvp = parts.find(p => p.label === "MVP song");
+  const now = musicNow && musicNow.kit === it.paintkit;
+  const art = it.art ? '<span class="art"><img src="/item-art/' + encodeURIComponent(it.art) +
+    '.png" alt="" loading="lazy" onerror="this.parentNode.classList.add(\'none\')"></span>' : "";
+  let body;
+  if (!musicKits) body = '<span class="mk-none"><span class="spin"></span> Looking for the songs&hellip;</span>';
+  else if (!parts.length) body = '<span class="mk-none">The songs for this kit were not found in your game files.</span>';
+  else body = (mvp ? '<button class="btn primary small mk-mvp" data-mk-kit="' + esc(it.paintkit) +
+      '" data-mk-part="' + esc(mvp.part) + '">&#9654; Play MVP song</button>' : "") +
+    '<div class="mk-parts">' + parts.filter(p => p !== mvp).map(p =>
+      '<button class="mk-part' + (now && musicNow.part === p.part ? " on" : "") + '" data-mk-kit="' +
+      esc(it.paintkit) + '" data-mk-part="' + esc(p.part) + '">' + esc(p.label) + "</button>").join("") + "</div>";
+  return '<div class="mk-card' + (now ? " playing" : "") + '" data-mk-card="' + esc(it.paintkit) + '">' +
+    '<div class="mk-top">' + art + '<span class="mk-name"><b>' + esc(it.skin_name) + "</b>" +
+    (it.artist ? "<span>" + esc(it.artist) + "</span>" : "") + "</span></div>" + body + "</div>";
+}
+
+function renderMusicKits(box, items) {
+  if (musicKits === null) loadMusicKits();
+  const shown = items.slice(0, skinsShown);
+  box.innerHTML = '<p class="skins-count">' + items.length + " music kits &middot; press Play MVP song " +
+    "to hear what plays when you are the round's MVP</p>" +
+    '<div class="mk-grid">' + shown.map(musicCard).join("") + "</div>" +
+    (items.length > shown.length
+      ? '<div class="skins-more"><button class="btn small" id="skins-more">Show more (' +
+        (items.length - shown.length) + ' left)</button></div>' : "");
+}
+
+function fmtSongTime(s) {
+  s = Math.max(0, Math.floor(s || 0));
+  return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+}
+
+function stopMusic() {
+  if (musicAbort) { musicAbort.abort(); musicAbort = null; }
+  if (musicAudio) { musicAudio.pause(); musicAudio = null; }
+  if (musicUrl) { URL.revokeObjectURL(musicUrl); musicUrl = null; }
+  musicNow = null;
+  $("mk-player")?.classList.add("hidden");
+  document.querySelectorAll(".mk-card.playing").forEach(c => c.classList.remove("playing"));
+  document.querySelectorAll(".mk-part.on").forEach(c => c.classList.remove("on"));
+}
+
+async function playMusic(kitId, part) {
+  stopMusic();
+  const kit = musicKits && musicKits[kitId];
+  const item = ((skinsData && skinsData.items) || []).find(it => it.kind === "music" && it.paintkit === kitId);
+  const label = ((kit && kit.parts) || []).find(p => p.part === part)?.label || "";
+  musicNow = { kit: kitId, part };
+  const controller = new AbortController();
+  musicAbort = controller;
+  $("mk-now-kit").textContent = item ? item.skin_name : "";
+  $("mk-now-part").textContent = label + " · loading…";
+  $("mk-bar-fill").style.width = "0";
+  $("mk-time").textContent = "0:00";
+  $("mk-player").classList.remove("hidden");
+  document.querySelector('[data-mk-card="' + CSS.escape(kitId) + '"]')?.classList.add("playing");
+  document.querySelector('.mk-part[data-mk-kit="' + CSS.escape(kitId) + '"][data-mk-part="' + CSS.escape(part) + '"]')?.classList.add("on");
+  try {
+    const res = await fetch("/music-kit/" + encodeURIComponent(kitId) + "/" + encodeURIComponent(part),
+      { headers: { "X-CS2CFG-Token": TOKEN }, signal: controller.signal });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "This song part could not be played.");
+    }
+    const blob = await res.blob();
+    if (controller.signal.aborted) return;
+    musicUrl = URL.createObjectURL(blob);
+    const audio = new Audio(musicUrl);
+    musicAudio = audio;
+    audio.volume = Number($("mk-volume").value) / 100;
+    audio.addEventListener("timeupdate", () => {
+      if (musicAudio !== audio) return;
+      $("mk-bar-fill").style.width = (audio.duration ? 100 * audio.currentTime / audio.duration : 0) + "%";
+      $("mk-time").textContent = fmtSongTime(audio.currentTime) + " / " + fmtSongTime(audio.duration);
+    });
+    audio.addEventListener("ended", () => { if (musicAudio === audio) stopMusic(); });
+    $("mk-now-part").textContent = label;
+    await audio.play();
+  } catch (err) {
+    if (err && err.name === "AbortError") return;
+    stopMusic();
+    status(String(err && err.message || err), true);
+  }
+}
+
+document.addEventListener("click", e => {
+  const play = e.target.closest("[data-mk-part]");
+  if (play) { playMusic(play.dataset.mkKit, play.dataset.mkPart); return; }
+  if (e.target.closest("#mk-stop")) { stopMusic(); return; }
+  const bar = e.target.closest(".mk-bar");
+  if (bar && musicAudio && musicAudio.duration) {
+    const r = bar.getBoundingClientRect();
+    musicAudio.currentTime = musicAudio.duration * Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+    return;
+  }
+  if (e.target.closest("#skins-more")) { skinsShown += SKINS_PAGE; renderSkins(); }
+});
+document.addEventListener("input", e => {
+  if (e.target.id === "mk-volume" && musicAudio) musicAudio.volume = Number(e.target.value) / 100;
+});
+
+/* A picture-only look for items that have no 3D model here (agents,
+   stickers, graffiti, patches, charms): the same window, the real picture. */
+function openPictureViewer(art, displayName) {
+  if (skinRenderAbort) { skinRenderAbort.abort(); skinRenderAbort = null; }
+  skinViewerCurrent = null;
+  $("skin-viewer-title").textContent = displayName;
+  $("skin-viewer-market").href = "https://steamcommunity.com/market/search?appid=730&q=" +
+    encodeURIComponent(displayName);
+  $("skin-viewer-body").innerHTML = '<img class="skin-picture" src="/item-art/' + encodeURIComponent(art) +
+    '.png" alt="" onerror="this.outerHTML=\'<p class=&quot;sub&quot;>No picture for this item in your game files.</p>\'">';
+  $("skin-viewer-overlay").classList.remove("hidden");
 }
 
 document.addEventListener("input", e => {
   if (e.target.id === "skins-search") {
     skinsFilters.search = e.target.value;
+    skinsShown = SKINS_PAGE;
     renderSkins();
   }
 });
 document.addEventListener("change", e => {
-  if (e.target.id === "skins-weapon-filter") { skinsFilters.weapon = e.target.value; renderSkins(); }
-  if (e.target.id === "skins-rarity-filter") { skinsFilters.rarity = e.target.value; renderSkins(); }
+  if (e.target.id === "skins-weapon-filter") { skinsFilters.weapon = e.target.value; skinsShown = SKINS_PAGE; renderSkins(); }
+  if (e.target.id === "skins-rarity-filter") { skinsFilters.rarity = e.target.value; skinsShown = SKINS_PAGE; renderSkins(); }
 });
 
 function skinViewerSetupPrompt() {
@@ -13704,6 +13936,9 @@ async function openSkinViewer(weaponClass, paintkit, displayName) {
 
 document.addEventListener("click", async e => {
   if (e.target.closest("#skins-reload") || e.target.closest("#skins-reload-inline")) {
+    musicKits = null;
+    const weaponSel = $("skins-weapon-filter");
+    if (weaponSel) delete weaponSel.dataset.filledFor;
     loadSkinsCatalog(true);
     return;
   }
@@ -13712,6 +13947,8 @@ document.addEventListener("click", async e => {
     skinsFilters.kind = kindTab.dataset.kind;
     skinsFilters.weapon = "";
     skinsFilters.rarity = "";
+    skinsShown = SKINS_PAGE;
+    if (skinsFilters.kind !== "music") stopMusic();
     document.querySelectorAll(".skins-kind-tab").forEach(t => {
       t.classList.toggle("active", t === kindTab);
       t.setAttribute("aria-selected", String(t === kindTab));
@@ -13721,7 +13958,8 @@ document.addEventListener("click", async e => {
   }
   const card = e.target.closest(".skin-card");
   if (card) {
-    openSkinViewer(card.dataset.weapon, card.dataset.paintkit, card.dataset.name);
+    if (SKINS_3D.has(card.dataset.kind)) openSkinViewer(card.dataset.weapon, card.dataset.paintkit, card.dataset.name);
+    else openPictureViewer(card.dataset.art, card.dataset.name);
     return;
   }
   if (e.target.closest("#skin-viewer-close")) {
@@ -16812,6 +17050,7 @@ function setTab(name) {
   if (name === "faceit") loadDemos().then(loadFaceit);
   if (name === "inventory" && !inventoryData) loadInventory(false);
   if (name === "skins") { if (!skinsToolStatus) loadSkinsToolStatus(); if (!skinsData) loadSkinsCatalog(false); }
+  else if (musicNow) stopMusic();
   if (name === "scripts") loadPlugins(false);
   if (name === "builder") sbLoad(false);
   if (name === "keyboard") loadKeyboard(false);

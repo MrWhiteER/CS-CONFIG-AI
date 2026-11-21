@@ -18,7 +18,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List
 
-from . import vpk
+from . import econ, vpk
 
 ITEMS_GAME_PATH = "scripts/items/items_game.txt"
 LOCALIZATION_PATH = "resource/csgo_english.txt"
@@ -468,8 +468,30 @@ def build(dir_vpk: Path, force: bool = False) -> List[Dict[str, Any]]:
     out = sorted(by_combo.values(), key=lambda it: (it["weapon_name"], it["skin_name"]))
     out += sorted(_knife_entries(), key=lambda it: (it["weapon_name"], it["skin_name"]))
     out += sorted(_glove_entries(), key=lambda it: (it["weapon_name"], it["skin_name"]))
-    _CACHE[key] = {"at": time.time(), "data": out}
+
+    # Where each item's real picture sits in the game files. Kept here on
+    # the server: the page only ever gets a short picture name, so it can
+    # never ask for an arbitrary file.
+    pictures: Dict[str, List[str]] = {}
+    for it in out:
+        it["art"] = f"{it['kind']}__{it['weapon_class']}__{it['paintkit']}".lower()
+        pictures[it["art"]] = econ.finish_pictures(it["kind"], it["weapon_class"], it["paintkit"])
+    try:
+        extra = econ.extra_items(items_text, tokens)
+    except Exception:  # noqa: BLE001 -- the guns must still show if this breaks
+        extra = []
+    for it in extra:
+        pictures[it["art"]] = it.pop("_pictures")
+    out += extra
+    _CACHE[key] = {"at": time.time(), "data": out, "pictures": pictures}
     return out
+
+
+def pictures_for(dir_vpk: Path, art_id: str) -> List[str]:
+    """The in-game picture paths behind one item's picture name."""
+    build(dir_vpk)
+    cached = _CACHE.get(str(dir_vpk)) or {}
+    return list((cached.get("pictures") or {}).get(art_id, []))
 
 
 def forget_all() -> None:
