@@ -1,12 +1,16 @@
-"""Read the NVIDIA driver's settings database. Read-only, by design.
+"""The NVIDIA driver's settings database: read everything, write CS2's profile only.
 
 The driver keeps its 3D settings in a profile database under ProgramData, and
-NVAPI is the documented way in. This module opens a session, reads, and closes
-it. There is deliberately no write path: ``NvAPI_DRS_SaveSettings`` is not in
-the function table below, so nothing here can modify the database even by
-mistake. Writing would need elevation and would land in a system-wide store
-shared by every game on the machine. Most values are displayed without decoding;
-the verification targets below use only NVIDIA's published DWORD enums.
+NVAPI is the documented way in. Reading needs nothing special.
+
+Writing (Edy, Nov 21 2026: the NVIDIA tab changes real driver settings) is
+limited on purpose: only DWORD settings, and only in CS2's own program profile
+-- NVIDIA's "Counter-Strike 2" profile, or one the app makes for cs2.exe when
+the driver has none -- never the global profile, so no other game changes.
+The driver only saves for an administrator on most PCs, so the write goes
+through the one-time helper (``nvidia.set`` in helper/broker.ps1) and never
+raises a prompt. Every change is recorded with pcstate, so it is put back
+whenever the app is not running.
 
 Everything degrades quietly: on a machine with no NVIDIA driver, ``probe()``
 reports that and the caller shows the display section on its own.
@@ -41,6 +45,14 @@ _FN = {
     "DRS_GetSetting": 0x73BF8338,
     "DRS_EnumAvailableSettingIds": 0xF020614A,
     "DRS_GetSettingNameFromId": 0xD61CBE6E,
+    # The write path, used only by write_cs2() and only on CS2's own profile.
+    "DRS_SetSetting": 0x577DD202,
+    "DRS_SaveSettings": 0xFCBC7E14,
+    "DRS_DeleteProfileSetting": 0xE4A26362,
+    "DRS_RestoreProfileDefaultSetting": 0x53F0381E,
+    "DRS_CreateProfile": 0xCC176068,
+    "DRS_CreateApplication": 0x4347A9DE,
+    "DRS_FindProfileByName": 0x7E4A9A0B,
 }
 
 _DWORD, _BINARY, _STRING = 0, 1, 2
@@ -48,6 +60,17 @@ _SETTING_NOT_FOUND = -160
 _PROFILE_NOT_FOUND = -163
 _EXECUTABLE_NOT_FOUND = -166
 _INHERITED = (_SETTING_NOT_FOUND, _PROFILE_NOT_FOUND, _EXECUTABLE_NOT_FOUND)
+_NO_PRIVILEGE = -137          # NVAPI_INVALID_USER_PRIVILEGE: saving needs administrator
+_ACCESS_DENIED = -175         # NVAPI_ACCESS_DENIED
+_PROFILE_REMOVED = -169       # restoring NVIDIA's preset dropped a profile the app made
+
+# The profile the app makes when the driver has none for CS2 (NVIDIA ships one,
+# so this is the rare case). Must match broker.ps1.
+OWN_PROFILE = "CS CONFIG AI - Counter-Strike 2"
+CS2_EXE = "cs2.exe"
+# A setting in CS2's profile that holds NVIDIA's own preset for CS2, rather
+# than one the player or the app set. Putting it back means restoring the preset.
+PRESET = "default"
 
 
 class _BinarySetting(ctypes.Structure):
@@ -118,6 +141,10 @@ def _wide(value: str):
     for i, ch in enumerate(value[:UNICODE_MAX - 1]):
         buf[i] = ord(ch)
     return buf
+
+
+class NeedsAdministrator(PermissionError):
+    """The driver will only save settings for an administrator."""
 
 
 class NvApiError(RuntimeError):
@@ -205,7 +232,7 @@ class Probe:
 
 
 class _Session:
-    """An NVAPI DRS session. Read-only: there is no save() here."""
+    """An NVAPI DRS session. Writes go only to CS2's profile (see write_cs2)."""
 
     def __init__(self) -> None:
         try:
@@ -454,6 +481,82 @@ class _Session:
             values[setting_id] = value
         return values
 
+    # -- CS2's profile: the only thing the app ever writes ------------------
+    def cs2_profile(self, create: bool = False):
+        """CS2's program profile: NVIDIA's own, or one the app makes if none."""
+        handle = self._app_handle(CS2_EXE)
+        if handle is not None or not create:
+            return handle
+        found = ctypes.c_void_p()
+        code = self._fn("DRS_FindProfileByName", ctypes.c_void_p,
+                        ctypes.c_uint16 * UNICODE_MAX, ctypes.POINTER(ctypes.c_void_p))(
+            self._session, _wide(OWN_PROFILE), ctypes.byref(found))
+        if code == _PROFILE_NOT_FOUND:
+            info = _Profile()
+            info.version = _stamp(_Profile, 1)
+            for i, ch in enumerate(OWN_PROFILE):
+                info.profileName[i] = ord(ch)
+            self._check(self._fn("DRS_CreateProfile", ctypes.c_void_p,
+                                 ctypes.POINTER(_Profile), ctypes.POINTER(ctypes.c_void_p))(
+                self._session, ctypes.byref(info), ctypes.byref(found)), "making a profile for CS2")
+        else:
+            self._check(code, "finding the app's CS2 profile")
+        app = _Application()
+        app.version = _stamp(_Application, 4)
+        for i, ch in enumerate(CS2_EXE):
+            app.appName[i] = ord(ch)
+        self._check(self._fn("DRS_CreateApplication", ctypes.c_void_p, ctypes.c_void_p,
+                             ctypes.POINTER(_Application))(
+            self._session, found, ctypes.byref(app)), "adding CS2 to its profile")
+        return found
+
+    def profile_state(self, handle, setting_id: int):
+        """A DWORD in CS2's profile: an int, PRESET for NVIDIA's own, or None if unset."""
+        if handle is None:
+            return None
+        entry = _Setting()
+        entry.version = _stamp(_Setting, 1)
+        code = self._fn("DRS_GetSetting", ctypes.c_void_p, ctypes.c_void_p,
+                        ctypes.c_uint32, ctypes.POINTER(_Setting))(
+            self._session, handle, setting_id, ctypes.byref(entry))
+        if code in _INHERITED:
+            return None
+        self._check(code, "reading CS2's NVIDIA profile")
+        if entry.settingType != _DWORD:
+            return None
+        if entry.isCurrentPredefined:
+            return PRESET
+        return int(entry.current.u32)
+
+    def change(self, handle, setting_id: int, value) -> None:
+        """Set an int, put back NVIDIA's preset (PRESET), or remove (None)."""
+        if value is None:
+            code = self._fn("DRS_DeleteProfileSetting", ctypes.c_void_p, ctypes.c_void_p,
+                            ctypes.c_uint32)(self._session, handle, setting_id)
+            if code not in _INHERITED:
+                self._check(code, "removing a setting from CS2's NVIDIA profile")
+            return
+        if value == PRESET:
+            code = self._fn("DRS_RestoreProfileDefaultSetting", ctypes.c_void_p,
+                            ctypes.c_void_p, ctypes.c_uint32)(self._session, handle, setting_id)
+            if code not in _INHERITED + (_PROFILE_REMOVED,):
+                self._check(code, "putting back NVIDIA's own CS2 setting")
+            return
+        entry = _Setting()
+        entry.version = _stamp(_Setting, 1)
+        entry.settingId = setting_id
+        entry.settingType = _DWORD
+        entry.current.u32 = int(value) & 0xFFFFFFFF
+        self._check(self._fn("DRS_SetSetting", ctypes.c_void_p, ctypes.c_void_p,
+                             ctypes.POINTER(_Setting))(
+            self._session, handle, ctypes.byref(entry)), "changing CS2's NVIDIA profile")
+
+    def save(self) -> None:
+        code = self._fn("DRS_SaveSettings", ctypes.c_void_p)(self._session)
+        if code in (_NO_PRIVILEGE, _ACCESS_DENIED):
+            raise NeedsAdministrator("the NVIDIA driver only saves settings for an administrator")
+        self._check(code, "saving the NVIDIA settings")
+
 
 def read_recommended() -> dict:
     """Small unelevated read for the receipt; no catalogue scan or write calls."""
@@ -522,3 +625,222 @@ def as_dict(result: Probe) -> dict:
         "global": profile(result.global_profile),
         "apps": {k: profile(v) for k, v in result.app_profiles.items()},
     }
+
+
+# ---------------------------------------------------------------------------
+# Writing CS2's NVIDIA profile (Edy, Nov 21: the NVIDIA tab changes real
+# driver settings). Only ever CS2's own program profile -- never the global
+# one, so no other game on the PC is touched -- and only DWORD settings.
+# ---------------------------------------------------------------------------
+
+POWER, VSYNC, LOW_LATENCY = 0x1057EB71, 0x00A879CF, 0x007BA09E
+TEX_QUALITY, ANISO_OPT, THREADED = 0x00CE2691, 0x00E73211, 0x20C1221E
+
+# What each Launcher mode sets in CS2's NVIDIA profile. Small on purpose:
+# these are the driver settings that matter for CS2; picture detail itself is
+# CS2's own video settings. Reflex and anti-aliasing are left to the game.
+MANAGED = {
+    "competitive": {POWER: 0x1, VSYNC: 0x60925292, LOW_LATENCY: 1, TEX_QUALITY: 0x14,
+                    ANISO_OPT: 1, THREADED: 1},
+    "balanced":    {POWER: 0x1, VSYNC: 0x60925292, LOW_LATENCY: 1, TEX_QUALITY: 0xA,
+                    ANISO_OPT: 0, THREADED: 1},
+    "quality":     {POWER: 0x1, VSYNC: 0x60925292, LOW_LATENCY: 1, TEX_QUALITY: 0xFFFFFFF6,
+                    ANISO_OPT: 0, THREADED: 1},
+}
+MAX_CHANGES = 64
+
+
+def known_settings() -> Dict[str, dict]:
+    """Names and choices from NVIDIA's published header (knowledge/nvidia_settings.json)."""
+    import json
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parent / "knowledge" / "nvidia_settings.json"
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))["settings"]
+    except (OSError, ValueError, KeyError):
+        return {}
+
+
+def hex_id(setting_id: int) -> str:
+    return f"0x{int(setting_id):08X}"
+
+
+def label_for(setting_id: int, value, known: Optional[Dict[str, dict]] = None) -> str:
+    """A value in plain words, as the NVIDIA Control Panel would say it."""
+    if value is None:
+        return "Not set (NVIDIA's global setting)"
+    if value == PRESET:
+        return "NVIDIA's own setting for CS2"
+    entry = (known if known is not None else known_settings()).get(hex_id(setting_id), {})
+    choices = {int(k, 16): v for k, v in (entry.get("choices") or {}).items()}
+    if int(value) in choices:
+        return choices[int(value)]
+    if setting_id == 0x10835002:
+        return f"{int(value)} FPS"
+    return str(int(value))
+
+
+def desired(intent: str, manual: Optional[Dict[str, int]] = None) -> Dict[int, int]:
+    """What CS2's profile should hold: the mode's settings, with the player's own on top."""
+    want = dict(MANAGED.get(intent) or MANAGED["balanced"])
+    for key, value in (manual or {}).items():
+        try:
+            want[int(str(key), 16)] = int(value)
+        except (TypeError, ValueError):
+            continue
+    return want
+
+
+def read_cs2(ids) -> Dict[int, object]:
+    """Each setting's value in CS2's profile. Reading needs no administrator."""
+    with _Session() as session:
+        handle = session.cs2_profile(create=False)
+        return {int(i): session.profile_state(handle, int(i)) for i in ids}
+
+
+def _clean(changes: Dict[int, object]) -> Dict[int, object]:
+    out = {}
+    for key, value in changes.items():
+        setting_id = int(key)
+        if not 0 < setting_id <= 0xFFFFFFFF:
+            raise ValueError("not an NVIDIA setting")
+        if value is not None and value != PRESET:
+            value = int(value)
+            if not 0 <= value <= 0xFFFFFFFF:
+                raise ValueError("not a value NVIDIA accepts")
+        out[setting_id] = value
+    if len(out) > MAX_CHANGES:
+        raise ValueError("too many NVIDIA settings at once")
+    return out
+
+
+def _write_here(changes: Dict[int, object]) -> Dict[int, object]:
+    """Write as this user. Returns what each setting held before."""
+    with _Session() as session:
+        handle = session.cs2_profile(create=True)
+        before = {i: session.profile_state(handle, i) for i in changes}
+        for setting_id, value in changes.items():
+            session.change(handle, setting_id, value)
+        session.save()
+        return before
+
+
+def _write_helper(changes: Dict[int, object]) -> Dict[int, object]:
+    from . import elevated
+
+    result = elevated.run("nvidia.set", {"changes": [
+        {"id": i, "value": v} for i, v in changes.items()]})
+    if result.get("needs_setup"):
+        raise NeedsAdministrator(
+            "NVIDIA only lets an administrator save its settings. Allow it once in "
+            "Settings → NVIDIA (one Windows prompt, never again)")
+    if not result.get("ok"):
+        raise NvApiError(result.get("error") or "the NVIDIA driver refused the change")
+    before = {}
+    for item in result.get("before") or []:
+        try:
+            before[int(item["id"])] = item.get("value")
+        except (KeyError, TypeError, ValueError):
+            continue
+    return before
+
+
+def write_cs2(changes: Dict[int, object], record: bool = True) -> dict:
+    """Change settings in CS2's profile. Never prompts.
+
+    Tries as this user first; the driver refuses that on most PCs, so the
+    one-time administrator helper (``nvidia.set``) does it instead. Every
+    change is recorded with pcstate so it is put back when the app is closed.
+    """
+    try:
+        changes = _clean(changes)
+    except (TypeError, ValueError) as exc:
+        return {"ok": False, "error": str(exc)}
+    if not changes:
+        return {"ok": True, "changed": []}
+    try:
+        try:
+            before = _write_here(changes)
+        except NeedsAdministrator:
+            before = _write_helper(changes)
+    except NoNvidiaDriver as exc:
+        return {"ok": False, "no_driver": True, "error": str(exc)}
+    except NeedsAdministrator as exc:
+        return {"ok": False, "needs_setup": True, "error": str(exc)}
+    except (NvApiError, OSError) as exc:
+        return {"ok": False, "error": str(exc)}
+
+    known = known_settings()
+    changed = []
+    for setting_id, value in changes.items():
+        was = before.get(setting_id)
+        if record:
+            try:
+                from . import pcstate
+                pcstate.note("nvidia_3d", hex_id(setting_id), was, value)
+            except Exception:
+                pass
+        if was != value:
+            changed.append({"id": hex_id(setting_id),
+                            "name": (known.get(hex_id(setting_id)) or {}).get("name", hex_id(setting_id)),
+                            "before": label_for(setting_id, was, known),
+                            "after": label_for(setting_id, value, known)})
+    return {"ok": True, "changed": changed}
+
+
+def apply_intent(intent: str, manual: Optional[Dict[str, int]] = None) -> dict:
+    """Bring CS2's profile in line with a Launcher mode. Only what differs is written."""
+    want = desired(intent, manual)
+    try:
+        now = read_cs2(want)
+    except NoNvidiaDriver as exc:
+        return {"ok": False, "no_driver": True, "error": str(exc)}
+    except (NvApiError, OSError) as exc:
+        return {"ok": False, "error": str(exc)}
+    todo = {i: v for i, v in want.items() if now.get(i) != v}
+    result = write_cs2(todo)
+    if result.get("ok"):
+        result["checked"] = len(want)
+    return result
+
+
+def panel(intent: str, manual: Optional[Dict[str, int]] = None) -> dict:
+    """Everything the Settings → NVIDIA tab shows."""
+    known = known_settings()
+    managed = MANAGED.get(intent) or MANAGED["balanced"]
+    manual = {int(str(k), 16): int(v) for k, v in (manual or {}).items()
+              if str(k).lower().startswith("0x")}
+    try:
+        with _Session() as session:
+            driver, _branch = session.driver_version()
+            handle = session.cs2_profile(create=False)
+            names = session.setting_names()
+            ids = sorted(set(names) | set(managed) | set(manual))
+            values = {i: session.profile_state(handle, i) for i in ids}
+    except NoNvidiaDriver as exc:
+        return {"available": False, "no_driver": True, "reason": str(exc)}
+    except (NvApiError, OSError) as exc:
+        return {"available": False, "reason": str(exc)}
+
+    def row(setting_id: int) -> dict:
+        entry = known.get(hex_id(setting_id)) or {}
+        value = values.get(setting_id)
+        return {
+            "id": hex_id(setting_id),
+            "name": entry.get("name") or names.get(setting_id) or hex_id(setting_id),
+            "value": None if value in (None, PRESET) else int(value),
+            "label": label_for(setting_id, value, known),
+            "choices": [{"value": int(k, 16), "label": v}
+                        for k, v in (entry.get("choices") or {}).items()],
+            "range": entry.get("range"),
+            "managed": setting_id in managed,
+            "ours": managed.get(setting_id),
+            "ours_label": label_for(setting_id, managed[setting_id], known) if setting_id in managed else None,
+            "manual": setting_id in manual,
+        }
+
+    rows = [row(i) for i in ids]
+    return {"available": True, "driver": driver, "intent": intent,
+            "managed": [r for r in rows if r["managed"]],
+            "all": sorted(rows, key=lambda r: r["name"].lower())}

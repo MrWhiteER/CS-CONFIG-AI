@@ -106,20 +106,21 @@ class TestRefreshGuards(unittest.TestCase):
                                 "rates", "best", "at_best"}, True)
 
 
-class TestNvidiaIsReadOnly(unittest.TestCase):
-    def test_no_write_call_is_reachable(self):
-        """The safety property this module rests on: without SaveSettings in
-        the function table, nothing here can modify the driver database."""
-        for forbidden in ("DRS_SaveSettings", "DRS_SetSetting",
-                          "DRS_CreateProfile", "DRS_CreateApplication",
-                          "DRS_DeleteProfile", "DRS_RestoreDefaults"):
+class TestNvidiaWritesOnlyCs2(unittest.TestCase):
+    def test_no_whole_database_or_global_write_is_reachable(self):
+        """Edy allowed writing CS2's own profile (Nov 21). Nothing that could
+        change every game -- the global profile, deleting profiles, resetting
+        the database -- is in the function table."""
+        for forbidden in ("DRS_DeleteProfile", "DRS_RestoreAllDefaults",
+                          "DRS_SetCurrentGlobalProfile", "DRS_SaveSettingsToFile",
+                          "DRS_LoadSettingsFromFile", "DRS_DeleteApplication"):
             self.assertNotIn(forbidden, nvidia._FN)
 
-    def test_the_source_never_mentions_saving(self):
+    def test_writes_only_go_through_cs2s_profile(self):
         source = Path(nvidia.__file__).read_text(encoding="utf-8")
-        code = "\n".join(line for line in source.splitlines()
-                         if not line.strip().startswith("#"))
-        self.assertNotIn("SaveSettings", code.split('"""')[-1])
+        self.assertEqual(source.count("session.change("), 1)
+        self.assertIn("handle = session.cs2_profile(create=True)", source)
+        self.assertNotIn("change(self._global_handle", source)
 
     def test_a_machine_with_no_driver_reports_rather_than_raises(self):
         with mock.patch.object(nvidia.ctypes, "WinDLL",

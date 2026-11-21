@@ -73,6 +73,7 @@ KIND_LABELS = {
     "defender": "Windows Security scan of the CS2 folder",
     "scaling": "NVIDIA screen scaling",
     "refresh": "Screen refresh rate",
+    "nvidia_3d": "NVIDIA graphics settings for CS2",
 }
 
 WINDOW_KEY_LABELS = {
@@ -261,6 +262,9 @@ def _read(kind: str, ident: str) -> Any:
         if found is None:
             raise RuntimeError("that screen is not connected")
         return found.scaling
+    if kind == "nvidia_3d":
+        from . import nvidia
+        return nvidia.read_cs2([int(ident, 16)])[int(ident, 16)]
     if kind == "refresh":
         from . import displays
         screen = displays.find(ident)
@@ -315,6 +319,16 @@ def _write(kind: str, ident: str, value: Any, *, live_ok: bool, persist: bool) -
             raise Waiting("waiting for CS2 to close")
         if not result.get("ok"):
             raise RuntimeError(result.get("error") or "Windows refused")
+        return
+    if kind == "nvidia_3d":
+        # The driver reads a profile when the game starts, so a change under a
+        # running CS2 would only land next launch -- wait for it to close.
+        if not live_ok and steam.cs2_running():
+            raise Waiting("waiting for CS2 to close")
+        from . import nvidia
+        result = nvidia.write_cs2({int(ident, 16): value}, record=False)
+        if not result.get("ok"):
+            raise RuntimeError(result.get("error") or "the NVIDIA driver refused")
         return
     raise RuntimeError(f"unknown setting {kind}")
 

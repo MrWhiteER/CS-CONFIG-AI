@@ -302,7 +302,7 @@
 
   /* The track carries the live category's colour; each item carries its own,
      which is what it shows on hover. */
-  .segbar[data-current="apply"]   { --cat: var(--cat-apply); }
+  .segbar[data-current="nvidia"]  { --cat: var(--cat-apply); }
   .segbar[data-current="account"] { --cat: var(--cat-account); }
   .segbar[data-current="apps"]    { --cat: var(--cat-apps); }
   .segbar[data-current="look"]    { --cat: var(--cat-look); }
@@ -310,7 +310,7 @@
   .segbar[data-current="config"]  { --cat: var(--cat-config); }
   .segbar[data-current="editing"] { --cat: var(--cat-editing); }
   .segbar[data-current="logs"]    { --cat: var(--cat-logs); }
-  .seg-item[data-sub="apply"]   { --cat: var(--cat-apply); }
+  .seg-item[data-sub="nvidia"]  { --cat: var(--cat-apply); }
   .seg-item[data-sub="account"] { --cat: var(--cat-account); }
   .seg-item[data-sub="apps"]    { --cat: var(--cat-apps); }
   .seg-item[data-sub="look"]    { --cat: var(--cat-look); }
@@ -2262,7 +2262,6 @@
 .settings-box .subpane { grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:stretch;padding:16px 18px; }
 .settings-box .subpane > :is(.panel,.card) { min-width:0;min-height:220px;padding:20px; }
 .settings-box #machine-card { grid-column:auto;order:0; }
-.settings-box [data-sub="apply"] > .panel:has(#w-video) { order:1; }
 .settings-box #setups-card { order:2; }
 .settings-box #results { display:contents; }
 .settings-box #results > .card { order:3;min-width:0;padding:20px;margin:0; }
@@ -6809,7 +6808,7 @@ const startup = (() => {
       <div class="segwrap">
         <div class="segbar" id="settings-subtabs" role="tablist">
           <div class="seg-thumb" id="seg-thumb"></div>
-          <button class="seg-item" data-sub="apply" role="tab" aria-selected="true">Apply</button>
+          <button class="seg-item" data-sub="nvidia" role="tab" aria-selected="true"><span class="nv-tab-mark" aria-hidden="true"></span> NVIDIA</button>
           <button class="seg-item" data-sub="this-pc" role="tab" aria-selected="false"><span data-hardware-icon="display"></span> This PC</button>
           <button class="seg-item" data-sub="lighting" role="tab" aria-selected="false"><span data-hardware-icon="lighting"></span> Lighting</button>
           <button class="seg-item" data-sub="steam" role="tab" aria-selected="false">Steam</button>
@@ -6859,47 +6858,27 @@ const startup = (() => {
         </section>
       </div>
 
-      <div class="subpane" data-sub="apply">
-      <!-- Saved answers to "what is this machine for right now". Above Write
-           because it decides what Write is about to do. -->
-      <section class="panel" id="setups-card">
-        <h2>Setups</h2>
-        <p class="sub" style="margin:0 0 10px">
-          Practice, a match and recording want different things. Save what you have
-          chosen under a name and switch between them. A setup only decides what the
-          next Apply will write &mdash; switching changes nothing in the game by itself,
-          and never touches which folder you are working on.
-        </p>
-        <div id="setups-out"></div>
-      </section>
-
-      <!-- Only drawn when Crosshair X is actually installed. Advertising an
-           integration for software somebody does not have is noise. -->
-
-
-      <!-- Which half of the machine is asked to do less, and what Windows
-           itself has been told about the game. -->
+      <!-- NVIDIA (Edy, Nov 21): what used to be Apply. Each Launcher mode now
+           applies the moment it is picked, so this tab is about the graphics
+           card itself: which part carries the load, the NVIDIA settings the
+           app looks after for CS2, and every other NVIDIA setting. -->
+      <div class="subpane" data-sub="nvidia">
       <section class="panel wide" id="machine-card">
-        <h2>Machine</h2>
+        <h2>GPU or CPU</h2>
+        <p class="sub" style="margin:0 0 10px">Which part of your PC carries more of CS2's picture. Changes shadows, anti-aliasing, ambient occlusion, texture filtering and particles, and applies right away.</p>
         <div id="machine-out"></div>
       </section>
 
-      <section class="panel">
-        <h2>Write</h2>
-        <label class="opt"><input type="checkbox" id="w-video" checked> Picture quality (cs2_video.txt)</label>
-        <label class="opt"><input type="checkbox" id="p-video" checked> Set CS2 to borderless windowed before launching</label>
-        <label class="opt"><input type="checkbox" id="w-cfg" checked> Generated .vcfg config</label>
-        <label class="opt"><input type="checkbox" id="w-autoexec"> Add exec line to autoexec.vcfg</label>
-        <label class="opt"><input type="checkbox" id="w-scaling" checked> Full-screen scaling (no black bars when stretched)</label>
-        <div class="actions">
-          <button class="btn primary" id="preview">Preview changes</button>
-          <button class="btn" id="apply" disabled>Apply</button>
-          <button class="btn" id="revert">Undo last</button>
+      <section class="panel wide" id="nv-card">
+        <div class="nv-head">
+          <h2><span class="nv-mark" aria-hidden="true"></span> NVIDIA settings for CS2</h2>
+          <span class="nv-managed-by" title="These follow your Launcher mode"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 21 7v10l-9 5-9-5V7Z"/><path d="m8 12 3 3 5-6"/></svg> Managed by CS CONFIG</span>
         </div>
+        <p class="sub" style="margin:0 0 10px">Only CS2's own NVIDIA profile is changed, never other games. Turn on <b>Set manually</b> to choose a value yourself; your Launcher mode then leaves it alone.</p>
+        <div id="nv-out" aria-live="polite"><span class="sub">Reading NVIDIA settings&hellip;</span></div>
+        <div class="nv-all-bar"><button class="btn" id="nv-show-all" type="button" aria-expanded="false" aria-controls="nv-all">Show all settings</button><input id="nv-filter" type="search" placeholder="Find a setting" aria-label="Find an NVIDIA setting" hidden></div>
+        <div id="nv-all" hidden></div>
       </section>
-
-      <div id="results" class="wide"></div>
-
       </div>
 
       <div class="subpane hidden" data-sub="overlay">
@@ -6928,9 +6907,9 @@ const startup = (() => {
       </button></div>
         </section>
         <section class="panel" id="steam-launch-card"><h2>Steam launch options</h2>
-          <label class="opt"><input type="checkbox" id="w-launch" checked> Apply launch options with next Apply</label>
+          <label class="opt"><input type="checkbox" id="w-launch" checked> Update launch options when you switch Launcher mode</label>
           <div id="steam-launch-out"><span class="sub">Preview changes to read launch options.</span></div>
-          <div class="actions"><button class="btn" id="steam-preview">Preview changes</button><button class="btn" id="steam-apply">Review Apply</button></div>
+          <div class="actions"><button class="btn" id="steam-preview">Preview changes</button><button class="btn" id="steam-apply">Apply now</button></div>
         </section>
         <div class="wide" id="steam-tools-feedback"><span id="steam-tools-status" class="sub" role="status"></span><button class="btn small" id="steam-tools-retry" hidden>Retry Steam tools</button></div>
         <div id="steam-tools" class="settings-tools wide"></div>
@@ -7077,6 +7056,16 @@ const startup = (() => {
         <div id="cfg-out"></div>
       </section>
       </div></details>
+      <!-- Moved from the old Apply tab: saved snapshots of your choices. -->
+      <section class="panel wide" id="setups-card">
+        <h2>Setups</h2>
+        <p class="sub" style="margin:0 0 10px">
+          Practice, a match and recording want different things. Save your current
+          choices (Launcher mode, GPU or CPU, crosshair and so on) under a name, then
+          switch between them. Switching a setup applies it right away.
+        </p>
+        <div id="setups-out"></div>
+      </section>
       </div>
 
       <div class="subpane hidden" data-sub="logs">
@@ -7940,69 +7929,15 @@ function renderPlan(p) {
   renderFps();
 
 
-  const changed = p.settings.filter(s => s.changed);
   renderScores();
   $("assessment-out").innerHTML = '<div class="assess"><div class="subcat">Selected settings</div><span class="sub">' + esc(p.intent) + ' \u00b7 ' + p.settings.length + ' picture settings reviewed</span></div>';
 
-  // A change you cannot see is a change you cannot check. Anything moving gets
-  // a full row with the reason attached; the rest collapses out of the way.
-  const unchanged = p.settings.filter(s => !s.changed);
-
-  const chip = (text, raw, kind) =>
-    '<span class="chg-chip ' + kind + '">' + esc(text) +
-    (raw != null && String(raw) !== text ? '<i>' + esc(String(raw)) + "</i>" : "") + "</span>";
-
-  const changedRows = changed.map(s => {
-    // Where both sides carry the same label, show the stored numbers too, or
-    // the row reads "Quality -> Quality" and looks like nothing happened.
-    const showRaw = s.same_label;
-    return '<div class="chg-row">' +
-      '<div class="chg-name">' + esc(s.name) + "</div>" +
-      '<div class="chg-move">' +
-      (s.before != null
-        ? chip(s.before, showRaw ? s.before_raw : null, "from") +
-          '<span class="chg-arrow">→</span>' +
-          chip(s.after, showRaw ? s.after_raw : null, "to")
-        : '<span class="chg-chip new">new</span>' +
-          '<span class="chg-arrow">→</span>' + chip(s.after, null, "to")) +
-      "</div>" +
-      (s.reason ? '<div class="chg-why">' + esc(/headroom|\btier\b|estimated|ceiling/i.test(s.reason) ? 'Selected for this picture profile.' : s.reason) + "</div>" : "") +
-      "</div>";
-  }).join("");
-
-  let html = '<section class="card"><h2>Picture quality</h2>' +
-    '<div class="chg-head"><span class="chg-count">' + changed.length + "</span>" +
-    '<span class="sub">of ' + p.settings.length + " settings will change</span>" +
-    (unchanged.length
-      ? '<span class="spacer"></span><label class="opt" style="margin:0">' +
-        '<input type="checkbox" id="show-unchanged"> Show the ' + unchanged.length +
-        " already correct</label>"
-      : "") +
-    "</div>" +
-    (changed.length
-      ? '<div class="chg-list">' + changedRows + "</div>"
-      : '<span class="sub">Everything already matches this profile.</span>') +
-    '<div class="chg-list quiet hidden" id="unchanged-list">' +
-    unchanged.map(s => '<div class="chg-row"><div class="chg-name">' + esc(s.name) +
-      '</div><div class="chg-move"><span class="chg-chip same">' + esc(s.after) +
-      "</span></div></div>").join("") +
-    "</div></section>";
-
   $('steam-launch-out').innerHTML =
     '<div class="sub">Current</div><pre class="opts">' + esc(p.launch_current || '(none set)') + '</pre>' +
-    '<div class="sub">Next Apply</div><pre class="opts">' + esc(p.launch_new || '(none set)') + '</pre>' +
+    '<div class="sub">After the next mode switch</div><pre class="opts">' + esc(p.launch_new || '(none set)') + '</pre>' +
     (p.launch_removed || []).map(r => '<div class="note"><div class="rm">− ' + esc(r.option) + '</div><div class="d">' + esc(r.reason) + '</div></div>').join('') +
     (p.launch_added || []).map(a => '<div class="note"><div class="ad">+ ' + esc(a.option) + '</div><div class="d">' + esc(a.reason) + '</div></div>').join('');
   presetReveal(p);
-
-  $("results").innerHTML = html;
-  const toggle = $("show-unchanged");
-  if (toggle) {
-    toggle.addEventListener("change", () =>
-      $("unchanged-list").classList.toggle("hidden", !toggle.checked));
-  }
-  $("apply").disabled = false;
-  markPending(p.changed_count);
   // Clears the "Building plan" spinner. It used to be cleared by a message
   // saying the preview had written nothing; dropping that line without
   // putting this in its place left the spinner turning for the session.
@@ -8033,9 +7968,13 @@ function requestBody() {
     hide_crosshair: !!(prefsNow && prefsNow.hide_crosshair),
     crosshairx_launch: !!(prefsNow && prefsNow.crosshairx_launch),
     load_bias: (prefsNow && prefsNow.load_bias) || "auto",
-    write_video: $("w-video").checked, write_cfg: $("w-cfg").checked,
-    write_launch: $("w-launch").checked, link_autoexec: $("w-autoexec").checked,
-    fix_scaling: $("w-scaling").checked,
+    // The old Apply tab's Write checkboxes are gone (Edy, Nov 21): picture
+    // settings and the generated config always follow the mode; the autoexec
+    // line lives in the Steam tab and screen scaling in the Launcher.
+    write_video: true, write_cfg: true, write_nvidia: true,
+    write_launch: $("w-launch").checked,
+    link_autoexec: !!(prefsNow && prefsNow.link_autoexec),
+    fix_scaling: false,
   };
 }
 
@@ -8345,12 +8284,7 @@ $("confirm-veil").addEventListener("keydown", e => {
 */
 (function wirePendingChanges() {
   const TOGGLES = {
-    "w-video": "Picture quality",
-    "w-cfg": "Generated .vcfg config",
     "w-launch": "Steam launch options",
-    "w-autoexec": "Add exec line to autoexec.vcfg",
-    "w-scaling": "Full-screen scaling",
-    "p-video": "Patch video settings before launch",
   };
   for (const [id, label] of Object.entries(TOGGLES)) {
     const el = $(id);
@@ -8656,8 +8590,8 @@ function presetReveal(plan) {
 document.addEventListener('keydown', e => { if (e.key === 'Escape') presetClose(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) presetClose(); });
 new MutationObserver(() => { if (!homeVisible()) presetClose(); }).observe(document.querySelector('[data-panel="launcher"]'),{attributes:true,attributeFilter:['class']});
-$('steam-preview').addEventListener('click', () => $('preview').click());
-$('steam-apply').addEventListener('click', () => setSettingsSub('apply'));
+$('steam-preview').addEventListener('click', previewPlan);
+$('steam-apply').addEventListener('click', () => applyProfile('steam'));
 
 
 function paintIntent(name) {
@@ -8673,20 +8607,19 @@ function paintIntent(name) {
 }
 
 function chooseIntent(name, quiet) {
-  if (profileApplyBusy) return;
   if (!INTENTS.includes(name) || name === intent) { paintIntent(name || intent); return; }
   const before = intent;
   intent = name;
   ++planRevision;
   ++verificationRevision;
   paintIntent(name);
-  $("apply").disabled = true;
   planned = null;
   rememberPrefs();
   if (!quiet) {
-    noteChange("Optimise for → " + name, () => { chooseIntent(before, true); previewPlan(); });
-    presetBegin(name);
-    $("preview").click();
+    // Picking a mode applies it (Edy, Nov 21): the live list bottom right
+    // shows each change as it lands. No question first, no Apply button.
+    noteChange("Optimise for → " + name, () => { chooseIntent(before, true); applyProfile('mode'); });
+    applyProfile('mode');
   }
 }
 
@@ -8695,7 +8628,7 @@ function chooseIntent(name, quiet) {
   cards.addEventListener("click", e => {
     const card = e.target.closest(".mode-card");
     if (card?.classList.contains('preset-active')) presetClose();
-    else if (card) { if(card.dataset.intent === intent) { presetBegin(intent); $('preview').click(); } else chooseIntent(card.dataset.intent); }
+    else if (card) { if(card.dataset.intent === intent) { presetBegin(intent); previewPlan(); } else chooseIntent(card.dataset.intent); }
   });
   cards.addEventListener("keydown", e => {
     let at = INTENTS.indexOf(intent);
@@ -8746,7 +8679,7 @@ function openVerificationControl(action) {
   let target;
   if (action === 'nvidia') { setTab('gpu'); target = $('gpu-out'); }
   else if (action === 'power') { setTab('fix'); target = document.querySelector('[data-fix="power.performance"]'); }
-  else if (action === 'wingraphics') { setSettingsSub('apply', true); setTab('settings'); target = $('wg-apply') || $('machine-card'); }
+  else if (action === 'wingraphics') { setSettingsSub('nvidia', true); setTab('settings'); target = $('wg-apply') || $('machine-card'); }
   if (target) { target.scrollIntoView({block:'center'}); if (target.matches('button')) target.focus(); }
 }
 document.addEventListener('click', e => {
@@ -8781,23 +8714,111 @@ document.addEventListener('visibilitychange', () => {
 });
 setInterval(() => { if (!document.hidden && !$('verification').hidden) refreshVerification(); }, 15000);
 
-let planRevision = 0, profileApplyBusy = false;
+let planRevision = 0, profileApplyBusy = false, profileApplyAgain = null;
 async function previewPlan() {
   busy("Preparing your settings preview…");
-  $("preview").disabled = true;
-  $("apply").disabled = true;
   const revision = ++planRevision, body = requestBody();
   try { const plan = await api("/api/plan", body); if (revision === planRevision && body.intent === intent) renderPlan(plan); }
   catch (e) { if (revision === planRevision) { presetClose(); status("Plan failed: " + esc(e.message), true); } }
-  finally { if (revision === planRevision) $("preview").disabled = false; }
 }
-$("preview").addEventListener("click", previewPlan);
 
-$("apply").addEventListener("click", async () => {
-  if (!planned || profileApplyBusy) return;
-  if (!await appAsk("Apply the " + planned.intent +
-               " profile?\n\nEverything changed is backed up first.", {yes: "Apply"})) return;
+/* The live "applying" list, bottom right (Edy, Nov 21).
+
+   Every change the app makes for a mode -- CS2's picture settings, then
+   CS2's NVIDIA profile -- arrives as its own row, one after another, and the
+   list ends on the NVIDIA mark with a tick drawn in. A PC without NVIDIA ends
+   on a plain tick. It closes by itself; hovering keeps it open. */
+const APPLY_WHAT = {
+  'cs2_video.txt': 'CS2 picture settings',
+  'Steam launch options': 'Steam launch options',
+  'Display scaling': 'Screen scaling',
+  'autoexec.vcfg': 'Autoexec line',
+  'NVIDIA settings for CS2': 'NVIDIA settings for CS2',
+};
+const applyFeed = (() => {
+  let box = null, timers = [], closeTimer = 0, hovered = false;
+  const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function clear() { timers.forEach(clearTimeout); timers = []; clearTimeout(closeTimer); }
+  function close() {
+    clear();
+    if (!box) return;
+    const gone = box; box = null;
+    gone.classList.add('leaving');
+    setTimeout(() => gone.remove(), reduced() ? 0 : 260);
+  }
+  function later(fn, ms) { timers.push(setTimeout(fn, reduced() ? 0 : ms)); }
+  function closeSoon(ms) {
+    clearTimeout(closeTimer);
+    closeTimer = setTimeout(function wait() { if (hovered) closeTimer = setTimeout(wait, 800); else close(); }, ms);
+  }
+  function start(title) {
+    clear();
+    if (box) box.remove();
+    box = document.createElement('aside');
+    box.className = 'apply-feed';
+    box.setAttribute('role', 'status');
+    box.setAttribute('aria-live', 'polite');
+    box.innerHTML = '<header><span class="af-spin" aria-hidden="true"></span><b>' + esc(title) + '</b><button type="button" class="af-x" aria-label="Close">&times;</button></header><ol class="af-rows"></ol><footer class="af-end" hidden></footer>';
+    box.querySelector('.af-x').onclick = close;
+    box.addEventListener('pointerenter', () => { hovered = true; });
+    box.addEventListener('pointerleave', () => { hovered = false; });
+    document.body.append(box);
+    return box;
+  }
+  function row(kind, name, from, to, note) {
+    if (!box) return;
+    const list = box.querySelector('.af-rows');
+    const li = document.createElement('li');
+    li.className = 'af-row ' + kind;
+    li.innerHTML = '<span class="af-ic" aria-hidden="true">' + (kind === 'nv' ? '<span class="nv-mark"></span>' : kind === 'warn' ? '!' : hwIcon('display')) + '</span>' +
+      '<span class="af-name">' + esc(name) + (note ? '<small>' + esc(note) + '</small>' : '') + '</span>' +
+      (to != null ? '<span class="af-move">' + (from != null ? '<s>' + esc(String(from)) + '</s> ' : '') + '<b>' + esc(String(to)) + '</b></span>' : '');
+    list.append(li);
+    list.scrollTop = list.scrollHeight;
+  }
+  function finish(r) {
+    if (!box) return;
+    const nv = r && r.nvidia;
+    const trouble = r && ((r.skipped || []).length || (r.steps || []).some(s => !s.ok && !s.skipped));
+    const end = box.querySelector('.af-end');
+    box.querySelector('.af-spin').hidden = true;
+    end.hidden = false;
+    end.className = 'af-end' + (nv && nv.ok ? ' nvidia' : '') + (trouble ? ' partly' : '');
+    end.innerHTML = (nv && nv.ok
+      ? '<span class="nv-badge" aria-hidden="true"><span class="nv-mark big"></span></span>'
+      : '<span class="af-badge" aria-hidden="true"></span>') +
+      '<svg class="af-tick" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m7 12.5 3.2 3.2L17 9"/></svg>' +
+      '<span class="af-done"><b>' + (trouble ? 'Applied, with a note above' : nv && nv.ok ? 'NVIDIA settings applied' : 'Settings applied') + '</b>' +
+      '<small>' + esc(r && r.intent ? r.intent[0].toUpperCase() + r.intent.slice(1) + ' mode is set' : '') + '</small></span>';
+    box.classList.add('done');
+    closeSoon(trouble ? 9000 : 4200);
+  }
+  function fail(text) {
+    if (!box) start('Applying');
+    row('warn', 'Not applied', null, null, text);
+    box.querySelector('.af-spin').hidden = true;
+    closeSoon(9000);
+  }
+  // Rows land one after another so each change can be read as it happens.
+  function play(r, title) {
+    if (!box) start(title);
+    const items = [];
+    (r.video || []).forEach(v => items.push(['cs2', v.name, v.before, v.after]));
+    if (r.nvidia && r.nvidia.ok) (r.nvidia.changed || []).forEach(v => items.push(['nv', v.name, v.before, v.after]));
+    (r.skipped || []).forEach(x => items.push(['warn', APPLY_WHAT[x.what] || x.what, null, null,
+      x.what === 'cs2_video.txt' ? 'CS2 is open. Close it, then pick the mode again.' : 'Steam is open. Close it, then pick the mode again.']));
+    if (r.nvidia && !r.nvidia.ok && !r.nvidia.no_driver) items.push(['warn', 'NVIDIA settings for CS2', null, null, r.nvidia.error || 'Not changed']);
+    if (!items.length) items.push(['cs2', 'Everything already matches', null, null]);
+    items.forEach((it, i) => later(() => row(...it), 120 + i * 170));
+    later(() => finish(r), 160 + items.length * 170 + 220);
+  }
+  return {start, play, fail, close};
+})();
+
+async function applyProfile(source) {
+  if (profileApplyBusy) { profileApplyAgain = source; return; }
   profileApplyBusy = true;
+  presetClose();
   profileRail.syncStatus();
   verificationRevision++;
   verificationDirty = true;
@@ -8805,47 +8826,28 @@ $("apply").addEventListener("click", async () => {
     $('verification-title').textContent = 'Applying and reading back…';
     $('verification').dataset.state = 'changed';
   }
-  busy('Applying your settings...', {id:'apply',detail:planned.changed_count != null ? planned.changed_count+' settings in your preview' : ''});
-  $("apply").disabled = true;
+  const label = intent[0].toUpperCase() + intent.slice(1);
+  applyFeed.start('Applying ' + label);
+  const body = requestBody();
   try {
-    const r = await api("/api/apply", requestBody());
+    const r = await api("/api/apply", body);
+    if (!r.ok) throw new Error(r.error || 'Settings could not be applied');
+    r.intent = body.intent;
     verificationDirty = false;
     verificationRevision++;
-    renderVerification(r.verification, true);
+    renderVerification(r.verification, false);
     settleChanges();          // written to disk; nothing left to answer for
-    $("results").insertAdjacentHTML("afterbegin",
-      '<section class="card"><h2>Written</h2>' +
-      // Three states, not two. A step that stood down because Steam or CS2
-      // was holding its file was never attempted, and colouring that the
-      // same red as a write that actually failed says the wrong thing.
-      r.steps.map(s => {
-        const colour = s.skipped ? "var(--warn)" : s.ok ? "var(--good)" : "var(--bad)";
-        const mark = s.skipped ? "– " : s.ok ? "✓ " : "× ";
-        const tail = s.skipped ? " (not written)" : "";
-        return '<div class="note"><div class="t" style="color:' + colour + '">' +
-          mark + esc(s.what) + tail + '</div><div class="d">' + esc(s.detail) +
-          "</div></div>";
-      }).join("") +
-      (r.backup ? '<p class="sub">Backup ' + esc(r.backup) + " — use Undo last to revert.</p>" : "") +
-      '</section>');
-    $('apply-verification')?.remove();
-    $('results').insertAdjacentHTML('afterbegin', '<section id="apply-verification" class="verification reveal"></section>');
-    renderApplyVerification();
-    // Never just "Applied." when part of it was not: that is how somebody
-    // ends up believing a setting was written when it was stood down.
-    const stood = r.skipped || [];
-    if (stood.length) {
-      status("Applied — but " + stood.map(x => esc(x.what)).join(" and ") +
-             " could not be changed yet. Close Steam and CS2, then try again. See the checklist for details.", {id:"apply",kind:"warn"});
-    } else if (r.steps.some(s => !s.ok)) {
-      status('Some settings could not be applied. Review the checklist.', {id:'apply',kind:'error'});
-    } else {
-      status('Your settings have been applied.', {id:'apply',kind:'done',detail:r.steps.filter(s=>s.ok).length+' changes completed'});
-    }
-    scan(true);
-  } catch (e) { status(e.message, {id:'apply',kind:'error',title:'Settings could not be applied'}); $("apply").disabled = false; }
-  finally { profileApplyBusy = false; profileRail.syncStatus(); }
-});
+    applyFeed.play(r, 'Applying ' + label);
+    if (typeof loadNvidia === 'function' && settingsSub === 'nvidia') loadNvidia();
+    previewPlan();
+  } catch (e) {
+    applyFeed.fail(String(e && e.message || e));
+  } finally {
+    profileApplyBusy = false;
+    profileRail.syncStatus();
+    if (profileApplyAgain) { const again = profileApplyAgain; profileApplyAgain = null; applyProfile(again); }
+  }
+}
 
 /* Profile Rail: selection is separate from Apply and verification is read-only. */
 const profileRail = (() => {
@@ -8857,7 +8859,7 @@ const profileRail = (() => {
   const animations = new Set();
   root.innerHTML = `<div class="pd-rail"><div class="pd-slider" aria-hidden="true"></div><div class="pd-direct" role="radiogroup" aria-label="Profile">${names.map((n,i) => `<button type="button" role="radio" data-pick="${n}" aria-label="${labels[i]}" aria-describedby="profile-caption">${icon(n)}</button>`).join('')}</div><button type="button" class="pd-more" aria-label="Profile details" aria-expanded="false" aria-controls="profile-shelf"><svg viewBox="0 0 22 22" aria-hidden="true"><path d="m7 9 4 4 4-4"/></svg></button></div>
     <div class="pd-caption" id="profile-caption" hidden><b></b><span class="pd-status"></span></div>
-    <section class="pd-pop" id="profile-shelf" aria-label="Choose profile" hidden><div class="pd-head"><b>Choose profile</b><span class="pd-status"></span></div><div class="pd-options" role="radiogroup" aria-label="Profile choices">${names.map((n,i) => `<button type="button" class="pd-option" role="radio" data-pick="${n}">${icon(n)}<span><b>${labels[i]}</b><small>${taglines[i]}</small></span></button>`).join('')}</div><div class="pd-foot"><span>Selection needs Apply</span><kbd>← → choose · Enter select</kbd></div></section>
+    <section class="pd-pop" id="profile-shelf" aria-label="Choose profile" hidden><div class="pd-head"><b>Choose profile</b><span class="pd-status"></span></div><div class="pd-options" role="radiogroup" aria-label="Profile choices">${names.map((n,i) => `<button type="button" class="pd-option" role="radio" data-pick="${n}">${icon(n)}<span><b>${labels[i]}</b><small>${taglines[i]}</small></span></button>`).join('')}</div><div class="pd-foot"><span>Applies right away</span><kbd>← → choose · Enter select</kbd></div></section>
     <div class="pd-transition" hidden></div><span class="pd-live" role="status" aria-live="polite" aria-atomic="true"></span>`;
   const shelf = $('profile-shelf'), caption = $('profile-caption');
   const more = root.querySelector('.pd-more'), seat = root.querySelector('.pd-slider');
@@ -8884,10 +8886,9 @@ const profileRail = (() => {
     const state = profileApplyBusy ? 'applying' : box.hidden ? 'unknown' : box.dataset.state || 'unknown';
     root.dataset.verify = state;
     root.setAttribute('aria-busy', String(profileApplyBusy));
-    const words = {verified:'PC is set', changed:'Needs Apply', failed:'Review settings', unknown:'Not checked', applying:'Applying…'};
+    const words = {verified:'PC is set', changed:'Not applied yet', failed:'Review settings', unknown:'Not checked', applying:'Applying…'};
     const glyphs = {verified:'<path d="m5 11 4 4 8-9"/>',changed:'<circle cx="11" cy="11" r="7"/><path d="M11 7v5m0 3v1"/>',failed:'<path d="m6 6 10 10m0-10L6 16"/>',unknown:'<circle cx="11" cy="11" r="7"/><path d="M8 8c0-4 8-3 6 1l-3 3m0 3v1"/>',applying:'<path d="M6 3h10M6 19h10M7 3v4l8 8v4M15 3v4l-8 8v4"/>'};
     root.querySelectorAll('.pd-status').forEach(el => { el.innerHTML = `<svg viewBox="0 0 22 22" aria-hidden="true">${glyphs[state] || glyphs.unknown}</svg><span>${words[state] || words.unknown}</span>`; });
-    root.querySelectorAll('[data-pick]').forEach(b => b.disabled = profileApplyBusy);
   }
   function paint(announce = true) {
     const next = document.body.dataset.intent || intent;
@@ -8904,7 +8905,7 @@ const profileRail = (() => {
     syncStatus();
     if (before !== current && announce) {
       animate(seat,[{transform:oldTransform,background:`color-mix(in srgb,${oldTone} 16%,transparent)`,borderColor:`color-mix(in srgb,${oldTone} 50%,transparent)`},{transform:seat.style.transform,background:`color-mix(in srgb,var(--tone) 16%,transparent)`,borderColor:'color-mix(in srgb,var(--tone) 50%,transparent)'}],560);
-      const message = `${labels[names.indexOf(before)]} → ${labels[names.indexOf(current)]} · Needs Apply`;
+      const message = `${labels[names.indexOf(before)]} → ${labels[names.indexOf(current)]} · Applying`;
       const note = root.querySelector('.pd-transition'); note.textContent = message; note.hidden = false;
       hideCaption();
       root.querySelector('.pd-live').textContent = message;
@@ -8931,13 +8932,13 @@ const profileRail = (() => {
     }
   }
   function select(name) {
-    if (profileApplyBusy || name === intent) { if (open) toggle(false,true); return; }
+    if (name === intent) { if (open) toggle(false,true); return; }
     const before = intent;
     if (homeVisible()) chooseIntent(name);
     else {
       chooseIntent(name, true);
-      noteChange('Optimise for → ' + name, () => { chooseIntent(before, true); previewPlan(); });
-      previewPlan();
+      noteChange('Optimise for → ' + name, () => { chooseIntent(before, true); applyProfile('mode'); });
+      applyProfile('mode');
     }
     if (open) toggle(false,true);
   }
@@ -8975,19 +8976,6 @@ const profileRail = (() => {
   paint(false);
   return {syncStatus};
 })();
-
-$("revert").addEventListener("click", async () => {
-  if (!await appAsk("Restore the most recent backup?\n\nYour current settings are swapped for the ones saved before the last change.", {yes: "Restore"})) return;
-  busy('Restoring your previous settings...', {id:'restore'});
-  try {
-    const r = await api("/api/revert", {});
-    $("results").insertAdjacentHTML("afterbegin",
-      '<section class="card"><h2>Restored ' + esc(r.stamp) + "</h2>" +
-      r.lines.map(l => '<div class="mono">' + esc(l) + "</div>").join("") + "</section>");
-    status('Your previous settings have been restored.', {id:'restore',kind:'done',detail:r.lines.length+' restore steps completed'});
-    scan(true);
-  } catch (e) { status(e.message, {id:'restore',kind:'error',title:'Settings could not be restored'}); }
-});
 
 // --- common settings ------------------------------------------------------
 let cfgSettings = null;
@@ -9345,7 +9333,7 @@ window.addEventListener("resize", () => {
 
 /* Settings sub-tabs. Each category loads what it needs the first time it is
    opened, so switching to Sound does not pay for a config scan. */
-let settingsSub = "apply";
+let settingsSub = "nvidia";
 // Whether somebody has picked one this session. Preferences arrive from the
 // server after the page is usable, and a late arrival must not pull the view
 // out from under a click that already happened.
@@ -9353,7 +9341,7 @@ let settingsSubChosen = false;
 document.addEventListener('cs2cfg:ready', () => { if (settingsSub === 'steam') loadFixes(); });
 
 function setSettingsSub(name, restoring) {
-  if (!document.querySelector('#settings-subtabs [data-sub="' + name + '"]')) name = "apply";
+  if (!document.querySelector('#settings-subtabs [data-sub="' + name + '"]')) name = "nvidia";
   const was = settingsSub;
   settingsSub = name;
   if (!restoring) settingsSubChosen = true;
@@ -9608,7 +9596,6 @@ document.addEventListener("click", async e => {
     } else {
       // The existing launch-mode switch owns the next launch's video changes.
       setStretchMode("borderless");
-      $("p-video").checked = true;
       rememberPrefs();
       setTab("launcher");
       status("Borderless selected for the next launch. Restart CS2 through Play to use it.");
@@ -14579,22 +14566,24 @@ $('sync-auto').addEventListener('change',async e => {
   finally { input.disabled = false; }
 });
 
-/* The Machine card: which half of the machine is asked to do less, and what
-   Windows itself has been told about the game.
+/* The GPU or CPU card (Settings -> NVIDIA): which part of the machine carries
+   more of CS2's picture, and what Windows itself has been told about the game.
 
-   The three choices are detail dials, not a scheduler. Nothing here moves
-   work from the processor to the graphics card; it decides which of the two
-   is asked to draw less when the machine cannot have everything. The card
-   says that rather than implying something cleverer than it is. */
+   Detail dials, not a scheduler: nothing moves work from the processor to the
+   graphics card. "Lean on GPU" gives the graphics card more to draw (shadows,
+   anti-aliasing, ambient occlusion, texture filtering, shader detail) and the
+   processor fewer particles; "Lean on CPU" the other way round. See
+   LEAN_GPU_KEYS in cs2cfg/profile.py. Until Nov 21 it only moved two hidden
+   values and changed nothing on most PCs. */
 let wgData = null;
 
 const BIAS = [
   ["auto", "Automatic",
-   "Automatically reduces picture detail for the slower part."],
+   "The app compares your graphics card and processor and holds back detail on the slower one."],
   ["gpu", "Lean on GPU",
-   "Keeps more graphics detail when the GPU is the stronger part."],
+   "For a strong graphics card: sharper shadows, more anti-aliasing and texture detail, fewer particles."],
   ["cpu", "Lean on CPU",
-   "Reduces graphics detail for a weaker GPU. Does not move work between parts."],
+   "For a weaker graphics card: lighter shadows, less anti-aliasing and texture work, more particles."],
 ];
 
 async function loadPcState() {
@@ -14669,7 +14658,8 @@ function renderMachine() {
   }
 
   html += '<div class="bias" role="group" aria-label="Picture detail balance" style="--bias-index:' + Math.max(0, BIAS.findIndex(b => b[0] === now)) + '"><i class="bias-thumb" aria-hidden="true"></i>' +
-    BIAS.map(([id,name,why]) => '<button type="button" data-bias="' + id + '" title="' + esc(why) + '" aria-pressed="' + (now === id) + '"><b>' + esc(name) + '</b></button>').join('') + '</div>';
+    BIAS.map(([id,name,why]) => '<button type="button" data-bias="' + id + '" title="' + esc(why) + '" aria-pressed="' + (now === id) + '"><b>' + esc(name) + '</b></button>').join('') + '</div>' +
+    '<p class="sub2 bias-why">' + esc((BIAS.find(b => b[0] === now) || BIAS[0])[2]) + '</p>';
 
   if (wgData && wgData.supported) {
     const set = wgData.high_performance && wgData.windowed_optimised;
@@ -14692,9 +14682,11 @@ document.addEventListener("click", async e => {
     const track = pick.closest('.bias');
     track.style.setProperty('--bias-index', BIAS.findIndex(b => b[0] === want));
     track.querySelectorAll('[data-bias]').forEach(b => b.setAttribute('aria-pressed', String(b === pick)));
+    const why = track.parentElement.querySelector('.bias-why');
+    if (why) why.textContent = (BIAS.find(b => b[0] === want) || BIAS[0])[2];
     try { await api("/api/prefs", { load_bias: want }); } catch (err) { /* below */ }
-    // The generated config just changed, so the preview is stale.
-    $("preview").click();
+    // Applies straight away, with the same live list as a mode switch.
+    applyProfile('bias');
     return;
   }
   const go = e.target.closest("#wg-apply");
@@ -14740,11 +14732,11 @@ document.addEventListener("change", async e => {
   if (prefsNow) Object.assign(prefsNow, body);
   try { await api("/api/prefs", body); } catch (err) { /* reported below */ }
   if (hide) {
-    // The config this would generate just changed, so the preview is stale.
+    // The config this would generate just changed, so it is written again.
     noteChange("CS2 crosshair \u2192 " + (e.target.checked ? "off (Crosshair X)" : "on"),
                () => { const el = $("xhair-hide"); if (el) { el.checked = !e.target.checked;
                        el.dispatchEvent(new Event("change", { bubbles: true })); } });
-    $("preview").click();
+    applyProfile('crosshair');
   }
 });
 
@@ -14854,7 +14846,10 @@ document.addEventListener("click", async e => {
   if (use) {
     const name = use.dataset.setupUse;
     const r = await setupsAct({ do: "use", name });
-    if (r) status("Switched to " + name + ". " + (r.goxlr?.ok === false ? "GoXLR: " + r.goxlr.error : r.goxlr && !r.goxlr.skipped ? "GoXLR profiles switched." : "Game settings are ready to apply."), r.goxlr?.ok === false);
+    if (r) {
+      status("Switched to " + name + ". " + (r.goxlr?.ok === false ? "GoXLR: " + r.goxlr.error : r.goxlr && !r.goxlr.skipped ? "GoXLR profiles switched." : ""), r.goxlr?.ok === false);
+      applyProfile('setup');
+    }
     return;
   }
   if (e.target.closest("#setup-keep")) {
@@ -16998,16 +16993,11 @@ function markPending(count) {
 const PREF_FIELDS = {
   target_fps: () => $("target").value.trim(),
   account: () => currentAccount(),
-  write_video: () => $("w-video").checked,
-  write_cfg: () => $("w-cfg").checked,
   write_launch: () => $("w-launch").checked,
-  link_autoexec: () => $("w-autoexec").checked,
-  fix_scaling: () => $("w-scaling").checked,
   stretch_mode: () => stretchMode,
   cfg_folder: () => $("cfg-folder").value.trim(),
   settings_sub: () => settingsSub,
   tab: () => activeTab,
-  patch_video: () => $("p-video").checked,
 };
 let prefsReady = false;
 /* The preferences as the server last had them.
@@ -17033,10 +17023,7 @@ function applyPrefs(ui) {
   // describing an empty field that has just been filled in.
   renderFps();
   const set = (id, v) => { if (v !== undefined && v !== null) $(id).checked = !!v; };
-  set("w-video", ui.write_video); set("w-cfg", ui.write_cfg);
-  set("w-launch", ui.write_launch); set("w-autoexec", ui.link_autoexec);
-  set("w-scaling", ui.fix_scaling);
-  set("p-video", ui.patch_video);
+  set("w-launch", ui.write_launch);
   if (ui.stretch_mode) {
     setStretchMode(
       { window: "borderless", desktop: "borderless", none: "fullscreen" }[ui.stretch_mode]
@@ -17098,7 +17085,7 @@ document.addEventListener("change", e => {
   // the cards they used to live in -- the target rate to the head of CS2
   // Settings, the video patch in with the other write options -- and a
   // preference that stops being saved when it is moved is silent about it.
-  if (e.target.closest("#launch-card, .card, #p-video, .fps")) rememberPrefs();
+  if (e.target.closest("#launch-card, .card, .fps")) rememberPrefs();
 });
 
 // --- history --------------------------------------------------------------
@@ -17661,7 +17648,7 @@ $("play").addEventListener("click", async () => {
     const launched = await api("/api/play", {
       account: currentAccount(),
       stretch_mode: stretchMode,
-      patch_video: $("p-video").checked,
+      patch_video: true,
       // The Crosshair X switches. Read at launch so the game starts with the
       // crosshair the switch asks for, in whichever direction it was moved.
       hide_crosshair: !!(prefsNow && prefsNow.hide_crosshair),
@@ -17776,8 +17763,7 @@ $("rescan").addEventListener("click", () => scan(true));
    drawn later, so a re-rendered panel does not lose its icons. */
 (function () {
   var BY_ID = {
-    "w-video": "picture", "p-video": "window", "w-cfg": "file",
-    "w-launch": "terminal", "w-autoexec": "code", "w-scaling": "expand",
+    "w-launch": "terminal",
     "cfg-family": "branch", "cfg-wording": "text", "audio-enforce": "speaker",
     "fix-all-devices": "device", "fix-steam-play": "gamepad",
     "xhair-hide": "crosshair", "xhair-launch": "play", "wg-auto": "gpu",
@@ -17790,7 +17776,7 @@ $("rescan").addEventListener("click", () => scan(true));
      the number fields, the theme picks -- which a row icon cannot. Matched on
      the heading's text, so a panel renamed here is renamed in one place. */
   var BY_HEADING = {
-    "Account": "user", "Setups": "layers", "Machine": "device", "Write": "file",
+    "Account": "user", "Setups": "layers", "GPU or CPU": "device",
     "Written": "file", "Start a config": "play", "Carry this setup": "layers",
     "Configuration studio": "branch", "Common settings": "sliders",
     "Script & alias editor": "code", "Scripts": "code", "Session history": "gauge",

@@ -389,7 +389,19 @@ def _apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
 
     session = backup.BackupSession(note=f"web apply {profile.intent}/tier {profile.tier}")
 
+    video_changes: List[Dict[str, Any]] = []
     if write_video:
+        current = steam.read_video_cfg(user)
+        for key in sorted(profile.video):
+            was = current.get(key)
+            if was is not None and str(profile.video[key]) == str(was):
+                continue
+            try:
+                before = kb.label(key, int(was)) if was is not None else None
+            except ValueError:
+                before = was
+            video_changes.append({"name": kb.ui_name(key), "before": before,
+                                  "after": kb.label(key, profile.video[key])})
         try:
             diff = steam.write_video_cfg(user, profile.video, session)
             steps.append({"ok": True, "what": "cs2_video.txt",
@@ -437,10 +449,101 @@ def _apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     for stood_down in skipped:
         steps.append({"ok": False, "skipped": True, **stood_down})
 
+    # CS2's NVIDIA profile follows the mode too. Its own list, so the page can
+    # show each driver change and end on the NVIDIA mark.
+    nv = None
+    if body.get("write_nvidia", True):
+        try:
+            nv = _nvidia_apply(state, profile.intent)
+        except Exception as exc:            # never fail an apply over the driver
+            nv = {"ok": False, "error": str(exc)}
+        if nv is not None:
+            steps.append({"ok": bool(nv.get("ok")), "what": "NVIDIA settings for CS2",
+                          "detail": (f"{len(nv.get('changed') or [])} setting(s) changed"
+                                     if nv.get("ok") else nv.get("error", ""))})
+
     backup.prune()
     verified = _record_verification(state, user, profile, launch, body, steps, generated)
     return {"ok": True, "steps": steps, "skipped": skipped, "verification": verified,
+            "video": video_changes, "nvidia": nv,
             "backup": None if session.empty else session.stamp}
+
+
+# --- Settings -> NVIDIA ------------------------------------------------------
+# CS2's own NVIDIA profile: the few settings each Launcher mode manages, the
+# player's own choices on top ("Set manually"), and the full list.
+
+def _nvidia_manual() -> Dict[str, int]:
+    from .cli import load_prefs
+
+    manual = load_prefs().get("nvidia_manual") or {}
+    return {str(k): int(v) for k, v in manual.items() if isinstance(v, int)}
+
+
+def _nvidia_ready(state: State) -> bool:
+    gpu = state.machine.gpu if state.machine else None
+    return bool(gpu and gpu.is_nvidia)
+
+
+def _nvidia_panel(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import elevated, nvidia
+
+    intent = str(body.get("intent") or "balanced")
+    out = nvidia.panel(intent, _nvidia_manual())
+    return {"ok": True, **out, "helper": elevated.status()}
+
+
+def _nvidia_set(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """One setting: the player's own value, or back to what the mode manages.
+
+    ``manual`` true keeps ``value`` as the player's choice; every Launcher mode
+    leaves it alone from then on. ``manual`` false hands it back: the mode's
+    value if the mode manages it, otherwise NVIDIA's own (the setting removed
+    from CS2's profile).
+    """
+    from . import nvidia
+    from .cli import load_prefs, save_prefs
+
+    try:
+        setting_id = int(str(body.get("id")), 16)
+    except (TypeError, ValueError):
+        return {"ok": False, "error": "That is not an NVIDIA setting."}
+    key = nvidia.hex_id(setting_id)
+    intent = str(body.get("intent") or "balanced")
+    prefs = load_prefs()
+    manual = dict(prefs.get("nvidia_manual") or {})
+    if body.get("manual"):
+        value = body.get("value")
+        if value is None:
+            value = (nvidia.read_cs2([setting_id]).get(setting_id)
+                     if body.get("keep_current") else None)
+        if not isinstance(value, int) or isinstance(value, bool):
+            managed = nvidia.MANAGED.get(intent, {})
+            value = managed.get(setting_id)
+            if value is None:
+                return {"ok": False, "error": "Pick a value for this setting first."}
+        result = nvidia.write_cs2({setting_id: value})
+        if result.get("ok"):
+            manual[key] = int(value)
+    else:
+        managed = nvidia.MANAGED.get(intent, {})
+        result = nvidia.write_cs2({setting_id: managed.get(setting_id)})
+        if result.get("ok"):
+            manual.pop(key, None)
+    if result.get("ok"):
+        prefs["nvidia_manual"] = manual
+        save_prefs(prefs)
+    return result
+
+
+def _nvidia_apply(state: State, intent: str) -> Optional[Dict[str, Any]]:
+    """Bring CS2's NVIDIA profile in line with the mode. None on a PC without NVIDIA."""
+    from . import nvidia
+
+    state.refresh()
+    if not _nvidia_ready(state):
+        return None
+    return nvidia.apply_intent(intent, _nvidia_manual())
 
 
 def _revert(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -5701,6 +5804,8 @@ def make_handler(state: State):
         "/api/configs/import/pick": _configs_import_pick,
         "/api/configs/import/preview": _configs_import_preview,
         "/api/apply": _apply,
+        "/api/nvidia": _nvidia_panel,
+        "/api/nvidia/set": _nvidia_set,
         "/api/revert": _revert,
         "/api/backups": _backups,
         "/api/play": _play,
