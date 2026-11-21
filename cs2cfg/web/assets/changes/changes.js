@@ -54,7 +54,6 @@
     return '<div class="chist-line ' + esc(status) + '">' +
       '<div class="w">' + esc(item.what) +
         (item.group && entry.kind === "nvidia" ? "<small>" + esc(item.group) + "</small>" : "") +
-        (item.file && entry.kind === "app" ? "<small>" + esc(item.file) + "</small>" : "") +
       "</div>" +
       '<div class="mv">' +
         (item.was !== undefined && item.was !== null

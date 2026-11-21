@@ -68,3 +68,6 @@
 .chist-entry .chg-pick button[data-chist-answer="back"][aria-pressed="true"] {
   background: var(--bad); color: #1a0509;
 }
+
+/* The history is the main thing on its tab: full width. */
+#chist-card { grid-column: 1 / -1; width: auto; max-width: none; }
