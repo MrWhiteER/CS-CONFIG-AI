@@ -1322,6 +1322,7 @@
     .chgwin-body .chg-mark { background: var(--panel-2); }
   }
 
+
   /* The scores, small enough to share the title bar with the live chips. */
   .scorebar { display: flex; gap: 8px; align-items: center; margin-left: auto; }
   /* The same pill the CPU/GPU/RAM chips wear at the other end of the bar.
@@ -5903,6 +5904,7 @@
 <link rel="stylesheet" href="assets/devices/workspace.css">
 <link rel="stylesheet" href="assets/fixit/toolbox.css">
 <link rel="stylesheet" href="assets/hardware/icons.css">
+<link rel="stylesheet" href="assets/changes/changes.css">
 <script src="assets/hardware/icons.js"></script>
 <script src="assets/fixit/icons.js"></script>
 <style>
@@ -6217,6 +6219,7 @@ const startup = (() => {
     <symbol id="i-chart" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 15v2m5-6v6m5-10v10"/></symbol>
     <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18M5 7h14M5 17h14"/></symbol>
     <symbol id="i-sync" viewBox="0 0 24 24"><path d="M20 8a9 9 0 0 0-15-3L3 7m0-5v5h5M4 16a9 9 0 0 0 15 3l2-2m0 5v-5h-5"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24"><path d="M3.5 12a8.5 8.5 0 1 0 2.5-6M3 3.5V8h4.5M12 7.5V12l3 2"/></symbol>
   </defs>
 </svg>
 
@@ -6797,18 +6800,18 @@ const startup = (() => {
       <div class="segwrap">
         <div class="segbar" id="settings-subtabs" role="tablist">
           <div class="seg-thumb" id="seg-thumb"></div>
-          <button class="seg-item" data-sub="apply" role="tab" aria-selected="true">Apply</button>
+          <button class="seg-item" data-sub="apply" role="tab" aria-selected="true"><span data-hardware-icon="apply"></span> Apply</button>
           <button class="seg-item" data-sub="this-pc" role="tab" aria-selected="false"><span data-hardware-icon="display"></span> This PC</button>
           <button class="seg-item" data-sub="lighting" role="tab" aria-selected="false"><span data-hardware-icon="lighting"></span> Lighting</button>
-          <button class="seg-item" data-sub="steam" role="tab" aria-selected="false">Steam</button>
-          <button class="seg-item" data-sub="account" role="tab" aria-selected="false">Account</button>
-          <button class="seg-item" data-sub="apps" role="tab" aria-selected="false">Apps</button>
-          <button class="seg-item" data-sub="look" role="tab" aria-selected="false">Look</button>
-          <button class="seg-item" data-sub="sound" role="tab" aria-selected="false">Sound</button>
-          <button class="seg-item" data-sub="overlay" role="tab" aria-selected="false">Overlay</button>
-          <button class="seg-item" data-sub="config" role="tab" aria-selected="false">Config files</button>
-          <button class="seg-item" data-sub="editing" role="tab" aria-selected="false">Editing</button>
-          <button class="seg-item" data-sub="logs" role="tab" aria-selected="false">Logs</button>
+          <button class="seg-item" data-sub="steam" role="tab" aria-selected="false"><span data-hardware-icon="steam"></span> Steam</button>
+          <button class="seg-item" data-sub="account" role="tab" aria-selected="false"><span data-hardware-icon="accounts"></span> Accounts</button>
+          <button class="seg-item" data-sub="apps" role="tab" aria-selected="false"><span data-hardware-icon="apps"></span> Apps</button>
+          <button class="seg-item" data-sub="look" role="tab" aria-selected="false"><span data-hardware-icon="look"></span> Look</button>
+          <button class="seg-item" data-sub="sound" role="tab" aria-selected="false"><span data-hardware-icon="sound"></span> Sound</button>
+          <button class="seg-item" data-sub="overlay" role="tab" aria-selected="false"><span data-hardware-icon="overlay"></span> Overlay</button>
+          <button class="seg-item" data-sub="config" role="tab" aria-selected="false"><span data-hardware-icon="config"></span> Config files</button>
+          <button class="seg-item" data-sub="editing" role="tab" aria-selected="false"><span data-hardware-icon="history"></span> Editing</button>
+          <button class="seg-item" data-sub="logs" role="tab" aria-selected="false"><span data-hardware-icon="logs"></span> Logs</button>
         </div>
       </div>
 
@@ -6916,7 +6919,7 @@ const startup = (() => {
       <!-- App sign-in, linking and subscription stay separate from Steam settings. -->
       <div class="subpane hidden" data-sub="account">
         <section class="panel wide" id="account-card">
-          <h2>Account</h2>
+          <h2>Accounts</h2>
           <div id="account-out"></div>
         </section>
       </div>
@@ -7069,6 +7072,24 @@ const startup = (() => {
       </div>
 
       <div class="subpane hidden" data-sub="editing">
+      <section class="panel" id="chist-card">
+        <h2>Change history</h2>
+        <p class="sub" style="margin:0 0 10px">
+          Everything that changed, newest first: what you changed here, what you changed inside
+          CS2, and what was changed in the NVIDIA app. Keep it, or put it back to how it was before.
+          Changes made in the game are asked about as soon as the game closes.
+        </p>
+        <div class="chist-head">
+          <div class="chist-filter" role="group" aria-label="Which changes to show">
+            <button type="button" data-chist-filter="all" aria-pressed="true">All changes</button>
+            <button type="button" data-chist-filter="waiting" aria-pressed="false">Waiting for you <b id="chist-waiting-count"></b></button>
+          </div>
+          <span class="spacer"></span>
+          <button type="button" class="btn" id="chist-review">Review waiting changes</button>
+          <button type="button" class="btn" id="chist-refresh">Refresh</button>
+        </div>
+        <div id="chist-out"><div class="chist-empty">Loading your changes&hellip;</div></div>
+      </section>
       <section class="panel hidden" id="cfg-settings-card">
         <h2>Common settings</h2>
         <p class="sub" style="margin:0 0 4px">
@@ -7170,6 +7191,7 @@ const startup = (() => {
 <script src="assets/config/files.js"></script>
 <link rel="stylesheet" href="assets/home/server-lock.css">
 <script src="assets/home/server-lock.js"></script>
+<script src="assets/changes/changes.js"></script>
 <script>
 const TOKEN = "__CS2CFG_TOKEN__";
 const $ = (id) => document.getElementById(id);
@@ -8080,30 +8102,14 @@ function closeConfirm() {
   if (veil) veil.classList.add("hidden");
 }
 
-/* Whether CS2 changes are worth showing: something counted, and not the
-   first run, which is only establishing what "unchanged" looks like. */
-function gameChanged() {
-  const d = ingameData;
-  return !!(d && !d.first_run && d.count);
-}
-
-/* Changes made in CS2's own menus that can be kept or put back. Keep writes
-   the new value into the player's config; Put back writes the old one. */
-const GAME_ANSWERABLE = ["Key binds", "In-game settings", "Picture quality"];
-function gameChangeId(source, key) { return "game\u0001" + source + "\u0001" + key; }
-function gameChoices() {
-  const out = [];
-  for (const [id, choice] of Object.entries(changeChoice)) {
-    if (!id.startsWith("game\u0001")) continue;
-    const parts = id.split("\u0001");
-    out.push({ source: parts[1], key: parts.slice(2).join("\u0001"), choice });
-  }
-  return out;
-}
+/* Changes made inside CS2 are no longer asked about in this window: they go
+   into the change history, and the review window that comes up on top of
+   everything as soon as the game closes asks about them (see
+   assets/changes/changes.js and review.html). */
+function gameChanged() { return false; }
 
 /* What the window has to say, drawn from both places at once. */
 function changesBody() {
-  const d = ingameData;
   let html = "";
 
   if (pendingChanges.length) {
@@ -8129,39 +8135,6 @@ function changesBody() {
       }).join("") + "</div>";
   }
 
-  if (gameChanged()) {
-    for (const [source, list] of Object.entries(d.sources || {})) {
-      html += '<div class="subcat">' + esc(source) + "</div>";
-      const answerable = GAME_ANSWERABLE.includes(source);
-      html += '<div class="chg-rows">' + list.map(c => {
-        const id = gameChangeId(source, c.key);
-        const back = changeChoice[id] === "back";
-        return '<div class="chg-row ' + esc(c.kind || "changed") + (back ? " undoing" : "") + '">' +
-          changeMark(c.kind) +
-          '<div class="chg-what"><b>' + esc(c.label || c.key) + "</b>" +
-            (c.label ? '<span class="sub2 mono">' + esc(c.key) + "</span>" : "") +
-          "</div>" +
-          '<div class="chg-move">' +
-            '<code class="was">' + esc(c.was === null ? "\u2014" : c.was) + "</code>" +
-            '<span class="chg-arrow">\u2192</span>' +
-            '<code class="now">' + esc(c.now === null ? "\u2014" : c.now) + "</code>" +
-          "</div>" +
-          (answerable
-            ? '<div class="chg-pick" role="group" aria-label="What to do with this change">' +
-                '<button data-choice="keep" data-for="' + esc(id) + '"' +
-                  ' aria-pressed="' + (!back) + '">Keep</button>' +
-                '<button data-choice="back" data-for="' + esc(id) + '"' +
-                  ' aria-pressed="' + back + '">Put back</button>' +
-              "</div>"
-            : "") +
-        "</div>";
-      }).join("") + "</div>";
-    }
-    if (d.missing && d.missing.length) {
-      html += '<p class="sub2" style="margin-top:8px">Could not read: ' +
-        esc(d.missing.join(", ")) + "</p>";
-    }
-  }
   return html;
 }
 
@@ -8256,35 +8229,10 @@ function applyChoices() {
 }
 
 async function answerChanges(how) {
-  const hadGame = gameChanged();
   if (how === "all-back") {
     for (const c of pendingChanges) changeChoice[c.id] = "back";
-    if (hadGame) {
-      for (const [source, list] of Object.entries(ingameData.sources || {})) {
-        if (!GAME_ANSWERABLE.includes(source)) continue;
-        for (const c of list) changeChoice[gameChangeId(source, c.key)] = "back";
-      }
-    }
   }
-  const choices = hadGame ? gameChoices() : [];
   applyChoices();
-  if (hadGame) {
-    try {
-      const r = await api("/api/ingame/resolve", { account: currentAccount(), choices });
-      if (r && r.ok === false) {
-        status(r.error || "Could not save your answers about the game's changes.", true);
-        return;
-      }
-      const bits = [];
-      if (r && r.kept) bits.push("kept " + r.kept);
-      if (r && r.put_back) bits.push("put back " + r.put_back);
-      if (bits.length) {
-        status("Changes from your last game: " + bits.join(", ") +
-               ". Your config now matches, so your next launch has them.");
-      }
-      ingameData = { count: 0, sources: {} };
-    } catch (e) { /* it will be offered again on the next pass */ }
-  }
 }
 
 document.addEventListener("click", e => {
@@ -9355,6 +9303,7 @@ function setSettingsSub(name, restoring) {
     if (name === "sound") { loadAudio(false); loadGoxlr(true); }
     if (name === "logs") loadHistory();
     if (name === "config" || name === "editing") ensureScan(false);
+    if (name === "editing") loadChanges();
     if (name === "apps") { loadCompanions(); loadAppTiles(); }
     if (name === "steam") { loadFixes(); loadWho(); }
     if (name === "account") loadCloud();
@@ -10771,7 +10720,108 @@ $("cs2-apply").addEventListener("click", async () => {
   await saveCs2(null);
 });
 
-let ingameData = null;
+
+/* --------------------------------------------------------------------------
+   Change history (Settings, Editing). Read from /api/history: every change
+   the app made, plus what was changed inside CS2 and in the NVIDIA app. The
+   cards are drawn by assets/changes/changes.js, shared with the review
+   window that comes up after a game.
+   -------------------------------------------------------------------------- */
+const chist = { entries: [], filter: "all", open: {}, conflicts: {}, loaded: false };
+
+function renderChanges() {
+  const box = $("chist-out");
+  if (!box || !window.ChangeList) return;
+  const waiting = chist.entries.filter(e => e.status === "waiting");
+  const shown = chist.filter === "waiting" ? waiting : chist.entries;
+  box.innerHTML = ChangeList.render(shown, {
+    open: chist.open, conflicts: chist.conflicts,
+    empty: chist.filter === "waiting" ? "Nothing is waiting for you."
+         : "No changes yet. Everything you change from now on is listed here.",
+  });
+  const count = $("chist-waiting-count");
+  if (count) count.textContent = waiting.length ? "(" + waiting.length + ")" : "";
+  const review = $("chist-review");
+  if (review) review.classList.toggle("hidden", !waiting.length);
+  // A dot on the tab, so waiting changes are visible from anywhere in Settings.
+  const tab = document.querySelector('#settings-subtabs [data-sub="editing"]');
+  if (tab) {
+    let badge = tab.querySelector(".count");
+    if (waiting.length && !badge) {
+      badge = document.createElement("span");
+      badge.className = "count";
+      tab.appendChild(badge);
+    }
+    if (badge) {
+      if (waiting.length) {
+        badge.textContent = waiting.length;
+        badge.title = waiting.length + " change(s) waiting for you";
+      } else badge.remove();
+    }
+  }
+}
+
+async function loadChanges() {
+  try {
+    const r = await api("/api/history", {});
+    chist.entries = r.entries || [];
+    chist.loaded = true;
+    renderChanges();
+  } catch (err) {
+    const box = $("chist-out");
+    if (box && !chist.loaded) box.innerHTML = '<div class="chist-empty">Could not read the change history: ' +
+      esc(err.message || String(err)) + "</div>";
+  }
+}
+
+async function answerChange(id, choice, force) {
+  delete chist.conflicts[id.split("#")[0]];
+  try {
+    await api("/api/history/answer", { answers: [{ id, choice, force: !!force }] });
+    status(choice === "back" ? "Put back. It is as it was before that change."
+                             : "Kept.");
+  } catch (err) {
+    const data = err.data || {};
+    if (data.conflicts && data.conflicts.length) {
+      for (const c of data.conflicts) chist.conflicts[c.id] = c.error;
+    } else {
+      status(err.message || String(err), true);
+    }
+  }
+  await loadChanges();
+}
+
+document.addEventListener("click", e => {
+  const answer = e.target.closest("[data-chist-answer]");
+  if (answer && answer.closest("#chist-out")) {
+    answerChange(answer.dataset.id, answer.dataset.chistAnswer, false);
+    return;
+  }
+  const force = e.target.closest("[data-chist-force]");
+  if (force && force.closest("#chist-out")) {
+    answerChange(force.dataset.chistForce, "back", true);
+    return;
+  }
+  const more = e.target.closest("[data-chist-more]");
+  if (more && more.closest("#chist-out")) {
+    chist.open[more.dataset.chistMore] = !chist.open[more.dataset.chistMore];
+    renderChanges();
+    return;
+  }
+  const filter = e.target.closest("[data-chist-filter]");
+  if (filter) {
+    chist.filter = filter.dataset.chistFilter;
+    document.querySelectorAll("[data-chist-filter]").forEach(b =>
+      b.setAttribute("aria-pressed", String(b === filter)));
+    renderChanges();
+    return;
+  }
+  if (e.target.closest("#chist-refresh")) loadChanges();
+  if (e.target.closest("#chist-review")) api("/api/history/review", {}).catch(() => {});
+});
+// Coming back to the app is when something new is most likely to be there.
+window.addEventListener("focus", () => { if (settingsSub === "editing") loadChanges(); });
+
 let ingameSeenAt = 0;
 
 // The watcher finds changes on its own; the page just has to notice. The count
@@ -10814,24 +10864,9 @@ function noteIngame(summary) {
   }
 }
 
-function renderIngame() {
-  // Nothing of its own to draw any more: what CS2 changed goes in the one
-  // window with everything else. This only decides whether that window has
-  // something to say.
-  reviewChanges();
-}
-
-async function loadIngame(quiet) {
-  try {
-    ingameData = await api("/api/ingame", { account: currentAccount() });
-    renderIngame();
-  } catch (err) {
-    // A failed read is not something to interrupt anyone over; the watcher
-    // will say so again on its next pass.
-    if (!quiet) status("Could not read CS2's settings: " +
-                       String(err && err.message || err), true);
-  }
-}
+/* A new finding from CS2's files is already in the change history (the
+   server put it there); the page only has to redraw the list. */
+function loadIngame() { loadChanges(); }
 
 /* Whose settings everything on screen belongs to.
 
@@ -17674,6 +17709,7 @@ $("rescan").addEventListener("click", () => scan(true));
     startup.run("companions", async () => { await loadCompanions(); await loadAppTiles(); startCompanionsWatch(); }),
     startup.run("audio", () => loadAudio(false)),
     startup.run("history", loadHistory),
+    loadChanges(),
     startup.run("profile", loadWho),
     startup.run("launch", startGameWatch),
     startup.run("monitor", startLive),
@@ -17730,7 +17766,7 @@ $("rescan").addEventListener("click", () => scan(true));
      the number fields, the theme picks -- which a row icon cannot. Matched on
      the heading's text, so a panel renamed here is renamed in one place. */
   var BY_HEADING = {
-    "Account": "user", "Setups": "layers", "Machine": "device", "Write": "file",
+    "Accounts": "user", "Change history": "history", "Setups": "layers", "Machine": "device", "Write": "file",
     "Written": "file", "Start a config": "play", "Carry this setup": "layers",
     "Configuration studio": "branch", "Common settings": "sliders",
     "Script & alias editor": "code", "Scripts": "code", "Session history": "gauge",
