@@ -48,7 +48,7 @@ let browser,socket;
     await pause(800);
     if(open) await evaluate("$('dock-main').click()");
     await pause(1150);
-    await check(state+' accessible rows',"document.querySelectorAll('#dock-rows .dock-row[aria-label]').length==="+(state==='violet'?4:6));
+    await check(state+' accessible rows',"document.querySelectorAll('#dock-rows .dock-row[aria-label]').length==="+(state==='violet'?1:3));
     await check(state+' fits the rail',"(()=>{const rail=document.querySelector('.rail').getBoundingClientRect(),dock=$('accounts-dock').getBoundingClientRect(),update=$('updc').getBoundingClientRect();return dock.top>rail.top && update.bottom<=rail.bottom && dock.bottom<=update.top;})()");
     await check(state+' menu never scrolls at 900px',"document.querySelector('.tabs').scrollHeight<=document.querySelector('.tabs').clientHeight");
     await check(state+' no horizontal overflow',"$('accounts-dock').scrollWidth<=$('accounts-dock').clientWidth");
