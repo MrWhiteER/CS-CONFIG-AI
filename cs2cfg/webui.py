@@ -4236,14 +4236,120 @@ def _steam_hooks(state: State) -> None:
     """After the shared Steam sign-in, read the match history straight away."""
     from . import steamweb
 
-    steamweb.on_signed_in[:] = [lambda: _steam_history_start(state)]
+    def cloud_too() -> None:
+        state._cloud_quiet_tried = False
+        _cloud_quietly(state)
+
+    steamweb.on_signed_in[:] = [lambda: _steam_history_start(state), cloud_too]
 
 
 def _steam_state() -> Dict[str, Any]:
     from . import steamhistory, steamweb
 
     return {"linked": steamweb.linked(), "available": steamweb.available(),
-            **steamhistory.status}
+            **steamhistory.status, "connection": _steam_connected()}
+
+
+def _cloud_claim_later(state: State, started: Dict[str, Any]) -> None:
+    """Finish a cloud sign-in on the app's side, without the page polling.
+
+    The Steam window does the visible half; this collects the session once
+    Steam hands back, then starts the settings sync straight away.
+    """
+    from . import cloud
+
+    state._steam_login = started
+
+    def run() -> None:
+        try:
+            answer = cloud.wait_for_login(
+                started["state"], started["verifier"],
+                should_stop=lambda: getattr(state, "_steam_login", None) is not started)
+        except cloud.CloudError:
+            return
+        finally:
+            if getattr(state, "_steam_login", None) is started:
+                state._steam_login = None
+        cloud.forget_me()
+        if answer.get("ok", True) and cloud.signed_in():
+            _sync_loop(state).nudge()
+
+    threading.Thread(target=run, name="cloud-claim", daemon=True).start()
+
+
+def _cloud_quietly(state: State) -> None:
+    """Settings sync with nothing for the player to do.
+
+    Once Steam is connected in the app, the app's own cloud signs in with
+    that same Steam session in a hidden window. Tried once per launch; if it
+    does not work the next "Connect Steam" covers it.
+    """
+    from . import cloud, cloudconfig, steamweb
+
+    if getattr(state, "_cloud_quiet_tried", False):
+        return
+    if not (cloudconfig.configured() and steamweb.available() and steamweb.linked()):
+        return
+    if cloud.signed_in() or getattr(state, "_steam_login", None):
+        return
+    if steamweb.mark().get("cloud_off"):
+        return  # signed out of the cloud on purpose, in Settings
+    state._cloud_quiet_tried = True
+
+    def run() -> None:
+        try:
+            started = cloud.begin_login("steam")
+        except cloud.CloudError:
+            return
+        _cloud_claim_later(state, started)
+        if not steamweb.quiet_openid(started["url"]):
+            # Nothing came back: stop asking the cloud about it.
+            if getattr(state, "_steam_login", None) is started:
+                state._steam_login = None
+
+    threading.Thread(target=run, name="cloud-quiet", daemon=True).start()
+
+
+def _steam_connected() -> Dict[str, Any]:
+    """The one Steam connection: Steam's website plus the app's cloud."""
+    from . import cloud, cloudconfig, steamweb
+
+    web = steamweb.linked()
+    has_cloud = cloud.signed_in()
+    return {"web": web, "cloud": has_cloud,
+            "cloud_configured": cloudconfig.configured(),
+            "connected": web and (has_cloud or not cloudconfig.configured())}
+
+
+def _steam_connect(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Connect Steam once: match history, settings sync and anything else.
+
+    One Steam window. When the app's cloud is not signed in yet, the window
+    opens on Steam's OpenID page for it: signing in there also signs Steam's
+    website in for the app, so both are done in one go. When only the
+    website half is missing, Steam's own login page is shown instead.
+    """
+    from . import cloud, cloudconfig, steamweb
+
+    if not steamweb.available():
+        return {**_steam_state(), "ok": False,
+                "error": "Open the app's own window to connect Steam."}
+    _steam_hooks(state)
+    steamweb.mark({"cloud_off": False})
+    if cloudconfig.configured() and not cloud.signed_in():
+        try:
+            started = cloud.begin_login("steam")
+        except cloud.CloudError:
+            started = None
+        if started and steamweb.sign_in(started["url"]):
+            _cloud_claim_later(state, started)
+            return {"ok": True, "opened": True, **_steam_state()}
+    if not steamweb.linked():
+        if not steamweb.sign_in():
+            return {**_steam_state(), "ok": False,
+                    "error": "Open the app's own window to connect Steam."}
+        return {"ok": True, "opened": True, **_steam_state()}
+    return {"ok": True, "opened": False, **_steam_state()}
 
 
 def _stats_steam(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -4258,6 +4364,8 @@ def _stats_steam(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
                     **_steam_state()}
     elif action == "sync" and not _steam_history_start(state):
         return {"ok": False, "error": "Steam account not found", **_steam_state()}
+    elif action == "status":
+        _cloud_quietly(state)
     return {"ok": True, **_steam_state()}
 
 
@@ -5320,7 +5428,12 @@ def _cloud_password(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
 def _cloud_logout(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     from . import cloud
 
+    from . import steamweb
+
     state._login = None
+    state._steam_login = None
+    # Signing out here is a choice: do not sign the cloud back in quietly.
+    steamweb.mark({"cloud_off": True})
     return cloud.sign_out()
 
 
@@ -5763,6 +5876,7 @@ def make_handler(state: State):
         "/api/faceit/forget": _faceit_forget,
         "/api/stats": _stats,
         "/api/stats/steam": _stats_steam,
+        "/api/steam/connect": _steam_connect,
         "/api/match/state": _match_state,
         "/api/match/accept": _match_accept,
         "/api/match/dismiss": _match_dismiss,
