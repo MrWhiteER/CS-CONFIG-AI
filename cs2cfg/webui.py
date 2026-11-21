@@ -2721,6 +2721,26 @@ def _cfg_plugin_toggle(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     flat = cfglang.restore_newlines(original, chr(10), False)
     updated = plugins.set_enabled(flat, found.line, found.end_line, enable)
 
+    # A Script Builder script knows its own key and what that key did before,
+    # so it puts exactly that back instead of the game's default.
+    made = _scriptgen_block(flat, found)
+    if made is not None:
+        updated = cfglang.restore_newlines(
+            updated, config.document.newline, config.document.trailing_newline)
+        session = backup.BackupSession(
+            note=f"{'enabled' if enable else 'disabled'} {found.name}")
+        session.add(config.path)
+        cfglang.write_config_text(config.path, updated, config.document.encoding)
+        backup.prune()
+        state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+        key = _scriptgen_rekey(state, made, enable)
+        return {
+            "path": found.file, "name": found.name, "enabled": enable,
+            "restored": [key] if key and not enable else [], "dropped": 0,
+            "changed": True, "backup": session.stamp,
+            "lines": found.end_line - found.line + 1, "builder": True,
+        }
+
     # The keys this script was holding, and what CS2 does with them itself.
     restored, dropped = [], []
     if enable:
@@ -3669,12 +3689,19 @@ def _scriptgen_check(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _scriptgen_saved(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
-    """Read-only: the scripts Script Builder has saved, to open them again."""
-    from . import keys, scriptgen
+    """Read-only: the scripts Script Builder has saved, to open them again.
+
+    The key shown is the one that really runs the script now (read from the
+    binds, so a key changed on the Keyboard tab shows here too), and whether
+    the script is on is read from the file, the same as the Scripts tab.
+    """
+    from . import cfgscan, keys, plugins, scriptgen
 
     result = _rescan(state)
     found = []
     if result is not None:
+        chain = cfgscan.startup_chain(result)
+        blocks = plugins.find(result)
         for config in sorted(result.files.values(), key=lambda c: c.relative):
             try:
                 text = config.path.read_bytes().decode(config.document.encoding, errors="replace")
@@ -3684,11 +3711,78 @@ def _scriptgen_saved(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
                 continue
             for block in scriptgen.own_blocks(text):
                 spec = block["spec"]
+                alias = str(spec.get("alias") or "")
+                plug = next((p for p in blocks if p.file == config.relative
+                             and p.line <= block["last"] and p.end_line >= block["first"]), None)
+                on_keys = []
+                for binding in sorted(result.binds):
+                    winner = cfgscan._effective_bind(result, chain, binding)
+                    if (winner is not None and winner.file in chain and alias
+                            and scriptgen._runs_own(winner.body or "", alias)
+                            and keys.label(binding) not in on_keys):
+                        on_keys.append(keys.label(binding))
                 binding = spec.get("binding") or ""
-                found.append({"spec": spec, "file": config.relative,
-                              "key": keys.label(binding) if binding else "",
-                              "target": keys.label(spec["target"]) if spec.get("target") else ""})
+                enabled = plug.enabled if plug is not None else True
+                found.append({
+                    "spec": spec, "file": config.relative,
+                    "id": f"{plug.file}:{plug.line}" if plug is not None else "",
+                    "enabled": enabled,
+                    "keys": on_keys,
+                    "key": ", ".join(on_keys) if on_keys else
+                           (keys.label(binding) if binding and not enabled else ""),
+                    "before": scriptgen.describe(spec["key_before"], result)
+                              if spec.get("key_before") else "",
+                    "target": keys.label(spec["target"]) if spec.get("target") else ""})
     return {"ok": True, "scripts": found}
+
+
+def _scriptgen_block(text: str, found) -> Optional[Dict[str, Any]]:
+    """The Script Builder spec behind a Scripts-tab block, if it is one."""
+    from . import scriptgen
+
+    if scriptgen.MARK not in text:
+        return None
+    for block in scriptgen.own_blocks(text):
+        if block["first"] <= found.end_line and block["last"] >= found.line:
+            spec = dict(block["spec"])
+            alias = str(spec.get("alias") or "")
+            names = {a.lower() for a in (found.aliases or [])}
+            spec["entry"] = "+" + alias if "+" + alias in names else alias
+            return spec
+    return None
+
+
+def _scriptgen_rekey(state: State, spec: Dict[str, Any], enable: bool) -> Optional[Dict[str, Any]]:
+    """Put a builder script's key on the script, or give it back what it did.
+
+    Switching off: the key goes back to what it did before the script took it
+    (Mouse 5 back to voice chat), else to the game's own default, else is
+    cleared. A key that has since been given to something else is left alone.
+    """
+    from . import cfgscan, keys, scriptgen
+
+    binding = str(spec.get("binding") or "")
+    alias = str(spec.get("alias") or "")
+    result = getattr(state, "cfg_scan", None)
+    if not binding or not alias or result is None:
+        return None
+    chain = cfgscan.startup_chain(result)
+    existing = [b for b in cfgscan.binds_for_key(result, binding) if b.file in chain]
+    now = (existing[-1].body or "").strip().strip(chr(34)) if existing else ""
+    if enable:
+        if now and not scriptgen._runs_own(now, alias) and now != spec.get("key_before"):
+            return None     # the key was given to something else meanwhile
+        _cfg_bind(state, {"binding": binding, "command": spec["entry"], "force": True})
+        return {"key": binding, "command": spec["entry"], "label": keys.label(binding)}
+    if not now or not scriptgen._runs_own(now, alias):
+        return None
+    back = (str(spec.get("key_before") or "")
+            or _scriptgen_stock(state, binding) or scriptgen.STOCK_FALLBACK.get(binding, ""))
+    if back:
+        _cfg_bind(state, {"binding": binding, "command": back, "force": True})
+    else:
+        _cfg_bind(state, {"binding": binding, "unbind": True})
+    return {"key": binding, "command": back, "label": keys.label(binding)}
 
 
 def _scriptgen_save(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -3741,6 +3835,12 @@ def _scriptgen_save(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     cfglang.write_config_text(config.path, text, config.document.encoding)
     backup.prune()
     state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+
+    # Moved to another key: the old key gets back what it did before.
+    moved = (built.replaces or {}).get("binding") or ""
+    if moved and moved != binding:
+        _scriptgen_rekey(state, {"binding": moved, "alias": built.alias,
+                                 "key_before": built.replaces.get("key_before", "")}, False)
 
     bound = _cfg_bind(state, {"binding": binding, "command": built.entry, "force": True})
     return {"ok": bool(bound.get("ok")), "file": target, "alias": built.entry,

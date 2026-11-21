@@ -238,6 +238,12 @@ def normal_bind(scan, binding: str) -> str:
     return (winner.body or "").strip().strip('"').strip()
 
 
+def _runs_own(body: str, alias: str) -> bool:
+    """Whether a bind runs one of this script's own lines."""
+    head = (body or "").strip().strip('"').split(";")[0].strip().lower().lstrip("+-")
+    return head == alias or head.startswith(alias + "_")
+
+
 def _number(text: Any, fallback: Any) -> Any:
     try:
         return float(text)
@@ -569,8 +575,10 @@ def build(spec: Dict[str, Any], scan=None, key_label: str = "") -> Built:
     step_end = len(checks)
     alias = slug(name) if name else ""
     replaces = None
+    earlier: Dict[str, Any] = {}
     if alias:
         own = _own_block(scan, alias)
+        earlier = dict((own or {}).get("spec") or {})
         clash = alias in _taken_names() or alias.lstrip("+-") in _taken_names()
         users = []
         if scan is not None:
@@ -580,7 +588,9 @@ def build(spec: Dict[str, Any], scan=None, key_label: str = "") -> Built:
                 if scan.effective_alias(candidate) is not None:
                     users.append(candidate)
         if own is not None:
-            replaces = {"file": own["file"], "first": own["first"], "last": own["last"]}
+            replaces = {"file": own["file"], "first": own["first"], "last": own["last"],
+                        "binding": str(earlier.get("binding") or ""),
+                        "key_before": str(earlier.get("key_before") or "")}
             checks.append(Check("ok", "Saving replaces your earlier script with this name."))
         elif clash:
             checks.append(Check("block", "That name is already a CS2 command. Pick another name."))
@@ -594,6 +604,13 @@ def build(spec: Dict[str, Any], scan=None, key_label: str = "") -> Built:
     if not binding:
         checks.append(Check("block", "Pick a key."))
         block = True
+
+    # What the key did before this script took it, remembered so switching
+    # the script off (or keeping the shift key's own job) can give it back.
+    key_before = normal_bind(scan, binding)
+    if key_before and alias and _runs_own(key_before, alias):
+        key_before = (str(earlier.get("key_before") or "")
+                      if earlier.get("binding") == binding else "")
 
     # The shift key's second key, and how to give that key its own job back.
     target = str(spec.get("target") or "").strip() if mode == "shift" else ""
@@ -637,7 +654,7 @@ def build(spec: Dict[str, Any], scan=None, key_label: str = "") -> Built:
     # can stay voice chat and still be the shift key.
     own_press, own_release, own_lines, own_said = "", "", [], ""
     if mode == "shift" and binding and spec.get("keep_own", True) is not False:
-        own = (normal_bind(scan, binding) or str(spec.get("key_stock") or "").strip()
+        own = (key_before or str(spec.get("key_stock") or "").strip()
                or STOCK_FALLBACK.get(binding, ""))
         if own and alias and own.lower().lstrip("+") != alias:
             own_said = describe(own, scan)
@@ -758,6 +775,8 @@ def build(spec: Dict[str, Any], scan=None, key_label: str = "") -> Built:
                       keep_own=spec.get("keep_own", True) is not False)
     if clean_release:
         stored["release_steps"] = clean_release
+    if key_before:
+        stored["key_before"] = key_before
     if isinstance(edited, str) and alias:
         stored["lines"] = lines
     return Built(ok=not block, alias=alias, entry=entry, lines=lines,
