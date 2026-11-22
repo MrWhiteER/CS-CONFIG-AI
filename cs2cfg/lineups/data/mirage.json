@@ -1,0 +1,535 @@
+{
+  "map": "mirage",
+  "name": "Mirage",
+  "overview": {
+    "pos_x": -3230,
+    "pos_y": 1713,
+    "scale": 5,
+    "width": 1024,
+    "height": 1024
+  },
+  "lineups": [
+    {
+      "id": "3535834e-86a3-4de9-a963-cc29ab8aeb03",
+      "name": "Window",
+      "side": "T",
+      "type": "smoke",
+      "area": "Mid",
+      "stand": {
+        "x": 1389.46875,
+        "y": 70.968201,
+        "z": -167.96875
+      },
+      "aim": {
+        "pitch": -30.937386,
+        "yaw": -163.909958
+      },
+      "throw": "jump throw",
+      "land": {
+        "x": -1161.228394,
+        "y": -643.96991,
+        "z": -165.96875
+      },
+      "steps": [
+        "Stand by the T spawn wooden box.",
+        "Aim at the left edge of the antenna above the Mid roof.",
+        "Strafe right beside the T spawn wooden box, then jump and release left click."
+      ],
+      "source": "CS2-annotations, MIT",
+      "checked": false
+    },
+    {
+      "id": "bb4277a1-409e-4d2c-aa01-7861913cd0e0",
+      "name": "Stairs",
+      "side": "T",
+      "type": "smoke",
+      "area": "A",
+      "stand": {
+        "x": 907.430115,
+        "y": -1036.031982,
+        "z": -251.96875
+      },
+      "aim": {
+        "pitch": -64.587288,
+        "yaw": -158.774521
+      },
+      "throw": "jump throw",
+      "land": {
+        "x": -520.425903,
+        "y": -1590.563599,
+        "z": -37.96875
+      },
+      "steps": [
+        "Stand by the A ramp entrance corner.",
+        "Aim at just beside the Palace roof edge above Stairs.",
+        "Jump and release left click from the A ramp entrance corner."
+      ],
+      "source": "CS2-annotations, MIT",
+      "checked": false
+    },
+    {
+      "id": "1ae5efea-0053-4eb9-8703-1ab3e13b3e97",
+      "name": "Jungle",
+      "side": "T",
+      "type": "smoke",
+      "area": "A",
+      "stand": {
+        "x": 1092.043335,
+        "y": -1012.002258,
+        "z": -257.438171
+      },
+      "aim": {
+        "pitch": -22.106411,
+        "yaw": -162.921844
+      },
+      "throw": "jump throw",
+      "land": {
+        "x": -812.124756,
+        "y": -1647.311646,
+        "z": 18.03125
+      },
+      "steps": [
+        "Stand by the A ramp entrance wall.",
+        "Aim at the dot on the A ramp wall below the Palace roof.",
+        "Jump and release left click from the A ramp entrance wall."
+      ],
+      "source": "CS2-annotations, MIT",
+      "checked": false
+    },
+    {
+      "id": "ee36e993-22ed-4d05-9268-4e27a2fb7817",
+      "name": "Top connector",
+      "side": "T",
+      "type": "smoke",
+      "area": "A",
+      "stand": {
+        "x": 1239.962158,
+        "y": -1159.484131,
+        "z": -246.550842
+      },
+      "aim": {
+        "pitch": -24.690639,
+        "yaw": -175.049759
+      },
+      "throw": "jump throw",
+      "land": {
+        "x": -611.516357,
+        "y": -1368.771606,
+        "z": -165.96875
+      },
+      "steps": [
+        "Stand by the T spawn corner beside A ramp.",
+        "Aim at the top of the antenna above Connector.",
+        "Jump and release left click from the T spawn corner beside A ramp."
+      ],
+      "source": "CS2-annotations, MIT",
+      "checked": false
+    },
+    {
+      "id": "885d6007-4902-4194-b5fa-94ce6c935814",
+      "name": "A main lurk",
+      "side": "T",
+      "type": "smoke",
+      "area": "A",
+      "stand": {
+        "x": 509.521759,
+        "y": -1707.965698,
+        "z": -263.96875
+      },
+      "aim": {
+        "pitch": -15.127167,
+        "yaw": 133.609192
+      },
+      "throw": "left click",
+      "land": {
+        "x": 19.33671,
+        "y": -1642.851929,
+        "z": -169.96875
+      },
+      "steps": [
+        "Stand by the A ramp right wall.",
+        "Aim at the middle seam on the A ramp wall.",
+        "Release left click from the A ramp right wall."
+      ],
+      "source": "CS2-annotations, MIT",
+      "checked": false
+    },
+    {
+      "id": "eeb7fbac-b4a7-49db-a252-bbcb5fcf2a21",
+      "name": "Palace lurk",
+      "side": "T",
+      "type": "smoke",
+      "area": "A",
+      "stand": {
+        "x": 385.87326,
+        "y": -2127.966309,
+        "z": -39.96875
+      },
+      "aim": {
+        "pitch": -5.785342,
+        "yaw": -126.39624
+      },
+      "throw": "left click",
+      "land": {
+        "x": -34.790619,
+        "y": -2081.317383,
+        "z": -36.96875
+      },
+      "steps": [
+        "Stand by the Palace exit corner.",
+        "Aim at the vertical seam between the horizontal lines on the Palace wall.",
+        "Release left click from the Palace exit corner."
+      ],
+      "source": "CS2-annotations, MIT",
+      "checked": false
+    },
+    {
+      "id": "abace398-457e-4a58-aeca-f033270827ad",
+      "name": "Top mid",
+      "side": "T",
+      "type": "smoke",
+      "area": "Mid",
+      "stand": {
+        "x": 1422.966919,
+        "y": 36.46875,
+        "z": -167.96875
+      },
+      "aim": {
+        "pitch": -42.303638,
+        "yaw": -160.521606
+      },
+      "throw": "left click",
+      "land": {
+        "x": 34.644897,
+        "y": -481.505035,
+        "z": -184.162582
+      },
+      "steps": [
+        "Stand by the T spawn wooden box.",
+        "Aim at the antenna tip above Top mid.",
+        "Release left click from the T spawn wooden box."
+      ],
+      "source": "CS2-annotations, MIT",
+      "checked": false
+    },
+    {
+      "id": "c5d46018-6036-4da3-bd6b-ee3427ce422a",
+      "name": "Window from mid",
+      "side": "T",
+      "type": "smoke",
+      "area": "Mid",
+      "stand": {
+        "x": 343.302429,
+        "y": -621.618347,
+        "z": -162.331787
+      },
+      "aim": {
+        "pitch": -32.384068,
+        "yaw": 179.378647
+      },
+      "throw": "left click",
+      "land": {
+        "x": -1187.866455,
+        "y": -603.414001,
+        "z": -165.96875
+      },
+      "steps": [
+        "Stand by the Top mid boxes.",
+        "Aim at the top flap of the Top mid box.",
+        "Release left click from the Top mid boxes."
+      ],
+      "source": "CS2-annotations, MIT",
+      "checked": false
+    },
+    {
+      "id": "52bb2de0-7f6e-4169-aaa6-f3082abd9fc7",
+      "name": "Short",
+      "side": "T",
+      "type": "smoke",
+      "area": "Mid",
+      "stand": {
+        "x": 360.075439,
+        "y": -691.96875,
+        "z": -163.355286
+      },
+      "aim": {
+        "pitch": -24.909782,
+        "yaw": 160.904984
+      },
+      "throw": "left click",
+      "land": {
+        "x": -798.707214,
+        "y": -202.775055,
+        "z": -164.94046
+      },
+      "steps": [
+        "Stand by the Top mid boxes.",
+        "Aim at the antenna tip above Short.",
+        "Release left click from the Top mid boxes."
+      ],
+      "source": "CS2-annotations, MIT",
+      "checked": false
+    },
+    {
+      "id": "53157d39-88f0-4c3e-ab3a-36d6e4225594",
+      "name": "Market window",
+      "side": "T",
+      "type": "smoke",
+      "area": "B",
+      "stand": {
+        "x": -160.03302,
+        "y": 887.96698,
+        "z": -135.328064
+      },
+      "aim": {
+        "pitch": -50.946461,
+        "yaw": -146.991608
+      },
+      "throw": "jump throw",
+      "land": {
+        "x": -1916.892456,
+        "y": -292.930206,
+        "z": -165.972
+      },
+      "steps": [
+        "Stand by the B apartments entrance corner.",
+        "Aim at the highest point of the Market tower.",
+        "Jump and release left click from the B apartments entrance corner."
+      ],
+      "source": "CS2-annotations, MIT",
+      "checked": false
+    },
+    {
+      "id": "2d509f9b-edcc-4d2c-a35d-0a257e4c18f8",
+      "name": "Market entrance",
+      "side": "T",
+      "type": "smoke",
+      "area": "B",
+      "stand": {
+        "x": -160.027588,
+        "y": 887.969849,
+        "z": -135.328125
+      },
+      "aim": {
+        "pitch": -42.075165,
+        "yaw": -151.91066
+      },
+      "throw": "jump throw",
+      "land": {
+        "x": -2376.21167,
+        "y": -295.757202,
+        "z": -165.966705
+      },
+      "steps": [
+        "Stand by the B apartments entrance corner.",
+        "Aim at the top of the rightmost Market window.",
+        "Jump and release left click from the B apartments entrance corner."
+      ],
+      "source": "CS2-annotations, MIT",
+      "checked": false
+    },
+    {
+      "id": "4169c6de-a461-43af-ba30-51d6f3b5883b",
+      "name": "CT spawn",
+      "side": "T",
+      "type": "smoke",
+      "area": "A",
+      "stand": {
+        "x": 1091.133789,
+        "y": -1012.912842,
+        "z": -257.549683
+      },
+      "aim": {
+        "pitch": -29.730185,
+        "yaw": -143.773361
+      },
+      "throw": "jump throw",
+      "land": {
+        "x": -876.852173,
+        "y": -2436.367432,
+        "z": -108.837357
+      },
+      "steps": [
+        "Stand by the A ramp entrance wall.",
+        "Aim at the right edge of the tower above CT spawn.",
+        "Jump and release left click from the A ramp entrance wall."
+      ],
+      "source": "CS2-annotations, MIT",
+      "checked": false
+    },
+    {
+      "id": "bce4337a-cef1-421e-9a7d-2a7e12bc852e",
+      "name": "Deep A ramp",
+      "side": "CT",
+      "type": "smoke",
+      "area": "A",
+      "stand": {
+        "x": -2031.968872,
+        "y": -1766.488647,
+        "z": -300.431152
+      },
+      "aim": {
+        "pitch": -16.542898,
+        "yaw": 5.386463
+      },
+      "throw": "jump throw",
+      "land": {
+        "x": 476.344696,
+        "y": -1531.98938,
+        "z": -255.135513
+      },
+      "steps": [
+        "Stand by the CT spawn corner toward Ticket booth.",
+        "Aim at the wall edge at the upper grout line toward A ramp.",
+        "Jump and release left click from the CT spawn corner toward Ticket booth."
+      ],
+      "source": "CS2-annotations, MIT",
+      "checked": false
+    },
+    {
+      "id": "own-ct-a-ramp-from-ticket",
+      "name": "A ramp from Ticket",
+      "side": "CT",
+      "type": "smoke",
+      "area": "A",
+      "stand": {
+        "x": -876,
+        "y": -2436,
+        "z": -109
+      },
+      "aim": {
+        "pitch": -11.828594,
+        "yaw": 41.542019
+      },
+      "throw": "left click",
+      "land": {
+        "x": 19,
+        "y": -1643,
+        "z": -170
+      },
+      "steps": [
+        "Stand beside Ticket booth.",
+        "Aim above A ramp entrance; this estimated angle needs a game check.",
+        "Release left click beside Ticket booth."
+      ],
+      "source": "own",
+      "checked": false
+    },
+    {
+      "id": "own-ct-palace-from-a-site",
+      "name": "Palace from A site",
+      "side": "CT",
+      "type": "smoke",
+      "area": "A",
+      "stand": {
+        "x": -520,
+        "y": -1590,
+        "z": -38
+      },
+      "aim": {
+        "pitch": 1.208927,
+        "yaw": -45.352224
+      },
+      "throw": "left click",
+      "land": {
+        "x": -35,
+        "y": -2081,
+        "z": -37
+      },
+      "steps": [
+        "Stand beside Stairs on A site.",
+        "Aim above Palace balcony; this estimated angle needs a game check.",
+        "Release left click beside Stairs on A site."
+      ],
+      "source": "own",
+      "checked": false
+    },
+    {
+      "id": "own-ct-top-mid-from-connector",
+      "name": "Top mid from Connector",
+      "side": "CT",
+      "type": "smoke",
+      "area": "Mid",
+      "stand": {
+        "x": -611,
+        "y": -1369,
+        "z": -166
+      },
+      "aim": {
+        "pitch": -11.067071,
+        "yaw": 53.934237
+      },
+      "throw": "left click",
+      "land": {
+        "x": 35,
+        "y": -482,
+        "z": -184
+      },
+      "steps": [
+        "Stand beside Connector doorway.",
+        "Aim above Top mid boxes; this estimated angle needs a game check.",
+        "Release left click beside Connector doorway."
+      ],
+      "source": "own",
+      "checked": false
+    },
+    {
+      "id": "own-ct-b-apartments-from-bench",
+      "name": "B apartments from Bench",
+      "side": "CT",
+      "type": "smoke",
+      "area": "B",
+      "stand": {
+        "x": -2050,
+        "y": 420,
+        "z": -160
+      },
+      "aim": {
+        "pitch": 9.847065,
+        "yaw": 56.821488
+      },
+      "throw": "left click",
+      "land": {
+        "x": -1880,
+        "y": 680,
+        "z": -135
+      },
+      "steps": [
+        "Stand beside B site Bench.",
+        "Aim toward the B apartments exit edge; this estimated angle needs a game check.",
+        "Release left click beside B site Bench."
+      ],
+      "source": "own",
+      "checked": false
+    },
+    {
+      "id": "own-ct-short-from-market",
+      "name": "Short from Market",
+      "side": "CT",
+      "type": "smoke",
+      "area": "B",
+      "stand": {
+        "x": -1917,
+        "y": -293,
+        "z": -166
+      },
+      "aim": {
+        "pitch": -13.335378,
+        "yaw": 4.602437
+      },
+      "throw": "left click",
+      "land": {
+        "x": -799,
+        "y": -203,
+        "z": -165
+      },
+      "steps": [
+        "Stand beside Market window.",
+        "Aim above Short arch; this estimated angle needs a game check.",
+        "Release left click beside Market window."
+      ],
+      "source": "own",
+      "checked": false
+    }
+  ]
+}

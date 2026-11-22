@@ -87,6 +87,7 @@ class State:
 
         self.overlay = OverlayService()  # Inert until enabled in preferences.
         self.overlay.pinned_context = lambda: _overlay_pinned_context(self)
+        self.overlay.lineups_art = lambda key: _lineups_art(self, key)
         from .rgb import RgbSync
 
         # Inert until switched on in preferences; remembers the last board so
@@ -6020,6 +6021,36 @@ def _cloud_logout(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     return cloud.sign_out()
 
 
+def _lineups_pictures(state, body):
+    from .overlay.tools.lineups import creating
+    if body.get('action') == 'stop':
+        legacy = state.overlay.picture_session
+        if legacy and legacy.active:
+            legacy.abort()
+            state.overlay._configure_gsi(state.overlay._settings['overlay_enabled'])
+        if hasattr(state.overlay, 'cancel_creating'):
+            return creating(state, {'action': 'cancel'})
+        return {'available': True, 'active': False, 'text': legacy.text if legacy else 'Pictures stopped.'}
+    if body.get('action') == 'status':
+        return creating(state, {'action': 'status'})
+    if not state.overlay._settings['overlay_enabled'] or 'lineups' not in state.overlay._settings['overlay_tools']:
+        return {'available': False, 'active': False, 'text': 'Turn on the overlay and Lineups first.'}
+    return {'available': True, 'active': False,
+            'text': 'Open Lineups, choose a lineup, then press Make lineup pictures.'}
+
+
+def _lineups_art(state, key):
+    from .lineups.radar import picture
+    from .paths import user_data_dir
+    if not state.overlay._settings['overlay_enabled'] or 'lineups' not in state.overlay._settings['overlay_tools']:
+        return None
+    try:
+        package = _skins_vpk(state)
+    except (OSError, ValueError, AttributeError, steam.SteamError):
+        return None
+    return picture(package, user_data_dir(), key) if package else None
+
+
 def _overlay_pinned_context(state):
     """Read saved profile names without rescanning configs or invoking web APIs."""
     from . import profiles, setups, layouts
@@ -6534,6 +6565,7 @@ def make_handler(state: State):
         "/api/overlay": _overlay,
         "/api/overlay/panel": _overlay_panel,
         "/api/overlay/settings": _overlay_settings,
+        "/api/lineups/pictures": _lineups_pictures,
         "/api/rgb": _rgb,
         "/api/rgb/settings": _rgb_settings,
         "/api/mouse": _mouse,
