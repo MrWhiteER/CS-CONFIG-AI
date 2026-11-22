@@ -3370,6 +3370,16 @@
     background: rgba(0, 0, 0, .38); border: 1px solid var(--line);
     font-size: 10.5px; color: var(--ink-dim); white-space: nowrap;
   }
+  .mapcfg-row { border: 1px solid var(--line-soft); border-radius: 12px; padding: 12px 14px; margin: 0 0 10px; }
+  .mapcfg-top { display: flex; align-items: center; gap: 12px; }
+  .mapcfg-top b { font-size: 15px; }
+  .mapcfg-top .sub { flex: 1; margin: 0; }
+  .mapcfg-maps { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .mapcfg-maps button { border-radius: 999px; padding: 4px 10px; font-size: 12px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; }
+  .mapcfg-maps button[aria-pressed="true"] { background: var(--good); color: #0b0b0b; border-color: transparent; }
+  .mapcfg-live { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; }
+  .mapcfg-auto { display: flex; align-items: center; gap: 12px; margin: 0 0 14px; }
+  .mapcfg-auto div { flex: 1; }
   .chip i { width: 6px; height: 6px; border-radius: 50%; background: var(--good); flex: none; }
   .chip b { color: var(--ink); font-family: var(--mono); font-weight: 600; }
   .chip.warn i { background: var(--warn); }
@@ -6974,6 +6984,7 @@ const startup = (() => {
           <button class="seg-item" data-sub="sound" role="tab" aria-selected="false"><span data-hardware-icon="sound"></span> Sound</button>
           <button class="seg-item" data-sub="overlay" role="tab" aria-selected="false"><span data-hardware-icon="overlay"></span> Overlay</button>
           <button class="seg-item" data-sub="config" role="tab" aria-selected="false"><span data-hardware-icon="config"></span> Config files</button>
+          <button class="seg-item" data-sub="maps" role="tab" aria-selected="false"><span data-hardware-icon="config"></span> Map configs</button>
           <button class="seg-item" data-sub="editing" role="tab" aria-selected="false"><span data-hardware-icon="history"></span> Editing</button>
           <button class="seg-item" data-sub="logs" role="tab" aria-selected="false"><span data-hardware-icon="logs"></span> Logs</button>
         </div>
@@ -7152,6 +7163,23 @@ const startup = (() => {
         <div id="audio-out"><span class="sub"><span class="spin"></span> Reading&hellip;</span></div>
       </section>
 
+      </div>
+
+      <!-- Map configs (Edy, Nov 22): warmup / 5v5 configs that only last
+           while you are on their map. Leaving the map, quitting or a crash
+           brings the normal keys and settings back. -->
+      <div class="subpane hidden" data-sub="maps">
+        <section class="panel wide" id="mapcfg-card">
+          <h2><span data-hardware-icon="config"></span> Map configs</h2>
+          <p class="sub" style="margin:0 0 10px">
+            Pick the configs you load on a map, like a warmup or a 5v5 setup, and the
+            maps they belong to. Load them in game the way you always do. When you
+            leave that map, quit CS2 or the game crashes, your normal keys and
+            settings come back on their own. These changes are never listed as
+            buttons you changed.
+          </p>
+          <div id="mapcfg-out"><span class="sub">&hellip;</span></div>
+        </section>
       </div>
 
       <div class="subpane hidden" data-sub="config">
@@ -9502,6 +9530,7 @@ function setSettingsSub(name, restoring) {
     if (name === "overlay") loadOverlay();
     if (name === "lighting") loadRgb();
     if (name === "mouse") loadMouse();
+    if (name === "maps") loadMapCfg();
     if (name === "sound") { loadAudio(false); loadGoxlr(true); }
     if (name === "logs") loadHistory();
     if (name === "config" || name === "editing") ensureScan(false);
@@ -9624,6 +9653,103 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.id === 'mouse-dpi') $('mouse-dpi-set')?.click();
+});
+
+// Map configs: configs that only last while you are on their map.
+let mapCfgData = null, mapCfgError = '', mapCfgBusy = false, mapCfgOpen = new Set();
+
+function renderMapCfg() {
+  const box = $('mapcfg-out');
+  if (!box) return;
+  if (mapCfgError && !mapCfgData) { box.innerHTML = '<p class="sub">' + esc(mapCfgError) + '</p>'; return; }
+  const d = mapCfgData;
+  if (!d) { box.innerHTML = '<span class="sub">Reading your configs&hellip;</span>'; return; }
+  let html = '';
+  const live = d.live;
+  if (live) {
+    const where = live.map ? ('You are on ' + live.map + (live.on_setup_map ? ', and a map config can be on here.' : '.'))
+      : live.in_menu ? 'You are in the main menu.' : 'CS2 is not telling the app about a map right now.';
+    html += '<div class="mapcfg-live"><span class="chip' + (live.owed ? ' warn' : '') + '"><i></i> <b>' +
+      esc(live.owed ? 'Normal keys come back in the menu' : 'Normal keys are on') + '</b></span><span class="sub">' + esc(where) + '</span></div>';
+  }
+  html += '<div class="mapcfg-auto"><div><b>Put my keys back for me</b><p class="sub" style="margin:2px 0 0">' +
+    (d.apply_key
+      ? 'When you are back in the main menu with CS2 in front, the app presses your apply key (' + esc(d.apply_key) + ') once. Never during a match.'
+      : 'Pick an apply key in Settings first. Without one, the app cannot bring your keys back until you restart CS2.') +
+    '</p></div><label class="switch" title="Press the apply key for me after a map config"><input type="checkbox" id="mapcfg-auto"' +
+    (d.auto_press ? ' checked' : '') + (mapCfgBusy ? ' disabled' : '') + '></label></div>';
+  if (!d.setups.length) {
+    html += '<p class="sub">No configs you load in game were found in your config folder. Configs that start with the game, like your autoexec, are always on and cannot be map configs.</p>';
+  }
+  for (const s of d.setups) {
+    const picked = new Set(s.maps.map(m => m.id));
+    const changes = [];
+    if (s.keys.length) changes.push('Keys: ' + s.keys.join(', '));
+    if (s.settings) changes.push(s.settings + (s.settings === 1 ? ' setting' : ' settings'));
+    const mapsText = !s.on ? 'Not a map config. Once loaded, it stays on until you restart CS2.'
+      : picked.size ? 'On for ' + s.maps.map(m => m.name).join(', ') + '.' : 'On for any map.';
+    html += '<div class="mapcfg-row"><div class="mapcfg-top"><b>' + esc(s.name) + '</b><p class="sub">' +
+      esc(changes.join(' · ') || 'Changes nothing the app can see') + '<br>' + esc(mapsText) + '</p>' +
+      (s.on ? '<button class="btn small ghost" data-mapcfg-open="' + esc(s.file) + '">' + (mapCfgOpen.has(s.file) ? 'Done' : 'Pick maps') + '</button>' : '') +
+      '<label class="switch" title="Use as a map config"><input type="checkbox" data-mapcfg-on="' + esc(s.file) + '"' +
+      (s.on ? ' checked' : '') + (mapCfgBusy ? ' disabled' : '') + '></label></div>';
+    if (s.on && mapCfgOpen.has(s.file)) {
+      html += '<div class="mapcfg-maps" role="group" aria-label="Maps for ' + esc(s.name) + '">' +
+        '<button type="button" data-mapcfg-map="" data-file="' + esc(s.file) + '" aria-pressed="' + (picked.size ? 'false' : 'true') + '">Any map</button>' +
+        d.maps.map(m => '<button type="button" data-mapcfg-map="' + esc(m.id) + '" data-file="' + esc(s.file) +
+          '" aria-pressed="' + (picked.has(m.id) ? 'true' : 'false') + '">' + esc(m.name) + '</button>').join('') + '</div>';
+    }
+    html += '</div>';
+  }
+  if (mapCfgError) html += '<p class="sub" style="color:var(--bad)">' + esc(mapCfgError) + '</p>';
+  box.innerHTML = html;
+}
+
+async function loadMapCfg() {
+  if (mapCfgBusy) return;
+  try {
+    const d = await api('/api/mapsetups', {});
+    if (!d || d.ok === false) throw new Error(d?.error || 'Your map configs could not be read');
+    mapCfgData = d; mapCfgError = '';
+  } catch (err) { mapCfgError = err.message || String(err); }
+  renderMapCfg();
+}
+
+async function saveMapCfg(body) {
+  if (mapCfgBusy) return;
+  mapCfgBusy = true; mapCfgError = ''; renderMapCfg();
+  try {
+    const d = await api('/api/mapsetups/set', body);
+    if (!d || d.ok === false) throw new Error(d?.error || 'That change was not saved');
+    mapCfgData = d;
+  } catch (err) { mapCfgError = err.message || String(err); }
+  finally { mapCfgBusy = false; renderMapCfg(); }
+}
+
+document.addEventListener('change', e => {
+  if (e.target.id === 'mapcfg-auto') return saveMapCfg({auto_press: e.target.checked});
+  const on = e.target.closest('[data-mapcfg-on]');
+  if (!on) return;
+  const file = on.dataset.mapcfgOn;
+  const row = (mapCfgData?.setups || []).find(s => s.file === file);
+  if (on.checked) mapCfgOpen.add(file); else mapCfgOpen.delete(file);
+  saveMapCfg({file, on: on.checked, maps: (row?.maps || []).map(m => m.id)});
+});
+document.addEventListener('click', e => {
+  const open = e.target.closest('[data-mapcfg-open]');
+  if (open) {
+    const file = open.dataset.mapcfgOpen;
+    if (mapCfgOpen.has(file)) mapCfgOpen.delete(file); else mapCfgOpen.add(file);
+    return renderMapCfg();
+  }
+  const chip = e.target.closest('[data-mapcfg-map]');
+  if (!chip || mapCfgBusy) return;
+  const file = chip.dataset.file, id = chip.dataset.mapcfgMap;
+  const row = (mapCfgData?.setups || []).find(s => s.file === file);
+  let maps = new Set((row?.maps || []).map(m => m.id));
+  if (!id) maps = new Set();
+  else if (maps.has(id)) maps.delete(id); else maps.add(id);
+  saveMapCfg({file, on: true, maps: [...maps]});
 });
 
 // Both lighting entry points display the same confirmed server snapshot.

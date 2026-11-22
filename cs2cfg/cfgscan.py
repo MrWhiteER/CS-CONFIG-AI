@@ -34,6 +34,8 @@ CONFIG_SUFFIXES = (".cfg", ".vcfg")
 # startup configs, so reading it back as part of a collection would make its
 # copy of a setting look like the one that wins.
 APPLY_NOW_FILE = "cs2cfg_apply_now.cfg"
+# Written by mapconfig; generated, never part of a collection.
+MAP_RESET_FILE = "cs2cfg_map_reset.cfg"
 
 # Commands that are real but are not settings and not user aliases. Used to
 # avoid calling a normal engine command an unresolved reference.
@@ -233,7 +235,7 @@ def discover(folder: Path, cfg_root: Optional[Path] = None) -> Dict[str, ConfigF
     for path in sorted(folder.rglob("*")):
         if not path.is_file() or path.suffix.lower() not in CONFIG_SUFFIXES:
             continue
-        if path.name.lower() == APPLY_NOW_FILE:
+        if path.name.lower() in (APPLY_NOW_FILE, MAP_RESET_FILE):
             continue
         try:
             raw = path.read_bytes()

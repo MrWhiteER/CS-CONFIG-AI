@@ -77,6 +77,8 @@ class State:
         self.faceit: Optional[Dict[str, Any]] = None  # cached profile + history
         self.stats_token = ""                # secret for CS2's stats GSI feed
         self.stats_recorder: Optional[Any] = None  # matchlog.Recorder, once set up
+        self.stats_on = True                 # player lets matches be recorded
+        self.stats_feed: Optional[Any] = None  # (install finder, port) for the feed file
         self.stats_store: Optional[Any] = None     # matchlog.Store
         self.sync: Optional[Any] = None      # autosync.Loop, once started
         self.server_ping: Optional[Any] = None  # on-demand Valve relay survey
@@ -4375,8 +4377,8 @@ def _ingame(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
                 "note": "Recorded how your settings look now. Changes you make "
                         "in-game from here on will be listed after each session."}
 
-    changes = gamewatch.compare(baseline, now,
-                                include_machine=bool(body.get("include_machine")))
+    changes = gamewatch.without_app_owned(gamewatch.compare(
+        baseline, now, include_machine=bool(body.get("include_machine"))))
     payload = gamewatch.as_dict(changes, baseline, now)
     payload["account"] = user.account_id
     payload["running"] = window.find_game_window("cs2.exe") is not None
@@ -4934,11 +4936,31 @@ def _stats_setup(state: State, install_finder, port: int) -> None:
             timer.start()
 
     state.stats_recorder = matchlog.Recorder(save)
+    state.stats_feed = (install_finder, port)
+    _stats_cfg(state)
+
+
+def _stats_cfg(state: State) -> None:
+    """Write or remove CS2's game state feed file for this app.
+
+    Needed when matches are recorded, and also when a map setup has to know
+    which map the game is on.
+    """
+    from . import mapconfig, matchlog
+    from .cli import load_prefs
+    from .paths import user_data_dir
+
+    feed = getattr(state, "stats_feed", None)
+    if not feed:
+        return
+    install_finder, port = feed
+    state.stats_on = load_prefs().get("ui", {}).get("cs2_stats_record", True) is not False
     try:
+        wanted = state.stats_on or bool(mapconfig.load().get("setups"))
         install = install_finder()
         if not install:
             return
-        if load_prefs().get("ui", {}).get("cs2_stats_record", True) is False:
+        if not wanted:
             matchlog.remove_cfg(install)
             return
         state.stats_token = matchlog.install_token(user_data_dir())
@@ -4951,8 +4973,80 @@ def _stats_receive(state: State, raw: bytes) -> None:
     from . import matchlog
 
     payload = matchlog.parse_payload(raw, state.stats_token)
-    if state.stats_recorder is not None:
+    if state.stats_recorder is not None and getattr(state, "stats_on", True):
         state.stats_recorder.feed(payload)
+    # Map setups follow the same feed: which map, or the main menu.
+    try:
+        from . import mapconfig
+
+        watch = mapconfig.shared()
+        if watch is not None:
+            watch.feed(payload)
+    except Exception:
+        pass                    # a map setup is never worth losing a match over
+
+
+def _map_scan(state: State):
+    """The collection as last read, or read now from the remembered folder.
+
+    The app often runs in the tray without its page ever opening, and map
+    setups still have to work then.
+    """
+    held = getattr(state, "cfg_scan", None)
+    if held is not None:
+        return held
+    from . import cfgscan
+    from .cli import load_prefs
+
+    folder = str(load_prefs().get("ui", {}).get("cfg_folder") or "")
+    if not folder or not Path(folder).is_dir():
+        return None
+    try:
+        state.cfg_scan = cfgscan.scan(Path(folder))
+    except OSError:
+        return None
+    return state.cfg_scan
+
+
+def _map_setup_start(state: State) -> None:
+    from . import applynow, gamewatch, mapconfig
+
+    def refresh(result) -> None:
+        try:
+            applynow.refresh(result)
+        except Exception:
+            pass
+
+    mapconfig.start(lambda: _map_scan(state), refresh)
+    gamewatch.APP_OWNED.append(
+        lambda change: mapconfig.app_owned_filter(_map_scan(state))(change))
+
+
+def _map_setups(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import mapconfig
+
+    return mapconfig.summary(_rescan(state) or _map_scan(state))
+
+
+def _map_setups_set(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Turn one config into a map setup (with its maps), or back off."""
+    from . import applynow, mapconfig
+
+    result = _rescan(state) or _map_scan(state)
+    if "auto_press" in body:
+        data = mapconfig.load()
+        data["auto_press"] = bool(body.get("auto_press"))
+        mapconfig.save(data)
+        return mapconfig.summary(result)
+    try:
+        out = mapconfig.set_setup(result, str(body.get("file") or ""), bool(body.get("on")),
+                                  [str(m) for m in body.get("maps") or []])
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
+    applynow.refresh(result)
+    # The game state feed is what tells the app which map you are on.
+    _stats_cfg(state)
+    return out
 
 
 STEAM_HISTORY_EVERY = 3600   # re-read Steam's history at most hourly
@@ -5128,7 +5222,7 @@ def _stats(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         **out,
         "faceit": {k: faceit.get(k) for k in ("linked", "player", "error", "stale")
                    if k in faceit},
-        "cs2": {"recording": bool(state.stats_token)},
+        "cs2": {"recording": bool(state.stats_token) and getattr(state, "stats_on", True)},
         "steam": _stats_steam_auto(state),
     }
 
@@ -6808,6 +6902,8 @@ def make_handler(state: State):
         "/api/rgb/settings": _rgb_settings,
         "/api/mouse": _mouse,
         "/api/mouse/settings": _mouse_settings,
+        "/api/mapsetups": _map_setups,
+        "/api/mapsetups/set": _map_setups_set,
     }
 
     class Handler(BaseHTTPRequestHandler):
@@ -7374,6 +7470,14 @@ def _history_watchers(state: State) -> None:
                 watcher.check_now()
         except Exception:
             pass
+        try:
+            from . import mapconfig
+
+            watch = mapconfig.shared()
+            if watch is not None:
+                watch.game_closed()
+        except Exception:
+            pass
 
     def nvidia_moved(items: List[Dict[str, Any]]) -> None:
         history.add_event("nvidia", items)
@@ -7462,6 +7566,10 @@ def serve(port: int = 8765, cfg_folder: str = "mrwhiteer",
 
     state.overlay.bind_gsi(overlay_install, server.server_address[1])
     _stats_setup(state, overlay_install, server.server_address[1])
+    try:
+        _map_setup_start(state)
+    except Exception:
+        pass
     state.overlay.configure(overlay_settings(load_prefs().get("ui")))
     try:
         from .rgb import read_settings as rgb_settings
