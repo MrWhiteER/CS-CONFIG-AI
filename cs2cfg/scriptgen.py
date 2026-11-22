@@ -671,7 +671,11 @@ def build(spec: Dict[str, Any], scan=None, key_label: str = "") -> Built:
     # The shift key's own job, kept unless the player turns that off: Mouse 5
     # can stay voice chat and still be the shift key.
     own_press, own_release, own_lines, own_said = "", "", [], ""
-    if mode == "shift" and binding and spec.get("keep_own", True) is not False:
+    # Another shift script already on this key is always kept: several
+    # scripts can share one shift key, whatever "keep its own job" says.
+    shared = bool(key_before) and _own_block(
+        scan, key_before.strip('"').lstrip("+-").split(";")[0].strip().lower()) is not None
+    if mode == "shift" and binding and (spec.get("keep_own", True) is not False or shared):
         own = (key_before or str(spec.get("key_stock") or "").strip()
                or STOCK_FALLBACK.get(binding, ""))
         if own and alias and own.lower().lstrip("+") != alias:

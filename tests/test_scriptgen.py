@@ -689,6 +689,19 @@ class SharedShiftKeyCase(Base):
         self.assertEqual(self.key(), "+nade")
         self.assertTrue(self.aliases()["+smoke"].startswith("+voicerecord;"))
 
+    def test_every_script_shows_the_shared_key(self):
+        cards = [c for c in webui._cfg_plugins(self.state, {})["plugins"] if c.get("made")]
+        self.assertEqual({c["name"]: c["bound_labels"] for c in cards},
+                         {"Smoke": ["Mouse 5"], "Molly": ["Mouse 5"], "Nade": ["Mouse 5"]})
+
+    def test_new_script_without_own_job_still_keeps_the_others(self):
+        body = spec("Flash", "shift", {"id": "cmd:slot3"}, binding="mouse5")
+        body.update(target="scancode29", style="next", keep_own=False)
+        self.assertTrue(webui._scriptgen_save(self.state, {"spec": body, "binding": "mouse5"})["ok"])
+        self.assertEqual(self.key(), "+flash")
+        flash = self.state.cfg_scan.effective_alias("+flash").body
+        self.assertTrue(flash.startswith("+nade;"), flash)
+
     def test_deleting_the_top_gives_the_key_to_the_next(self):
         self.assertTrue(webui._script_delete(self.state, {"id": self.card("Nade")})["ok"])
         self.assertEqual(self.key(), "+molly")
