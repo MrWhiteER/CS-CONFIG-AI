@@ -2672,11 +2672,44 @@ def _cfg_plugins(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     return payload
 
 
+def _live_binds(result) -> Dict[str, Any]:
+    """Every key as the game has it now: ``{physical key: bind}``.
+
+    With a profile picked on the Keyboard tab that is the profile's keyboard,
+    not the default layout's -- a script saved while a profile is on goes into
+    the profile, so reading the default layout would show the old key.
+    """
+    from . import cfgscan, layouts
+
+    active = _current_profile(result)
+    if active is not None:
+        final, _ = cfgscan.profile_layout(
+            result, active, layouts.load_pins(result.root).get(active, []))
+        return dict(final)
+    chain = cfgscan.startup_chain(result)
+    out: Dict[str, Any] = {}
+    for key in result.binds:
+        winner = cfgscan._effective_bind(result, chain, key)
+        if winner is not None and winner.file in chain:
+            out[cfgscan.physical_key(winner.key)] = winner
+    return out
+
+
+def _made_keys(live: Dict[str, Any], alias: str) -> List[Any]:
+    """The binds that run a Script Builder script, in a steady order."""
+    from . import scriptgen
+
+    return sorted((b for b in live.values()
+                   if alias and scriptgen._runs_own(b.body or "", alias)),
+                  key=lambda b: b.key.lower())
+
+
 def _mark_made(result, cards: list) -> None:
     """Say which Scripts-tab cards Script Builder made, so they get a tab of
     their own and an Edit button that opens them in the builder again."""
-    from . import scriptgen
+    from . import keys, scriptgen
 
+    live = _live_binds(result)
     for config in result.files.values():
         try:
             text = config.path.read_bytes().decode(config.document.encoding, errors="replace")
@@ -2685,6 +2718,8 @@ def _mark_made(result, cards: list) -> None:
         if scriptgen.MARK not in text:
             continue
         for block in scriptgen.own_blocks(text):
+            spec = block["spec"]
+            on = _made_keys(live, str(spec.get("alias") or ""))
             for card in cards:
                 if (card["file"] == config.relative and card["line"] <= block["last"]
                         and card["end_line"] >= block["first"]):
@@ -2694,6 +2729,17 @@ def _mark_made(result, cards: list) -> None:
                         card["suspect"] = False
                         card["notes"] = [n for n in card.get("notes", [])
                                          if n.get("code") != "state-redefines-other"]
+                    # The keys as the game has them now, so saving the script
+                    # on other keys shows here straight away.
+                    card["bound_to"] = [b.key for b in on]
+                    card["bound_labels"] = [keys.label(b.key) for b in on]
+                    target = str(spec.get("target") or "")
+                    if on and target and spec.get("mode") == "shift":
+                        shift = " / ".join(card["bound_labels"])
+                        card["made_keys"] = (
+                            f"Hold {shift}, press {keys.label(target)}"
+                            if spec.get("style") == "hold"
+                            else f"{shift}, then {keys.label(target)}")
                     card["made"] = {"alias": block["spec"].get("alias", ""),
                                     "name": block["spec"].get("name", ""),
                                     "mode": block["spec"].get("mode", "")}
@@ -3697,6 +3743,19 @@ def _scriptgen_steps(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
             "folder": result is not None}
 
 
+def _scriptgen_now(result, spec: Dict[str, Any], binding: str) -> None:
+    """What the two keys do now, on the keyboard in use (a profile counts)."""
+    from . import cfgscan
+
+    if result is None:
+        return
+    live = _live_binds(result)
+    for name, key in (("key_now", binding), ("target_now", str(spec.get("target") or ""))):
+        if key:
+            held = live.get(cfgscan.physical_key(key))
+            spec[name] = (held.body or "").strip().strip(chr(34)) if held is not None else ""
+
+
 def _scriptgen_check(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     """Read-only: what a script would do, its lines, and every check on it."""
     from . import scriptgen
@@ -3709,6 +3768,7 @@ def _scriptgen_check(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         spec["target_stock"] = _scriptgen_stock(state, str(spec["target"]))
     if binding:
         spec["key_stock"] = _scriptgen_stock(state, binding)
+    _scriptgen_now(result, spec, binding)
     key = _scriptgen_key(result, binding, "", state)
     built = scriptgen.build(spec, result, key["label"])
     key = _scriptgen_key(result, binding, built.entry, state)
@@ -3730,7 +3790,7 @@ def _scriptgen_saved(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     result = _rescan(state)
     found = []
     if result is not None:
-        chain = cfgscan.startup_chain(result)
+        live = _live_binds(result)
         blocks = plugins.find(result)
         for config in sorted(result.files.values(), key=lambda c: c.relative):
             try:
@@ -3744,14 +3804,9 @@ def _scriptgen_saved(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
                 alias = str(spec.get("alias") or "")
                 plug = next((p for p in blocks if p.file == config.relative
                              and p.line <= block["last"] and p.end_line >= block["first"]), None)
-                on_keys, on_bindings = [], []
-                for binding in sorted(result.binds):
-                    winner = cfgscan._effective_bind(result, chain, binding)
-                    if (winner is not None and winner.file in chain and alias
-                            and scriptgen._runs_own(winner.body or "", alias)
-                            and keys.label(binding) not in on_keys):
-                        on_keys.append(keys.label(binding))
-                        on_bindings.append(binding)
+                on = _made_keys(live, alias)
+                on_keys = [keys.label(b.key) for b in on]
+                on_bindings = [b.key for b in on]
                 binding = spec.get("binding") or ""
                 enabled = plug.enabled if plug is not None else True
                 found.append({
@@ -3797,9 +3852,8 @@ def _scriptgen_rekey(state: State, spec: Dict[str, Any], enable: bool) -> Option
     result = getattr(state, "cfg_scan", None)
     if not binding or not alias or result is None:
         return None
-    chain = cfgscan.startup_chain(result)
-    existing = [b for b in cfgscan.binds_for_key(result, binding) if b.file in chain]
-    now = (existing[-1].body or "").strip().strip(chr(34)) if existing else ""
+    held = _live_binds(result).get(cfgscan.physical_key(binding))
+    now = (held.body or "").strip().strip(chr(34)) if held is not None else ""
     if enable:
         if now and not scriptgen._runs_own(now, alias) and now != spec.get("key_before"):
             return None     # the key was given to something else meanwhile
@@ -3834,6 +3888,7 @@ def _scriptgen_save(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         spec["target_stock"] = _scriptgen_stock(state, str(spec["target"]))
     if binding:
         spec["key_stock"] = _scriptgen_stock(state, binding)
+    _scriptgen_now(result, spec, binding)
     key = _scriptgen_key(result, binding, "", state)
     built = scriptgen.build(spec, result, key["label"])
     if not built.ok:

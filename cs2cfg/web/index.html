@@ -11789,7 +11789,7 @@ function plugCard(p) {
     (p.bound_labels.length
       ? "Bound to " + esc(p.bound_labels.join(", ")) + " \u2014 click to change"
       : "Not bound to any key \u2014 click to assign one") + '">' +
-    (p.bound_labels.length ? esc(p.bound_labels.join(" / ")) : "set a key") +
+    (p.made_keys ? esc(p.made_keys) : p.bound_labels.length ? esc(p.bound_labels.join(" / ")) : "set a key") +
     "</button>" +
     '<span class="sub2">' + (p.bound_labels.length ? "runs this script" :
       "not on any key") + "</span></div>" +

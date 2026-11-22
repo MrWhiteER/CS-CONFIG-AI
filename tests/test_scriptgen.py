@@ -503,6 +503,34 @@ class SyncCase(Base):
         self.assertIn('alias "+talk_alt" "+voicerecord; talk_alt_next"', again)
         self.assertIn('bind "mouse5" "+talk_alt"', again)
 
+    def test_profile_resave_on_other_keys_shows_new_keys(self):
+        from cs2cfg import keys, layouts
+
+        prof = self.cfg_root / "me/lan/training.vcfg"
+        prof.parent.mkdir(parents=True, exist_ok=True)
+        prof.write_text('bind "mouse5" "+voicerecord"\nbind "mouse4" "player_ping"\n'
+                        'bind "scancode30" "slot1"\nbind "scancode31" "slot2"\n', encoding="utf-8")
+        alias = self.cfg_root / "me/tools/alias.vcfg"
+        alias.write_text(alias.read_text() + 'alias "!train" "exec me/lan/training.vcfg"\n')
+        self.state.cfg_scan = cfgscan.scan(self.cfg_root / "me", cfg_root=self.cfg_root)
+        self.assertTrue(cfgscan.is_match_profile(self.state.cfg_scan, "me/lan/training.vcfg"))
+        layouts.save_current(self.state.cfg_scan.root, "me/lan/training.vcfg")
+
+        def save(key, target):
+            body = spec("Insta fire", "shift", {"id": "cmd:slot3"}, binding=key)
+            body.update(target=target, style="hold")
+            reply = webui._scriptgen_save(self.state, {"spec": body, "binding": key})
+            self.assertTrue(reply["ok"], reply)
+
+        save("mouse5", "scancode30")
+        save("mouse4", "scancode31")
+        card = [c for c in webui._cfg_plugins(self.state, {})["plugins"] if c.get("made")][0]
+        self.assertEqual(card["bound_labels"], ["Mouse 4"])
+        self.assertEqual(card["made_keys"], "Hold Mouse 4, press " + keys.label("scancode31"))
+        self.assertEqual(self.saved()[0]["keys"], ["Mouse 4"])
+        live = webui._live_binds(self.state.cfg_scan)
+        self.assertEqual(live["mouse5"].body.strip('"'), "+voicerecord")
+
     def test_scripts_tab_marks_builder_scripts(self):
         self.save_shift()
         cards = webui._cfg_plugins(self.state, {})["plugins"]
