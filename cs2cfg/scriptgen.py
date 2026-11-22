@@ -607,7 +607,10 @@ def build(spec: Dict[str, Any], scan=None, key_label: str = "") -> Built:
 
     # What the key did before this script took it, remembered so switching
     # the script off (or keeping the shift key's own job) can give it back.
-    key_before = normal_bind(scan, binding)
+    # The page's caller passes what the key does now on the keyboard in use
+    # (a profile has keys of its own); otherwise the files decide.
+    key_before = (str(spec["key_now"]).strip().strip('"') if "key_now" in spec
+                  else normal_bind(scan, binding))
     if key_before and alias and _runs_own(key_before, alias):
         key_before = (str(earlier.get("key_before") or "")
                       if earlier.get("binding") == binding else "")
@@ -628,7 +631,8 @@ def build(spec: Dict[str, Any], scan=None, key_label: str = "") -> Built:
             checks.append(Check("block", "The shift key and the key it changes must be two different keys."))
             block = True
         else:
-            normal = (normal_bind(scan, target) or str(spec.get("target_stock") or "").strip()
+            normal = ((str(spec["target_now"]).strip().strip('"') if "target_now" in spec
+                       else normal_bind(scan, target)) or str(spec.get("target_stock") or "").strip()
                       or STOCK_FALLBACK.get(target, ""))
             normal_said = describe(normal, scan) if normal else "nothing"
             if not normal:
