@@ -291,6 +291,25 @@ def lint(text: str, scan, base: str, entry: str) -> (List[str], List[Problem]):
             problems.append(Problem(
                 "block", "One press here does " + str(len(moves)) + " moving or shooting actions. "
                 "CS2 has only allowed one per key since August 2024.", number))
+        # A key rebound away from a held action (Mouse 2 off scoping) while it
+        # is held would never get its let-go: CS2 lets go of whatever the key
+        # is bound to at the moment it is released.
+        so_far: List[str] = []
+        for piece in _pieces(body):
+            words = piece.replace('"', " ").split()
+            if len(words) >= 3 and words[0].lower() == "bind":
+                was = (scriptgen.normal_bind(scan, words[1].lower())
+                       or scriptgen.STOCK_FALLBACK.get(words[1].lower(), ""))
+                was = was.strip().strip('"')
+                to = " ".join(words[2:]).lower()
+                if (re.fullmatch(r"\+[^\s;]+", was) and to != was.lower()
+                        and "-" + was[1:].lower() not in so_far):
+                    from . import keys
+
+                    problems.append(Problem(
+                        "block", f"{keys.label(words[1])} could be held down when this changes it, and "
+                        f"then it would stay on. Put -{was[1:]} before the bind.", number))
+            so_far.append(piece.lower())
         for head in pressed:
             let_go = "-" + head[1:]
             if name.startswith("+"):

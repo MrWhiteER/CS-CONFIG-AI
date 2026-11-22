@@ -3,6 +3,7 @@ and never use a combination CS2 refuses."""
 
 from __future__ import annotations
 
+import re
 import shutil
 import sys
 import tempfile
@@ -389,6 +390,46 @@ class SaveCase(Base):
         text = self.all_text()
         self.assertEqual(text.count('alias "drop_it"'), 1)
         self.assertIn("say_team bomb", text)
+
+
+class LetGoCase(Base):
+    """Edy, Nov 22: Mouse 5 (held) changes Mouse 2. Mouse 2 was scoping when
+    it got rebound, so CS2 never ran -attack2 and the knife kept stabbing."""
+
+    def built(self, style, steps=({"id": "cmd:slot3"},)):
+        body = spec("Insta fire", "shift", *steps, binding="mouse5")
+        body.update(target="mouse2", style=style)
+        built = scriptgen.build(body, self.scan)
+        self.assertTrue(built.ok, [c.text for c in built.checks if c.level == "block"])
+        return built
+
+    def test_hold_style_lets_go_of_right_click_before_rebinding(self):
+        built = self.built("hold")
+        self.assertIn('alias "+insta_fire" "+voicerecord; -attack2; bind mouse2 insta_fire_do"',
+                      built.lines)
+        self.assertIn('alias "-insta_fire" "-voicerecord; bind mouse2 +attack2"', built.lines)
+
+    def test_next_press_style_lets_go_too(self):
+        built = self.built("next")
+        arm = [l for l in built.lines if l.startswith('alias "insta_fire_arm"')][0]
+        self.assertIn('"-attack2; bind mouse2 insta_fire_do;', arm)
+
+    def test_every_plus_has_its_minus(self):
+        for style in ("hold", "next"):
+            text = " ".join(self.built(style).lines)
+            for word in set(re.findall(r"(?<![\w-])\+(\w+)", text)):
+                if word.startswith("insta_fire"):
+                    continue
+                self.assertIn("-" + word, text, (style, word))
+
+    def test_edited_lines_without_let_go_are_refused(self):
+        built = self.built("hold")
+        body = spec("Insta fire", "shift", {"id": "cmd:slot3"}, binding="mouse5")
+        body.update(target="mouse2", style="hold",
+                    lines_text="\n".join(l.replace("-attack2; ", "") for l in built.lines))
+        again = scriptgen.build(body, self.scan)
+        self.assertFalse(again.ok)
+        self.assertTrue(any("-attack2" in c.text for c in again.checks))
 
 
 class SyncCase(Base):
