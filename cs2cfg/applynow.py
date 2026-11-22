@@ -98,14 +98,83 @@ def key_taken(result: cfgscan.ScanResult, key: str) -> Optional[Dict[str, object
 # The file itself
 # ---------------------------------------------------------------------------
 
-def _previous_keys(text: str) -> Set[str]:
+def _previous_keys(text: str) -> List[str]:
     """Every key an earlier version of the file bound or cleared."""
-    out = set()
+    out: List[str] = []
     for line in (text or "").splitlines():
         match = _BIND_LINE.match(line)
-        if match:
-            out.add(match.group(2))
+        if match and match.group(2) not in out:
+            out.append(match.group(2))
     return out
+
+
+def _active_profile(result: cfgscan.ScanResult) -> Optional[str]:
+    """The profile picked on the Keyboard tab, if one is and it still exists."""
+    from . import layouts
+
+    try:
+        current = layouts.load_current(result.root)
+    except Exception:
+        return None
+    if current and cfgscan.is_match_profile(result, current):
+        return current
+    return None
+
+
+_BUILDER = re.compile(r"^// Script Builder: (\S+) (on|off)$")
+
+
+def _builder_groups(result: cfgscan.ScanResult) -> List[Tuple[str, bool, List[str]]]:
+    """Script Builder scripts as (name, on, lines to send).
+
+    CS2 keeps an alias for as long as it runs, so a script switched off in
+    the app would go on working until the next launch. A switched-off script
+    sends every one of its names emptied instead, which makes it do nothing
+    right away. A shift script's other key is sent its normal bind too, in
+    case the script was armed the moment it was switched off.
+    """
+    from . import plugins, scriptgen
+
+    chain = cfgscan.startup_chain(result)
+    try:
+        found = plugins.find(result)
+    except Exception:
+        return []
+    groups = []
+    for config in result.files.values():
+        if config.relative not in chain:
+            continue
+        try:
+            text = config.path.read_bytes().decode(config.document.encoding, errors="replace")
+        except OSError:
+            continue
+        if scriptgen.MARK not in text:
+            continue
+        for block in scriptgen.own_blocks(text):
+            spec = block["spec"]
+            alias = str(spec.get("alias") or "")
+            plug = next((p for p in found if p.file == config.relative
+                         and p.line <= block["last"] and p.end_line >= block["first"]), None)
+            if not alias or plug is None:
+                continue
+            lines = []
+            for name in sorted(plug.aliases, key=lambda n: plug.spelled.get(n, n)):
+                spelled = plug.spelled.get(name, name)
+                if plug.enabled:
+                    winner = result.effective_alias(name)
+                    if winner is not None:
+                        lines.append(f'alias "{winner.name}" "{winner.body}"')
+                else:
+                    lines.append(f'alias "{spelled}" ""')
+            target = str(spec.get("target") or "")
+            if target:
+                winner = cfgscan._effective_bind(result, chain, target)
+                if winner is not None and winner.file in chain:
+                    lines.append(f'bind "{winner.key}" "{winner.body}"')
+                else:
+                    lines.append(f'unbind "{target}"')
+            groups.append((alias, plug.enabled, lines))
+    return groups
 
 
 def render(result: cfgscan.ScanResult, previous: str = "") -> str:
@@ -131,15 +200,29 @@ def render(result: cfgscan.ScanResult, previous: str = "") -> str:
     settings.sort(key=lambda s: s.order)
 
     binds = []
+    seen = set()
     for key in result.binds:
         winner = cfgscan._effective_bind(result, chain, key)
-        if winner is not None and winner.file in chain:
+        # Two spellings of one key ("e", "scancode8") share one winner.
+        if winner is not None and winner.file in chain and id(winner) not in seen:
+            seen.add(id(winner))
             binds.append(winner)
+    taken_off: List[str] = []
+    active = _active_profile(result)
+    if active is not None:
+        # A profile is a whole keyboard of its own: its keys, and the default
+        # layout's other keys taken off -- the same as the next launch.
+        from . import layouts
+
+        final, taken_off = cfgscan.profile_layout(
+            result, active, layouts.load_pins(result.root).get(active, []))
+        binds = list(final.values())
     binds.sort(key=lambda b: b.order)
 
-    bound = {b.key.lower() for b in binds}
-    cleared = sorted(k for k in _previous_keys(previous)
-                     if k.lower() not in bound)
+    bound = {cfgscan.physical_key(b.key) for b in binds}
+    cleared = sorted({k for k in _previous_keys(previous) + taken_off
+                      if cfgscan.physical_key(k) not in bound},
+                     key=str.lower)
 
     lines = [
         MARKER,
@@ -149,9 +232,16 @@ def render(result: cfgscan.ScanResult, previous: str = "") -> str:
         "// the key more than once is harmless.",
         "",
     ]
+    groups = _builder_groups(result)
+    made = {line for _, _, block in groups for line in block}
+    aliases = [a for a in aliases if f'alias "{a.name}" "{a.body}"' not in made]
     if aliases:
         lines.append("// Scripts")
         lines += [f'alias "{a.name}" "{a.body}"' for a in aliases]
+        lines.append("")
+    for name, on, block in groups:
+        lines.append(f"// Script Builder: {name} {'on' if on else 'off'}")
+        lines += block
         lines.append("")
     if settings:
         lines.append("// Settings")
@@ -169,8 +259,143 @@ def render(result: cfgscan.ScanResult, previous: str = "") -> str:
     return "\n".join(lines) + "\n"
 
 
-def refresh(result: Optional[cfgscan.ScanResult]) -> Optional[Path]:
+_ENTRY = re.compile(r'^\s*(alias|bind|unbind)\s+"([^"]*)"|^\s*([A-Za-z_][\w.]*)\s+"', re.IGNORECASE)
+
+
+def _entries(text: str) -> Dict[str, str]:
+    """A rendered file as ``{what: line}`` -- one entry per script, setting
+    and physical key -- in file order."""
+    out: Dict[str, str] = {}
+    for line in (text or "").splitlines():
+        made = _BUILDER.match(line.strip())
+        if made:
+            out[f"made:{made.group(1)}"] = line.strip()
+            continue
+        if not line.strip() or line.lstrip().startswith("//"):
+            continue
+        match = _ENTRY.match(line)
+        if not match:
+            continue
+        verb, name, setting = match.group(1), match.group(2), match.group(3)
+        if verb and verb.lower() == "alias":
+            out[f"alias:{name}"] = line
+        elif verb:
+            out[f"key:{cfgscan.physical_key(name)}"] = line
+        elif setting and setting.lower() != "echo":
+            out[f"set:{setting.lower()}"] = line
+    return out
+
+
+def _baseline_file() -> Path:
+    from .paths import user_data_dir
+
+    return user_data_dir() / "apply_now_baseline.json"
+
+
+def _load_baseline(target: Path) -> Optional[Dict[str, str]]:
+    import json
+
+    try:
+        data = json.loads(_baseline_file().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    held = data.get(str(target)) if isinstance(data, dict) else None
+    return held if isinstance(held, dict) else None
+
+
+def _save_baseline(target: Path, entries: Dict[str, str]) -> None:
+    import json
+
+    path = _baseline_file()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            data = {}
+    except (OSError, ValueError):
+        data = {}
+    if data.get(str(target)) == entries:
+        return
+    data[str(target)] = entries
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=1), encoding="utf-8")
+
+
+def render_changes(full_text: str, baseline: Dict[str, str], previous: str = "") -> str:
+    """Only what differs from what CS2 loaded when it started.
+
+    Pressing the key sends a handful of commands instead of the whole
+    setup: hundreds of commands in one go is what a server can take for a
+    flood. Still safe to press any number of times.
+    """
+    now = _entries(full_text)
+    # Also anything the last press sent that has since gone back to how CS2
+    # started: the game holds what that press gave it, not the start.
+    sent = _entries(previous)
+    changed = [line for what, line in now.items()
+               if not what.startswith("made:")
+               and (baseline.get(what) != line or sent.get(what, line) != line)]
+    # A Script Builder script switched off or back on since CS2 started sends
+    # all of its lines, even ones that look unchanged: the game still holds
+    # whatever the last press of the apply key gave it.
+    # Once sent, it keeps being sent until CS2 restarts, so switching it back
+    # again mid-match lands too.
+    flipped = {what[5:] for what, line in now.items()
+               if what.startswith("made:") and baseline.get(what, line) != line}
+    flipped |= {m.group(1) for m in map(_BUILDER.match, (previous or "").splitlines()) if m}
+    headers = {}
+    group = None
+    for line in full_text.splitlines():
+        made = _BUILDER.match(line.strip())
+        if made:
+            group = made.group(1)
+            if group in flipped:
+                headers[group] = line.strip()
+            continue
+        if not line.strip() or line.lstrip().startswith("//"):
+            group = None
+            continue
+        if group in flipped and line not in changed:
+            changed.append(line)
+    gone = []
+    for what, line in baseline.items():
+        if what.startswith("key:") and what not in now:
+            match = _ENTRY.match(line)
+            if match and match.group(2) is not None:
+                gone.append(f'unbind "{match.group(2)}"')
+
+    lines = [
+        MARKER,
+        "// Applies what you changed in CS CONFIG AI since CS2 started. Press",
+        "// your apply key in game. Only the changes are in here, so the key",
+        "// sends a few commands, never your whole config.",
+        "",
+    ]
+    scripts = [l for l in changed if l.lstrip().lower().startswith("alias")]
+    keys = [l for l in changed if l.lstrip().lower().startswith(("bind", "unbind"))]
+    settings = [l for l in changed if l not in scripts and l not in keys]
+    if headers:
+        # Kept as comments so the next rewrite knows these are still owed.
+        lines += list(headers.values()) + [""]
+    for title, block in (("// Scripts", scripts), ("// Settings", settings),
+                         ("// Keys", gone + keys)):
+        if block:
+            lines.append(title)
+            lines += block
+            lines.append("")
+    if not (scripts or settings or keys or gone):
+        lines.append("// Nothing changed since CS2 started.")
+        lines.append("")
+    lines.append('echo "CS CONFIG AI: your latest changes are now applied"')
+    return "\n".join(lines) + "\n"
+
+
+def refresh(result: Optional[cfgscan.ScanResult],
+            running: Optional[bool] = None) -> Optional[Path]:
     """Rewrite the file from what is on disk now, if an apply key is set.
+
+    While CS2 is closed the file holds the full setup, and that setup is
+    remembered as what the next launch loads. While CS2 is running it holds
+    only the changes since then (see ``render_changes``).
 
     Without a key nothing would ever run it, so no file is left lying about.
     Writes only when the content actually changed.
@@ -182,7 +407,21 @@ def refresh(result: Optional[cfgscan.ScanResult]) -> Optional[Path]:
         previous = target.read_text(encoding="utf-8", errors="replace")
     except OSError:
         previous = ""
-    text = render(result, previous)
+    if running is None:
+        try:
+            from . import steam
+
+            running = steam.cs2_running_recent()
+        except Exception:
+            running = False
+
+    baseline = _load_baseline(target)
+    full = render(result, previous + "\n" + "\n".join((baseline or {}).values()))
+    if running and baseline is not None:
+        text = render_changes(full, baseline, previous)
+    else:
+        text = full
+        _save_baseline(target, _entries(full))
     if text != previous:
         target.parent.mkdir(parents=True, exist_ok=True)
         cfglang.write_config_text(target, text, "utf-8")
@@ -231,6 +470,81 @@ def set_key_text(result: cfgscan.ScanResult, key: str) -> Tuple[Path, str]:
     if text and not text.endswith(("\n", "\r")):
         text += newline
     return config.path, text + block
+
+
+# Picked for the player when no apply key is set yet: F12 first, then the
+# next F key down that nothing else uses.
+AUTO_KEYS = ("scancode69", "scancode68", "scancode67", "scancode66",
+             "scancode65", "scancode64", "scancode63", "scancode62")
+
+
+def _auto_file() -> Path:
+    from .paths import user_data_dir
+
+    return user_data_dir() / "apply_now_auto.json"
+
+
+def _auto_done(target: Path) -> bool:
+    import json
+
+    try:
+        done = json.loads(_auto_file().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    return isinstance(done, list) and str(target) in done
+
+
+def _mark_auto_done(target: Path) -> None:
+    import json
+
+    path = _auto_file()
+    try:
+        done = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(done, list):
+            done = []
+    except (OSError, ValueError):
+        done = []
+    if str(target) not in done:
+        done.append(str(target))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(done, indent=1), encoding="utf-8")
+
+
+def auto_key(result: cfgscan.ScanResult) -> Optional[str]:
+    """The key to set up for a player who has no apply key yet, or None.
+
+    A key that already runs something is skipped, except an old "reload my
+    whole config" key (one that runs the autoexec): the apply key does the
+    same job without re-sending the whole config.
+    """
+    for key in AUTO_KEYS:
+        taken = key_taken(result, key)
+        if taken is None or "autoexec" in str(taken.get("runs", "")).lower():
+            return key
+    return None
+
+
+def ensure_auto_key(result: Optional[cfgscan.ScanResult]) -> Optional[Tuple[Path, str, str]]:
+    """Every player gets an apply key without having to pick one.
+
+    Done once per collection: a player who later removes or changes the key
+    is not overruled. Returns ``(autoexec path, new text, key)`` to write, or
+    None when nothing should change.
+    """
+    if result is None or not result.entry_points or current_key(result) is not None:
+        return None
+    target = path_for(result)
+    if _auto_done(target):
+        return None
+    key = auto_key(result)
+    _mark_auto_done(target)
+    if key is None:
+        return None
+    try:
+        path, text = set_key_text(result, key)
+    except ValueError:
+        return None
+    return path, text, key
 
 
 def status(result: Optional[cfgscan.ScanResult]) -> Dict[str, object]:

@@ -101,7 +101,7 @@ async function run(scenario){
   const before=count('performance');await $('close').click();await flush();assert.equal(timers.size,0);assert.equal(requests.at(-1).path,'/api/overlay/panel');assert.equal(requests.at(-1).body.action,'close');await tick();assert.equal(count('performance'),before);
  }else if(scenario==='opacity'){
   for(const id of ['performance','hardware','events','profiles','serverlock','settings']){
-   win.overlayShell.showTool(id);await flush();const input=q(id,'[data-opacity]');assert.equal(Number(input.value),60);
+   win.overlayShell.showTool(id);await flush();const input=q(id,'[data-opacity]');assert.equal(Number(input.value),10);
    input.value=0;input.oninput();await input.onchange();await flush();assert.equal(requests.at(-1).body.overlay_layout[id].opacity,0);assert.equal(tool(id).dataset.clear,'true');
    if(id==='settings')assert.equal(q(id,'[data-pin]'),null);else assert(q(id,'[data-pin]'));
   }

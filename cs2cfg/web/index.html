@@ -302,7 +302,7 @@
 
   /* The track carries the live category's colour; each item carries its own,
      which is what it shows on hover. */
-  .segbar[data-current="apply"]   { --cat: var(--cat-apply); }
+  .segbar[data-current="nvidia"]  { --cat: var(--cat-apply); }
   .segbar[data-current="account"] { --cat: var(--cat-account); }
   .segbar[data-current="apps"]    { --cat: var(--cat-apps); }
   .segbar[data-current="look"]    { --cat: var(--cat-look); }
@@ -310,7 +310,7 @@
   .segbar[data-current="config"]  { --cat: var(--cat-config); }
   .segbar[data-current="editing"] { --cat: var(--cat-editing); }
   .segbar[data-current="logs"]    { --cat: var(--cat-logs); }
-  .seg-item[data-sub="apply"]   { --cat: var(--cat-apply); }
+  .seg-item[data-sub="nvidia"]  { --cat: var(--cat-apply); }
   .seg-item[data-sub="account"] { --cat: var(--cat-account); }
   .seg-item[data-sub="apps"]    { --cat: var(--cat-apps); }
   .seg-item[data-sub="look"]    { --cat: var(--cat-look); }
@@ -855,6 +855,53 @@
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
   }
   .skin-card .rr { font-size: 10px; margin-top: 2px; }
+  .skin-card .art {
+    height: 96px; margin: -2px -2px 4px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(circle at 50% 60%, rgba(var(--lift), .10), transparent 70%);
+  }
+  .skin-card .art img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .skin-card .art.none { display: none; }
+  .skins-more { display: flex; justify-content: center; margin-top: 14px; }
+  .skin-picture { max-width: 92%; max-height: 92%; object-fit: contain; filter: drop-shadow(0 10px 24px rgba(0,0,0,.45)); }
+
+  /* Music kits: the kit's picture, its name, and its song parts to play. */
+  .mk-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+  .mk-card {
+    background: var(--chip); border: 1px solid var(--line); border-radius: 12px;
+    padding: 12px; display: flex; flex-direction: column; gap: 8px;
+  }
+  .mk-card.playing { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .mk-top { display: flex; gap: 10px; align-items: center; }
+  .mk-top .art { width: 64px; height: 64px; flex: 0 0 64px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: rgba(var(--lift), .06); }
+  .mk-top .art img { max-width: 100%; max-height: 100%; }
+  .mk-top .art.none img { display: none; }
+  .mk-name b { display: block; font-size: 13px; color: var(--ink); line-height: 1.25; }
+  .mk-name span { font-size: 11px; color: var(--muted); }
+  .mk-mvp { width: 100%; }
+  .mk-parts { display: flex; flex-wrap: wrap; gap: 5px; }
+  .mk-part {
+    background: transparent; border: 1px solid var(--line); color: var(--muted);
+    border-radius: 999px; padding: 3px 9px; font-size: 11px; cursor: pointer;
+  }
+  .mk-part:hover, .mk-part.on { color: var(--ink); border-color: rgba(var(--lift), .4); }
+  .mk-none { font-size: 11px; color: var(--muted); }
+  .mk-player {
+    position: sticky; bottom: 0; margin-top: 14px; z-index: 5;
+    display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.35);
+  }
+  .mk-player.hidden { display: none; }
+  .mk-stop { background: var(--accent); color: #fff; border: 0; border-radius: 999px; width: 30px; height: 30px; cursor: pointer; font-size: 11px; }
+  .mk-now { display: flex; flex-direction: column; min-width: 0; flex: 0 1 240px; }
+  .mk-now b { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mk-now span { font-size: 11px; color: var(--muted); }
+  .mk-bar { flex: 1; height: 4px; border-radius: 4px; background: rgba(var(--lift), .14); overflow: hidden; cursor: pointer; }
+  .mk-bar i { display: block; height: 100%; width: 0; background: var(--accent); }
+  .mk-time { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .mk-vol { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+  .mk-vol input { width: 90px; }
   .skins-count { font-size: 11px; color: var(--muted); margin: -4px 0 12px; }
 
   .skin-viewer-overlay {
@@ -1023,6 +1070,18 @@
     padding: 10px 0 0; margin-top: 12px; border-top: 1px solid var(--line);
   }
   .wg-row .sub2 { flex: 1 1 220px; min-width: 0; margin: 0; line-height: 1.45; }
+
+  /* PC settings that go back when the app is quit. */
+  .pcs-list { list-style: none; margin: 10px 0 0; padding: 0; }
+  .pcs-list li {
+    display: flex; align-items: baseline; gap: 10px; padding: 8px 0;
+    border-top: 1px solid var(--line);
+  }
+  .pcs-list li:first-child { border-top: 0; }
+  .pcs-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--muted); transform: translateY(-1px); }
+  .pcs-list li.on .pcs-dot { background: var(--good); box-shadow: 0 0 8px color-mix(in srgb, var(--good) 60%, transparent); }
+  .pcs-name { font-weight: 600; flex: 0 0 auto; }
+  .pcs-text { color: var(--muted); font-size: 12px; line-height: 1.45; }
 
   /* The rules note. Bordered rather than buried, because it is the one thing
      on the card this application cannot answer for somebody. */
@@ -1321,6 +1380,7 @@
   @supports not (color: color-mix(in srgb, red 50%, blue)) {
     .chgwin-body .chg-mark { background: var(--panel-2); }
   }
+
 
   /* The scores, small enough to share the title bar with the live chips. */
   .scorebar { display: flex; gap: 8px; align-items: center; margin-left: auto; }
@@ -2249,8 +2309,7 @@
 /* Section 5: a shared Settings grid and plan-backed preset reveal. */
 .settings-box .subpane { grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:stretch;padding:16px 18px; }
 .settings-box .subpane > :is(.panel,.card) { min-width:0;min-height:220px;padding:20px; }
-.settings-box #machine-card { grid-column:auto;order:0; }
-.settings-box [data-sub="apply"] > .panel:has(#w-video) { order:1; }
+.settings-box #machine-card,.settings-box #nv-card { grid-column:1/-1;order:0; }
 .settings-box #setups-card { order:2; }
 .settings-box #results { display:contents; }
 .settings-box #results > .card { order:3;min-width:0;padding:20px;margin:0; }
@@ -2290,6 +2349,74 @@
 .hw-paused .bias-thumb,.hidden .bias-thumb { transition:none!important; }
 @media(prefers-reduced-motion:reduce) { .settings-box .bias .bias-thumb { transition:none!important; }.preset-row,.preset-veil { animation:none!important; } }
 
+
+/* NVIDIA tab and the live apply list (Edy, Nov 21). The mark is an original
+   eye-and-swirl shape in NVIDIA green, drawn as a mask so it takes any size. */
+.nv-mark,.nv-tab-mark,.nv-mini { display:inline-block; width:18px; height:18px; vertical-align:-3px; background:#76b900; -webkit-mask:var(--nv-eye) center/contain no-repeat; mask:var(--nv-eye) center/contain no-repeat; }
+:root { --nv-eye:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M2 16c4-7 9-10 14-10s10 3 14 10c-4 7-9 10-14 10S6 23 2 16Zm14-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13Zm0 3a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7Z' fill='%23000'/%3E%3C/svg%3E"); }
+.nv-tab-mark { width:14px; height:14px; vertical-align:-2px; }
+.nv-mini { width:11px; height:11px; vertical-align:-1px; margin-right:4px; }
+.nv-mark.big { width:30px; height:30px; }
+.nv-head { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:0 0 10px; }
+.nv-managed-by { display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px; font-size:11.5px; color:var(--ink); background:color-mix(in srgb,#76b900 14%,transparent); border:1px solid color-mix(in srgb,#76b900 45%,transparent); }
+.nv-managed-by svg { width:15px; height:15px; fill:none; stroke:#76b900; stroke-width:1.8; stroke-linejoin:round; stroke-linecap:round; }
+.nv-mode { margin:0 0 6px; }
+.nv-list { display:grid; }
+.nv-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(150px,auto) auto; gap:12px; align-items:center; padding:10px 0; border-top:1px solid var(--line); transition:opacity .2s; }
+.nv-row.saving { opacity:.55; pointer-events:none; }
+.nv-name { font-size:13px; min-width:0; overflow-wrap:anywhere; }
+.nv-name small { display:block; margin-top:3px; font-size:11px; color:var(--muted); }
+.nv-row.managed:not(.manual) .nv-name small { color:#8fd11a; }
+.nv-val { font-size:12.5px; color:var(--ink); justify-self:end; text-align:right; }
+.nv-pick { justify-self:end; max-width:240px; }
+.nv-manual { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); white-space:nowrap; cursor:pointer; }
+.nv-all-bar { display:flex; gap:10px; align-items:center; margin-top:14px; flex-wrap:wrap; }
+.nv-all-bar input { flex:1; min-width:180px; }
+#nv-all { margin-top:8px; max-height:520px; overflow:auto; padding-right:6px; }
+.nv-helper { display:flex; gap:12px; align-items:center; justify-content:space-between; padding:10px 12px; margin:0 0 10px; border-radius:9px; border:1px solid color-mix(in srgb,var(--warn) 45%,transparent); background:color-mix(in srgb,var(--warn) 10%,transparent); font-size:12.5px; }
+.bias-why { margin:8px 0 0; }
+@media(max-width:700px) { .nv-row { grid-template-columns:1fr; gap:6px; } .nv-val,.nv-pick { justify-self:start; } }
+
+.apply-feed { position:fixed; right:20px; bottom:20px; z-index:520; width:min(360px,calc(100vw - 40px)); max-height:min(460px,calc(100vh - 40px)); display:flex; flex-direction:column; color:var(--ink); border-radius:14px; border:1px solid var(--line); background:linear-gradient(var(--panel-2),var(--panel-2)),var(--bg); box-shadow:0 18px 50px rgba(0,0,0,.45); overflow:hidden; animation:af-in .32s cubic-bezier(.2,.9,.25,1.15) both; }
+.apply-feed.leaving { animation:af-out .25s ease both; }
+.apply-feed header { display:flex; align-items:center; gap:10px; padding:12px 14px; border-bottom:1px solid var(--line); font-size:13px; }
+.apply-feed header b { flex:1; font-weight:600; }
+.af-x { background:none; border:0; color:var(--muted); font-size:18px; line-height:1; cursor:pointer; padding:0 2px; }
+.af-spin { width:14px; height:14px; border-radius:50%; border:2px solid color-mix(in srgb,var(--accent) 30%,transparent); border-top-color:var(--accent); animation:af-spin .8s linear infinite; }
+.af-rows { list-style:none; margin:0; padding:6px 14px; overflow:auto; flex:1; min-height:0; }
+.af-row { display:grid; grid-template-columns:22px minmax(0,1fr); column-gap:10px; row-gap:2px; align-items:center; padding:7px 0; font-size:12.5px; animation:af-row .34s cubic-bezier(.2,.9,.25,1.1) both; }
+.af-row + .af-row { border-top:1px solid color-mix(in srgb,var(--line) 70%,transparent); }
+.af-ic { display:grid; place-items:center; width:22px; height:22px; border-radius:6px; color:var(--accent); background:color-mix(in srgb,var(--accent) 14%,transparent); }
+.af-ic svg { width:14px; height:14px; }
+.af-row.nv .af-ic { background:color-mix(in srgb,#76b900 16%,transparent); }
+.af-row.nv .af-ic .nv-mark { width:15px; height:15px; }
+.af-row.warn .af-ic { color:var(--warn); background:color-mix(in srgb,var(--warn) 16%,transparent); font-weight:700; }
+.af-name small { display:block; color:var(--muted); font-size:11px; margin-top:2px; }
+.af-move { grid-column:2; font-size:12px; }
+.af-move s { color:var(--muted); text-decoration-thickness:1px; margin-right:2px; }
+.af-move b { color:var(--good); font-weight:600; }
+.af-row.nv .af-move b { color:#8fd11a; }
+.af-end { position:relative; display:grid; grid-template-columns:auto auto minmax(0,1fr); gap:12px; align-items:center; padding:14px; border-top:1px solid var(--line); background:color-mix(in srgb,var(--good) 8%,transparent); }
+.af-end.nvidia { background:color-mix(in srgb,#76b900 12%,transparent); }
+.af-end.partly { background:color-mix(in srgb,var(--warn) 10%,transparent); }
+.nv-badge,.af-badge { display:grid; place-items:center; width:44px; height:44px; border-radius:12px; background:color-mix(in srgb,#76b900 20%,transparent); animation:af-pop .5s cubic-bezier(.2,1.4,.4,1) both; }
+.af-badge { display:none; }
+.af-end:not(.nvidia) { grid-template-columns:auto minmax(0,1fr); }
+.af-end .af-tick { display:block; width:30px; height:30px; fill:none; stroke:var(--good); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.af-end.nvidia .af-tick { stroke:#8fd11a; }
+.af-end.partly .af-tick { stroke:var(--warn); }
+.af-tick circle { stroke-dasharray:63; stroke-dashoffset:63; animation:af-draw .5s .15s ease-out forwards; }
+.af-tick path { stroke-dasharray:16; stroke-dashoffset:16; animation:af-draw .32s .55s ease-out forwards; }
+.af-done b { display:block; font-size:13.5px; }
+.af-done small { color:var(--muted); font-size:11.5px; }
+.af-done { animation:af-row .35s .3s both; }
+@keyframes af-in { from { opacity:0; transform:translate(24px,12px) scale(.97); } to { opacity:1; transform:none; } }
+@keyframes af-out { to { opacity:0; transform:translateX(30px); } }
+@keyframes af-row { from { opacity:0; transform:translateX(14px); } to { opacity:1; transform:none; } }
+@keyframes af-pop { 0% { transform:scale(.4) rotate(-12deg); opacity:0; } 100% { transform:none; opacity:1; } }
+@keyframes af-draw { to { stroke-dashoffset:0; } }
+@keyframes af-spin { to { transform:rotate(360deg); } }
+@media(prefers-reduced-motion:reduce) { .apply-feed,.apply-feed * { animation:none!important; } .af-tick circle,.af-tick path { stroke-dashoffset:0; } }
 </style>
 <style>
   /* ------------------------------------------------------------------------
@@ -3027,7 +3154,7 @@
     .updc-veil, .updc-dialog { animation: none; }
   }
 
-  /* The target frame rate, at the head of the settings it governs.
+  /* The frame rate goal, at the head of the settings it governs.
 
      Given a box of its own rather than a row in a list because it is the one
      number on the page that every other setting is chosen to reach: the
@@ -3062,33 +3189,29 @@
   .fps-copy h3 { margin: 0; font-size: 14px; font-weight: 650; color: var(--ink); }
   .fps-copy p { margin: 3px 0 0; font-size: 11.5px; color: var(--muted); line-height: 1.45; }
 
-  /* The number itself, sized to be the thing you look at. */
+  /* The goal itself, sized to be the thing you look at. Read only: it is
+     the monitor's refresh rate, not a number to type. A typed goal let
+     anyone ask for 400 from a PC that reaches 250, and the plan then
+     dropped every setting to its lowest for frames that never came. */
   .fps-set {
     grid-area: set; display: flex; align-items: baseline; gap: 7px;
     padding: 7px 14px; border-radius: 12px;
     background: rgba(0, 0, 0, .34);
     border: 1px solid var(--line);
-    transition: border-color .2s ease, box-shadow .2s ease;
   }
-  .fps-set:focus-within {
-    border-color: var(--violet);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--violet) 22%, transparent);
-  }
-  .fps-set input {
-    appearance: none; -moz-appearance: textfield;
-    border: 0; background: none; padding: 0; margin: 0;
-    width: 4.2ch; text-align: right;
+  .fps-set strong {
     font-family: var(--mono); font-size: 25px; font-weight: 600;
-    color: var(--ink);
+    color: var(--ink); min-width: 3ch; text-align: right;
   }
-  .fps-set input::-webkit-outer-spin-button,
-  .fps-set input::-webkit-inner-spin-button { appearance: none; margin: 0; }
-  .fps-set input:focus { outline: none; }
-  .fps-set input::placeholder { color: var(--faint); font-size: 19px; }
+  .fps-set strong.fps-auto { font-family: inherit; font-size: 15px; color: var(--muted); }
+  /* What the game really ran at, from the player's own games. */
+  .fps-copy p.fps-real { color: var(--ink-dim); }
+  .fps-copy p.fps-real b { color: var(--ink); font-weight: 650; }
+  .fps-copy p.fps-real.fps-none { color: var(--faint); }
   .fps-unit { font-size: 11px; color: var(--faint); letter-spacing: .08em; }
 
-  /* The rates people actually pick, since they are their monitor's, not
-     arbitrary. Filled in from the displays we detected. */
+  /* With two or more monitors at different rates, which one CS2 runs on.
+     Only real monitor rates are offered: nothing arbitrary. */
   /* The consequence of the number, beside the number. */
   .fps-effect {
     display: inline-block; margin-left: 2px; font-weight: 600;
@@ -4210,6 +4333,13 @@
   #rgb-out .row .v { font-family: inherit; font-variant-numeric: normal; font-size: 12px; color: var(--muted); }
   #rgb-out .row .v.live { color: var(--good); }
   #rgb-out > .sub2 { margin: 2px 0 8px; color: var(--muted); font-size: 12px; }
+  #mouse-out .seg button { flex: 0 1 auto; }
+  #mouse-out .row .v { font-family: inherit; font-variant-numeric: normal; font-size: 12px; color: var(--muted); }
+  #mouse-out .row .v.live { color: var(--good); }
+  #mouse-out .sub2 { margin: 2px 0 8px; color: var(--muted); font-size: 12px; }
+  #mouse-out .sub2.warn { color: var(--warn); }
+  .mouse-dpi { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .mouse-dpi input[type=number] { width: 96px; }
   .rgb-brightness { display: flex; align-items: center; gap: 12px; }
   .rgb-brightness input { min-width: 80px; width: 160px; max-width: 100%; }
   .kb-legend .dot { width: 9px; height: 9px; border-radius: 3px; }
@@ -4504,6 +4634,8 @@
     font-size: 9px; min-width: 62px;
   }
   .plug code { font-size: 10.5px; color: var(--ink-dim); }
+  .plug-row.plug-made { align-items: center; gap: 9px; margin-top: 10px; }
+  .plug-row.plug-made .sub2 { flex: 1 1 160px; line-height: 1.4; }
   .plug-notes { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
   .plug-note {
     padding: 5px 8px; border-radius: 7px; font-size: 10.5px; line-height: 1.45;
@@ -5853,7 +5985,10 @@
 .sb-step h4, .sb-side h4 { margin: 3px 0 9px; font-size: 14px; color: var(--ink); }
 .sb-input { width: 100%; box-sizing: border-box; background: var(--chip); border: 1px solid var(--line); color: var(--ink); border-radius: 9px; padding: 8px 11px; font: inherit; }
 .sb-input:focus { outline: none; border-color: var(--accent); }
-.sb-modes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+.sb-modes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; }
+@media (max-width: 1250px) { .sb-modes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.sb-styles { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.sb-keys { display: flex; flex-direction: column; gap: 10px; }
 .sb-mode { text-align: left; border: 1px solid var(--line); border-radius: 11px; padding: 10px 12px; background: var(--panel-2); color: var(--ink); font: inherit; cursor: pointer; }
 .sb-mode b { display: block; margin-bottom: 2px; }
 .sb-mode small { color: var(--muted); font-size: 12px; line-height: 1.35; display: block; }
@@ -5891,9 +6026,24 @@
 .sb-chk .ic { flex: none; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 800; color: var(--bg); margin-top: 1px; }
 .sb-chk.ok .ic { background: var(--good); } .sb-chk.warn .ic { background: var(--warn); } .sb-chk.block .ic { background: var(--bad); }
 .sb-chk .fix { margin-top: 5px; }
-.sb-lines { margin-top: 10px; border-top: 1px solid var(--line-soft); padding-top: 9px; }
-.sb-lines summary { color: var(--muted); cursor: pointer; }
-.sb-lines pre { background: var(--sunk); color: var(--ink); border-radius: 9px; padding: 9px 11px; font: 12px/1.5 Consolas, monospace; white-space: pre-wrap; word-break: break-all; margin: 8px 0 0; }
+.sb-lines-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.sb-lines-head h4 { margin: 3px 0 0; }
+.sb-lines-head .sp { flex: 1; }
+.sb-lines { display: flex; flex-direction: column; gap: 8px; }
+.sb-line { border: 1px solid var(--line); border-radius: 11px; background: var(--panel-2); overflow: hidden; }
+.sb-line-top { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--line-soft); color: var(--ink); }
+.sb-line-top b { font-weight: 600; font-size: 13px; }
+.sb-line-top code { margin-left: auto; font: 11px/1.3 Consolas, monospace; color: var(--faint); }
+.sb-cmd { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; padding: 6px 12px; align-items: baseline; }
+.sb-cmd + .sb-cmd { border-top: 1px dashed var(--line-soft); }
+.sb-cmd code { font: 12.5px/1.45 Consolas, monospace; color: var(--accent); word-break: break-all; }
+.sb-cmd span { color: var(--muted); font-size: 12.5px; }
+.sb-code { width: 100%; box-sizing: border-box; background: var(--sunk); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font: 12.5px/1.6 Consolas, monospace; resize: vertical; margin-bottom: 10px; white-space: pre; overflow-x: auto; }
+.sb-code:focus { outline: none; border-color: var(--accent); }
+.sb-keep { display: inline-flex; align-items: center; gap: 7px; color: var(--ink); font-size: 13px; margin-left: 6px; cursor: pointer; }
+.sb-keep input { accent-color: var(--accent); }
+.sb-offtag { font-size: 10.5px; padding: 1px 6px; border-radius: 6px; background: var(--bg-2, rgba(127,127,127,.15)); color: var(--muted); margin-left: 4px; }
+.sb-keytag { font-size: 10.5px; padding: 1px 6px; border-radius: 6px; background: var(--accent-dim); color: var(--accent); margin-left: 4px; }
 .sb-btns { display: flex; gap: 9px; margin-top: 14px; }
 .sb-btns .primary { flex: 1; }
 .sb-ideas { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 7px; }
@@ -5903,6 +6053,7 @@
 <link rel="stylesheet" href="assets/devices/workspace.css">
 <link rel="stylesheet" href="assets/fixit/toolbox.css">
 <link rel="stylesheet" href="assets/hardware/icons.css">
+<link rel="stylesheet" href="assets/changes/changes.css">
 <script src="assets/hardware/icons.js"></script>
 <script src="assets/fixit/icons.js"></script>
 <style>
@@ -6217,6 +6368,7 @@ const startup = (() => {
     <symbol id="i-chart" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 15v2m5-6v6m5-10v10"/></symbol>
     <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18M5 7h14M5 17h14"/></symbol>
     <symbol id="i-sync" viewBox="0 0 24 24"><path d="M20 8a9 9 0 0 0-15-3L3 7m0-5v5h5M4 16a9 9 0 0 0 15 3l2-2m0 5v-5h-5"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24"><path d="M3.5 12a8.5 8.5 0 1 0 2.5-6M3 3.5V8h4.5M12 7.5V12l3 2"/></symbol>
   </defs>
 </svg>
 
@@ -6455,7 +6607,7 @@ const startup = (() => {
               <svg id="hardware-chart" viewBox="0 0 600 180" preserveAspectRatio="none" aria-hidden="true"></svg>
               <div class="hardware-tooltip" id="hardware-tooltip" role="tooltip" hidden></div>
             </div>
-            <div class="hardware-times sub"><span>~2 min ago</span><span id="hardware-state">Waiting for samples</span><span>Now</span></div>
+            <div class="hardware-times sub"><span id="hardware-since">~2 min ago</span><span id="hardware-state">Waiting for samples</span><span>Now</span></div>
           </div>
           <div class="sub" id="live-note" style="margin-top:8px">&nbsp;</div>
           <!-- Last in the card on purpose. It is an offer, not a reading, and
@@ -6532,8 +6684,10 @@ const startup = (() => {
           <div class="eyebrow">Every finish, owned or not</div>
           <h2>All <em>Skins</em></h2>
           <p>
-            Every weapon and finish CS2 has ever released, read fresh from the
-            game's own files &mdash; not just what is in your inventory.
+            Every weapon, knife, glove, agent, sticker, graffiti and music kit
+            CS2 has ever released, with its real picture, read fresh from the
+            game's own files &mdash; not just what is in your inventory. Music
+            kits play their MVP song right here, so you can hear it before you buy.
             <b>View in 3D</b> is a look, nothing more: the model is exported on
             the spot through a tool you install yourself, shown once, and never
             written anywhere or kept.
@@ -6546,8 +6700,12 @@ const startup = (() => {
           <button class="skins-kind-tab active" data-kind="gun" role="tab" aria-selected="true">Guns</button>
           <button class="skins-kind-tab" data-kind="knife" role="tab" aria-selected="false">Knives</button>
           <button class="skins-kind-tab" data-kind="glove" role="tab" aria-selected="false">Gloves</button>
-          <button class="skins-kind-tab" disabled title="Agents are full player-character models &mdash; a different export pipeline than a weapon, not built yet.">Agents</button>
-          <button class="skins-kind-tab" disabled title="Stickers are a 2D decal composited onto a specific spot on the model, not a texture override &mdash; not built yet.">Stickers</button>
+          <button class="skins-kind-tab" data-kind="agent" role="tab" aria-selected="false">Agents</button>
+          <button class="skins-kind-tab" data-kind="sticker" role="tab" aria-selected="false">Stickers</button>
+          <button class="skins-kind-tab" data-kind="graffiti" role="tab" aria-selected="false">Graffiti</button>
+          <button class="skins-kind-tab" data-kind="patch" role="tab" aria-selected="false">Patches</button>
+          <button class="skins-kind-tab" data-kind="charm" role="tab" aria-selected="false">Charms</button>
+          <button class="skins-kind-tab" data-kind="music" role="tab" aria-selected="false">Music kits</button>
         </div>
         <div class="skins-toolbar">
           <input type="search" id="skins-search" placeholder="Search by weapon or finish&hellip;">
@@ -6556,6 +6714,13 @@ const startup = (() => {
           <button class="btn small" id="skins-reload">Re-read</button>
         </div>
         <div id="skins-out"><span class="sub"><span class="spin"></span> Reading&hellip;</span></div>
+        <div class="mk-player hidden" id="mk-player" role="status">
+          <button class="mk-stop" id="mk-stop" title="Stop">&#9632;</button>
+          <span class="mk-now"><b id="mk-now-kit"></b><span id="mk-now-part"></span></span>
+          <span class="mk-bar"><i id="mk-bar-fill"></i></span>
+          <span class="mk-time" id="mk-time">0:00</span>
+          <label class="mk-vol" title="Volume"><span>Volume</span><input type="range" id="mk-volume" min="0" max="100" value="60"></label>
+        </div>
       </section>
     </div>
 
@@ -6600,13 +6765,15 @@ const startup = (() => {
           </svg>
         </div>
         <div class="fps-copy">
-          <h3>Target frame rate</h3>
-          <p id="fps-say">Use your refresh rate as the settings target.</p>
+          <h3>Frame rate goal</h3>
+          <p id="fps-say">Settings aim for your monitor's refresh rate.</p>
+          <p id="fps-real" class="fps-real"></p>
         </div>
-        <div class="fps-set">
-          <input type="number" id="target" min="30" max="1000" placeholder="auto"
-                 aria-label="Target frames per second">
+        <div class="fps-set" title="Your monitor's refresh rate">
+          <strong id="fps-goal" class="fps-auto">Auto</strong>
           <span class="fps-unit">fps</span>
+          <!-- Kept for the saved choice of monitor; never typed into. -->
+          <input type="hidden" id="target" value="">
         </div>
         <div class="fps-quick" id="fps-quick"></div>
       </section>
@@ -6784,9 +6951,8 @@ const startup = (() => {
           <div class="eyebrow">Tuning &amp; tools</div>
           <h2>Settings</h2>
           <p>
-            Pick what the generated config should optimise for, then review and apply.
-            Below that, the configuration studio reads a folder of scripts to show how they
-            load and where the problems are &mdash; nothing is written until you ask.
+            Your graphics card and NVIDIA settings, Steam, lighting, look, sound and the
+            rest of the app. Picture settings follow the mode you pick in the Launcher.
           </p>
         </div>
       </div>
@@ -6797,18 +6963,19 @@ const startup = (() => {
       <div class="segwrap">
         <div class="segbar" id="settings-subtabs" role="tablist">
           <div class="seg-thumb" id="seg-thumb"></div>
-          <button class="seg-item" data-sub="apply" role="tab" aria-selected="true">Apply</button>
+          <button class="seg-item" data-sub="nvidia" role="tab" aria-selected="true"><span class="nv-tab-mark" aria-hidden="true"></span> NVIDIA</button>
           <button class="seg-item" data-sub="this-pc" role="tab" aria-selected="false"><span data-hardware-icon="display"></span> This PC</button>
           <button class="seg-item" data-sub="lighting" role="tab" aria-selected="false"><span data-hardware-icon="lighting"></span> Lighting</button>
-          <button class="seg-item" data-sub="steam" role="tab" aria-selected="false">Steam</button>
-          <button class="seg-item" data-sub="account" role="tab" aria-selected="false">Account</button>
-          <button class="seg-item" data-sub="apps" role="tab" aria-selected="false">Apps</button>
-          <button class="seg-item" data-sub="look" role="tab" aria-selected="false">Look</button>
-          <button class="seg-item" data-sub="sound" role="tab" aria-selected="false">Sound</button>
-          <button class="seg-item" data-sub="overlay" role="tab" aria-selected="false">Overlay</button>
-          <button class="seg-item" data-sub="config" role="tab" aria-selected="false">Config files</button>
-          <button class="seg-item" data-sub="editing" role="tab" aria-selected="false">Editing</button>
-          <button class="seg-item" data-sub="logs" role="tab" aria-selected="false">Logs</button>
+          <button class="seg-item" data-sub="mouse" role="tab" aria-selected="false"><span data-hardware-icon="mouse"></span> Mouse</button>
+          <button class="seg-item" data-sub="steam" role="tab" aria-selected="false"><span data-hardware-icon="steam"></span> Steam</button>
+          <button class="seg-item" data-sub="account" role="tab" aria-selected="false"><span data-hardware-icon="accounts"></span> Accounts</button>
+          <button class="seg-item" data-sub="apps" role="tab" aria-selected="false"><span data-hardware-icon="apps"></span> Apps</button>
+          <button class="seg-item" data-sub="look" role="tab" aria-selected="false"><span data-hardware-icon="look"></span> Look</button>
+          <button class="seg-item" data-sub="sound" role="tab" aria-selected="false"><span data-hardware-icon="sound"></span> Sound</button>
+          <button class="seg-item" data-sub="overlay" role="tab" aria-selected="false"><span data-hardware-icon="overlay"></span> Overlay</button>
+          <button class="seg-item" data-sub="config" role="tab" aria-selected="false"><span data-hardware-icon="config"></span> Config files</button>
+          <button class="seg-item" data-sub="editing" role="tab" aria-selected="false"><span data-hardware-icon="history"></span> Editing</button>
+          <button class="seg-item" data-sub="logs" role="tab" aria-selected="false"><span data-hardware-icon="logs"></span> Logs</button>
         </div>
       </div>
 
@@ -6819,6 +6986,17 @@ const startup = (() => {
           <!-- The verdict belongs under the hardware it is a verdict on,
                rather than in a card of its own further down the page. -->
           <div id="assessment-out"></div>
+        </section>
+        <section class="panel" id="pcstate-card">
+          <h2>When you quit the app</h2>
+          <p class="sub" style="margin:0">
+            Settings the app changes outside the game, like Steam launch options,
+            the borderless window for Alt+Tab, NVIDIA scaling and the power plan,
+            are only on while the app is running. When you quit it, restart the PC
+            or uninstall it, your PC goes back to how it was before. Your game
+            configs and picture settings stay as they are.
+          </p>
+          <div id="pcstate-out"><span class="sub">&hellip;</span></div>
         </section>
       </div>
 
@@ -6836,47 +7014,42 @@ const startup = (() => {
         </section>
       </div>
 
-      <div class="subpane" data-sub="apply">
-      <!-- Saved answers to "what is this machine for right now". Above Write
-           because it decides what Write is about to do. -->
-      <section class="panel" id="setups-card">
-        <h2>Setups</h2>
-        <p class="sub" style="margin:0 0 10px">
-          Practice, a match and recording want different things. Save what you have
-          chosen under a name and switch between them. A setup only decides what the
-          next Apply will write &mdash; switching changes nothing in the game by itself,
-          and never touches which folder you are working on.
-        </p>
-        <div id="setups-out"></div>
-      </section>
+      <!-- Mouse speed and polling rate, set on the mouse itself. -->
+      <div class="subpane hidden" data-sub="mouse">
+        <section class="panel" id="mouse-card">
+          <h2><span data-hardware-icon="mouse"></span> Mouse</h2>
+          <p class="sub" style="margin:0 0 10px">
+            Set how fast your mouse moves (DPI) and how often it reports to the
+            PC. The app talks to the mouse directly, so no software from the
+            maker has to be installed or running. Your choice is saved with
+            your Steam account, so any PC you sign in on sets your mouse the
+            same way.
+          </p>
+          <div id="mouse-out"></div>
+        </section>
+      </div>
 
-      <!-- Only drawn when Crosshair X is actually installed. Advertising an
-           integration for software somebody does not have is noise. -->
-
-
-      <!-- Which half of the machine is asked to do less, and what Windows
-           itself has been told about the game. -->
+      <!-- NVIDIA (Edy, Nov 21): what used to be Apply. Each Launcher mode now
+           applies the moment it is picked, so this tab is about the graphics
+           card itself: which part carries the load, the NVIDIA settings the
+           app looks after for CS2, and every other NVIDIA setting. -->
+      <div class="subpane" data-sub="nvidia">
       <section class="panel wide" id="machine-card">
-        <h2>Machine</h2>
+        <h2>GPU or CPU</h2>
+        <p class="sub" style="margin:0 0 10px">Which part of your PC carries more of CS2's picture. Changes shadows, anti-aliasing, ambient occlusion, texture filtering and particles, and applies right away.</p>
         <div id="machine-out"></div>
       </section>
 
-      <section class="panel">
-        <h2>Write</h2>
-        <label class="opt"><input type="checkbox" id="w-video" checked> Picture quality (cs2_video.txt)</label>
-        <label class="opt"><input type="checkbox" id="p-video" checked> Set CS2 to borderless windowed before launching</label>
-        <label class="opt"><input type="checkbox" id="w-cfg" checked> Generated .vcfg config</label>
-        <label class="opt"><input type="checkbox" id="w-autoexec"> Add exec line to autoexec.vcfg</label>
-        <label class="opt"><input type="checkbox" id="w-scaling" checked> Full-screen scaling (no black bars when stretched)</label>
-        <div class="actions">
-          <button class="btn primary" id="preview">Preview changes</button>
-          <button class="btn" id="apply" disabled>Apply</button>
-          <button class="btn" id="revert">Undo last</button>
+      <section class="panel wide" id="nv-card">
+        <h2>NVIDIA settings for CS2</h2>
+        <div class="nv-head">
+          <span class="nv-managed-by" title="These follow your Launcher mode"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 21 7v10l-9 5-9-5V7Z"/><path d="m8 12 3 3 5-6"/></svg> Managed by CS CONFIG</span>
         </div>
+        <p class="sub" style="margin:0 0 10px">Only CS2's own NVIDIA profile is changed, never other games. Turn on <b>Set manually</b> to choose a value yourself; your Launcher mode then leaves it alone.</p>
+        <div id="nv-out" aria-live="polite"><span class="sub">Reading NVIDIA settings&hellip;</span></div>
+        <div class="nv-all-bar"><button class="btn" id="nv-show-all" type="button" aria-expanded="false" aria-controls="nv-all">Show all settings</button><input id="nv-filter" type="search" placeholder="Find a setting" aria-label="Find an NVIDIA setting" hidden></div>
+        <div id="nv-all" hidden></div>
       </section>
-
-      <div id="results" class="wide"></div>
-
       </div>
 
       <div class="subpane hidden" data-sub="overlay">
@@ -6905,9 +7078,9 @@ const startup = (() => {
       </button></div>
         </section>
         <section class="panel" id="steam-launch-card"><h2>Steam launch options</h2>
-          <label class="opt"><input type="checkbox" id="w-launch" checked> Apply launch options with next Apply</label>
+          <label class="opt"><input type="checkbox" id="w-launch" checked> Update launch options when you switch Launcher mode</label>
           <div id="steam-launch-out"><span class="sub">Preview changes to read launch options.</span></div>
-          <div class="actions"><button class="btn" id="steam-preview">Preview changes</button><button class="btn" id="steam-apply">Review Apply</button></div>
+          <div class="actions"><button class="btn" id="steam-preview">Preview changes</button><button class="btn" id="steam-apply">Apply now</button></div>
         </section>
         <div class="wide" id="steam-tools-feedback"><span id="steam-tools-status" class="sub" role="status"></span><button class="btn small" id="steam-tools-retry" hidden>Retry Steam tools</button></div>
         <div id="steam-tools" class="settings-tools wide"></div>
@@ -6916,7 +7089,7 @@ const startup = (() => {
       <!-- App sign-in, linking and subscription stay separate from Steam settings. -->
       <div class="subpane hidden" data-sub="account">
         <section class="panel wide" id="account-card">
-          <h2>Account</h2>
+          <h2>Accounts</h2>
           <div id="account-out"></div>
         </section>
       </div>
@@ -7054,6 +7227,16 @@ const startup = (() => {
         <div id="cfg-out"></div>
       </section>
       </div></details>
+      <!-- Moved from the old Apply tab: saved snapshots of your choices. -->
+      <section class="panel wide" id="setups-card">
+        <h2>Setups</h2>
+        <p class="sub" style="margin:0 0 10px">
+          Practice, a match and recording want different things. Save your current
+          choices (Launcher mode, GPU or CPU, crosshair and so on) under a name, then
+          switch between them. Switching a setup applies it right away.
+        </p>
+        <div id="setups-out"></div>
+      </section>
       </div>
 
       <div class="subpane hidden" data-sub="logs">
@@ -7069,6 +7252,24 @@ const startup = (() => {
       </div>
 
       <div class="subpane hidden" data-sub="editing">
+      <section class="panel" id="chist-card">
+        <h2>Change history</h2>
+        <p class="sub" style="margin:0 0 10px">
+          Everything that changed, newest first: what you changed here, what you changed inside
+          CS2, and what was changed in the NVIDIA app. Keep it, or put it back to how it was before.
+          Changes made in the game are asked about as soon as the game closes.
+        </p>
+        <div class="chist-head">
+          <div class="chist-filter" role="group" aria-label="Which changes to show">
+            <button type="button" data-chist-filter="all" aria-pressed="true">All changes</button>
+            <button type="button" data-chist-filter="waiting" aria-pressed="false">Waiting for you <b id="chist-waiting-count"></b></button>
+          </div>
+          <span class="spacer"></span>
+          <button type="button" class="btn" id="chist-review">Review waiting changes</button>
+          <button type="button" class="btn" id="chist-refresh">Refresh</button>
+        </div>
+        <div id="chist-out"><div class="chist-empty">Loading your changes&hellip;</div></div>
+      </section>
       <section class="panel hidden" id="cfg-settings-card">
         <h2>Common settings</h2>
         <p class="sub" style="margin:0 0 4px">
@@ -7170,6 +7371,7 @@ const startup = (() => {
 <script src="assets/config/files.js"></script>
 <link rel="stylesheet" href="assets/home/server-lock.css">
 <script src="assets/home/server-lock.js"></script>
+<script src="assets/changes/changes.js"></script>
 <script>
 const TOKEN = "__CS2CFG_TOKEN__";
 const $ = (id) => document.getElementById(id);
@@ -7771,20 +7973,29 @@ function hardwarePaintSelection() {
   });
   $('hardware-all').setAttribute('aria-pressed', String(!key));
 }
+/* Samples in the current view. Until the window is full (the first seconds after a
+   cold start, when nothing was saved from a recent run) the real samples are
+   spread across the whole width, so the graph is never an empty box that
+   fills in from the right. */
+function hardwareCount() { return Math.max(0, ...hardwareSeries().map(([key]) => Math.min(60, hardwareValues(key).length))); }
+function hardwareStep() { const n = hardwareCount(); return n >= 60 ? 600 / 59 : 600 / Math.max(1, n - 1); }
 function hardwareDraw() {
-  const g = hardwareGraph, max = g.mode === 'usage' ? 100 : 120, step = 600 / 59;
+  const g = hardwareGraph, max = g.mode === 'usage' ? 100 : 120, step = hardwareStep(), n = hardwareCount();
   let svg = '<defs>' + hardwareSeries().map(([key,,tone]) => '<linearGradient id="hardware-fill-' + key + '" x1="0" y1="0" x2="0" y2="1"><stop stop-color="' + tone + '" stop-opacity=".26"/><stop offset="1" stop-color="' + tone + '" stop-opacity=".01"/></linearGradient>').join('') + '</defs><g class="hardware-grid">';
   for (let y = 0; y <= 180; y += 45) svg += '<path d="M0 ' + y + 'H600"/>';
   svg += '</g><g id="hardware-scroll">';
   let known = 0;
   for (const [key,,tone] of hardwareSeries()) {
-    const values = hardwareValues(key).slice(-61), segments = []; let part = [];
+    const values = hardwareValues(key).slice(n >= 60 ? -61 : -n), segments = []; let part = [];
+    const last = n >= 60 ? 59 : n - 1;
     values.forEach((value, i) => {
       if (!Number.isFinite(value)) { if (part.length) segments.push(part); part = []; return; }
       known++;
-      part.push([(60 - values.length + i) * step, 180 - Math.max(0, Math.min(max, value)) / max * 180]);
+      part.push([(last - values.length + 1 + i) * step, 180 - Math.max(0, Math.min(max, value)) / max * 180]);
     });
     if (part.length) segments.push(part);
+    // The very first reading on its own: hold it across the width as a line.
+    if (n === 1 && segments.length === 1) segments[0] = [[0, segments[0][0][1]], [600, segments[0][0][1]]];
     const line = segments.map(homeSmoothPath).join(' ');
     const area = segments.map(p => homeSmoothPath(p) + ' L' + p.at(-1)[0] + ' 180 L' + p[0][0] + ' 180 Z').join(' ');
     svg += '<g data-hardware="' + key + '" style="--series:' + tone + '"><path class="hardware-area" fill="url(#hardware-fill-' + key + ')" d="' + area + '"/><path class="hardware-line" stroke="' + tone + '" d="' + line + '"/>' + segments.filter(p => p.length === 1).map(p => '<circle cx="' + p[0][0] + '" cy="' + p[0][1] + '" r="3" fill="' + tone + '"/>').join('') + '<path class="hardware-hit" data-hardware-line="' + key + '" d="' + line + '"/></g>';
@@ -7792,6 +8003,9 @@ function hardwareDraw() {
   svg += '</g><path id="hardware-crosshair" class="hardware-crosshair" visibility="hidden"/>';
   $('hardware-chart').innerHTML = svg;
   $('hardware-state').textContent = known ? (g.mode === 'usage' ? 'Usage · %' : 'Temperature · °C') : 'No readings available';
+  // The left edge says how far back the drawn samples really go.
+  const span = n >= 60 ? 118 : Math.max(0, n - 1) * 2;
+  $('hardware-since').textContent = n >= 60 ? '~2 min ago' : span ? '~' + span + 's ago' : 'Now';
   $('hardware-axis').innerHTML = max + hardwareUnit() + '<br>' + max / 2 + hardwareUnit() + '<br>0' + hardwareUnit();
   hardwareLegend(); hardwarePaintSelection(); hardwareTranslate();
 }
@@ -7816,7 +8030,10 @@ function hardwarePause() {
 function hardwareUpdate(d) {
   const g = hardwareGraph;
   if (d.at != null && g.at === d.at) return;
-  const animate = g.at !== null && Number(d.at) > g.at && Number(d.at) - g.at < 4 && homeVisible() && !homeMotion.reduced.matches;
+  // Slide only between two full windows; while it is still spreading out the
+  // new sample simply redraws in place.
+  const full = hardwareCount() >= 60 && hardwareSeries().some(([key]) => (d.history?.[key] || []).length >= 60);
+  const animate = full && g.at !== null && Number(d.at) > g.at && Number(d.at) - g.at < 4 && homeVisible() && !homeMotion.reduced.matches;
   const previous = g.data;
   g.data = {};
   for (const [key] of g.usage) {
@@ -7824,7 +8041,8 @@ function hardwareUpdate(d) {
     // Retain the point leaving the left edge until its translation finishes.
     if (animate && g.data[key].length === 60 && previous[key]?.length >= 60) g.data[key].unshift(previous[key].at(-60));
   }
-  // Temperatures have no server history: begin collecting at this page's first poll.
+  // Temperatures come from the same server history; collecting here is only
+  // the fallback for an app that does not send it.
   const parts = (d.temps?.parts || []).filter(p => ['cpu', 'gpu', 'system'].includes(p.part));
   if (!parts.some(p => p.part === 'gpu')) parts.push({part:'gpu', label:'GPU', celsius:d.gpu?.temperature, known:Number.isFinite(d.gpu?.temperature)});
   for (const p of parts) {
@@ -7833,6 +8051,12 @@ function hardwareUpdate(d) {
   }
   for (const [key] of g.thermal) {
     const p = parts.find(p => key === 'temp-' + p.part);
+    if (Array.isArray(d.history?.[key])) {
+      const keep = animate ? g.temperatures[key] : null;
+      g.temperatures[key] = d.history[key].slice(-60);
+      if (keep && g.temperatures[key].length === 60 && keep.length >= 60) g.temperatures[key].unshift(keep.at(-60));
+      continue;
+    }
     const values = g.temperatures[key] ||= [];
     if (g.at !== null && Number(d.at) - g.at >= 4) values.push(null);
     values.push(p?.known && Number.isFinite(p.celsius) ? p.celsius : null);
@@ -7846,7 +8070,7 @@ function hardwareUpdate(d) {
 }
 function hardwareInspect(x) {
   const g = hardwareGraph; g.cursor = Math.max(0, Math.min(600, x));
-  const age = Math.max(0, Math.min(59, Math.round((600 - g.cursor + g.offset) / (600 / 59))));
+  const age = Math.max(0, Math.min(Math.max(0, hardwareCount() - 1), Math.round((600 - g.cursor + g.offset) / hardwareStep())));
   const cross = $('hardware-crosshair');
   cross?.setAttribute('d', 'M' + g.cursor + ' 0V180'); cross?.setAttribute('visibility', 'visible');
   const tip = $('hardware-tooltip'); tip.hidden = false;
@@ -7877,7 +8101,7 @@ $('hardware-plot').addEventListener('blur', hardwareClearCursor);
 $('hardware-plot').addEventListener('keydown', e => {
   if (e.key === 'Escape') hardwareClearCursor();
   else if (['ArrowLeft','ArrowRight','Home','End'].includes(e.key)) {
-    e.preventDefault(); hardwareInspect(e.key === 'Home' ? 0 : e.key === 'End' ? 600 : (hardwareGraph.cursor ?? 600) + (e.key === 'ArrowLeft' ? -1 : 1) * 600 / 59);
+    e.preventDefault(); hardwareInspect(e.key === 'Home' ? 0 : e.key === 'End' ? 600 : (hardwareGraph.cursor ?? 600) + (e.key === 'ArrowLeft' ? -1 : 1) * hardwareStep());
   }
 });
 document.addEventListener('visibilitychange', hardwarePause);
@@ -7911,75 +8135,21 @@ function renderPlan(p) {
   // The profile's description used to print under the band. The band and the
   // three names say the same thing, so the sentence was reading it back.
 
-  // What the target actually cost, said where the target is typed.
+  // What the goal led to, said beside the goal.
   const level = (p.settings || []).find(x => /gpu level|overall quality/i.test(x.name || ""));
   fpsEffect = level && level.after ? "Picture " + esc(String(level.after)) : "";
   renderFps();
 
 
-  const changed = p.settings.filter(s => s.changed);
   renderScores();
   $("assessment-out").innerHTML = '<div class="assess"><div class="subcat">Selected settings</div><span class="sub">' + esc(p.intent) + ' \u00b7 ' + p.settings.length + ' picture settings reviewed</span></div>';
 
-  // A change you cannot see is a change you cannot check. Anything moving gets
-  // a full row with the reason attached; the rest collapses out of the way.
-  const unchanged = p.settings.filter(s => !s.changed);
-
-  const chip = (text, raw, kind) =>
-    '<span class="chg-chip ' + kind + '">' + esc(text) +
-    (raw != null && String(raw) !== text ? '<i>' + esc(String(raw)) + "</i>" : "") + "</span>";
-
-  const changedRows = changed.map(s => {
-    // Where both sides carry the same label, show the stored numbers too, or
-    // the row reads "Quality -> Quality" and looks like nothing happened.
-    const showRaw = s.same_label;
-    return '<div class="chg-row">' +
-      '<div class="chg-name">' + esc(s.name) + "</div>" +
-      '<div class="chg-move">' +
-      (s.before != null
-        ? chip(s.before, showRaw ? s.before_raw : null, "from") +
-          '<span class="chg-arrow">→</span>' +
-          chip(s.after, showRaw ? s.after_raw : null, "to")
-        : '<span class="chg-chip new">new</span>' +
-          '<span class="chg-arrow">→</span>' + chip(s.after, null, "to")) +
-      "</div>" +
-      (s.reason ? '<div class="chg-why">' + esc(/headroom|\btier\b|estimated|ceiling/i.test(s.reason) ? 'Selected for this picture profile.' : s.reason) + "</div>" : "") +
-      "</div>";
-  }).join("");
-
-  let html = '<section class="card"><h2>Picture quality</h2>' +
-    '<div class="chg-head"><span class="chg-count">' + changed.length + "</span>" +
-    '<span class="sub">of ' + p.settings.length + " settings will change</span>" +
-    (unchanged.length
-      ? '<span class="spacer"></span><label class="opt" style="margin:0">' +
-        '<input type="checkbox" id="show-unchanged"> Show the ' + unchanged.length +
-        " already correct</label>"
-      : "") +
-    "</div>" +
-    (changed.length
-      ? '<div class="chg-list">' + changedRows + "</div>"
-      : '<span class="sub">Everything already matches this profile.</span>') +
-    '<div class="chg-list quiet hidden" id="unchanged-list">' +
-    unchanged.map(s => '<div class="chg-row"><div class="chg-name">' + esc(s.name) +
-      '</div><div class="chg-move"><span class="chg-chip same">' + esc(s.after) +
-      "</span></div></div>").join("") +
-    "</div></section>";
-
   $('steam-launch-out').innerHTML =
     '<div class="sub">Current</div><pre class="opts">' + esc(p.launch_current || '(none set)') + '</pre>' +
-    '<div class="sub">Next Apply</div><pre class="opts">' + esc(p.launch_new || '(none set)') + '</pre>' +
+    '<div class="sub">After the next mode switch</div><pre class="opts">' + esc(p.launch_new || '(none set)') + '</pre>' +
     (p.launch_removed || []).map(r => '<div class="note"><div class="rm">− ' + esc(r.option) + '</div><div class="d">' + esc(r.reason) + '</div></div>').join('') +
     (p.launch_added || []).map(a => '<div class="note"><div class="ad">+ ' + esc(a.option) + '</div><div class="d">' + esc(a.reason) + '</div></div>').join('');
   presetReveal(p);
-
-  $("results").innerHTML = html;
-  const toggle = $("show-unchanged");
-  if (toggle) {
-    toggle.addEventListener("change", () =>
-      $("unchanged-list").classList.toggle("hidden", !toggle.checked));
-  }
-  $("apply").disabled = false;
-  markPending(p.changed_count);
   // Clears the "Building plan" spinner. It used to be cleared by a message
   // saying the preview had written nothing; dropping that line without
   // putting this in its place left the spinner turning for the session.
@@ -8010,9 +8180,13 @@ function requestBody() {
     hide_crosshair: !!(prefsNow && prefsNow.hide_crosshair),
     crosshairx_launch: !!(prefsNow && prefsNow.crosshairx_launch),
     load_bias: (prefsNow && prefsNow.load_bias) || "auto",
-    write_video: $("w-video").checked, write_cfg: $("w-cfg").checked,
-    write_launch: $("w-launch").checked, link_autoexec: $("w-autoexec").checked,
-    fix_scaling: $("w-scaling").checked,
+    // The old Apply tab's Write checkboxes are gone (Edy, Nov 21): picture
+    // settings and the generated config always follow the mode; the autoexec
+    // line lives in the Steam tab and screen scaling in the Launcher.
+    write_video: true, write_cfg: true, write_nvidia: true,
+    write_launch: $("w-launch").checked,
+    link_autoexec: !!(prefsNow && prefsNow.link_autoexec),
+    fix_scaling: false,
   };
 }
 
@@ -8080,16 +8254,14 @@ function closeConfirm() {
   if (veil) veil.classList.add("hidden");
 }
 
-/* Whether CS2 changes are worth showing: something counted, and not the
-   first run, which is only establishing what "unchanged" looks like. */
-function gameChanged() {
-  const d = ingameData;
-  return !!(d && !d.first_run && d.count);
-}
+/* Changes made inside CS2 are no longer asked about in this window: they go
+   into the change history, and the review window that comes up on top of
+   everything as soon as the game closes asks about them (see
+   assets/changes/changes.js and review.html). */
+function gameChanged() { return false; }
 
 /* What the window has to say, drawn from both places at once. */
 function changesBody() {
-  const d = ingameData;
   let html = "";
 
   if (pendingChanges.length) {
@@ -8115,27 +8287,6 @@ function changesBody() {
       }).join("") + "</div>";
   }
 
-  if (gameChanged()) {
-    for (const [source, list] of Object.entries(d.sources || {})) {
-      html += '<div class="subcat">' + esc(source) + "</div>";
-      html += '<div class="chg-rows">' + list.map(c =>
-        '<div class="chg-row ' + esc(c.kind || "changed") + '">' +
-          changeMark(c.kind) +
-          '<div class="chg-what"><b>' + esc(c.label || c.key) + "</b>" +
-            (c.label ? '<span class="sub2 mono">' + esc(c.key) + "</span>" : "") +
-          "</div>" +
-          '<div class="chg-move">' +
-            '<code class="was">' + esc(c.was === null ? "\u2014" : c.was) + "</code>" +
-            '<span class="chg-arrow">\u2192</span>' +
-            '<code class="now">' + esc(c.now === null ? "\u2014" : c.now) + "</code>" +
-          "</div>" +
-        "</div>").join("") + "</div>";
-    }
-    if (d.missing && d.missing.length) {
-      html += '<p class="sub2" style="margin-top:8px">Could not read: ' +
-        esc(d.missing.join(", ")) + "</p>";
-    }
-  }
   return html;
 }
 
@@ -8152,25 +8303,26 @@ function openConfirm() {
   if (title) {
     title.textContent = mine && theirs ? "Two things changed"
       : mine ? "You changed something"
-      : "CS2 changed its own settings";
+      : "You changed settings inside CS2";
   }
   if (say) {
     say.textContent = mine && theirs
-      ? "Changes of yours are still unanswered, and the game has moved some of " +
-        "its own settings. Choose what to keep; the game's are only reported."
+      ? "Some of your changes here are still unanswered, and you changed some " +
+        "settings inside CS2 during your last game. Keep each one or put it back, " +
+        "then press Done."
       : mine
       ? "You left the app with a change still unconfirmed. Keep each one or " +
         "put it back, then press Done."
-      : "Changed in the game's own menus, not here. Nothing is written back to " +
-        "CS2 \u2014 this is only telling you.";
+      : "You changed these inside CS2 during your last game. Keep saves them in " +
+        "your config so every launch has them. Put back returns them to how they " +
+        "were before that game. Press Done when you've chosen.";
   }
 
   const act = $("chgwin-act");
   if (act) {
-    act.innerHTML = mine
-      ? '<button class="btn" id="confirm-undo">Put everything back</button>' +
-        '<button class="btn primary" id="confirm-keep">Done</button>'
-      : '<button class="btn primary" id="confirm-keep">Got it</button>';
+    act.innerHTML =
+      '<button class="btn" id="confirm-undo">Put everything back</button>' +
+      '<button class="btn primary" id="confirm-keep">Done</button>';
   }
 
   $("confirm-veil").classList.remove("hidden");
@@ -8229,16 +8381,10 @@ function applyChoices() {
 }
 
 async function answerChanges(how) {
-  const hadGame = gameChanged();
   if (how === "all-back") {
     for (const c of pendingChanges) changeChoice[c.id] = "back";
   }
   applyChoices();
-  if (hadGame) {
-    try {
-      ingameData = await api("/api/ingame/ack", { account: currentAccount() });
-    } catch (e) { /* it will be offered again on the next pass */ }
-  }
 }
 
 document.addEventListener("click", e => {
@@ -8276,12 +8422,7 @@ $("confirm-veil").addEventListener("keydown", e => {
 */
 (function wirePendingChanges() {
   const TOGGLES = {
-    "w-video": "Picture quality",
-    "w-cfg": "Generated .vcfg config",
     "w-launch": "Steam launch options",
-    "w-autoexec": "Add exec line to autoexec.vcfg",
-    "w-scaling": "Full-screen scaling",
-    "p-video": "Patch video settings before launch",
   };
   for (const [id, label] of Object.entries(TOGGLES)) {
     const el = $(id);
@@ -8296,10 +8437,9 @@ $("confirm-veil").addEventListener("keydown", e => {
   const target = $("target");
   if (target) {
     let was = target.value;
-    target.addEventListener("focus", () => { was = target.value; });
     target.addEventListener("change", () => {
       const before = was;
-      noteChange("Target fps → " + (target.value || "auto"),
+      noteChange("Frame rate goal: " + (target.value ? target.value + " Hz monitor" : "main monitor"),
                  () => { target.value = before; rememberPrefs(); });
       was = target.value;
     });
@@ -8587,8 +8727,8 @@ function presetReveal(plan) {
 document.addEventListener('keydown', e => { if (e.key === 'Escape') presetClose(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) presetClose(); });
 new MutationObserver(() => { if (!homeVisible()) presetClose(); }).observe(document.querySelector('[data-panel="launcher"]'),{attributes:true,attributeFilter:['class']});
-$('steam-preview').addEventListener('click', () => $('preview').click());
-$('steam-apply').addEventListener('click', () => setSettingsSub('apply'));
+$('steam-preview').addEventListener('click', previewPlan);
+$('steam-apply').addEventListener('click', () => applyProfile('steam'));
 
 
 function paintIntent(name) {
@@ -8604,20 +8744,19 @@ function paintIntent(name) {
 }
 
 function chooseIntent(name, quiet) {
-  if (profileApplyBusy) return;
   if (!INTENTS.includes(name) || name === intent) { paintIntent(name || intent); return; }
   const before = intent;
   intent = name;
   ++planRevision;
   ++verificationRevision;
   paintIntent(name);
-  $("apply").disabled = true;
   planned = null;
   rememberPrefs();
   if (!quiet) {
-    noteChange("Optimise for → " + name, () => { chooseIntent(before, true); previewPlan(); });
-    presetBegin(name);
-    $("preview").click();
+    // Picking a mode applies it (Edy, Nov 21): the live list bottom right
+    // shows each change as it lands. No question first, no Apply button.
+    noteChange("Optimise for → " + name, () => { chooseIntent(before, true); applyProfile('mode'); });
+    applyProfile('mode');
   }
 }
 
@@ -8626,7 +8765,7 @@ function chooseIntent(name, quiet) {
   cards.addEventListener("click", e => {
     const card = e.target.closest(".mode-card");
     if (card?.classList.contains('preset-active')) presetClose();
-    else if (card) { if(card.dataset.intent === intent) { presetBegin(intent); $('preview').click(); } else chooseIntent(card.dataset.intent); }
+    else if (card) { if(card.dataset.intent === intent) { presetBegin(intent); previewPlan(); } else chooseIntent(card.dataset.intent); }
   });
   cards.addEventListener("keydown", e => {
     let at = INTENTS.indexOf(intent);
@@ -8677,7 +8816,7 @@ function openVerificationControl(action) {
   let target;
   if (action === 'nvidia') { setTab('gpu'); target = $('gpu-out'); }
   else if (action === 'power') { setTab('fix'); target = document.querySelector('[data-fix="power.performance"]'); }
-  else if (action === 'wingraphics') { setSettingsSub('apply', true); setTab('settings'); target = $('wg-apply') || $('machine-card'); }
+  else if (action === 'wingraphics') { setSettingsSub('nvidia', true); setTab('settings'); target = $('wg-apply') || $('machine-card'); }
   if (target) { target.scrollIntoView({block:'center'}); if (target.matches('button')) target.focus(); }
 }
 document.addEventListener('click', e => {
@@ -8712,23 +8851,112 @@ document.addEventListener('visibilitychange', () => {
 });
 setInterval(() => { if (!document.hidden && !$('verification').hidden) refreshVerification(); }, 15000);
 
-let planRevision = 0, profileApplyBusy = false;
+let planRevision = 0, profileApplyBusy = false, profileApplyAgain = null;
 async function previewPlan() {
   busy("Preparing your settings preview…");
-  $("preview").disabled = true;
-  $("apply").disabled = true;
   const revision = ++planRevision, body = requestBody();
   try { const plan = await api("/api/plan", body); if (revision === planRevision && body.intent === intent) renderPlan(plan); }
   catch (e) { if (revision === planRevision) { presetClose(); status("Plan failed: " + esc(e.message), true); } }
-  finally { if (revision === planRevision) $("preview").disabled = false; }
 }
-$("preview").addEventListener("click", previewPlan);
 
-$("apply").addEventListener("click", async () => {
-  if (!planned || profileApplyBusy) return;
-  if (!await appAsk("Apply the " + planned.intent +
-               " profile?\n\nEverything changed is backed up first.", {yes: "Apply"})) return;
+/* The live "applying" list, bottom right (Edy, Nov 21).
+
+   Every change the app makes for a mode -- CS2's picture settings, then
+   CS2's NVIDIA profile -- arrives as its own row, one after another, and the
+   list ends on the NVIDIA mark with a tick drawn in. A PC without NVIDIA ends
+   on a plain tick. It closes by itself; hovering keeps it open. */
+const APPLY_WHAT = {
+  'cs2_video.txt': 'CS2 picture settings',
+  'Steam launch options': 'Steam launch options',
+  'Display scaling': 'Screen scaling',
+  'autoexec.vcfg': 'Autoexec line',
+  'NVIDIA settings for CS2': 'NVIDIA settings for CS2',
+};
+const applyFeed = (() => {
+  let box = null, timers = [], closeTimer = 0, hovered = false;
+  const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function clear() { timers.forEach(clearTimeout); timers = []; clearTimeout(closeTimer); }
+  function close() {
+    clear();
+    if (!box) return;
+    const gone = box; box = null;
+    gone.classList.add('leaving');
+    setTimeout(() => gone.remove(), reduced() ? 0 : 260);
+  }
+  function later(fn, ms) { timers.push(setTimeout(fn, reduced() ? 0 : ms)); }
+  function closeSoon(ms) {
+    clearTimeout(closeTimer);
+    closeTimer = setTimeout(function wait() { if (hovered) closeTimer = setTimeout(wait, 800); else close(); }, ms);
+  }
+  function start(title) {
+    clear();
+    if (box) box.remove();
+    box = document.createElement('aside');
+    box.className = 'apply-feed';
+    box.setAttribute('role', 'status');
+    box.setAttribute('aria-live', 'polite');
+    box.innerHTML = '<header><span class="af-spin" aria-hidden="true"></span><b>' + esc(title) + '</b><button type="button" class="af-x" aria-label="Close">&times;</button></header><ol class="af-rows"></ol><footer class="af-end" hidden></footer>';
+    box.querySelector('.af-x').onclick = close;
+    box.addEventListener('pointerenter', () => { hovered = true; });
+    box.addEventListener('pointerleave', () => { hovered = false; });
+    document.body.append(box);
+    return box;
+  }
+  function row(kind, name, from, to, note) {
+    if (!box) return;
+    const list = box.querySelector('.af-rows');
+    const li = document.createElement('li');
+    li.className = 'af-row ' + kind;
+    li.innerHTML = '<span class="af-ic" aria-hidden="true">' + (kind === 'nv' ? '<span class="nv-mark"></span>' : kind === 'warn' ? '!' : hwIcon('display')) + '</span>' +
+      '<span class="af-name">' + esc(name) + (note ? '<small>' + esc(note) + '</small>' : '') + '</span>' +
+      (to != null ? '<span class="af-move">' + (from != null ? '<s>' + esc(String(from)) + '</s> ' : '') + '<b>' + esc(String(to)) + '</b></span>' : '');
+    list.append(li);
+    list.scrollTop = list.scrollHeight;
+  }
+  function finish(r) {
+    if (!box) return;
+    const nv = r && r.nvidia;
+    const trouble = r && ((r.skipped || []).length || (r.steps || []).some(s => !s.ok && !s.skipped));
+    const end = box.querySelector('.af-end');
+    box.querySelector('.af-spin').hidden = true;
+    if (r && r.intent) box.querySelector('header b').textContent = r.intent[0].toUpperCase() + r.intent.slice(1) + ' applied';
+    end.hidden = false;
+    end.className = 'af-end' + (nv && nv.ok ? ' nvidia' : '') + (trouble ? ' partly' : '');
+    end.innerHTML = (nv && nv.ok
+      ? '<span class="nv-badge" aria-hidden="true"><span class="nv-mark big"></span></span>'
+      : '<span class="af-badge" aria-hidden="true"></span>') +
+      '<svg class="af-tick" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m7 12.5 3.2 3.2L17 9"/></svg>' +
+      '<span class="af-done"><b>' + (trouble ? 'Applied, with a note above' : nv && nv.ok ? 'NVIDIA settings applied' : 'Settings applied') + '</b>' +
+      '<small>' + esc(r && r.intent ? r.intent[0].toUpperCase() + r.intent.slice(1) + ' mode is set' : '') + '</small></span>';
+    box.classList.add('done');
+    closeSoon(trouble ? 9000 : 4200);
+  }
+  function fail(text) {
+    if (!box) start('Applying');
+    row('warn', 'Not applied', null, null, text);
+    box.querySelector('.af-spin').hidden = true;
+    closeSoon(9000);
+  }
+  // Rows land one after another so each change can be read as it happens.
+  function play(r, title) {
+    if (!box) start(title);
+    const items = [];
+    (r.video || []).forEach(v => items.push(['cs2', v.name, v.before, v.after]));
+    if (r.nvidia && r.nvidia.ok) (r.nvidia.changed || []).forEach(v => items.push(['nv', v.name, v.before, v.after]));
+    (r.skipped || []).forEach(x => items.push(['warn', APPLY_WHAT[x.what] || x.what, null, null,
+      x.what === 'cs2_video.txt' ? 'CS2 is open. Close it, then pick the mode again.' : 'Steam is open. Close it, then pick the mode again.']));
+    if (r.nvidia && !r.nvidia.ok && !r.nvidia.no_driver) items.push(['warn', 'NVIDIA settings for CS2', null, null, r.nvidia.error || 'Not changed']);
+    if (!items.length) items.push(['cs2', 'Everything already matches', null, null]);
+    items.forEach((it, i) => later(() => row(...it), 120 + i * 170));
+    later(() => finish(r), 160 + items.length * 170 + 220);
+  }
+  return {start, play, fail, close};
+})();
+
+async function applyProfile(source) {
+  if (profileApplyBusy) { profileApplyAgain = source; return; }
   profileApplyBusy = true;
+  presetClose();
   profileRail.syncStatus();
   verificationRevision++;
   verificationDirty = true;
@@ -8736,47 +8964,28 @@ $("apply").addEventListener("click", async () => {
     $('verification-title').textContent = 'Applying and reading back…';
     $('verification').dataset.state = 'changed';
   }
-  busy('Applying your settings...', {id:'apply',detail:planned.changed_count != null ? planned.changed_count+' settings in your preview' : ''});
-  $("apply").disabled = true;
+  const label = intent[0].toUpperCase() + intent.slice(1);
+  applyFeed.start('Applying ' + label);
+  const body = requestBody();
   try {
-    const r = await api("/api/apply", requestBody());
+    const r = await api("/api/apply", body);
+    if (!r.ok) throw new Error(r.error || 'Settings could not be applied');
+    r.intent = body.intent;
     verificationDirty = false;
     verificationRevision++;
-    renderVerification(r.verification, true);
+    renderVerification(r.verification, false);
     settleChanges();          // written to disk; nothing left to answer for
-    $("results").insertAdjacentHTML("afterbegin",
-      '<section class="card"><h2>Written</h2>' +
-      // Three states, not two. A step that stood down because Steam or CS2
-      // was holding its file was never attempted, and colouring that the
-      // same red as a write that actually failed says the wrong thing.
-      r.steps.map(s => {
-        const colour = s.skipped ? "var(--warn)" : s.ok ? "var(--good)" : "var(--bad)";
-        const mark = s.skipped ? "– " : s.ok ? "✓ " : "× ";
-        const tail = s.skipped ? " (not written)" : "";
-        return '<div class="note"><div class="t" style="color:' + colour + '">' +
-          mark + esc(s.what) + tail + '</div><div class="d">' + esc(s.detail) +
-          "</div></div>";
-      }).join("") +
-      (r.backup ? '<p class="sub">Backup ' + esc(r.backup) + " — use Undo last to revert.</p>" : "") +
-      '</section>');
-    $('apply-verification')?.remove();
-    $('results').insertAdjacentHTML('afterbegin', '<section id="apply-verification" class="verification reveal"></section>');
-    renderApplyVerification();
-    // Never just "Applied." when part of it was not: that is how somebody
-    // ends up believing a setting was written when it was stood down.
-    const stood = r.skipped || [];
-    if (stood.length) {
-      status("Applied — but " + stood.map(x => esc(x.what)).join(" and ") +
-             " could not be changed yet. Close Steam and CS2, then try again. See the checklist for details.", {id:"apply",kind:"warn"});
-    } else if (r.steps.some(s => !s.ok)) {
-      status('Some settings could not be applied. Review the checklist.', {id:'apply',kind:'error'});
-    } else {
-      status('Your settings have been applied.', {id:'apply',kind:'done',detail:r.steps.filter(s=>s.ok).length+' changes completed'});
-    }
-    scan(true);
-  } catch (e) { status(e.message, {id:'apply',kind:'error',title:'Settings could not be applied'}); $("apply").disabled = false; }
-  finally { profileApplyBusy = false; profileRail.syncStatus(); }
-});
+    applyFeed.play(r, 'Applying ' + label);
+    if (typeof loadNvidia === 'function' && settingsSub === 'nvidia') loadNvidia();
+    previewPlan();
+  } catch (e) {
+    applyFeed.fail(String(e && e.message || e));
+  } finally {
+    profileApplyBusy = false;
+    profileRail.syncStatus();
+    if (profileApplyAgain) { const again = profileApplyAgain; profileApplyAgain = null; applyProfile(again); }
+  }
+}
 
 /* Profile Rail: selection is separate from Apply and verification is read-only. */
 const profileRail = (() => {
@@ -8788,7 +8997,7 @@ const profileRail = (() => {
   const animations = new Set();
   root.innerHTML = `<div class="pd-rail"><div class="pd-slider" aria-hidden="true"></div><div class="pd-direct" role="radiogroup" aria-label="Profile">${names.map((n,i) => `<button type="button" role="radio" data-pick="${n}" aria-label="${labels[i]}" aria-describedby="profile-caption">${icon(n)}</button>`).join('')}</div><button type="button" class="pd-more" aria-label="Profile details" aria-expanded="false" aria-controls="profile-shelf"><svg viewBox="0 0 22 22" aria-hidden="true"><path d="m7 9 4 4 4-4"/></svg></button></div>
     <div class="pd-caption" id="profile-caption" hidden><b></b><span class="pd-status"></span></div>
-    <section class="pd-pop" id="profile-shelf" aria-label="Choose profile" hidden><div class="pd-head"><b>Choose profile</b><span class="pd-status"></span></div><div class="pd-options" role="radiogroup" aria-label="Profile choices">${names.map((n,i) => `<button type="button" class="pd-option" role="radio" data-pick="${n}">${icon(n)}<span><b>${labels[i]}</b><small>${taglines[i]}</small></span></button>`).join('')}</div><div class="pd-foot"><span>Selection needs Apply</span><kbd>← → choose · Enter select</kbd></div></section>
+    <section class="pd-pop" id="profile-shelf" aria-label="Choose profile" hidden><div class="pd-head"><b>Choose profile</b><span class="pd-status"></span></div><div class="pd-options" role="radiogroup" aria-label="Profile choices">${names.map((n,i) => `<button type="button" class="pd-option" role="radio" data-pick="${n}">${icon(n)}<span><b>${labels[i]}</b><small>${taglines[i]}</small></span></button>`).join('')}</div><div class="pd-foot"><span>Applies right away</span><kbd>← → choose · Enter select</kbd></div></section>
     <div class="pd-transition" hidden></div><span class="pd-live" role="status" aria-live="polite" aria-atomic="true"></span>`;
   const shelf = $('profile-shelf'), caption = $('profile-caption');
   const more = root.querySelector('.pd-more'), seat = root.querySelector('.pd-slider');
@@ -8815,10 +9024,9 @@ const profileRail = (() => {
     const state = profileApplyBusy ? 'applying' : box.hidden ? 'unknown' : box.dataset.state || 'unknown';
     root.dataset.verify = state;
     root.setAttribute('aria-busy', String(profileApplyBusy));
-    const words = {verified:'PC is set', changed:'Needs Apply', failed:'Review settings', unknown:'Not checked', applying:'Applying…'};
+    const words = {verified:'PC is set', changed:'Not applied yet', failed:'Review settings', unknown:'Not checked', applying:'Applying…'};
     const glyphs = {verified:'<path d="m5 11 4 4 8-9"/>',changed:'<circle cx="11" cy="11" r="7"/><path d="M11 7v5m0 3v1"/>',failed:'<path d="m6 6 10 10m0-10L6 16"/>',unknown:'<circle cx="11" cy="11" r="7"/><path d="M8 8c0-4 8-3 6 1l-3 3m0 3v1"/>',applying:'<path d="M6 3h10M6 19h10M7 3v4l8 8v4M15 3v4l-8 8v4"/>'};
     root.querySelectorAll('.pd-status').forEach(el => { el.innerHTML = `<svg viewBox="0 0 22 22" aria-hidden="true">${glyphs[state] || glyphs.unknown}</svg><span>${words[state] || words.unknown}</span>`; });
-    root.querySelectorAll('[data-pick]').forEach(b => b.disabled = profileApplyBusy);
   }
   function paint(announce = true) {
     const next = document.body.dataset.intent || intent;
@@ -8835,7 +9043,7 @@ const profileRail = (() => {
     syncStatus();
     if (before !== current && announce) {
       animate(seat,[{transform:oldTransform,background:`color-mix(in srgb,${oldTone} 16%,transparent)`,borderColor:`color-mix(in srgb,${oldTone} 50%,transparent)`},{transform:seat.style.transform,background:`color-mix(in srgb,var(--tone) 16%,transparent)`,borderColor:'color-mix(in srgb,var(--tone) 50%,transparent)'}],560);
-      const message = `${labels[names.indexOf(before)]} → ${labels[names.indexOf(current)]} · Needs Apply`;
+      const message = `${labels[names.indexOf(before)]} → ${labels[names.indexOf(current)]} · Applying`;
       const note = root.querySelector('.pd-transition'); note.textContent = message; note.hidden = false;
       hideCaption();
       root.querySelector('.pd-live').textContent = message;
@@ -8862,13 +9070,13 @@ const profileRail = (() => {
     }
   }
   function select(name) {
-    if (profileApplyBusy || name === intent) { if (open) toggle(false,true); return; }
+    if (name === intent) { if (open) toggle(false,true); return; }
     const before = intent;
     if (homeVisible()) chooseIntent(name);
     else {
       chooseIntent(name, true);
-      noteChange('Optimise for → ' + name, () => { chooseIntent(before, true); previewPlan(); });
-      previewPlan();
+      noteChange('Optimise for → ' + name, () => { chooseIntent(before, true); applyProfile('mode'); });
+      applyProfile('mode');
     }
     if (open) toggle(false,true);
   }
@@ -8906,19 +9114,6 @@ const profileRail = (() => {
   paint(false);
   return {syncStatus};
 })();
-
-$("revert").addEventListener("click", async () => {
-  if (!await appAsk("Restore the most recent backup?\n\nYour current settings are swapped for the ones saved before the last change.", {yes: "Restore"})) return;
-  busy('Restoring your previous settings...', {id:'restore'});
-  try {
-    const r = await api("/api/revert", {});
-    $("results").insertAdjacentHTML("afterbegin",
-      '<section class="card"><h2>Restored ' + esc(r.stamp) + "</h2>" +
-      r.lines.map(l => '<div class="mono">' + esc(l) + "</div>").join("") + "</section>");
-    status('Your previous settings have been restored.', {id:'restore',kind:'done',detail:r.lines.length+' restore steps completed'});
-    scan(true);
-  } catch (e) { status(e.message, {id:'restore',kind:'error',title:'Settings could not be restored'}); }
-});
 
 // --- common settings ------------------------------------------------------
 let cfgSettings = null;
@@ -9276,7 +9471,7 @@ window.addEventListener("resize", () => {
 
 /* Settings sub-tabs. Each category loads what it needs the first time it is
    opened, so switching to Sound does not pay for a config scan. */
-let settingsSub = "apply";
+let settingsSub = "nvidia";
 // Whether somebody has picked one this session. Preferences arrive from the
 // server after the page is usable, and a late arrival must not pull the view
 // out from under a click that already happened.
@@ -9284,7 +9479,7 @@ let settingsSubChosen = false;
 document.addEventListener('cs2cfg:ready', () => { if (settingsSub === 'steam') loadFixes(); });
 
 function setSettingsSub(name, restoring) {
-  if (!document.querySelector('#settings-subtabs [data-sub="' + name + '"]')) name = "apply";
+  if (!document.querySelector('#settings-subtabs [data-sub="' + name + '"]')) name = "nvidia";
   const was = settingsSub;
   settingsSub = name;
   if (!restoring) settingsSubChosen = true;
@@ -9306,12 +9501,15 @@ function setSettingsSub(name, restoring) {
   if (prefsReady && startup.finished) {
     if (name === "overlay") loadOverlay();
     if (name === "lighting") loadRgb();
+    if (name === "mouse") loadMouse();
     if (name === "sound") { loadAudio(false); loadGoxlr(true); }
     if (name === "logs") loadHistory();
     if (name === "config" || name === "editing") ensureScan(false);
+    if (name === "editing") loadChanges();
     if (name === "apps") { loadCompanions(); loadAppTiles(); }
     if (name === "steam") { loadFixes(); loadWho(); }
     if (name === "account") loadCloud();
+    if (name === "nvidia") { loadMachine(); loadNvidia(); }
   }
   rememberPrefs();
 }
@@ -9331,6 +9529,102 @@ async function loadOverlay() {
   }
   catch (err) { box.innerHTML = '<p class="sub warn">' + esc(err.message || String(err)) + '</p>'; }
 }
+
+// Mouse speed and polling rate. Read from the mouse when the tab opens;
+// nothing polls in the background.
+let mouseData = null;
+let mouseError = '';
+let mouseBusy = false;
+const MOUSE_PRESETS = [400, 800, 1600, 3200];
+
+function mouseLine(m) {
+  const bits = [];
+  if (m.dpi) bits.push(m.dpi + ' DPI');
+  if (m.poll) bits.push(m.poll + ' Hz');
+  const how = m.connection === 'wireless' ? ' (wireless)' : m.connection === 'cable' ? ' (on its cable)' : '';
+  return '<div class="row"><span class="k">' + esc(m.name + how) + '</span><span class="v' +
+    (m.problem ? '' : ' live') + '">' + esc(m.problem ||
+    ('Now using ' + bits.join(' at ') + (m.tested ? '' : ' · this model has not been tried with the app yet'))) +
+    '</span></div>';
+}
+
+function renderMouse() {
+  const box = $('mouse-out');
+  if (!box) return;
+  if (mouseError && !mouseData) { box.innerHTML = '<p class="sub2 warn">' + esc(mouseError) + '</p>'; return; }
+  if (!mouseData) { box.innerHTML = '<p class="sub2">Looking for your mouse…</p>'; return; }
+  const s = mouseData.settings || {};
+  const mice = mouseData.mice || [];
+  const off = mouseBusy || !mice.length ? ' disabled' : '';
+  const first = mice[0] || {};
+  const maxDpi = Math.max(...mice.map(m => m.max_dpi || 0), 0) || 20000;
+  const rates = [...new Set(mice.flatMap(m => m.rates || []))].sort((a, b) => a - b);
+  const shownDpi = s.mouse_dpi || first.dpi || 800;
+  let html = '';
+  if (!mice.length) {
+    html += '<p class="sub2">' + esc(mouseData.problem ||
+      'No mouse the app can set was found. Razer mice work now; SteelSeries and HyperX are coming.') + '</p>';
+  }
+  html += mice.map(mouseLine).join('');
+  html += '<div class="row"><label class="k" for="mouse-dpi">Speed (DPI)</label><div class="mouse-dpi">' +
+    '<div class="seg" role="group" aria-label="Common speeds">' + MOUSE_PRESETS.map(v =>
+      '<button type="button" data-mouse-dpi="' + v + '" aria-pressed="' + (s.mouse_dpi === v) + '"' + off + '>' + v + '</button>').join('') +
+    '</div><input type="number" id="mouse-dpi" min="100" max="' + maxDpi + '" step="50" value="' + shownDpi + '"' + off + '>' +
+    '<button type="button" class="btn" id="mouse-dpi-set"' + off + '>Set</button></div></div>';
+  if (rates.length) {
+    html += '<div class="row"><span class="k" id="mouse-poll-label">Polling rate</span>' +
+      '<div class="seg" role="group" aria-labelledby="mouse-poll-label">' + rates.map(hz =>
+        '<button type="button" data-mouse-poll="' + hz + '" aria-pressed="' + (s.mouse_poll === hz) + '"' + off + '>' + hz + ' Hz</button>').join('') +
+      '</div></div>';
+  }
+  html += '<p class="sub2">' + (s.mouse_dpi || s.mouse_poll ?
+    'Saved: ' + [s.mouse_dpi ? s.mouse_dpi + ' DPI' : '', s.mouse_poll ? s.mouse_poll + ' Hz' : ''].filter(Boolean).join(' at ') +
+    '. The app puts this back on your mouse each time it starts.</p>' +
+    '<p class="sub2"><button type="button" class="btn" id="mouse-forget"' + (mouseBusy ? ' disabled' : '') + '>Leave my mouse as it is</button>' :
+    'Nothing chosen yet, so the app leaves your mouse exactly as it is.') + '</p>' +
+    '<p class="sub2">A different speed changes how far your aim moves in CS2. Lower your in-game sensitivity when you raise the speed to keep the same feel.</p>';
+  if (mouseError) html += '<p class="sub2 warn" role="status">' + esc(mouseError) + '</p>';
+  box.innerHTML = html;
+}
+
+async function loadMouse() {
+  if (mouseBusy) return;
+  try {
+    const d = await api('/api/mouse', {});
+    if (!d || d.ok === false) throw new Error(d?.error || 'The mouse could not be read');
+    mouseData = d; mouseError = '';
+  } catch (err) { mouseError = err.message || String(err); }
+  renderMouse();
+}
+
+async function saveMouse(settings) {
+  if (mouseBusy) return;
+  mouseBusy = true; mouseError = ''; renderMouse();
+  try {
+    const d = await api('/api/mouse/settings', settings);
+    if (!d || d.ok === false) throw new Error(d?.error || 'The mouse setting was not saved');
+    mouseData = d;
+  } catch (err) { mouseError = err.message || String(err); }
+  finally { mouseBusy = false; renderMouse(); }
+}
+
+document.addEventListener('click', e => {
+  const dpi = e.target.closest('[data-mouse-dpi]');
+  if (dpi && !dpi.disabled) return saveMouse({mouse_dpi: Number(dpi.dataset.mouseDpi)});
+  const poll = e.target.closest('[data-mouse-poll]');
+  if (poll && !poll.disabled) return saveMouse({mouse_poll: Number(poll.dataset.mousePoll)});
+  if (e.target.id === 'mouse-dpi-set') {
+    const input = $('mouse-dpi');
+    const value = Math.round(Number(input.value) / 50) * 50;
+    const max = Number(input.max) || 20000;
+    if (!(value >= 100 && value <= max)) { mouseError = 'Pick a speed between 100 and ' + max + ' DPI.'; renderMouse(); return; }
+    return saveMouse({mouse_dpi: value});
+  }
+  if (e.target.id === 'mouse-forget') saveMouse({mouse_dpi: 0, mouse_poll: 0});
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.id === 'mouse-dpi') $('mouse-dpi-set')?.click();
+});
 
 // Both lighting entry points display the same confirmed server snapshot.
 let rgbData = null;
@@ -9500,6 +9794,10 @@ function renderOverlay(d) {
       toggle('overlay_hide_from_capture', 'Hide from capture', 'Exclude the HUD and panel from supported capture tools.') +
       toggle('overlay_always_visible', 'Always visible', 'Override Auto hide while CS2 is focused.') +
       '<p class="sub2">Auto hide waits for game state if it is missing or out of date. Always visible still requires Fullscreen Windowed.</p>') +
+    card('Lineups', '<p class="sub2">Make pictures in offline Mirage practice. Close CS2 first. Keep the game visible and press the chosen key once for each picture.</p>' +
+      '<label>Picture key <select id="lineups-picture-key">' + ['F6','F7','F8','F9','F10','F11'].map(k => '<option' + (k === (s.overlay_lineups_picture_key || 'F8') ? ' selected' : '') + '>' + k + '</option>').join('') + '</select></label><button class="btn" id="lineups-pictures">Make lineup pictures</button>' +
+      '<label>Lineup picture key <select id="lineups-create-key">' + ['F6','F7','F8','F9','F10','F11'].map(k => '<option' + (k === (s.overlay_lineups_create_key || 'F9') ? ' selected' : '') + '>' + k + '</option>').join('') + '</select></label><p class="sub2">Use different keys for pictures and overlay shortcuts. Take pictures in New or Edit lineup. The app waits for your picture key, then captures the game window. Crop removes the game HUD.</p>' +
+      '<div class="actions"><span id="lineups-picture-status" role="status">' + esc(d.picture_status || '') + '</span><button class="btn" id="lineups-pictures-stop"' + (d.picture_active ? '' : ' hidden') + '>Stop pictures</button></div>') +
     card('Frame stats',
       '<p class="sub2">' + (live ? (d.frame_capture_ready ? 'Frame capture ready.' : 'Resource stats available; frame capture needs setup.') :
         (s.overlay_enabled ? 'Start CS2, then refresh to see live values.' : 'Enable the overlay and start CS2 to see live values.')) + '</p>' +
@@ -9516,11 +9814,15 @@ function renderOverlay(d) {
 }
 
 document.addEventListener("click", async e => {
-  const button = e.target.closest("#overlay-save, #overlay-refresh, #overlay-dismiss-sign-out, #overlay-borderless");
+  const button = e.target.closest("#overlay-save, #overlay-refresh, #overlay-dismiss-sign-out, #overlay-borderless, #lineups-pictures, #lineups-pictures-stop");
   if (!button || new URLSearchParams(location.search).has("overlayPreview")) return;
   button.disabled = true;
   try {
-    if (button.id === "overlay-refresh") await loadOverlay();
+    if (button.id === "lineups-pictures" || button.id === "lineups-pictures-stop") {
+      const answer = await api("/api/lineups/pictures", button.id === "lineups-pictures-stop" ? {action: 'stop'} : {key: $("lineups-picture-key").value});
+      $("lineups-picture-status").textContent = answer.text;
+      $("lineups-pictures-stop").hidden = !answer.active;
+    } else if (button.id === "overlay-refresh") await loadOverlay();
     else if (button.id === "overlay-save") {
       const answer = await api("/api/overlay/settings", {
         overlay_enabled: $("overlay-enabled").checked,
@@ -9530,6 +9832,8 @@ document.addEventListener("click", async e => {
         overlay_corner: $("overlay-corner").value,
         overlay_hotkey: $("overlay-hotkey").value.trim(),
         overlay_panel_hotkey: $("overlay-panel-hotkey").value.trim(),
+        overlay_lineups_picture_key: $("lineups-picture-key").value,
+        overlay_lineups_create_key: $("lineups-create-key").value,
         overlay_fields: [...document.querySelectorAll('[data-overlay-field]:checked')].map(x => x.dataset.overlayField),
       });
       renderOverlay(answer);
@@ -9539,7 +9843,6 @@ document.addEventListener("click", async e => {
     } else {
       // The existing launch-mode switch owns the next launch's video changes.
       setStretchMode("borderless");
-      $("p-video").checked = true;
       rememberPrefs();
       setTab("launcher");
       status("Borderless selected for the next launch. Restart CS2 through Play to use it.");
@@ -10725,7 +11028,108 @@ $("cs2-apply").addEventListener("click", async () => {
   await saveCs2(null);
 });
 
-let ingameData = null;
+
+/* --------------------------------------------------------------------------
+   Change history (Settings, Editing). Read from /api/history: every change
+   the app made, plus what was changed inside CS2 and in the NVIDIA app. The
+   cards are drawn by assets/changes/changes.js, shared with the review
+   window that comes up after a game.
+   -------------------------------------------------------------------------- */
+const chist = { entries: [], filter: "all", open: {}, conflicts: {}, loaded: false };
+
+function renderChanges() {
+  const box = $("chist-out");
+  if (!box || !window.ChangeList) return;
+  const waiting = chist.entries.filter(e => e.status === "waiting");
+  const shown = chist.filter === "waiting" ? waiting : chist.entries;
+  box.innerHTML = ChangeList.render(shown, {
+    open: chist.open, conflicts: chist.conflicts,
+    empty: chist.filter === "waiting" ? "Nothing is waiting for you."
+         : "No changes yet. Everything you change from now on is listed here.",
+  });
+  const count = $("chist-waiting-count");
+  if (count) count.textContent = waiting.length ? "(" + waiting.length + ")" : "";
+  const review = $("chist-review");
+  if (review) review.classList.toggle("hidden", !waiting.length);
+  // A dot on the tab, so waiting changes are visible from anywhere in Settings.
+  const tab = document.querySelector('#settings-subtabs [data-sub="editing"]');
+  if (tab) {
+    let badge = tab.querySelector(".count");
+    if (waiting.length && !badge) {
+      badge = document.createElement("span");
+      badge.className = "count";
+      tab.appendChild(badge);
+    }
+    if (badge) {
+      if (waiting.length) {
+        badge.textContent = waiting.length;
+        badge.title = waiting.length + " change(s) waiting for you";
+      } else badge.remove();
+    }
+  }
+}
+
+async function loadChanges() {
+  try {
+    const r = await api("/api/history", {});
+    chist.entries = r.entries || [];
+    chist.loaded = true;
+    renderChanges();
+  } catch (err) {
+    const box = $("chist-out");
+    if (box && !chist.loaded) box.innerHTML = '<div class="chist-empty">Could not read the change history: ' +
+      esc(err.message || String(err)) + "</div>";
+  }
+}
+
+async function answerChange(id, choice, force) {
+  delete chist.conflicts[id.split("#")[0]];
+  try {
+    await api("/api/history/answer", { answers: [{ id, choice, force: !!force }] });
+    status(choice === "back" ? "Put back. It is as it was before that change."
+                             : "Kept.");
+  } catch (err) {
+    const data = err.data || {};
+    if (data.conflicts && data.conflicts.length) {
+      for (const c of data.conflicts) chist.conflicts[c.id] = c.error;
+    } else {
+      status(err.message || String(err), true);
+    }
+  }
+  await loadChanges();
+}
+
+document.addEventListener("click", e => {
+  const answer = e.target.closest("[data-chist-answer]");
+  if (answer && answer.closest("#chist-out")) {
+    answerChange(answer.dataset.id, answer.dataset.chistAnswer, false);
+    return;
+  }
+  const force = e.target.closest("[data-chist-force]");
+  if (force && force.closest("#chist-out")) {
+    answerChange(force.dataset.chistForce, "back", true);
+    return;
+  }
+  const more = e.target.closest("[data-chist-more]");
+  if (more && more.closest("#chist-out")) {
+    chist.open[more.dataset.chistMore] = !chist.open[more.dataset.chistMore];
+    renderChanges();
+    return;
+  }
+  const filter = e.target.closest("[data-chist-filter]");
+  if (filter) {
+    chist.filter = filter.dataset.chistFilter;
+    document.querySelectorAll("[data-chist-filter]").forEach(b =>
+      b.setAttribute("aria-pressed", String(b === filter)));
+    renderChanges();
+    return;
+  }
+  if (e.target.closest("#chist-refresh")) loadChanges();
+  if (e.target.closest("#chist-review")) api("/api/history/review", {}).catch(() => {});
+});
+// Coming back to the app is when something new is most likely to be there.
+window.addEventListener("focus", () => { if (settingsSub === "editing") loadChanges(); });
+
 let ingameSeenAt = 0;
 
 // The watcher finds changes on its own; the page just has to notice. The count
@@ -10768,24 +11172,9 @@ function noteIngame(summary) {
   }
 }
 
-function renderIngame() {
-  // Nothing of its own to draw any more: what CS2 changed goes in the one
-  // window with everything else. This only decides whether that window has
-  // something to say.
-  reviewChanges();
-}
-
-async function loadIngame(quiet) {
-  try {
-    ingameData = await api("/api/ingame", { account: currentAccount() });
-    renderIngame();
-  } catch (err) {
-    // A failed read is not something to interrupt anyone over; the watcher
-    // will say so again on its next pass.
-    if (!quiet) status("Could not read CS2's settings: " +
-                       String(err && err.message || err), true);
-  }
-}
+/* A new finding from CS2's files is already in the change history (the
+   server put it there); the page only has to redraw the list. */
+function loadIngame() { loadChanges(); }
 
 /* Whose settings everything on screen belongs to.
 
@@ -10793,44 +11182,85 @@ async function loadIngame(quiet) {
    a second: a dropdown in the Optimise-for box that could disagree with it,
    which meant the answer depended on which control you had touched last.
 */
-/* The line under the heading, and the rates worth one click.
+/* The goal, and what the game really did.
 
-   The offers are the refresh rates of the monitors actually attached, plus the
-   nothing-in-particular option, because a target that is not a rate this
-   machine can present is a number with no meaning behind it.
+   The goal is no longer typed. Nothing on a PC can say ahead of time how
+   many frames CS2 will give, so a typed number was a wish: ask 400 of a PC
+   that reaches 250 and the plan dropped every setting to its lowest for
+   frames that never came. The one number that is known and means something
+   is the monitor's refresh rate -- the most frames it can show -- so that is
+   the goal. With monitors at different rates, the player says which one CS2
+   is on; nothing else can be picked.
+
+   Under it, the frame rate this PC really reached in the player's own games,
+   measured while the performance overlay was on. That is the honest answer
+   to "how much can my PC do", and it is only shown once it exists.
 */
-/* What the last plan made of the target. The estimate cannot show this: it is
-   the machine's ceiling for the chosen profile and does not depend on the
-   target at all, so it reads the same at 144 and at 1000 -- which makes typing
-   a number look like it did nothing, though it may have moved the whole plan
-   from Very High to Low. */
+/* What the last plan made of the goal: the picture level it led to. */
 let fpsEffect = "";
 
-function renderFps() {
-  const box = $("fps-quick"), field = $("target"), say = $("fps-say");
-  if (!field) return;
-  const now = field.value.trim();
-
-  if (say) {
-    say.innerHTML = (now
-      ? "Settings target: " + esc(now) + " fps."
-      : "Use your refresh rate as the settings target.") +
-      (fpsEffect ? ' <b class="fps-effect">' + fpsEffect + "</b>" : "");
-  }
-  if (!box) return;
-
+function fpsRates() {
   const rates = [];
   ((lastScan && lastScan.displays) || []).forEach(d => {
     const hz = Math.round(d.refresh || 0);
     if (hz >= 30 && !rates.includes(hz)) rates.push(hz);
   });
-  rates.sort((a, b) => a - b);
+  return rates.sort((a, b) => a - b);
+}
 
-  box.innerHTML =
-    '<button data-fps="" aria-pressed="' + (!now) + '">Refresh rate</button>' +
-    rates.map(hz =>
+function renderFps() {
+  const box = $("fps-quick"), field = $("target"), say = $("fps-say");
+  const goal = $("fps-goal"), real = $("fps-real");
+  if (!field) return;
+  const shown = (lastScan && lastScan.displays) || [];
+  const rates = fpsRates();
+  // A number saved by an older version, or a monitor that is gone, is not a
+  // goal any more: fall back to the main monitor.
+  if (field.value && lastScan && !rates.includes(Number(field.value))) field.value = "";
+  const main = shown.find(d => d.primary) || shown[0];
+  const mainHz = main ? Math.round(main.refresh || 0) : 0;
+  // Picking the main monitor's own rate is the same as no pick.
+  if (field.value && Number(field.value) === mainHz) field.value = "";
+  const now = field.value.trim();
+  const aim = Number(now) || mainHz;
+
+  if (goal) {
+    goal.textContent = aim ? String(aim) : "Auto";
+    goal.classList.toggle("fps-auto", !aim);
+  }
+  if (say) {
+    const line = now
+      ? "Settings aim for your " + now + " Hz monitor, the most frames it can show."
+      : aim
+        ? "Settings aim for your monitor's " + aim + " Hz, the most frames it can show."
+        : "Settings aim for your monitor's refresh rate, the most frames it can show.";
+    say.innerHTML = esc(line) +
+      (fpsEffect ? ' <b class="fps-effect">' + fpsEffect + "</b>" : "");
+  }
+  if (real) {
+    const m = lastScan && lastScan.measured_fps;
+    real.classList.toggle("fps-none", !m);
+    if (m && m.average) {
+      const games = m.games === 1 ? "your last game" : "your last " + m.games + " games";
+      real.innerHTML = "In " + games + ", CS2 really ran at about <b>" + esc(m.average) +
+        " FPS</b>" + (m.low ? ", dropping to " + esc(m.low) + " in the busiest moments" : "") + "." +
+        (aim && m.average < aim
+          ? " That is below your monitor's " + aim + " Hz: the Competitive profile gives the most frames."
+          : "");
+    } else {
+      real.textContent = "To see the frame rate this PC really reaches, turn on the performance " +
+        "overlay in Settings, Overlay and play one game.";
+    }
+  }
+  if (!box) return;
+
+  // One monitor: nothing to choose, so no buttons.
+  box.innerHTML = rates.length < 2 ? "" :
+    '<button data-fps="" aria-pressed="' + (!now || Number(now) === mainHz) + '">Main monitor' +
+    (mainHz ? ", " + mainHz + " Hz" : "") + "</button>" +
+    rates.filter(hz => hz !== mainHz).map(hz =>
       '<button data-fps="' + hz + '" aria-pressed="' + (now === String(hz)) + '">' +
-      hz + " fps</button>").join("");
+      hz + " Hz monitor</button>").join("");
 }
 
 document.addEventListener("click", e => {
@@ -10843,9 +11273,6 @@ document.addEventListener("click", e => {
   renderFps();
 });
 
-document.addEventListener("input", e => {
-  if (e.target.id === "target") renderFps();
-});
 
 function currentAccount() {
   return (whoData && whoData.account) || null;
@@ -11311,6 +11738,12 @@ function plugCard(p) {
     : p.drifts ? '<span class="fbadge warn">can lose track</span>' : "";
   const starred = favourites.has(p.id);
 
+  const editMade = p.made
+    ? '<div class="plug-row plug-made"><button class="btn small plug-edit" data-sb-edit-made="' +
+      esc(p.made.alias) + '" title="Open it in Script Builder to change it">Edit in Script Builder</button>' +
+      '<span class="sub2">' + (p.enabled ? "Switch it off above and it stops, in a match too once you press your apply key."
+        : "Switched off: its key does what it did before.") + "</span></div>"
+    : "";
   return '<div class="plug ' + state + (starred ? " fav" : "") + '">' +
     driftNote.replace("<p ", "<p data-hoist ") +
     '<div class="plug-top">' +
@@ -11328,7 +11761,8 @@ function plugCard(p) {
     "</div>" +
     '<div class="plug-meta">' + badge +
     '<span class="plug-kind" title="' + esc(kindWhy) + '">' + esc(kindName) + "</span>" +
-    (p.entry ? '<code>' + esc(p.entry) + "</code>" : "") +
+    (p.made ? '<span class="sub2">Made in Script Builder</span>'
+      : p.entry ? '<code>' + esc(p.entry) + "</code>" : "") +
     (p.states.length ? '<span class="sub2">' + p.states.length + " states</span>" : "") +
     "</div>" +
     (p.touches.length
@@ -11345,8 +11779,8 @@ function plugCard(p) {
           '<div class="plug-note ' + esc(n.severity) + '">' + esc(n.message) + "</div>").join("") +
         "</div>"
       : "") +
-    plugLayout(p) +
-    plugJump(p) +
+    (p.made ? "" : plugLayout(p)) +
+    plugJump(p) + editMade +
     // The key it is actually bound to, not the one its message claims -- the
     // two disagreed on several scripts. Click to put it on a different one.
     '<div class="plug-src">' +
@@ -11364,14 +11798,24 @@ function plugCard(p) {
 
 let plugTab = null;
 
+// The name on the "Generated scripts by ..." tab: the Steam account in use.
+function plugOwner() {
+  const active = (whoData && whoData.accounts || []).find(a => a.active);
+  return (active && active.name) || "you";
+}
+
 // Which pile each card belongs in. A card is only ever in one, so the counts
 // on the tabs add up to the number of cards.
 function plugGroups(list) {
   const starred = list.filter(p => favourites.has(p.id));
-  const rest = list.filter(p => !favourites.has(p.id));
+  const made = list.filter(p => !favourites.has(p.id) && p.made);
+  const rest = list.filter(p => !favourites.has(p.id) && !p.made);
   return [
     { id: "fav", label: "Favourites",
       items: starred },
+    // Script Builder's own scripts, on or off, in one place.
+    { id: "made", label: "Generated scripts by " + plugOwner(),
+      items: made },
     { id: "attention", label: "Needs attention",
       items: rest.filter(p => p.enabled && (p.broken || p.suspect)) },
     { id: "features", label: "Features",
@@ -11396,6 +11840,7 @@ function renderPlugins() {
     return;
   }
   if (!groups.some(g => g.id === plugTab)) plugTab = groups[0].id;
+  if (!whoData && groups.some(g => g.id === "made")) loadWho().then(renderPlugins);
 
   $("plug-summary").innerHTML =
     '<span class="chg-count">' + plugData.features + "</span>" +
@@ -13511,15 +13956,35 @@ function filteredSkins() {
     if (it.kind !== skinsFilters.kind) return false;
     if (skinsFilters.weapon && it.weapon_class !== skinsFilters.weapon) return false;
     if (skinsFilters.rarity && it.rarity !== skinsFilters.rarity) return false;
-    if (q && !it.display_name.toLowerCase().includes(q)) return false;
+    if (q && !(it.display_name + " " + (it.artist || "")).toLowerCase().includes(q)) return false;
     return true;
   });
 }
 
+// The game's own inventory picture for an item, cut out of the player's
+// CS2 files by the server (cs2cfg.econ). No CS2, no picture: the card just
+// shows its text, as before.
+function skinArt(it) {
+  if (!it.art) return "";
+  return '<span class="art"><img src="/item-art/' + encodeURIComponent(it.art) + '.png" alt="" ' +
+    'loading="lazy" decoding="async" onerror="this.parentNode.classList.add(\'none\')"></span>';
+}
+
+const SKINS_PAGE = 240;
+let skinsShown = SKINS_PAGE;
+const SKINS_3D = new Set(["gun", "knife", "glove"]);
+const SKINS_SEARCH_HINT = { gun: "Search by weapon or finish\u2026", knife: "Search by knife or finish\u2026",
+  glove: "Search by glove or finish\u2026", agent: "Search agents\u2026", sticker: "Search stickers\u2026",
+  graffiti: "Search graffiti\u2026", patch: "Search patches\u2026", charm: "Search charms\u2026",
+  music: "Search music kits or artists\u2026" };
+const SKINS_FILTER_LABEL = { gun: "All weapons", knife: "All knives", glove: "All gloves",
+  agent: "Both sides", sticker: "All styles", charm: "All charms" };
+
 function skinCard(it) {
   return '<div class="skin-card" style="border-left-color:' + esc(it.rarity_color) + '" ' +
+    'data-kind="' + esc(it.kind) + '" data-art="' + esc(it.art || "") + '" ' +
     'data-weapon="' + esc(it.weapon_class) + '" data-paintkit="' + esc(it.paintkit) + '" ' +
-    'data-name="' + esc(it.display_name) + '">' +
+    'data-name="' + esc(it.display_name) + '">' + skinArt(it) +
     '<span class="wn">' + (it.kind === "knife" || it.kind === "glove" ? "★ " : "") + esc(it.weapon_name) + '</span>' +
     '<span class="sn">' + esc(it.skin_name) + '</span>' +
     '<span class="rr" style="color:' + esc(it.rarity_color) + '">' + esc(it.rarity) + '</span>' +
@@ -13534,11 +13999,16 @@ function fillSkinsFilterOptions() {
   const weapons = [...new Map(items.map(it => [it.weapon_class, it.weapon_name])).entries()]
     .sort((a, b) => a[1].localeCompare(b[1]));
   const rarities = [...new Set(items.map(it => it.rarity))].filter(Boolean);
-  weaponSel.innerHTML = '<option value="">All weapons</option>' +
+  // One group only (graffiti, patches...): a filter with one choice is noise.
+  weaponSel.classList.toggle("hidden", weapons.length < 2);
+  raritySel.classList.toggle("hidden", skinsFilters.kind === "music");
+  weaponSel.innerHTML = '<option value="">' + (SKINS_FILTER_LABEL[skinsFilters.kind] || "All") + '</option>' +
     weapons.map(([cls, name]) => '<option value="' + esc(cls) + '">' + esc(name) + "</option>").join("");
   raritySel.innerHTML = '<option value="">All rarities</option>' +
     rarities.map(r => '<option value="' + esc(r) + '">' + esc(r) + "</option>").join("");
   weaponSel.dataset.filledFor = skinsFilters.kind;
+  const search = $("skins-search");
+  if (search) search.placeholder = SKINS_SEARCH_HINT[skinsFilters.kind] || "Search\u2026";
 }
 
 function renderSkins() {
@@ -13550,21 +14020,168 @@ function renderSkins() {
       '<div class="actions"><button class="btn" id="skins-reload-inline">Try again</button></div>';
     return;
   }
+  // Hide a tab this game version has nothing for (charms on an older install).
+  document.querySelectorAll(".skins-kind-tab[data-kind]").forEach(t => {
+    t.classList.toggle("hidden", !d.items.some(it => it.kind === t.dataset.kind));
+  });
   fillSkinsFilterOptions();
   const items = filteredSkins();
-  box.innerHTML = '<p class="skins-count">' + items.length + " of " + d.count + " shown</p>" +
-    '<div class="skins-grid">' + items.map(skinCard).join("") + "</div>";
+  if (skinsFilters.kind === "music") { renderMusicKits(box, items); return; }
+  const total = d.items.filter(it => it.kind === skinsFilters.kind).length;
+  const shown = items.slice(0, skinsShown);
+  box.innerHTML = '<p class="skins-count">' + items.length + " of " + total + " shown</p>" +
+    '<div class="skins-grid">' + shown.map(skinCard).join("") + "</div>" +
+    (items.length > shown.length
+      ? '<div class="skins-more"><button class="btn small" id="skins-more">Show more (' +
+        (items.length - shown.length) + ' left)</button></div>' : "");
+}
+
+/* Music kits. Each card plays the kit's own songs straight from the
+   player's CS2 files: the MVP song (what everyone hears when you are the
+   round's MVP) first, then the other moments the kit covers. One song plays
+   at a time; the bar at the bottom shows it and stops it. */
+let musicKits = null;          // kit id -> { parts: [...] }
+let musicAudio = null, musicUrl = null, musicNow = null, musicAbort = null;
+
+async function loadMusicKits() {
+  try {
+    const r = await api("/api/skins/music", {});
+    musicKits = {};
+    (r.kits || []).forEach(k => { musicKits[k.kit] = k; });
+  } catch (err) {
+    musicKits = {};
+  }
+  if (skinsFilters.kind === "music") renderSkins();
+}
+
+function musicCard(it) {
+  const kit = musicKits && musicKits[it.paintkit];
+  const parts = (kit && kit.parts) || [];
+  const mvp = parts.find(p => p.label === "MVP song");
+  const now = musicNow && musicNow.kit === it.paintkit;
+  const art = it.art ? '<span class="art"><img src="/item-art/' + encodeURIComponent(it.art) +
+    '.png" alt="" loading="lazy" onerror="this.parentNode.classList.add(\'none\')"></span>' : "";
+  let body;
+  if (!musicKits) body = '<span class="mk-none"><span class="spin"></span> Looking for the songs&hellip;</span>';
+  else if (!parts.length) body = '<span class="mk-none">The songs for this kit were not found in your game files.</span>';
+  else body = (mvp ? '<button class="btn primary small mk-mvp" data-mk-kit="' + esc(it.paintkit) +
+      '" data-mk-part="' + esc(mvp.part) + '">&#9654; Play MVP song</button>' : "") +
+    '<div class="mk-parts">' + parts.filter(p => p !== mvp).map(p =>
+      '<button class="mk-part' + (now && musicNow.part === p.part ? " on" : "") + '" data-mk-kit="' +
+      esc(it.paintkit) + '" data-mk-part="' + esc(p.part) + '">' + esc(p.label) + "</button>").join("") + "</div>";
+  return '<div class="mk-card' + (now ? " playing" : "") + '" data-mk-card="' + esc(it.paintkit) + '">' +
+    '<div class="mk-top">' + art + '<span class="mk-name"><b>' + esc(it.skin_name) + "</b>" +
+    (it.artist ? "<span>" + esc(it.artist) + "</span>" : "") + "</span></div>" + body + "</div>";
+}
+
+function renderMusicKits(box, items) {
+  if (musicKits === null) loadMusicKits();
+  const shown = items.slice(0, skinsShown);
+  box.innerHTML = '<p class="skins-count">' + items.length + " music kits &middot; press Play MVP song " +
+    "to hear what plays when you are the round's MVP</p>" +
+    '<div class="mk-grid">' + shown.map(musicCard).join("") + "</div>" +
+    (items.length > shown.length
+      ? '<div class="skins-more"><button class="btn small" id="skins-more">Show more (' +
+        (items.length - shown.length) + ' left)</button></div>' : "");
+}
+
+function fmtSongTime(s) {
+  s = Math.max(0, Math.floor(s || 0));
+  return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+}
+
+function stopMusic() {
+  if (musicAbort) { musicAbort.abort(); musicAbort = null; }
+  if (musicAudio) { musicAudio.pause(); musicAudio = null; }
+  if (musicUrl) { URL.revokeObjectURL(musicUrl); musicUrl = null; }
+  musicNow = null;
+  $("mk-player")?.classList.add("hidden");
+  document.querySelectorAll(".mk-card.playing").forEach(c => c.classList.remove("playing"));
+  document.querySelectorAll(".mk-part.on").forEach(c => c.classList.remove("on"));
+}
+
+async function playMusic(kitId, part) {
+  stopMusic();
+  const kit = musicKits && musicKits[kitId];
+  const item = ((skinsData && skinsData.items) || []).find(it => it.kind === "music" && it.paintkit === kitId);
+  const label = ((kit && kit.parts) || []).find(p => p.part === part)?.label || "";
+  musicNow = { kit: kitId, part };
+  const controller = new AbortController();
+  musicAbort = controller;
+  $("mk-now-kit").textContent = item ? item.skin_name : "";
+  $("mk-now-part").textContent = label + " · loading…";
+  $("mk-bar-fill").style.width = "0";
+  $("mk-time").textContent = "0:00";
+  $("mk-player").classList.remove("hidden");
+  document.querySelector('[data-mk-card="' + CSS.escape(kitId) + '"]')?.classList.add("playing");
+  document.querySelector('.mk-part[data-mk-kit="' + CSS.escape(kitId) + '"][data-mk-part="' + CSS.escape(part) + '"]')?.classList.add("on");
+  try {
+    const res = await fetch("/music-kit/" + encodeURIComponent(kitId) + "/" + encodeURIComponent(part),
+      { headers: { "X-CS2CFG-Token": TOKEN }, signal: controller.signal });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "This song part could not be played.");
+    }
+    const blob = await res.blob();
+    if (controller.signal.aborted) return;
+    musicUrl = URL.createObjectURL(blob);
+    const audio = new Audio(musicUrl);
+    musicAudio = audio;
+    audio.volume = Number($("mk-volume").value) / 100;
+    audio.addEventListener("timeupdate", () => {
+      if (musicAudio !== audio) return;
+      $("mk-bar-fill").style.width = (audio.duration ? 100 * audio.currentTime / audio.duration : 0) + "%";
+      $("mk-time").textContent = fmtSongTime(audio.currentTime) + " / " + fmtSongTime(audio.duration);
+    });
+    audio.addEventListener("ended", () => { if (musicAudio === audio) stopMusic(); });
+    $("mk-now-part").textContent = label;
+    await audio.play();
+  } catch (err) {
+    if (err && err.name === "AbortError") return;
+    stopMusic();
+    status(String(err && err.message || err), true);
+  }
+}
+
+document.addEventListener("click", e => {
+  const play = e.target.closest("[data-mk-part]");
+  if (play) { playMusic(play.dataset.mkKit, play.dataset.mkPart); return; }
+  if (e.target.closest("#mk-stop")) { stopMusic(); return; }
+  const bar = e.target.closest(".mk-bar");
+  if (bar && musicAudio && musicAudio.duration) {
+    const r = bar.getBoundingClientRect();
+    musicAudio.currentTime = musicAudio.duration * Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+    return;
+  }
+  if (e.target.closest("#skins-more")) { skinsShown += SKINS_PAGE; renderSkins(); }
+});
+document.addEventListener("input", e => {
+  if (e.target.id === "mk-volume" && musicAudio) musicAudio.volume = Number(e.target.value) / 100;
+});
+
+/* A picture-only look for items that have no 3D model here (agents,
+   stickers, graffiti, patches, charms): the same window, the real picture. */
+function openPictureViewer(art, displayName) {
+  if (skinRenderAbort) { skinRenderAbort.abort(); skinRenderAbort = null; }
+  skinViewerCurrent = null;
+  $("skin-viewer-title").textContent = displayName;
+  $("skin-viewer-market").href = "https://steamcommunity.com/market/search?appid=730&q=" +
+    encodeURIComponent(displayName);
+  $("skin-viewer-body").innerHTML = '<img class="skin-picture" src="/item-art/' + encodeURIComponent(art) +
+    '.png" alt="" onerror="this.outerHTML=\'<p class=&quot;sub&quot;>No picture for this item in your game files.</p>\'">';
+  $("skin-viewer-overlay").classList.remove("hidden");
 }
 
 document.addEventListener("input", e => {
   if (e.target.id === "skins-search") {
     skinsFilters.search = e.target.value;
+    skinsShown = SKINS_PAGE;
     renderSkins();
   }
 });
 document.addEventListener("change", e => {
-  if (e.target.id === "skins-weapon-filter") { skinsFilters.weapon = e.target.value; renderSkins(); }
-  if (e.target.id === "skins-rarity-filter") { skinsFilters.rarity = e.target.value; renderSkins(); }
+  if (e.target.id === "skins-weapon-filter") { skinsFilters.weapon = e.target.value; skinsShown = SKINS_PAGE; renderSkins(); }
+  if (e.target.id === "skins-rarity-filter") { skinsFilters.rarity = e.target.value; skinsShown = SKINS_PAGE; renderSkins(); }
 });
 
 function skinViewerSetupPrompt() {
@@ -13658,6 +14275,9 @@ async function openSkinViewer(weaponClass, paintkit, displayName) {
 
 document.addEventListener("click", async e => {
   if (e.target.closest("#skins-reload") || e.target.closest("#skins-reload-inline")) {
+    musicKits = null;
+    const weaponSel = $("skins-weapon-filter");
+    if (weaponSel) delete weaponSel.dataset.filledFor;
     loadSkinsCatalog(true);
     return;
   }
@@ -13666,6 +14286,8 @@ document.addEventListener("click", async e => {
     skinsFilters.kind = kindTab.dataset.kind;
     skinsFilters.weapon = "";
     skinsFilters.rarity = "";
+    skinsShown = SKINS_PAGE;
+    if (skinsFilters.kind !== "music") stopMusic();
     document.querySelectorAll(".skins-kind-tab").forEach(t => {
       t.classList.toggle("active", t === kindTab);
       t.setAttribute("aria-selected", String(t === kindTab));
@@ -13675,7 +14297,8 @@ document.addEventListener("click", async e => {
   }
   const card = e.target.closest(".skin-card");
   if (card) {
-    openSkinViewer(card.dataset.weapon, card.dataset.paintkit, card.dataset.name);
+    if (SKINS_3D.has(card.dataset.kind)) openSkinViewer(card.dataset.weapon, card.dataset.paintkit, card.dataset.name);
+    else openPictureViewer(card.dataset.art, card.dataset.name);
     return;
   }
   if (e.target.closest("#skin-viewer-close")) {
@@ -14510,23 +15133,62 @@ $('sync-auto').addEventListener('change',async e => {
   finally { input.disabled = false; }
 });
 
-/* The Machine card: which half of the machine is asked to do less, and what
-   Windows itself has been told about the game.
+/* The GPU or CPU card (Settings -> NVIDIA): which part of the machine carries
+   more of CS2's picture, and what Windows itself has been told about the game.
 
-   The three choices are detail dials, not a scheduler. Nothing here moves
-   work from the processor to the graphics card; it decides which of the two
-   is asked to draw less when the machine cannot have everything. The card
-   says that rather than implying something cleverer than it is. */
+   Detail dials, not a scheduler: nothing moves work from the processor to the
+   graphics card. "Lean on GPU" gives the graphics card more to draw (shadows,
+   anti-aliasing, ambient occlusion, texture filtering, shader detail) and the
+   processor fewer particles; "Lean on CPU" the other way round. See
+   LEAN_GPU_KEYS in cs2cfg/profile.py. Until Nov 21 it only moved two hidden
+   values and changed nothing on most PCs. */
 let wgData = null;
 
 const BIAS = [
   ["auto", "Automatic",
-   "Automatically reduces picture detail for the slower part."],
+   "The app compares your graphics card and processor and holds back detail on the slower one."],
   ["gpu", "Lean on GPU",
-   "Keeps more graphics detail when the GPU is the stronger part."],
+   "For a strong graphics card: sharper shadows, more anti-aliasing and texture detail, fewer particles."],
   ["cpu", "Lean on CPU",
-   "Reduces graphics detail for a weaker GPU. Does not move work between parts."],
+   "For a weaker graphics card: lighter shadows, less anti-aliasing and texture work, more particles."],
 ];
+
+async function loadPcState() {
+  const box = $("pcstate-out");
+  if (!box) return;
+  let data;
+  try { data = await api("/api/pcstate", {}); }
+  catch (err) { box.innerHTML = '<p class="sub">Could not read this right now.</p>'; return; }
+  const items = data.items || [];
+  let html = items.length
+    ? '<ul class="pcs-list">' + items.map(it =>
+        '<li class="' + (it.on ? 'on' : '') + '"><i class="pcs-dot" aria-hidden="true"></i>' +
+        '<div><div class="pcs-name">' + esc(it.label) + '</div>' +
+        '<div class="pcs-text">' + esc(it.text) + '</div></div></li>').join('') + '</ul>'
+    : '<p class="sub" style="margin:10px 0 0">The app has not changed any PC settings yet.</p>';
+  if (items.some(it => it.on)) {
+    html += '<div class="wg-row"><span class="sub2">Want your own settings back without quitting? ' +
+            'The app sets its own again the next time it starts.</span>' +
+            '<button class="btn small" id="pcs-restore">Put my PC back now</button></div>';
+  }
+  box.innerHTML = html;
+}
+
+document.addEventListener("click", async e => {
+  if (e.target.closest('[data-sub="this-pc"].seg-item')) { loadPcState(); return; }
+  const go = e.target.closest("#pcs-restore");
+  if (!go) return;
+  go.disabled = true;
+  go.textContent = "Putting back…";
+  try {
+    const r = await api("/api/pcstate/restore", {});
+    const waiting = (r.items || []).filter(it => it.result === "waiting");
+    status(waiting.length
+      ? "Done. Steam launch options and the CS2 window go back once Steam and CS2 are closed."
+      : "Your PC is back to its own settings.");
+  } catch (err) { status(String(err && err.message || err), true); }
+  loadPcState();
+});
 
 async function loadMachine() {
   try { wgData = await api("/api/wingraphics", {}); }
@@ -14563,7 +15225,8 @@ function renderMachine() {
   }
 
   html += '<div class="bias" role="group" aria-label="Picture detail balance" style="--bias-index:' + Math.max(0, BIAS.findIndex(b => b[0] === now)) + '"><i class="bias-thumb" aria-hidden="true"></i>' +
-    BIAS.map(([id,name,why]) => '<button type="button" data-bias="' + id + '" title="' + esc(why) + '" aria-pressed="' + (now === id) + '"><b>' + esc(name) + '</b></button>').join('') + '</div>';
+    BIAS.map(([id,name,why]) => '<button type="button" data-bias="' + id + '" title="' + esc(why) + '" aria-pressed="' + (now === id) + '"><b>' + esc(name) + '</b></button>').join('') + '</div>' +
+    '<p class="sub2 bias-why">' + esc((BIAS.find(b => b[0] === now) || BIAS[0])[2]) + '</p>';
 
   if (wgData && wgData.supported) {
     const set = wgData.high_performance && wgData.windowed_optimised;
@@ -14586,9 +15249,11 @@ document.addEventListener("click", async e => {
     const track = pick.closest('.bias');
     track.style.setProperty('--bias-index', BIAS.findIndex(b => b[0] === want));
     track.querySelectorAll('[data-bias]').forEach(b => b.setAttribute('aria-pressed', String(b === pick)));
+    const why = track.parentElement.querySelector('.bias-why');
+    if (why) why.textContent = (BIAS.find(b => b[0] === want) || BIAS[0])[2];
     try { await api("/api/prefs", { load_bias: want }); } catch (err) { /* below */ }
-    // The generated config just changed, so the preview is stale.
-    $("preview").click();
+    // Applies straight away, with the same live list as a mode switch.
+    applyProfile('bias');
     return;
   }
   const go = e.target.closest("#wg-apply");
@@ -14634,11 +15299,11 @@ document.addEventListener("change", async e => {
   if (prefsNow) Object.assign(prefsNow, body);
   try { await api("/api/prefs", body); } catch (err) { /* reported below */ }
   if (hide) {
-    // The config this would generate just changed, so the preview is stale.
+    // The config this would generate just changed, so it is written again.
     noteChange("CS2 crosshair \u2192 " + (e.target.checked ? "off (Crosshair X)" : "on"),
                () => { const el = $("xhair-hide"); if (el) { el.checked = !e.target.checked;
                        el.dispatchEvent(new Event("change", { bubbles: true })); } });
-    $("preview").click();
+    applyProfile('crosshair');
   }
 });
 
@@ -14660,6 +15325,124 @@ document.addEventListener("click", async e => {
   btn.textContent = said;
   btn.disabled = false;
 });
+
+/* Settings -> NVIDIA: CS2's own NVIDIA profile (Edy, Nov 21).
+
+   Top: the settings each Launcher mode looks after, marked "Managed by CS
+   CONFIG", each with a Set manually switch. Switched on, the player picks the
+   value and every mode leaves it alone; switched off, the mode takes it back.
+   "Show all settings" opens every NVIDIA 3D setting the driver knows, each
+   editable the same way. Changes save at once, through the one-time helper
+   where the driver wants an administrator -- never a prompt here. */
+let nvData = null, nvAllOpen = false, nvBusy = false;
+async function loadNvidia() {
+  const box = $('nv-out');
+  if (!box) return;
+  try { nvData = await api('/api/nvidia', {intent}); }
+  catch (err) { nvData = {available:false, reason:String(err && err.message || err)}; }
+  renderNvidia();
+}
+function nvValueControl(r) {
+  const choices = r.choices || [];
+  const now = r.value;
+  if (choices.length) {
+    const known = choices.some(c => c.value === now);
+    return '<select class="nv-pick" data-nv-pick="' + esc(r.id) + '" aria-label="' + esc(r.name) + '">' +
+      (now == null || !known ? '<option value="" selected>' + esc(r.label) + '</option>' : '') +
+      choices.map(c => '<option value="' + c.value + '"' + (c.value === now ? ' selected' : '') + '>' + esc(c.label) + '</option>').join('') + '</select>';
+  }
+  const range = r.range || [0, 4294967295];
+  return '<input class="nv-pick" type="number" inputmode="numeric" min="' + range[0] + '" max="' + range[1] + '" data-nv-pick="' + esc(r.id) + '" value="' + (now == null ? '' : now) + '" placeholder="' + esc(r.label) + '" aria-label="' + esc(r.name) + '">';
+}
+function nvRow(r) {
+  const manual = r.manual;
+  const value = manual ? nvValueControl(r)
+    : '<span class="nv-val">' + esc(r.label) + '</span>';
+  return '<div class="nv-row' + (manual ? ' manual' : '') + (r.managed ? ' managed' : '') + '" data-nv-row="' + esc(r.id) + '">' +
+    '<span class="nv-name">' + esc(r.name) + (r.managed && !manual ? '<small><span class="nv-mini" aria-hidden="true"></span>Managed by CS CONFIG</small>' : manual ? '<small>Set by you</small>' : '') + '</span>' +
+    value +
+    '<label class="nv-manual"><input type="checkbox" data-nv-manual="' + esc(r.id) + '"' + (manual ? ' checked' : '') + '> Set manually</label></div>';
+}
+function renderNvidia() {
+  const box = $('nv-out'), all = $('nv-all'), more = $('nv-show-all'), filter = $('nv-filter');
+  if (!box) return;
+  const d = nvData;
+  if (!d) { box.innerHTML = '<span class="sub">Reading NVIDIA settings&hellip;</span>'; return; }
+  if (!d.available) {
+    box.innerHTML = '<p class="sub">' + (d.no_driver ? 'This PC has no NVIDIA graphics card, so there is nothing to set here.' : 'NVIDIA settings could not be read: ' + esc(d.reason || 'unknown reason')) + '</p>';
+    more.hidden = true; all.hidden = true; filter.hidden = true;
+    return;
+  }
+  const helper = d.helper || {};
+  const ask = !(helper.installed && helper.current) && helper.supported
+    ? '<div class="nv-helper" data-helper-warning><span>NVIDIA saves settings only with administrator rights. Allow it once and the app never asks again.</span><button class="btn small" id="nv-allow" type="button">Allow once</button></div>' : '';
+  const mode = d.intent ? d.intent[0].toUpperCase() + d.intent.slice(1) : '';
+  box.innerHTML = ask + '<p class="sub2 nv-mode">Following your <b>' + esc(mode) + '</b> mode &middot; driver ' + esc(d.driver || '') + '</p>' +
+    '<div class="nv-list">' + (d.managed || []).map(nvRow).join('') + '</div>';
+  more.hidden = false;
+  more.textContent = nvAllOpen ? 'Hide all settings' : 'Show all settings (' + (d.all || []).length + ')';
+  more.setAttribute('aria-expanded', String(nvAllOpen));
+  filter.hidden = !nvAllOpen;
+  all.hidden = !nvAllOpen;
+  if (nvAllOpen) renderNvidiaAll();
+}
+function renderNvidiaAll() {
+  const all = $('nv-all');
+  const words = ($('nv-filter').value || '').trim().toLowerCase();
+  const rows = (nvData.all || []).filter(r => !words || r.name.toLowerCase().includes(words));
+  all.innerHTML = rows.length ? '<div class="nv-list">' + rows.map(nvRow).join('') + '</div>'
+    : '<p class="sub">No setting by that name.</p>';
+}
+async function nvSave(id, body, row) {
+  if (nvBusy) return;
+  nvBusy = true;
+  row?.classList.add('saving');
+  try {
+    const r = await api('/api/nvidia/set', Object.assign({id, intent}, body));
+    if (!r.ok) throw new Error(r.error || 'NVIDIA did not take the change');
+    const c = (r.changed || [])[0];
+    status(c ? c.name + ': ' + c.after : 'Saved.', {kind:'done'});
+  } catch (err) {
+    status(String(err && err.message || err), true);
+  } finally {
+    nvBusy = false;
+    await loadNvidia();
+  }
+}
+document.addEventListener('change', e => {
+  const sw = e.target.closest('[data-nv-manual]');
+  if (sw) {
+    const id = sw.dataset.nvManual;
+    const row = [...(nvData.managed || []), ...(nvData.all || [])].find(r => r.id === id);
+    // Nothing set yet and nothing managed: open the picker, save on the pick.
+    if (sw.checked && row && row.value == null && !row.managed) {
+      (nvData.all || []).concat(nvData.managed || []).forEach(r => { if (r.id === id) r.manual = true; });
+      renderNvidia();
+      return;
+    }
+    nvSave(id, sw.checked ? {manual:true, keep_current:true} : {manual:false}, sw.closest('.nv-row'));
+    return;
+  }
+  const pick = e.target.closest('[data-nv-pick]');
+  if (pick && pick.value !== '') {
+    const value = Number(pick.value);
+    if (Number.isInteger(value) && value >= 0) nvSave(pick.dataset.nvPick, {manual:true, value}, pick.closest('.nv-row'));
+  }
+});
+document.addEventListener('click', async e => {
+  if (e.target.closest('#nv-show-all')) { nvAllOpen = !nvAllOpen; renderNvidia(); if (nvAllOpen) $('nv-filter').focus(); return; }
+  const allow = e.target.closest('#nv-allow');
+  if (allow) {
+    allow.disabled = true; allow.textContent = 'Waiting for Windows…';
+    try {
+      const r = await api('/api/helper/install', {});
+      updateHelperStatus(r);
+      if (!r.ok) status(r.declined ? 'Windows was not allowed, so NVIDIA settings stay as they are.' : (r.error || 'Windows could not finish.'), true);
+    } catch (err) { status(String(err && err.message || err), true); }
+    loadNvidia();
+  }
+});
+document.addEventListener('input', e => { if (e.target.id === 'nv-filter' && nvData) renderNvidiaAll(); });
 
 /* Named setups.
 
@@ -14748,7 +15531,10 @@ document.addEventListener("click", async e => {
   if (use) {
     const name = use.dataset.setupUse;
     const r = await setupsAct({ do: "use", name });
-    if (r) status("Switched to " + name + ". " + (r.goxlr?.ok === false ? "GoXLR: " + r.goxlr.error : r.goxlr && !r.goxlr.skipped ? "GoXLR profiles switched." : "Game settings are ready to apply."), r.goxlr?.ok === false);
+    if (r) {
+      status("Switched to " + name + ". " + (r.goxlr?.ok === false ? "GoXLR: " + r.goxlr.error : r.goxlr && !r.goxlr.skipped ? "GoXLR profiles switched." : ""), r.goxlr?.ok === false);
+      applyProfile('setup');
+    }
     return;
   }
   if (e.target.closest("#setup-keep")) {
@@ -14985,7 +15771,12 @@ async function kbAssign(payload, describe) {
       status("Could not change " + pickedKey.label + ": " +
              ((answer && answer.error) || "unknown problem"), true);
     } else {
+      // CS2 reads its config files when it starts, so say when this lands.
+      const applyKeys = answer.apply_keys || [];
       status(describe(answer) +
+             (applyKeys.length
+               ? " — press " + applyKeys.join(" or ") + " in game to use it now"
+               : " — takes effect next time CS2 starts, or set an apply key to use it mid-match") +
              (answer.backup ? ". A backup was saved." : "") +
              (answer.unknown ? "  \u00b7  note: this collection does not " +
                                "recognise that command" : ""));
@@ -15166,12 +15957,21 @@ document.addEventListener("change", async e => {
       // What the key does now matters more than how many lines moved, so it
       // is said first and in the key's own terms.
       const gave = (r.restored || []).map(k => k.label);
-      status((want ? "Switched on " : "Switched off ") + r.name +
-             (gave.length ? " \u2014 " + gave.join(", ") +
-                            " restored to CS2 defaults"
-                          : ". Your configuration has been updated") +
-             (r.backup ? ", backup " + r.backup : ""));
+      if (r.builder) {
+        // A Script Builder script: its key goes back to what it did before.
+        status((want ? "Switched on " : "Switched off ") + r.name +
+               (gave.length ? ". " + gave.join(", ") + " is back to what it did before" : "") +
+               ". In a match, press your apply key and it counts right away.");
+      } else {
+        status((want ? "Switched on " : "Switched off ") + r.name +
+               (gave.length ? " \u2014 " + gave.join(", ") +
+                              " restored to CS2 defaults"
+                            : ". Your configuration has been updated") +
+               (r.backup ? ", backup " + r.backup : ""));
+      }
     }
+    // The Keyboard tab and Script Builder read the same files: re-read them.
+    keyData = null; sb.saved = null;
     await loadPlugins(true);
   } catch (err) {
     box.checked = !want;
@@ -16463,6 +17263,7 @@ const SB_MODES = [
   ["press", "Press once", "Every press does all the steps."],
   ["hold", "While held", "Starts on press, everything undoes when you let go."],
   ["toggle", "On / off", "First press turns it on, next press turns it off."],
+  ["shift", "Shift key", "Press it, and another key does something different, then goes back."],
 ];
 const SB_IDEAS = [
   {label: "Drop the bomb + tell team", spec: {name: "Drop the bomb and tell my team", mode: "press",
@@ -16473,12 +17274,37 @@ const SB_IDEAS = [
     steps: [{id: "buy_flash"}, {id: "buy_smoke"}, {id: "buy_he"}, {id: "buy_molotov"}]}},
   {label: "Big radar while held", spec: {name: "Big radar while held", mode: "hold",
     steps: [{id: "radar_zoom", value: 0.3}]}},
+  {label: "Shoot, then knife on let go", spec: {name: "Shoot then knife", mode: "hold",
+    steps: [{id: "cmd:+attack"}], release_steps: [{id: "cmd:slot3"}]}},
+  {label: "Alt + 1 says something", spec: {name: "Alt one says hi", mode: "shift", style: "next",
+    steps: [{id: "say_team", text: "Rotating"}]}, keys: {binding: "scancode226", target: "scancode30"}},
   {label: "Game sound on / off", spec: {name: "Game sound on off", mode: "toggle",
     steps: [{id: "volume", value: 0}]}},
 ];
 const sb = {data: null, spec: {name: "", mode: "press", steps: []}, binding: "", keyLabel: "",
+            target: "", targetLabel: "",
             cat: "weapons", find: "", built: null, key: null, listening: false, confirm: null,
             saving: false, timer: 0};
+
+// The saved list is read again on every visit: a script switched off on the
+// Scripts tab, or moved to another key on the Keyboard tab, shows that here.
+async function sbRefreshSaved() {
+  try { sb.saved = (await api("/api/scriptgen/saved", {})).scripts || []; } catch (_) { return; }
+  if (activeTab === "builder" && sb.data) sbRender();
+}
+
+function sbOpenSaved(x) {
+  const sp = x.spec;
+  sb.spec = {name: sp.name, mode: sp.mode, style: sp.style, keep_own: sp.keep_own,
+    steps: (sp.steps || []).map(s => Object.assign(sbNewStep(s.id), s)),
+    release_steps: (sp.release_steps || []).map(s => Object.assign(sbNewStep(s.id), s))};
+  if (sp.lines) sb.spec.lines_text = sp.lines.join("\n");
+  // The key that really runs it now, which the Keyboard tab may have changed.
+  sb.binding = x.binding_now || sp.binding || "";
+  sb.keyLabel = (x.keys && x.keys[0]) || x.key || "";
+  sb.target = sp.target || ""; sb.targetLabel = x.target || "";
+  sb.confirm = null; sbRender(); sbChanged();
+}
 
 function sbStep(id) { return (sb.data && sb.data.steps || []).find(s => s.id === id); }
 
@@ -16488,6 +17314,7 @@ async function sbLoad(force) {
   await ensureScan(false);
   try {
     sb.data = await api("/api/scriptgen/steps", {});
+    try { sb.saved = (await api("/api/scriptgen/saved", {})).scripts || []; } catch (_) { sb.saved = []; }
     if (!sb.data.groups.some(g => g.id === sb.cat) && sb.data.groups.length) sb.cat = sb.data.groups[0].id;
     sbRender();
     sbCheck();
@@ -16509,28 +17336,39 @@ function sbHasMove() {
   return sb.spec.steps.some(s => (sbStep(s.id) || {}).move);
 }
 
-function sbStepRow(picked, i) {
+// Steps live in two lists on a "While held" key: what the press does and
+// what letting go does. A row's index carries an "r" for the let-go list.
+function sbArr(ref) {
+  const r = String(ref);
+  if (r[0] === "r") { sb.spec.release_steps = sb.spec.release_steps || []; return [sb.spec.release_steps, +r.slice(1)]; }
+  return [sb.spec.steps, +r];
+}
+function sbReleaseRow(picked, i) { return sbStepRow(picked, i, "r"); }
+
+function sbStepRow(picked, i, pre) {
+  pre = typeof pre === "string" ? pre : "";
   const step = sbStep(picked.id) || {label: picked.id, group_name: ""};
-  const n = sb.spec.steps.length;
+  const n = (pre ? sb.spec.release_steps || [] : sb.spec.steps).length;
+  const ref = pre + i;
   const bad = sb.built && !sb.built.ok && ((step.move && sb.spec.steps.filter(s => (sbStep(s.id) || {}).move).length > 1) ||
     (step.hold && sb.spec.mode === "press"));
   let extra = "";
   if (step.input === "text") {
-    extra = '<input type="text" maxlength="100" data-sb-text="' + i + '" placeholder="' + esc(step.placeholder || "") +
+    extra = '<input type="text" maxlength="100" data-sb-text="' + ref + '" placeholder="' + esc(step.placeholder || "") +
       '" value="' + esc(picked.text || "") + '">';
   } else if (step.input === "number") {
     extra = '<label>Set to <input type="number" step="' + step.step + '" min="' + step.min + '" max="' + step.max +
-      '" data-sb-val="' + i + '" value="' + esc(picked.value) + '"></label>';
-    if (sb.spec.mode !== "press") {
+      '" data-sb-val="' + ref + '" value="' + esc(picked.value) + '"></label>';
+    if (sb.spec.mode !== "press" && sb.spec.mode !== "shift" && !pre) {
       extra += '<label>then back to <input type="number" step="' + step.step + '" min="' + step.min + '" max="' + step.max +
-        '" data-sb-back="' + i + '" value="' + esc(picked.back) + '"></label>';
+        '" data-sb-back="' + ref + '" value="' + esc(picked.back) + '"></label>';
     }
   }
   return '<div class="sb-act' + (bad ? " bad" : "") + '"><span class="n">' + (i + 1) + '</span><b>' + esc(step.label) + '</b>' +
     extra + '<span class="tag">' + esc(step.group_name || "") + '</span><span class="sp"></span>' +
-    '<button class="sb-mini" data-sb-move="' + i + ':-1" title="Move up"' + (i === 0 ? " disabled" : "") + '>&#8593;</button>' +
-    '<button class="sb-mini" data-sb-move="' + i + ':1" title="Move down"' + (i === n - 1 ? " disabled" : "") + '>&#8595;</button>' +
-    '<button class="sb-mini" data-sb-del="' + i + '" title="Remove this step">&#10005;</button></div>';
+    '<button class="sb-mini" data-sb-move="' + ref + ':-1" title="Move up"' + (i === 0 ? " disabled" : "") + '>&#8593;</button>' +
+    '<button class="sb-mini" data-sb-move="' + ref + ':1" title="Move down"' + (i === n - 1 ? " disabled" : "") + '>&#8595;</button>' +
+    '<button class="sb-mini" data-sb-del="' + ref + '" title="Remove this step">&#10005;</button></div>';
 }
 
 function sbChips() {
@@ -16543,8 +17381,10 @@ function sbChips() {
   let fadedMove = false, fadedHold = false;
   const chips = list.map(s => {
     let off = "";
-    if (s.move && hasMove) { off = "CS2 allows only one moving or shooting action per key."; fadedMove = true; }
-    else if (s.hold && sb.spec.mode === "press") { off = "Only works on a “While held” or “On / off” key."; fadedHold = true; }
+    const toRelease = sb.spec.mode === "hold" && sb.addTo === "release";
+    if (toRelease && (s.hold || s.move)) { off = "Letting go can't start something that has to be held."; fadedHold = true; }
+    else if (s.move && hasMove) { off = "CS2 allows only one moving or shooting action per key."; fadedMove = true; }
+    else if (s.hold && (sb.spec.mode === "press" || sb.spec.mode === "shift")) { off = "Only works on a “While held” or “On / off” key."; fadedHold = true; }
     return '<button class="sb-chip" data-sb-add="' + esc(s.id) + '"' + (off ? ' disabled title="' + esc(off) + '"' : (s.note ? ' title="' + esc(s.note) + '"' : "")) +
       '>' + esc(s.label) + '</button>';
   }).join("");
@@ -16558,11 +17398,23 @@ function sbSide() {
   const b = sb.built;
   let html = '<h4>What your script will do</h4>';
   const key = sb.keyLabel ? "<b>" + esc(sb.keyLabel) + "</b>" : "your key";
-  if (b && b.says && b.says.length) {
-    const lead = sb.spec.mode === "hold" ? "While you hold " + key + ":" :
+  if (b && b.edited) {
+    html += '<div class="sb-says"><p>You edited the config lines by hand, so the steps on the left no longer decide what the key does. ' +
+      'Step 5 shows what every line does.</p></div>';
+  } else if (b && b.says && b.says.length) {
+    const tgt = (b.target && b.target.label) ? "<b>" + esc(b.target.label) + "</b>" : "the other key";
+    const lead = sb.spec.mode === "shift" ? (sb.spec.style === "hold"
+        ? "While you hold " + key + ", pressing " + tgt + ":"
+        : "Press " + key + ", then the next press of " + tgt + ":") :
+      sb.spec.mode === "hold" ? "While you hold " + key + ":" :
       sb.spec.mode === "toggle" ? "First press of " + key + ":" : "When you press " + key + ":";
     html += '<div class="sb-says"><p>' + lead + '</p><ol>' + b.says.map(t => "<li>" + esc(t) + "</li>").join("") + '</ol>';
-    if (sb.spec.mode !== "press") {
+    if (sb.spec.mode === "shift") {
+      html += '<p style="margin-top:8px">' + (sb.spec.style === "hold" ? "When you let go of " + key + ", " : "After that, ") +
+        tgt + " goes back to \u201c" + esc(b.target && b.target.normal || "what it does now") + "\u201d." +
+        (b.target && b.target.own ? " " + key + " still does \u201c" + esc(b.target.own) + "\u201d every time you press it." : "") +
+        (sb.spec.style === "hold" ? "" : " Changed your mind? Press " + key + " again to cancel.") + '</p>';
+    } else if (sb.spec.mode !== "press") {
       const undo = [];
       if (sb.spec.steps.some(s => (sbStep(s.id) || {}).hold)) undo.push("lets go of everything held");
       (b.release_says || []).forEach(t => undo.push(t));
@@ -16585,11 +17437,6 @@ function sbSide() {
     if (c.fix === "valve") fix = '<div class="fix"><button class="btn small" data-sb-keepmove>Keep only the first one</button></div>';
     return '<div class="sb-chk ' + esc(c.level) + '"><span class="ic">' + (c.level === "ok" ? "&#10003;" : "!") + '</span><div>' + esc(c.text) + fix + '</div></div>';
   }).join("");
-  if (b && b.ok && b.lines && b.lines.length) {
-    const bindLine = sb.binding ? '\nbind "' + sb.binding + '" "' + b.entry + '"' : "";
-    html += '<details class="sb-lines"><summary>Show the config lines</summary><pre>' +
-      esc(b.lines.join("\n") + bindLine) + '</pre></details>';
-  }
   if (sb.confirm) {
     html += '<div class="sb-confirm">' + esc(sb.confirm) + '<div class="sb-btns" style="margin-top:8px">' +
       '<button class="btn" data-sb-cancel>Keep that key</button><button class="btn primary" data-sb-force>Replace it</button></div></div>';
@@ -16618,21 +17465,86 @@ function sbRender() {
       '<input class="sb-input" id="sb-name" maxlength="40" placeholder="For example: Drop the bomb and tell my team" value="' + esc(sb.spec.name) + '"></div></div>' +
     '<div class="sb-step"><span class="sb-num">2</span><div><h4>How the key works</h4><div class="sb-modes">' +
       SB_MODES.map(m => '<button class="sb-mode" data-sb-mode="' + m[0] + '" aria-pressed="' + (sb.spec.mode === m[0]) + '"><b>' +
-        m[1] + '</b><small>' + m[2] + '</small></button>').join("") + '</div></div></div>' +
-    '<div class="sb-step"><span class="sb-num">3</span><div><h4>What it does, in order</h4><div class="sb-acts">' +
-      sb.spec.steps.map(sbStepRow).join("") +
-      '<div class="sb-add"><input class="sb-input" id="sb-find" placeholder="Add a step: search, e.g. jump, buy, volume, say…" value="' + esc(sb.find) + '">' +
+        m[1] + '</b><small>' + m[2] + '</small></button>').join("") + '</div>' +
+      (sb.spec.mode === "shift" ? '<div class="sb-styles">' +
+        [["next", "Only the next press"], ["hold", "While I hold the shift key"]].map(o =>
+          '<button class="sb-cat" data-sb-style="' + o[0] + '" aria-pressed="' + ((sb.spec.style || "next") === o[0]) + '">' + o[1] + '</button>').join("") +
+        '<label class="sb-keep"><input type="checkbox" data-sb-keepown' + (sb.spec.keep_own === false ? "" : " checked") + '> The shift key keeps its own job too</label>' +
+        '</div>' : "") + '</div></div>' +
+    '<div class="sb-step"><span class="sb-num">3</span><div><h4>' + (sb.spec.mode === "hold" ? "When you press the key" : "What it does, in order") + '</h4><div class="sb-acts">' +
+      (sb.spec.steps.length ? sb.spec.steps.map((x, i) => sbStepRow(x, i)).join("") : (sb.spec.mode === "hold" ? '<p class="sb-hint" style="margin:0">Nothing yet.</p>' : "")) +
+      (sb.spec.mode === "hold" ? '</div><h4 style="margin-top:14px">When you let go</h4>' +
+        '<p class="sb-hint" style="margin:-4px 0 8px">Anything held is let go first, then these run. For example: shoot while held, switch to the knife when you let go.</p><div class="sb-acts">' +
+        ((sb.spec.release_steps || []).length ? sb.spec.release_steps.map(sbReleaseRow).join("") : '<p class="sb-hint" style="margin:0">Nothing extra.</p>') : "") +
+      '<div class="sb-add">' + (sb.spec.mode === "hold" ? '<div class="sb-styles" style="margin:0 0 9px"><span class="sub" style="align-self:center">Add steps to:</span>' +
+        [["press", "When you press"], ["release", "When you let go"]].map(o => '<button class="sb-cat" data-sb-addto="' + o[0] + '" aria-pressed="' + ((sb.addTo || "press") === o[0]) + '">' + o[1] + '</button>').join("") + '</div>' : "") +
+      '<input class="sb-input" id="sb-find" placeholder="Add a step: search, e.g. jump, buy, volume, say…" value="' + esc(sb.find) + '">' +
       '<div class="sb-cats">' + cats + '</div>' + sbChips() + '</div></div></div></div>' +
-    '<div class="sb-step"><span class="sb-num">4</span><div><h4>Which key</h4><div class="sb-key">' +
-      '<button class="sb-kc' + (sb.listening ? " listening" : "") + '" id="sb-keybtn">' + (sb.listening ? "Press a key…" : esc(sb.keyLabel || "Pick")) + '</button>' +
-      '<span class="sub">' + (sb.listening ? "Press any key or mouse button. Esc cancels." : "Click, then press any key or mouse button.") + '</span>' +
-      (sb.key && sb.key.binding ? '<span class="sb-hint" style="margin:0">' + esc(sb.key.free ? sb.key.label + " is free right now." : sb.key.label + " is in use right now.") + '</span>' : "") +
+    '<div class="sb-step"><span class="sb-num">4</span><div><h4>' + (sb.spec.mode === "shift" ? "Which keys" : "Which key") + '</h4><div class="sb-keys">' +
+      sbKeyRow("key", sb.spec.mode === "shift" ? "Shift key" : "", sb.keyLabel, sb.key) +
+      (sb.spec.mode === "shift" ? sbKeyRow("target", "Key it changes", sb.targetLabel,
+        sb.built && sb.built.target && sb.built.target.binding ? {binding: 1, free: true, label: sb.built.target.label,
+          note: sb.built.target.label + " does \u201c" + sb.built.target.normal + "\u201d right now."} : null) : "") +
     '</div></div></div>' +
-    '</section><section class="sb-card sb-side">' + sbSide() + '</section></div>';
+    sbLinesStep() +
+    '</section><section class="sb-card sb-side">' + sbSaved() + sbSide() + '</section></div>';
   if (keepSel && keepSel.attr.length) {
     const again = box.querySelector("[" + keepSel.attr[0] + "]");
     if (again) { again.focus(); try { if (keepSel.pos != null) again.setSelectionRange(keepSel.pos, keepSel.pos); } catch (_) {} }
   }
+}
+
+function sbKeyRow(which, title, label, info) {
+  const on = sb.listening === which;
+  const note = info && info.binding ? (info.note || (info.free ? info.label + " is free right now." : info.label + " is in use right now.")) : "";
+  return '<div class="sb-key">' + (title ? '<span class="sub" style="min-width:110px">' + esc(title) + '</span>' : "") +
+    '<button class="sb-kc' + (on ? " listening" : "") + '" data-sb-listen="' + which + '">' + (on ? "Press a key\u2026" : esc(label || "Pick")) + '</button>' +
+    '<span class="sub">' + (on ? "Press any key or mouse button (left and right click count too). Esc cancels." : "Click, then press any key or mouse button.") + '</span>' +
+    (note ? '<span class="sb-hint" style="margin:0">' + esc(note) + '</span>' : "") + '</div>';
+}
+
+function sbSaved() {
+  if (!sb.saved || !sb.saved.length) return "";
+  return '<h4>Your saved scripts</h4><p class="sb-hint" style="margin:0 0 7px">Click one to open it and change it.</p><div class="sb-ideas" style="margin:0 0 16px">' +
+    sb.saved.map((x, i) => '<button class="sb-chip" data-sb-open="' + i + '" title="' + esc(x.file) + '">' + esc(x.spec.name) +
+      (x.key ? ' <span class="sb-keytag">' + esc(x.key) + '</span>' : "") +
+      (x.enabled === false ? ' <span class="sb-offtag">switched off</span>' : "") + '</button>').join("") + '</div>';
+}
+
+function sbLinesStep() {
+  const b = sb.built;
+  const editing = typeof sb.spec.lines_text === "string";
+  let html = '<div class="sb-step"><span class="sb-num">5</span><div><div class="sb-lines-head"><h4>Your config lines</h4>' +
+    '<span class="sp"></span>' + (editing
+      ? '<button class="btn small" data-sb-unedit>Undo my edits</button>'
+      : (b && b.lines && b.lines.length ? '<button class="btn small" data-sb-edit>Edit the lines</button>' : "")) + '</div>';
+  if (editing) {
+    html += '<p class="sb-hint" style="margin:0 0 8px">One line per name: <code>alias "name" "command; command"</code>. ' +
+      'Every change is checked on the right before you can save.</p>' +
+      '<textarea class="sb-code" id="sb-lines-edit" spellcheck="false" rows="' + Math.max(4, sb.spec.lines_text.split("\n").length + 1) + '">' +
+      esc(sb.spec.lines_text) + '</textarea>';
+  }
+  const rows = b && b.explained || [];
+  if (!rows.length) {
+    html += editing ? "" : '<p class="sb-hint" style="margin:0">Add steps and pick a key, and the lines show up here.</p>';
+    return html + '</div></div>';
+  }
+  html += '<div class="sb-lines">' + rows.map(r =>
+    '<div class="sb-line"><div class="sb-line-top"><b>' + esc(r.role || "Part of this script") + '</b><code>' + esc(r.name) + '</code></div>' +
+    r.commands.map(c => '<div class="sb-cmd"><code>' + esc(c.text) + '</code><span>' + esc(c.says) + '</span></div>').join("") +
+    '</div>').join("");
+  if (sb.binding && b.entry) {
+    html += '<div class="sb-line"><div class="sb-line-top"><b>Puts it on ' + esc(sb.keyLabel || "your key") + '</b><code>bind</code></div>' +
+      '<div class="sb-cmd"><code>bind "' + esc(sb.binding) + '" "' + esc(b.entry) + '"</code><span>' +
+      esc((sb.keyLabel || "Your key") + " runs this script") + '</span></div></div>';
+  }
+  return html + '</div></div></div>';
+}
+
+function sbDropEdits() {
+  if (typeof sb.spec.lines_text !== "string") return;
+  delete sb.spec.lines_text;
+  status("Your hand edits were replaced, because the steps changed.");
 }
 
 function sbChanged() {
@@ -16643,7 +17555,7 @@ function sbChanged() {
 
 async function sbCheck() {
   try {
-    const r = await api("/api/scriptgen/check", {spec: sb.spec, binding: sb.binding});
+    const r = await api("/api/scriptgen/check", {spec: Object.assign({}, sb.spec, {target: sb.target}), binding: sb.binding});
     sb.built = r.built; sb.key = r.key;
   } catch (err) {
     sb.built = {ok: false, checks: [{level: "block", text: String(err && err.message || err)}]};
@@ -16654,7 +17566,7 @@ async function sbCheck() {
 async function sbSave(force) {
   sb.saving = true; sbRender();
   try {
-    const r = await api("/api/scriptgen/save", {spec: sb.spec, binding: sb.binding, force: !!force});
+    const r = await api("/api/scriptgen/save", {spec: Object.assign({}, sb.spec, {target: sb.target}), binding: sb.binding, force: !!force});
     sb.confirm = null;
     status((r.replaced ? "Updated “" : "Saved “") + sb.spec.name + "” on " + (r.key && r.key.label || sb.keyLabel) +
       ". Restart CS2 or press your Apply-now key to use it.");
@@ -16671,9 +17583,15 @@ async function sbSave(force) {
 }
 
 function sbSetKey(binding) {
+  const which = sb.listening;
   sb.listening = false;
-  if (binding) { sb.binding = binding; sb.keyLabel = ""; }
-  sbRender(); sbCheck().then(() => { if (sb.key) { sb.keyLabel = sb.key.label; sbRender(); } });
+  if (binding && which === "target") { sb.target = binding; sb.targetLabel = ""; }
+  else if (binding) { sb.binding = binding; sb.keyLabel = ""; }
+  sbRender(); sbCheck().then(() => {
+    if (sb.key) sb.keyLabel = sb.key.label;
+    if (sb.built && sb.built.target && sb.built.target.label) sb.targetLabel = sb.built.target.label;
+    sbRender();
+  });
 }
 
 document.addEventListener("keydown", e => {
@@ -16684,12 +17602,26 @@ document.addEventListener("keydown", e => {
   if (!binding) { status("That key can't be used in CS2. Try another.", true); return; }
   sbSetKey(binding);
 }, true);
+// While a key box is listening, every mouse button counts -- left and right
+// click too, so Mouse 1 and Mouse 2 can be picked. The click and the menu
+// that follow the press are swallowed so they don't also press a button.
+let sbSwallow = {click: false, menu: false};
 document.addEventListener("mousedown", e => {
-  if (!sb.listening || e.target && e.target.id === "sb-keybtn" && e.button === 0) return;
-  const map = {1: "mouse3", 3: "mouse4", 4: "mouse5"};
+  if (!sb.listening || sb.listening === "idea") return;
+  const map = {0: "mouse1", 1: "mouse3", 2: "mouse2", 3: "mouse4", 4: "mouse5"};
   if (!map[e.button]) return;
   e.preventDefault(); e.stopPropagation();
+  if (e.button === 0) sbSwallow.click = true;
+  if (e.button === 2) sbSwallow.menu = true;
   sbSetKey(map[e.button]);
+}, true);
+document.addEventListener("click", e => {
+  if (!sbSwallow.click) return;
+  sbSwallow.click = false; e.preventDefault(); e.stopPropagation();
+}, true);
+document.addEventListener("contextmenu", e => {
+  if (!sb.listening && !sbSwallow.menu) return;
+  sbSwallow.menu = false; e.preventDefault(); e.stopPropagation();
 }, true);
 document.addEventListener("wheel", e => {
   if (!sb.listening) return;
@@ -16703,19 +17635,23 @@ document.addEventListener("click", e => {
   const t = e.target.closest("button");
   if (!t) return;
   const d = t.dataset;
-  if (t.id === "sb-keybtn") { sb.listening = !sb.listening; sbRender(); return; }
-  if (d.sbMode) { sb.spec.mode = d.sbMode; sbRender(); sbChanged(); return; }
+  if (d.sbListen) { sb.listening = sb.listening === d.sbListen ? false : d.sbListen; sbRender(); return; }
+  if (d.sbStyle) { sbDropEdits(); sb.spec.style = d.sbStyle; sbRender(); sbChanged(); return; }
+  if (d.sbMode) { sbDropEdits(); sb.spec.mode = d.sbMode; sbRender(); sbChanged(); return; }
   if (d.sbCat) { sb.cat = d.sbCat; sb.find = ""; sbRender(); return; }
+  if (d.sbAddto) { sb.addTo = d.sbAddto; sbRender(); return; }
   if (d.sbAdd) {
-    if (sb.spec.steps.length >= 12) { status("Up to 12 steps fit on one key.", true); return; }
-    sb.spec.steps.push(sbNewStep(d.sbAdd)); sbRender(); sbChanged(); return;
+    const [list] = sbArr(sb.spec.mode === "hold" && sb.addTo === "release" ? "r0" : "0");
+    if (list.length >= 12) { status("Up to 12 steps fit here.", true); return; }
+    sbDropEdits(); list.push(sbNewStep(d.sbAdd)); sbRender(); sbChanged(); return;
   }
-  if (d.sbDel) { sb.spec.steps.splice(+d.sbDel, 1); sbRender(); sbChanged(); return; }
+  if (d.sbDel) { const [list, i] = sbArr(d.sbDel); sbDropEdits(); list.splice(i, 1); sbRender(); sbChanged(); return; }
   if (d.sbMove) {
-    const [i, dir] = d.sbMove.split(":").map(Number);
-    const j = i + dir, list = sb.spec.steps;
+    const [ref, dirText] = d.sbMove.split(":");
+    const [list, i] = sbArr(ref), dir = +dirText;
+    const j = i + dir;
     if (j < 0 || j >= list.length) return;
-    [list[i], list[j]] = [list[j], list[i]]; sbRender(); sbChanged(); return;
+    sbDropEdits(); [list[i], list[j]] = [list[j], list[i]]; sbRender(); sbChanged(); return;
   }
   if (d.sbKeepmove !== undefined) {
     let seen = false;
@@ -16724,14 +17660,34 @@ document.addEventListener("click", e => {
   }
   if (d.sbIdea) {
     const idea = SB_IDEAS[+d.sbIdea];
-    sb.spec = {name: idea.spec.name, mode: idea.spec.mode,
+    if (idea.keys) { sb.binding = idea.keys.binding; sb.target = idea.keys.target; sb.keyLabel = ""; sb.targetLabel = ""; sb.listening = "idea"; setTimeout(() => sbSetKey(""), 0); }
+    delete sb.spec.lines_text;
+    sb.spec = {name: idea.spec.name, mode: idea.spec.mode, style: idea.spec.style,
+      release_steps: (idea.spec.release_steps || []).map(x => Object.assign(sbNewStep(x.id), x)),
       steps: idea.spec.steps.map(s => Object.assign(sbNewStep(s.id), s))};
     sbRender(); sbChanged(); return;
+  }
+  if (d.sbEdit !== undefined) { sb.spec.lines_text = (sb.built && sb.built.lines || []).join("\n"); sbRender(); sbChanged();
+    setTimeout(() => { const t = $("sb-lines-edit"); if (t) t.focus(); }, 0); return; }
+  if (d.sbUnedit !== undefined) { delete sb.spec.lines_text; sbRender(); sbChanged(); return; }
+  if (d.sbOpen !== undefined) {
+    sbOpenSaved(sb.saved[+d.sbOpen]); return;
   }
   if (d.sbClear !== undefined) { sb.spec = {name: "", mode: "press", steps: []}; sb.confirm = null; sbRender(); sbChanged(); return; }
   if (d.sbSave !== undefined) { sbSave(false); return; }
   if (d.sbForce !== undefined) { sbSave(true); return; }
   if (d.sbCancel !== undefined) { sb.confirm = null; sbRender(); return; }
+});
+
+document.addEventListener("click", async e => {
+  const btn = e.target.closest("[data-sb-edit-made]");
+  if (!btn) return;
+  const alias = btn.dataset.sbEditMade;
+  setTab("builder");
+  await sbLoad(false);
+  await sbRefreshSaved();
+  const x = (sb.saved || []).find(s => s.spec.alias === alias);
+  if (x) sbOpenSaved(x);
 });
 
 document.addEventListener("input", e => {
@@ -16740,9 +17696,11 @@ document.addEventListener("input", e => {
   const t = e.target, d = t.dataset;
   if (t.id === "sb-name") { sb.spec.name = t.value; sbChanged(); return; }
   if (t.id === "sb-find") { sb.find = t.value; sbRender(); return; }
-  if (d.sbText !== undefined) { sb.spec.steps[+d.sbText].text = t.value; sbChanged(); return; }
-  if (d.sbVal !== undefined) { sb.spec.steps[+d.sbVal].value = t.value === "" ? null : +t.value; sbChanged(); return; }
-  if (d.sbBack !== undefined) { sb.spec.steps[+d.sbBack].back = t.value === "" ? null : +t.value; sbChanged(); return; }
+  if (t.id === "sb-lines-edit") { sb.spec.lines_text = t.value; sbChanged(); return; }
+  if (d.sbKeepown !== undefined) { sbDropEdits(); sb.spec.keep_own = t.checked; sbRender(); sbChanged(); return; }
+  if (d.sbText !== undefined) { const [l, i] = sbArr(d.sbText); sbDropEdits(); l[i].text = t.value; sbChanged(); return; }
+  if (d.sbVal !== undefined) { const [l, i] = sbArr(d.sbVal); sbDropEdits(); l[i].value = t.value === "" ? null : +t.value; sbChanged(); return; }
+  if (d.sbBack !== undefined) { const [l, i] = sbArr(d.sbBack); sbDropEdits(); l[i].back = t.value === "" ? null : +t.value; sbChanged(); return; }
 });
 
 let activeTab = "launcher";
@@ -16761,8 +17719,9 @@ function setTab(name) {
   if (name === "faceit") loadDemos().then(loadFaceit);
   if (name === "inventory" && !inventoryData) loadInventory(false);
   if (name === "skins") { if (!skinsToolStatus) loadSkinsToolStatus(); if (!skinsData) loadSkinsCatalog(false); }
+  else if (musicNow) stopMusic();
   if (name === "scripts") loadPlugins(false);
-  if (name === "builder") sbLoad(false);
+  if (name === "builder") sbLoad(false).then(sbRefreshSaved);
   if (name === "keyboard") loadKeyboard(false);
   if (name === "fix") loadFixes(false);
   if (name === "settings") {
@@ -16773,6 +17732,7 @@ function setTab(name) {
       loadSetups(); loadCrosshairX();
       loadCompanions(); startCompanionsWatch();
       loadMachine(); loadCloud();
+      if (settingsSub === "nvidia") loadNvidia();
     }
     renderThemes();
   }
@@ -16887,16 +17847,11 @@ function markPending(count) {
 const PREF_FIELDS = {
   target_fps: () => $("target").value.trim(),
   account: () => currentAccount(),
-  write_video: () => $("w-video").checked,
-  write_cfg: () => $("w-cfg").checked,
   write_launch: () => $("w-launch").checked,
-  link_autoexec: () => $("w-autoexec").checked,
-  fix_scaling: () => $("w-scaling").checked,
   stretch_mode: () => stretchMode,
   cfg_folder: () => $("cfg-folder").value.trim(),
   settings_sub: () => settingsSub,
   tab: () => activeTab,
-  patch_video: () => $("p-video").checked,
 };
 let prefsReady = false;
 /* The preferences as the server last had them.
@@ -16917,15 +17872,12 @@ function applyPrefs(ui) {
     intent = ui.intent;
     paintIntent(intent);
   }
-  if (ui.target_fps) $("target").value = ui.target_fps;
+  $("target").value = ui.target_fps || "";
   // Preferences arrive after the scan, so the line and the chips were
   // describing an empty field that has just been filled in.
   renderFps();
   const set = (id, v) => { if (v !== undefined && v !== null) $(id).checked = !!v; };
-  set("w-video", ui.write_video); set("w-cfg", ui.write_cfg);
-  set("w-launch", ui.write_launch); set("w-autoexec", ui.link_autoexec);
-  set("w-scaling", ui.fix_scaling);
-  set("p-video", ui.patch_video);
+  set("w-launch", ui.write_launch);
   if (ui.stretch_mode) {
     setStretchMode(
       { window: "borderless", desktop: "borderless", none: "fullscreen" }[ui.stretch_mode]
@@ -16987,7 +17939,7 @@ document.addEventListener("change", e => {
   // the cards they used to live in -- the target rate to the head of CS2
   // Settings, the video patch in with the other write options -- and a
   // preference that stops being saved when it is moved is silent about it.
-  if (e.target.closest("#launch-card, .card, #p-video, .fps")) rememberPrefs();
+  if (e.target.closest("#launch-card, .card, .fps")) rememberPrefs();
 });
 
 // --- history --------------------------------------------------------------
@@ -17550,7 +18502,7 @@ $("play").addEventListener("click", async () => {
     const launched = await api("/api/play", {
       account: currentAccount(),
       stretch_mode: stretchMode,
-      patch_video: $("p-video").checked,
+      patch_video: true,
       // The Crosshair X switches. Read at launch so the game starts with the
       // crosshair the switch asks for, in whichever direction it was moved.
       hide_crosshair: !!(prefsNow && prefsNow.hide_crosshair),
@@ -17623,6 +18575,7 @@ $("rescan").addEventListener("click", () => scan(true));
     startup.run("companions", async () => { await loadCompanions(); await loadAppTiles(); startCompanionsWatch(); }),
     startup.run("audio", () => loadAudio(false)),
     startup.run("history", loadHistory),
+    loadChanges(),
     startup.run("profile", loadWho),
     startup.run("launch", startGameWatch),
     startup.run("monitor", startLive),
@@ -17665,8 +18618,7 @@ $("rescan").addEventListener("click", () => scan(true));
    drawn later, so a re-rendered panel does not lose its icons. */
 (function () {
   var BY_ID = {
-    "w-video": "picture", "p-video": "window", "w-cfg": "file",
-    "w-launch": "terminal", "w-autoexec": "code", "w-scaling": "expand",
+    "w-launch": "terminal",
     "cfg-family": "branch", "cfg-wording": "text", "audio-enforce": "speaker",
     "fix-all-devices": "device", "fix-steam-play": "gamepad",
     "xhair-hide": "crosshair", "xhair-launch": "play", "wg-auto": "gpu",
@@ -17679,7 +18631,7 @@ $("rescan").addEventListener("click", () => scan(true));
      the number fields, the theme picks -- which a row icon cannot. Matched on
      the heading's text, so a panel renamed here is renamed in one place. */
   var BY_HEADING = {
-    "Account": "user", "Setups": "layers", "Machine": "device", "Write": "file",
+    "Accounts": "user", "Change history": "history", "Setups": "layers", "GPU or CPU": "device",
     "Written": "file", "Start a config": "play", "Carry this setup": "layers",
     "Configuration studio": "branch", "Common settings": "sliders",
     "Script & alias editor": "code", "Scripts": "code", "Session history": "gauge",

@@ -228,8 +228,13 @@ class Watcher:
     file that had been written against three that had not.
     """
 
-    def __init__(self, folder: Path, account_id: str, interval: float = 3.0) -> None:
+    def __init__(self, folder: Path, account_id: str, interval: float = 3.0,
+                 on_found=None) -> None:
         self.folder = Path(folder)
+        # Told about every finding, so it can go into the change history the
+        # moment it is made rather than whenever the page next looks.
+        self.on_found = on_found
+        self._compare_lock = threading.Lock()
         self.account_id = str(account_id)
         self.interval = interval
         self._lock = threading.Lock()
@@ -274,7 +279,22 @@ class Watcher:
                 out[filename] = 0.0
         return out
 
+    def check_now(self) -> Optional[dict]:
+        """Compare straight away, without waiting for the timestamps.
+
+        Called the moment CS2 is seen to have gone, however it went. A game
+        that quit normally has already written its files by then; one killed
+        from Task Manager wrote nothing, and this finds nothing -- which is the
+        truth, because the game never saved those changes either.
+        """
+        self._compare_now()
+        return self.pending
+
     def _compare_now(self) -> None:
+        with self._compare_lock:
+            self._compare_locked()
+
+    def _compare_locked(self) -> None:
         baseline = load_baseline(self.account_id)
         current = take(self.folder)
         if baseline is None:
@@ -289,6 +309,11 @@ class Watcher:
             # The baseline moves forward so the same session is not reported
             # again on the next write; the finding itself is kept above.
             save_baseline(self.account_id, current)
+            if self.on_found is not None:
+                try:
+                    self.on_found(self.account_id, as_dict(changes, baseline, current))
+                except Exception:
+                    pass        # the history is a bonus; the finding stands
 
     def _run(self) -> None:
         last = self._stamps()

@@ -21,7 +21,7 @@
 # newer helper asks once more to put the new one in place; nothing else does.
 
 $ErrorActionPreference = 'Stop'
-$Version = 2
+$Version = 3
 
 $Root     = Join-Path $env:ProgramData 'CS CONFIG AI Helper'
 $Requests = Join-Path $Root 'requests'
@@ -201,6 +201,153 @@ function Invoke-DefenderCs2($a) {
     return @{ ok = $true; detail = $d; excluded = [bool]$a.on }
 }
 
+# NVIDIA's settings database, CS2's program profile only (Edy, Nov 21 2026).
+# The driver saves settings only for an administrator, so this is the one
+# place the app writes them. Fixed code, compiled here from this file under
+# Program Files; a request only supplies setting numbers and values.
+$NvSource = @'
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+public static class CsCfgNv {
+    [DllImport("nvapi64.dll", EntryPoint = "nvapi_QueryInterface", CallingConvention = CallingConvention.Cdecl)]
+    static extern IntPtr QueryInterface(uint id);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)] delegate int Fn0();
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)] delegate int FnOut(out IntPtr h);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)] delegate int Fn1(IntPtr a);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)] delegate int FnFindApp(IntPtr s, IntPtr name, out IntPtr p, IntPtr app);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)] delegate int FnFind(IntPtr s, IntPtr name, out IntPtr p);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)] delegate int FnCreate(IntPtr s, IntPtr info, out IntPtr p);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)] delegate int FnPP(IntPtr s, IntPtr p, IntPtr x);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)] delegate int FnPId(IntPtr s, IntPtr p, uint id);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)] delegate int FnGet(IntPtr s, IntPtr p, uint id, IntPtr x);
+
+    const int SettingSize = 12320, ProfileSize = 4116, AppSize = 20488;
+    const string Cs2 = "cs2.exe", OwnProfile = "CS CONFIG AI - Counter-Strike 2";
+
+    static T F<T>(uint id) where T : class {
+        IntPtr at = QueryInterface(id);
+        if (at == IntPtr.Zero) throw new Exception("this NVIDIA driver does not allow changing settings");
+        return (T)(object)Marshal.GetDelegateForFunctionPointer(at, typeof(T));
+    }
+    static void Check(int code, string what) {
+        if (code != 0) throw new Exception(what + " failed (NVIDIA code " + code + ")");
+    }
+    static IntPtr Buf(int size, List<IntPtr> held) {
+        IntPtr p = Marshal.AllocHGlobal(size);
+        held.Add(p);
+        Marshal.Copy(new byte[size], 0, p, size);
+        return p;
+    }
+    static void Wide(IntPtr p, int offset, string text) {
+        for (int i = 0; i < text.Length; i++) Marshal.WriteInt16(p, offset + 2 * i, (short)text[i]);
+    }
+    static IntPtr Cs2Profile(IntPtr session, List<IntPtr> held) {
+        IntPtr name = Buf(4096, held); Wide(name, 0, Cs2);
+        IntPtr app = Buf(AppSize, held); Marshal.WriteInt32(app, 0, AppSize | (4 << 16));
+        IntPtr profile;
+        int code = F<FnFindApp>(0xEEE566B2)(session, name, out profile, app);
+        if (code == 0) return profile;
+        if (code != -166 && code != -163) Check(code, "finding CS2's NVIDIA profile");
+        IntPtr own = Buf(4096, held); Wide(own, 0, OwnProfile);
+        code = F<FnFind>(0x7E4A9A0B)(session, own, out profile);
+        if (code == -163) {
+            IntPtr info = Buf(ProfileSize, held);
+            Marshal.WriteInt32(info, 0, ProfileSize | (1 << 16));
+            Wide(info, 4, OwnProfile);
+            Check(F<FnCreate>(0xCC176068)(session, info, out profile), "making a profile for CS2");
+        } else Check(code, "finding the app's CS2 profile");
+        IntPtr add = Buf(AppSize, held);
+        Marshal.WriteInt32(add, 0, AppSize | (4 << 16));
+        Wide(add, 8, Cs2);
+        Check(F<FnPP>(0x4347A9DE)(session, profile, add), "adding CS2 to its profile");
+        return profile;
+    }
+    static string Read(IntPtr session, IntPtr profile, uint id, IntPtr setting) {
+        Marshal.Copy(new byte[SettingSize], 0, setting, SettingSize);
+        Marshal.WriteInt32(setting, 0, SettingSize | (1 << 16));
+        int code = F<FnGet>(0x73BF8338)(session, profile, id, setting);
+        if (code == -160 || code == -163 || code == -166) return "none";
+        Check(code, "reading CS2's NVIDIA profile");
+        if (Marshal.ReadInt32(setting, 4104) != 0) return "none";
+        if (Marshal.ReadInt32(setting, 4112) != 0) return "default";
+        return ((uint)Marshal.ReadInt32(setting, 8220)).ToString();
+    }
+    static void Change(IntPtr session, IntPtr profile, uint id, string value, IntPtr setting) {
+        int code;
+        if (value == "none") {
+            code = F<FnPId>(0xE4A26362)(session, profile, id);
+            if (code != -160) Check(code, "removing a CS2 NVIDIA setting");
+            return;
+        }
+        if (value == "default") {
+            code = F<FnPId>(0x53F0381E)(session, profile, id);
+            if (code != -160 && code != -169) Check(code, "putting back NVIDIA's own CS2 setting");
+            return;
+        }
+        uint number = UInt32.Parse(value);
+        Marshal.Copy(new byte[SettingSize], 0, setting, SettingSize);
+        Marshal.WriteInt32(setting, 0, SettingSize | (1 << 16));
+        Marshal.WriteInt32(setting, 4100, (int)id);
+        Marshal.WriteInt32(setting, 4104, 0);
+        Marshal.WriteInt32(setting, 8220, unchecked((int)number));
+        Check(F<FnPP>(0x577DD202)(session, profile, setting), "changing CS2's NVIDIA profile");
+    }
+    public static string[] Apply(uint[] ids, string[] values) {
+        var held = new List<IntPtr>();
+        IntPtr session = IntPtr.Zero;
+        Check(F<Fn0>(0x0150E828)(), "starting the NVIDIA driver");
+        try {
+            Check(F<FnOut>(0x0694D52E)(out session), "opening NVIDIA settings");
+            Check(F<Fn1>(0x375DBD6B)(session), "loading NVIDIA settings");
+            IntPtr profile = Cs2Profile(session, held);
+            IntPtr setting = Buf(SettingSize, held);
+            var before = new string[ids.Length];
+            for (int i = 0; i < ids.Length; i++) before[i] = Read(session, profile, ids[i], setting);
+            for (int i = 0; i < ids.Length; i++) Change(session, profile, ids[i], values[i], setting);
+            Check(F<Fn1>(0xFCBC7E14)(session), "saving NVIDIA settings");
+            return before;
+        } finally {
+            if (session != IntPtr.Zero) { try { F<Fn1>(0xDAD9CFF8)(session); } catch {} }
+            try { F<Fn0>(0xD22BDD7E)(); } catch {}
+            foreach (IntPtr p in held) Marshal.FreeHGlobal(p);
+        }
+    }
+}
+'@
+
+function Invoke-NvidiaSet($a) {
+    # Only DWORD settings, only CS2's program profile (never the global one).
+    $changes = @($a.changes)
+    if ($changes.Count -lt 1 -or $changes.Count -gt 64) { throw 'between 1 and 64 NVIDIA settings' }
+    $ids = New-Object 'uint32[]' $changes.Count
+    $values = New-Object 'string[]' $changes.Count
+    for ($i = 0; $i -lt $changes.Count; $i++) {
+        $id = [int64]$changes[$i].id
+        if ($id -le 0 -or $id -gt 4294967295) { throw 'bad NVIDIA setting' }
+        $ids[$i] = [uint32]$id
+        $v = $changes[$i].value
+        if ($null -eq $v) { $values[$i] = 'none' }
+        elseif ([string]$v -eq 'default') { $values[$i] = 'default' }
+        else {
+            if ([string]$v -notmatch '^\d{1,10}$') { throw 'bad NVIDIA value' }
+            $n = [int64][string]$v
+            if ($n -gt 4294967295) { throw 'bad NVIDIA value' }
+            $values[$i] = [string]$n
+        }
+    }
+    if (-not ('CsCfgNv' -as [type])) { Add-Type -TypeDefinition $NvSource -Language CSharp }
+    $before = [CsCfgNv]::Apply($ids, $values)
+    $list = @()
+    for ($i = 0; $i -lt $ids.Count; $i++) {
+        $was = $before[$i]
+        $value = $null
+        if ($was -eq 'default') { $value = 'default' } elseif ($was -ne 'none') { $value = [int64]$was }
+        $list += @{ id = [int64]$ids[$i]; value = $value }
+    }
+    return @{ ok = $true; detail = "changed $($ids.Count) NVIDIA settings for CS2"; before = $list }
+}
+
 function Invoke-HelperUninstall($a) {
     # The app is being uninstalled: take back everything the helper made.
     # Nothing from the request is used; every path below is a constant.
@@ -231,6 +378,7 @@ function Invoke-HelperUninstall($a) {
 $Jobs = @{
     'helper.uninstall' = { param($a) Invoke-HelperUninstall $a }
     'defender.cs2'     = { param($a) Invoke-DefenderCs2 $a }
+    'nvidia.set'       = { param($a) Invoke-NvidiaSet $a }
     'ping'             = { param($a) @{ ok = $true; version = $Version } }
     'firewall.lock'    = { param($a) Invoke-FirewallLock $a }
     'firewall.unlock'  = { param($a) Invoke-FirewallUnlock $a }

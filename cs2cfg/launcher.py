@@ -248,7 +248,7 @@ def run_url(extra: str = "") -> str:
     return f"{STEAM_RUN_URL}//{urllib.parse.quote(extra.strip())}"
 
 
-def launch_via_steam(extra_args: str = "") -> None:
+def launch_via_steam(extra_args: str = "", *, require_args: bool = False) -> None:
     """Ask Steam to run CS2.
 
     Through Steam rather than by running the exe directly: it starts Steam if
@@ -278,6 +278,8 @@ def launch_via_steam(extra_args: str = "") -> None:
                 # starting at all.
                 pass
 
+    if extra and require_args:
+        raise LaunchError("Steam could not start the requested practice map")
     url = run_url("")
     try:
         os.startfile(url)  # noqa: S606 - a protocol handler, not a shell command
@@ -679,7 +681,18 @@ def play(
             return 1
         mark("launching")
         report("  launching through Steam...", "")
-        launch_via_steam(extra_args)
+        # Steam was open when the app started, so the app's own launch options
+        # could not be written into Steam yet (they are put back whenever the
+        # app is closed). Hand them to this launch instead.
+        try:
+            from . import pcstate
+
+            borrowed = pcstate.for_launch(user)
+        except Exception:
+            borrowed = ""
+        if borrowed:
+            report(f"  adding the app's launch options for this game: {borrowed}", "dim")
+        launch_via_steam(" ".join(part for part in (borrowed, extra_args) if part.strip()))
 
         if not wait:
             report("  launched; not waiting (desktop mode will not be restored automatically)", "warn")

@@ -275,6 +275,23 @@ def _fps_max_value(headroom: float, target: int, estimated: int) -> Tuple[str, s
     return "0", "uncapped: the machine is already below the refresh rate, so a cap can only hurt"
 
 
+# The real CS2 settings each part pays for, moved by an explicit lean.
+LEAN_GPU_KEYS = ("setting.msaa_samples", "setting.videocfg_shadow_quality",
+                 "setting.videocfg_ao_detail", "setting.r_texturefilteringquality",
+                 "setting.shaderquality")
+LEAN_CPU_KEYS = ("setting.videocfg_particle_detail",)
+
+
+def _step(kb: KnowledgeBase, key: str, value: int, direction: int) -> int:
+    """The next value CS2 accepts for ``key`` above (+1) or below (-1) ``value``."""
+    spec = kb.video.get("keys", {}).get(key) or {}
+    choices = sorted(int(v) for v in (spec.get("allowed") or
+                     range(int(spec.get("min", value)), int(spec.get("max", value)) + 1)))
+    if direction > 0:
+        return next((c for c in choices if c > value), value)
+    return next((c for c in reversed(choices) if c < value), value)
+
+
 def build_profile(
     machine: Machine,
     kb: KnowledgeBase,
@@ -392,6 +409,29 @@ def build_profile(
                 video[key] = kb.clamp(key, give_back)
                 reasons[key] = ("asked to lean on the processor, so the graphics card "
                                 "is given less to draw")
+
+    # The lean used to stop at the two summary levels above, which CS2's menu
+    # does not even show -- "Lean on GPU" changed nothing on most machines
+    # (checked Nov 21). So an explicit lean also moves the real settings that
+    # load each part: the graphics card draws shadows, anti-aliasing, ambient
+    # occlusion, texture filtering and shader detail; the processor carries the
+    # particles. One step each way, never past what the game allows. Dynamic
+    # shadows stay as the mode set them, because they show where players are.
+    if load_bias in ("gpu", "cpu"):
+        toward_card = 1 if load_bias == "gpu" else -1
+        why = ("asked to lean on the graphics card, so it is given more to draw"
+               if load_bias == "gpu" else
+               "asked to lean on the processor, so the graphics card is given less to draw")
+        for key in LEAN_GPU_KEYS:
+            if key in video:
+                moved = _step(kb, key, video[key], toward_card)
+                if moved != video[key]:
+                    video[key], reasons[key] = moved, why
+        for key in LEAN_CPU_KEYS:
+            if key in video:
+                moved = _step(kb, key, video[key], -toward_card)
+                if moved != video[key]:
+                    video[key], reasons[key] = moved, why
 
     # --- console convars --------------------------------------------------
     fps_max, fps_reason = _fps_max_value(headroom, target, estimated)

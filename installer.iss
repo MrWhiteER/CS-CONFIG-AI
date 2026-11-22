@@ -90,7 +90,10 @@ Filename: "{app}\{#AppExe}"; Description: "Open {#AppName}"; \
   Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
-; Before any file goes: ask the one-time helper to remove what it made --
+; Before any file goes: put every PC setting the app changed back to how it
+; was before the app (Steam launch options, CS2 window mode, Windows graphics,
+; power plan, NVIDIA scaling, refresh rate -- see docs/pc-settings.md), then
+; ask the one-time helper to remove what it made --
 ; the region-lock firewall rules, CS2 Defender exclusions, its scheduled task
 ; and its Program Files / ProgramData folders. Runs through the helper, so
 ; there is no administrator prompt. Always exits 0; never blocks uninstall.

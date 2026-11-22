@@ -348,6 +348,7 @@ def _launch_webview(url: str, icon: Optional[Path], on_closed: Callable[[], None
             window.events.closed += panel.destroy
         _keep_running_in_the_tray(window, icon)
         _watch_for_matches(url)
+        _watch_for_reviews(url)
 
         # The app's one Steam sign-in lives in windows of our own (steamweb).
         # Not private, so it is remembered between launches.
@@ -562,6 +563,147 @@ def _watch_for_matches(url: str) -> None:
     matchwatch.start()
 
 
+REVIEW_TITLE = f"{APP_NAME} - Check your changes"
+
+
+def _watch_for_reviews(url: str) -> None:
+    """Bring the change review up over everything once a game is over.
+
+    Asked for by cs2cfg/history.py: when CS2 closes (however it closed) with
+    changes waiting, or when NVIDIA's settings were changed outside the app.
+    Styled and raised the same way as the match-found alert -- always on top,
+    on the main monitor, the screens dimmed behind it, blinking until answered.
+    """
+    if sys.platform != "win32":
+        return
+    try:
+        import webview
+
+        from . import history
+    except Exception:
+        return
+
+    held = {"window": None}
+    lock = threading.Lock()
+
+    def close() -> None:
+        with lock:
+            win, held["window"] = held["window"], None
+        if win is None:
+            return
+        try:
+            from . import dimmer
+
+            dimmer.hide()
+        except Exception:
+            pass
+        try:
+            win.destroy()
+        except Exception:
+            pass
+
+    def raise_it() -> None:
+        try:
+            focus_existing_window(REVIEW_TITLE, same_process=True)
+        except Exception:
+            pass
+        try:
+            u32 = ctypes.WinDLL("user32", use_last_error=True)
+            u32.FindWindowW.restype = wintypes.HWND
+            u32.FindWindowW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR]
+            u32.SetWindowPos.argtypes = [wintypes.HWND, wintypes.HWND,
+                                         ctypes.c_int, ctypes.c_int,
+                                         ctypes.c_int, ctypes.c_int,
+                                         wintypes.UINT]
+            hwnd = u32.FindWindowW(None, REVIEW_TITLE)
+            if not hwnd:
+                return
+            # Above everything, the dimming windows included.
+            u32.SetWindowPos(hwnd, wintypes.HWND(-1), 0, 0, 0, 0,
+                             0x0001 | 0x0002 | 0x0040)  # NOSIZE|NOMOVE|SHOWWINDOW
+
+            # And blink on the taskbar until it is looked at.
+            class FLASHWINFO(ctypes.Structure):
+                _fields_ = [("cbSize", wintypes.UINT), ("hwnd", wintypes.HWND),
+                            ("dwFlags", wintypes.DWORD), ("uCount", wintypes.UINT),
+                            ("dwTimeout", wintypes.DWORD)]
+
+            info = FLASHWINFO(ctypes.sizeof(FLASHWINFO), hwnd,
+                              0x3 | 0xC, 0, 0)  # FLASHW_ALL | FLASHW_TIMERNOFG
+            u32.FlashWindowEx(ctypes.byref(info))
+        except Exception:
+            pass
+
+    def open_review() -> None:
+        with lock:
+            already = held["window"]
+        if already is not None:
+            raise_it()
+            return
+        width, height = 760, 640
+        try:
+            user32 = ctypes.WinDLL("user32", use_last_error=True)
+            screen_w = user32.GetSystemMetrics(0)
+            screen_h = user32.GetSystemMetrics(1)
+        except Exception:
+            screen_w, screen_h = 1920, 1080
+        x = max(0, (screen_w - width) // 2)
+        y = max(0, (screen_h - height) // 2)
+        try:
+            from . import dimmer
+
+            dimmer.show()
+        except Exception:
+            pass
+        try:
+            win = webview.create_window(
+                REVIEW_TITLE, url.rstrip("/") + "/review.html",
+                width=width, height=height, x=x, y=y, resizable=True,
+                min_size=(560, 420), frameless=True, easy_drag=False,
+                on_top=True, focus=True, confirm_close=False)
+        except Exception:
+            try:
+                from . import dimmer
+
+                dimmer.hide()
+            except Exception:
+                pass
+            return
+        with lock:
+            held["window"] = win
+        try:
+            win.events.shown += lambda: threading.Timer(0.15, raise_it).start()
+        except Exception:
+            pass
+        try:
+            win.events.closed += lambda: close()
+        except Exception:
+            pass
+        try:
+            import winsound
+
+            winsound.PlaySound("SystemExclamation",
+                               winsound.SND_ALIAS | winsound.SND_ASYNC)
+        except Exception:
+            pass
+
+    def on_event(what: str) -> None:
+        if what == "review":
+            threading.Thread(target=open_review, daemon=True).start()
+        elif what == "closed":
+            threading.Thread(target=close, daemon=True).start()
+
+    history.add_listener(on_event)
+    # Anything left unanswered from last time (the app was closed before it
+    # was answered) is asked about once the app is up -- unless a game is on.
+    def first_look() -> None:
+        from . import sessionwatch
+
+        if not sessionwatch.game_running():
+            history.request_review()
+    threading.Timer(8.0, first_look).start()
+
+
 def _launch_browser_app_window(url: str) -> bool:
     """Fallback: a chromeless browser window via --app=.
 
@@ -638,6 +780,16 @@ def run(
             )
         return 0
 
+    # The PC settings the app changes are only in place while it runs: set
+    # them again now, and start the watcher that gives them back when this
+    # process ends, however it ends (cs2cfg/pcstate.py).
+    try:
+        from . import pcstate
+
+        pcstate.on_app_start()
+    except Exception:
+        pass
+
     server: Optional[BackgroundServer] = None
     try:
         try:
@@ -711,6 +863,12 @@ def run(
     finally:
         if server is not None:
             server.stop()
+        try:
+            from . import pcstate
+
+            pcstate.on_app_exit()
+        except Exception:
+            pass
         instance.release()
 
 

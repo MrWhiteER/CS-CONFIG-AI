@@ -87,11 +87,17 @@ class State:
 
         self.overlay = OverlayService()  # Inert until enabled in preferences.
         self.overlay.pinned_context = lambda: _overlay_pinned_context(self)
+        self.overlay.lineups_art = lambda key: _lineups_art(self, key)
         from .rgb import RgbSync
 
         # Inert until switched on in preferences; remembers the last board so
         # the lights come up at start without the keyboard tab being opened.
         self.rgb = RgbSync(cache=user_data_dir() / "rgb-board.json")
+        from .mouse import MouseControl
+
+        # Mouse speed and polling rate, set on the mouse itself. Touches the
+        # mouse only when asked, or at start when a speed was chosen.
+        self.mouse = MouseControl()
 
     def refresh(self, rescan: bool = False) -> None:
         if self.machine is None or rescan:
@@ -116,6 +122,33 @@ class State:
         return self.users[0]
 
 
+def _measured_fps() -> Optional[Dict[str, Any]]:
+    """The frame rate CS2 really reached in recent games, or None."""
+    try:
+        from . import telemetry
+        return telemetry.measured_fps(telemetry.load_sessions(40))
+    except Exception:
+        return None
+
+
+def _frame_goal(machine: Machine, value: Any) -> Optional[int]:
+    """A chosen frame rate goal, kept only if it is a real monitor's refresh rate.
+
+    The goal used to be typed freely, so 400 could be asked of a PC that
+    reaches 250: the plan then dropped every setting to its lowest for frames
+    that never came. Only a rate an attached monitor really runs at is kept;
+    anything else (including a number saved by an older version) falls back
+    to the main monitor's refresh rate.
+    """
+    try:
+        wanted = int(value)
+    except (TypeError, ValueError):
+        return None
+    displays = getattr(machine, "displays", None) or []
+    rates = {int(round(d.refresh)) for d in displays if d.refresh}
+    return wanted if wanted in rates else None
+
+
 def _machine_payload(machine: Machine, state: State) -> Dict[str, Any]:
     cpu, gpu = machine.cpu, machine.gpu
     return {
@@ -136,6 +169,7 @@ def _machine_payload(machine: Machine, state: State) -> Dict[str, Any]:
              "primary": d.primary, "confident": d.confident_refresh}
             for d in machine.displays
         ],
+        "measured_fps": _measured_fps(),
         "cs2_install": str(state.cs2_install) if state.cs2_install else None,
         "steam_path": str(state.steam_root) if state.steam_root else None,
         "steam_running": steam.steam_running(),
@@ -158,7 +192,7 @@ def _plan_payload(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     profile = build_profile(
         state.machine, kb,
         intent=body.get("intent", "balanced"),
-        target_fps=int(target) if target else None,
+        target_fps=_frame_goal(state.machine, target),
         current_video=current_video,
         hide_crosshair=bool(body.get("hide_crosshair")),
         load_bias=str(body.get("load_bias") or "auto"),
@@ -309,7 +343,8 @@ def _record_verification(state, user, profile, launch, body, steps, generated=No
     receipt = {"checks": checks, "account": user.account_id,
                "intent": profile.intent, "applied_at": time.time(),
                "selection": {"intent": profile.intent,
-                             "target_fps": body.get("target_fps") or None,
+                             "target_fps": _frame_goal(getattr(state, "machine", None),
+                                                         body.get("target_fps")),
                              "load_bias": body.get("load_bias") or "auto",
                              "hide_crosshair": bool(body.get("hide_crosshair"))}}
     state.verification_receipt = receipt
@@ -338,7 +373,7 @@ def _apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     profile = build_profile(
         state.machine, kb,
         intent=body.get("intent", "balanced"),
-        target_fps=int(target) if target else None,
+        target_fps=_frame_goal(state.machine, target),
         current_video=steam.read_video_cfg(user),
         hide_crosshair=bool(body.get("hide_crosshair")),
         load_bias=str(body.get("load_bias") or "auto"),
@@ -389,7 +424,19 @@ def _apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
 
     session = backup.BackupSession(note=f"web apply {profile.intent}/tier {profile.tier}")
 
+    video_changes: List[Dict[str, Any]] = []
     if write_video:
+        current = steam.read_video_cfg(user)
+        for key in sorted(profile.video):
+            was = current.get(key)
+            if was is not None and str(profile.video[key]) == str(was):
+                continue
+            try:
+                before = kb.label(key, int(was)) if was is not None else None
+            except ValueError:
+                before = was
+            video_changes.append({"name": kb.ui_name(key), "before": before,
+                                  "after": kb.label(key, profile.video[key])})
         try:
             diff = steam.write_video_cfg(user, profile.video, session)
             steps.append({"ok": True, "what": "cs2_video.txt",
@@ -437,10 +484,101 @@ def _apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     for stood_down in skipped:
         steps.append({"ok": False, "skipped": True, **stood_down})
 
+    # CS2's NVIDIA profile follows the mode too. Its own list, so the page can
+    # show each driver change and end on the NVIDIA mark.
+    nv = None
+    if body.get("write_nvidia", True):
+        try:
+            nv = _nvidia_apply(state, profile.intent)
+        except Exception as exc:            # never fail an apply over the driver
+            nv = {"ok": False, "error": str(exc)}
+        if nv is not None:
+            steps.append({"ok": bool(nv.get("ok")), "what": "NVIDIA settings for CS2",
+                          "detail": (f"{len(nv.get('changed') or [])} setting(s) changed"
+                                     if nv.get("ok") else nv.get("error", ""))})
+
     backup.prune()
     verified = _record_verification(state, user, profile, launch, body, steps, generated)
     return {"ok": True, "steps": steps, "skipped": skipped, "verification": verified,
+            "video": video_changes, "nvidia": nv,
             "backup": None if session.empty else session.stamp}
+
+
+# --- Settings -> NVIDIA ------------------------------------------------------
+# CS2's own NVIDIA profile: the few settings each Launcher mode manages, the
+# player's own choices on top ("Set manually"), and the full list.
+
+def _nvidia_manual() -> Dict[str, int]:
+    from .cli import load_prefs
+
+    manual = load_prefs().get("nvidia_manual") or {}
+    return {str(k): int(v) for k, v in manual.items() if isinstance(v, int)}
+
+
+def _nvidia_ready(state: State) -> bool:
+    gpu = state.machine.gpu if state.machine else None
+    return bool(gpu and gpu.is_nvidia)
+
+
+def _nvidia_panel(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import elevated, nvidia
+
+    intent = str(body.get("intent") or "balanced")
+    out = nvidia.panel(intent, _nvidia_manual())
+    return {"ok": True, **out, "helper": elevated.status()}
+
+
+def _nvidia_set(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """One setting: the player's own value, or back to what the mode manages.
+
+    ``manual`` true keeps ``value`` as the player's choice; every Launcher mode
+    leaves it alone from then on. ``manual`` false hands it back: the mode's
+    value if the mode manages it, otherwise NVIDIA's own (the setting removed
+    from CS2's profile).
+    """
+    from . import nvidia
+    from .cli import load_prefs, save_prefs
+
+    try:
+        setting_id = int(str(body.get("id")), 16)
+    except (TypeError, ValueError):
+        return {"ok": False, "error": "That is not an NVIDIA setting."}
+    key = nvidia.hex_id(setting_id)
+    intent = str(body.get("intent") or "balanced")
+    prefs = load_prefs()
+    manual = dict(prefs.get("nvidia_manual") or {})
+    if body.get("manual"):
+        value = body.get("value")
+        if value is None:
+            value = (nvidia.read_cs2([setting_id]).get(setting_id)
+                     if body.get("keep_current") else None)
+        if not isinstance(value, int) or isinstance(value, bool):
+            managed = nvidia.MANAGED.get(intent, {})
+            value = managed.get(setting_id)
+            if value is None:
+                return {"ok": False, "error": "Pick a value for this setting first."}
+        result = nvidia.write_cs2({setting_id: value})
+        if result.get("ok"):
+            manual[key] = int(value)
+    else:
+        managed = nvidia.MANAGED.get(intent, {})
+        result = nvidia.write_cs2({setting_id: managed.get(setting_id)})
+        if result.get("ok"):
+            manual.pop(key, None)
+    if result.get("ok"):
+        prefs["nvidia_manual"] = manual
+        save_prefs(prefs)
+    return result
+
+
+def _nvidia_apply(state: State, intent: str) -> Optional[Dict[str, Any]]:
+    """Bring CS2's NVIDIA profile in line with the mode. None on a PC without NVIDIA."""
+    from . import nvidia
+
+    state.refresh()
+    if not _nvidia_ready(state):
+        return None
+    return nvidia.apply_intent(intent, _nvidia_manual())
 
 
 def _revert(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -925,6 +1063,39 @@ def _rgb_settings(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         except Exception:
             pass
     return _rgb(state, {})
+
+
+def _mouse(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """The mice plugged in, what each uses now, and what the player chose."""
+    from .cli import load_prefs
+    from .mouse import read_settings
+
+    state.mouse.find()
+    return {"ok": True, **state.mouse.status(read_settings(load_prefs().get("ui")))}
+
+
+def _mouse_settings(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Choose a mouse speed / polling rate, remember it, put it on the mouse.
+
+    0 means "leave the mouse as it is". The choice syncs with the player's
+    cloud copy, so the next PC they sign in on sets its mouse the same way.
+    """
+    from .cli import load_prefs, save_prefs
+    from .mouse import DEFAULTS, read_settings
+
+    prefs = load_prefs()
+    current = read_settings(prefs.get("ui"))
+    try:
+        wanted = read_settings({**current, **{k: body[k] for k in DEFAULTS if k in body}},
+                               strict=True)
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
+    profiles.remember(prefs, None, wanted)
+    save_prefs(prefs)
+    # Only what was just picked goes to the mouse, so picking a polling rate
+    # doesn't undo a speed the player set with the button on the mouse.
+    state.mouse.apply({k: (wanted[k] if k in body else 0) for k in DEFAULTS})
+    return {"ok": True, **state.mouse.status(wanted)}
 
 
 def _cfg_scan(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -1720,15 +1891,73 @@ def _cfg_layouts_pin(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
             "profiles": _layout_view(state.cfg_scan, fresh_pins, keys, fresh_hidden)}
 
 
-def _cfg_layouts_apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
-    """Switch to a profile right now: write its overrides onto the standard
-    layout in place, as if its own key had just been pressed and the result
-    kept for good.
+def _current_profile(result) -> Optional[str]:
+    """The profile picked on the Keyboard tab, if it still exists."""
+    from . import cfgscan, layouts
 
-    A pinned key is left alone, same as it already would be if the profile
-    loaded live. Only edits files on disk -- getting it into a running game
-    still takes whatever already reloads live edits (the apply-saved-settings
-    key, if one is set up, or a relaunch).
+    current = layouts.load_current(result.root)
+    if current and cfgscan.is_match_profile(result, current):
+        return current
+    return None
+
+
+def _sync_active_layout(state: State, result=None) -> Optional[str]:
+    """Write the file that puts the active profile's keys on at launch.
+
+    Profiles are separate keyboards: switching never edits the default
+    layout's own files, and a key changed while a profile is active only
+    changes that profile. The autoexec runs this generated file last; for
+    the default layout it is empty. Returns the backup stamp when anything
+    was written, else None.
+    """
+    from . import cfgscan, emit, layouts
+
+    result = result if result is not None else _rescan(state)
+    if result is None:
+        return None
+    current = _current_profile(result)
+    relative = cfgscan.active_layout_path(result)
+    path = Path(result.cfg_root) / Path(relative)
+    if current is None and not path.exists():
+        return None           # never used profiles: leave the setup alone
+
+    pins = layouts.load_pins(result.root).get(current or "", [])
+    text = cfgscan.active_layout_text(result, current, pins)
+    session = backup.BackupSession(note="keyboard profile file (web)")
+    wrote = False
+    try:
+        old = path.read_text(encoding="utf-8")
+    except OSError:
+        old = None
+    if old != text:
+        session.add(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        cfglang.write_config_text(path, text, "utf-8")
+        wrote = True
+    if current is not None and result.entry_points:
+        entry = next((c for c in result.files.values()
+                      if c.relative == result.entry_points[0]), None)
+        if entry is not None:
+            said = emit.ensure_exec_line(entry.path, relative, session,
+                                         title="Keyboard profile (cs2-autoconfig)",
+                                         shout="KEYBOARD PROFILE")
+            wrote = wrote or not said.startswith(("already", "autoexec not found"))
+    backup.prune()
+    if wrote:
+        state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+        return session.stamp or "written"
+    return None
+
+
+def _cfg_layouts_apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Switch to a profile: from now on the game gets that profile's keys,
+    and only those.
+
+    Profiles are separate keyboards. The default layout's files are not
+    touched; a generated file run last at launch takes off every key the
+    profile does not use and puts on the ones it does (see
+    ``cfgscan.profile_layout``). Getting it into a running game takes the
+    apply key, or a relaunch.
     """
     from . import cfgscan, keys, layouts
 
@@ -1737,68 +1966,47 @@ def _cfg_layouts_apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         return {"ok": False, "error": "scan a configuration folder first"}
 
     profile_file = str(body.get("file") or "")
-    pins = layouts.load_pins(result.root)
-    skip_keys = pins.get(profile_file, [])
-
-    try:
-        applied, skipped, texts = cfgscan.apply_profile_overrides(
-            result, profile_file, skip_keys)
-    except ValueError as exc:
-        return {"ok": False, "error": str(exc)}
+    if not cfgscan.is_match_profile(result, profile_file):
+        return {"ok": False, "error": f"'{profile_file}' is not a detected layout profile"}
 
     profiles = {p["file"]: p for p in cfgscan.match_profiles(result)}
-    profile = profiles.get(profile_file)
-    label = profile["label"] if profile else profile_file
+    label = profiles[profile_file]["label"] if profile_file in profiles else profile_file
+    pins = layouts.load_pins(result.root).get(profile_file, [])
 
-    # Clicking a tab is the one explicit choice the switcher now trusts --
-    # see layouts.load_current -- regardless of whether this particular
-    # click changed anything on disk.
-    layouts.save_current(result.root, profile_file)
-
-    if not applied:
-        empty = not cfgscan._profile_own_binds(result, profile_file)
-        return {"ok": True, "changed": False, "empty": empty, "file": profile_file,
+    own = {k: b for k, b in cfgscan._profile_own_binds(result, profile_file).items()
+           if (b.body or "").strip()}
+    if not own:
+        # Nothing on it yet. Switching would take every key away.
+        return {"ok": True, "changed": False, "empty": True, "file": profile_file,
                 "apply_keys": _apply_keys(result),
-                "label": label, "applied": [], "skipped": [keys.label(k) for k in skipped]}
+                "label": label, "applied": [], "skipped": []}
 
-    # The first time any of these keys is ever overridden, remember what it
-    # was -- the one thing that makes a later "Default" mean something.
-    chain = cfgscan.startup_chain(result)
-    config = next(c for c in result.files.values() if c.relative == profile_file)
-    overrides = {o["key"]: o for o in
-                 cfgscan._profile_entry(result, chain, config)["overrides"]}
-    by_file: Dict[str, Dict[str, str]] = {}
-    for key in applied:
-        item = overrides.get(key)
-        if item is not None:
-            by_file.setdefault(item["standard_file"], {})[key] = item["standard_body"]
-    for file, bodies in by_file.items():
-        layouts.record_baseline(result.root, file, bodies)
+    was = _current_profile(result)
+    layouts.save_current(result.root, profile_file)
+    wrote = _sync_active_layout(state, result)
+    if was == profile_file and not wrote:
+        return {"ok": True, "changed": False, "empty": False, "file": profile_file,
+                "apply_keys": _apply_keys(state.cfg_scan),
+                "label": label, "applied": [], "skipped": []}
 
-    session = backup.BackupSession(note=f"switch to profile {profile_file} (web)")
-    for file, text in texts.items():
-        config = next(c for c in result.files.values() if c.relative == file)
-        session.add(config.path)
-        cfglang.write_config_text(config.path, text, config.document.encoding)
-    backup.prune()
-
-    state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+    final, _unbinds = cfgscan.profile_layout(state.cfg_scan, profile_file, pins)
+    applied = [b.key for b in final.values() if b.file == profile_file]
     return {
-        "ok": True, "changed": True, "file": profile_file, "label": label,
+        "ok": True, "changed": True, "empty": False, "file": profile_file, "label": label,
         "applied": [keys.label(k) for k in applied],
-        "skipped": [keys.label(k) for k in skipped],
-        "backup": None if session.empty else session.stamp,
+        "skipped": [keys.label(k) for k in pins],
+        "backup": wrote if wrote and wrote != "written" else None,
         "apply_keys": _apply_keys(state.cfg_scan),
     }
 
 
 def _cfg_layouts_default(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
-    """Go back to Default: restore every key a profile has ever overridden
-    back to what it was the first time that happened.
+    """Go back to Default: your own keys, exactly as your config files have
+    them.
 
-    The Keyboard tab's switcher shows this alongside the profiles themselves
-    as the one way out of a profile that got applied -- with no "Default" to
-    switch back to, a key a profile took over stayed that way for good.
+    Switching no longer edits those files, so going back only empties the
+    generated profile file. Keys an older version wrote into the default
+    files when switching are still put back from the recorded originals.
     """
     from . import cfgscan, keys, layouts
 
@@ -1806,28 +2014,30 @@ def _cfg_layouts_default(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     if result is None:
         return {"ok": False, "error": "scan a configuration folder first"}
 
-    baseline = layouts.load_baseline(result.root)
-    applied, texts = cfgscan.apply_default_layout(result, baseline)
-
+    was = _current_profile(result)
     layouts.save_current(result.root, None)
 
-    if not applied:
-        return {"ok": True, "changed": False,
-                "empty": not any(baseline.values()),
-                "applied": []}
-
+    baseline = layouts.load_baseline(result.root)
+    applied, texts = cfgscan.apply_default_layout(result, baseline)
     session = backup.BackupSession(note="restore default layout (web)")
     for file, text in texts.items():
         config = next(c for c in result.files.values() if c.relative == file)
         session.add(config.path)
         cfglang.write_config_text(config.path, text, config.document.encoding)
     backup.prune()
+    if texts:
+        state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+    wrote = _sync_active_layout(state, state.cfg_scan)
 
-    state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+    if not applied and was is None and not wrote:
+        ever = bool(any(baseline.values()) or
+                    (Path(result.cfg_root) / cfgscan.active_layout_path(result)).exists())
+        return {"ok": True, "changed": False, "empty": not ever, "applied": []}
     return {
         "ok": True, "changed": True,
         "applied": [keys.label(k) for k in applied],
-        "backup": None if session.empty else session.stamp,
+        "backup": (None if session.empty else session.stamp) or
+                  (wrote if wrote and wrote != "written" else None),
         "apply_keys": _apply_keys(state.cfg_scan),
     }
 
@@ -2453,11 +2663,40 @@ def _cfg_plugins(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
 
     found = plugins.find(result)
     payload = plugins.as_dict(found)
+    _mark_made(result, payload["plugins"])
+    payload["suspect"] = sum(1 for c in payload["plugins"] if c.get("suspect"))
     payload["empty_sections"] = [
         {"file": f, "name": n, "line": ln}
         for f, n, ln in getattr(plugins.find, "empty_sections", [])
     ]
     return payload
+
+
+def _mark_made(result, cards: list) -> None:
+    """Say which Scripts-tab cards Script Builder made, so they get a tab of
+    their own and an Edit button that opens them in the builder again."""
+    from . import scriptgen
+
+    for config in result.files.values():
+        try:
+            text = config.path.read_bytes().decode(config.document.encoding, errors="replace")
+        except OSError:
+            continue
+        if scriptgen.MARK not in text:
+            continue
+        for block in scriptgen.own_blocks(text):
+            for card in cards:
+                if (card["file"] == config.relative and card["line"] <= block["last"]
+                        and card["end_line"] >= block["first"]):
+                    # Built and checked by the builder: a shift script that
+                    # rewires another key does so on purpose.
+                    if card.get("suspect"):
+                        card["suspect"] = False
+                        card["notes"] = [n for n in card.get("notes", [])
+                                         if n.get("code") != "state-redefines-other"]
+                    card["made"] = {"alias": block["spec"].get("alias", ""),
+                                    "name": block["spec"].get("name", ""),
+                                    "mode": block["spec"].get("mode", "")}
 
 
 def _unclaimed_keys(result, found) -> list:
@@ -2511,6 +2750,26 @@ def _cfg_plugin_toggle(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     # ending back below -- the same round trip the editor uses.
     flat = cfglang.restore_newlines(original, chr(10), False)
     updated = plugins.set_enabled(flat, found.line, found.end_line, enable)
+
+    # A Script Builder script knows its own key and what that key did before,
+    # so it puts exactly that back instead of the game's default.
+    made = _scriptgen_block(flat, found)
+    if made is not None:
+        updated = cfglang.restore_newlines(
+            updated, config.document.newline, config.document.trailing_newline)
+        session = backup.BackupSession(
+            note=f"{'enabled' if enable else 'disabled'} {found.name}")
+        session.add(config.path)
+        cfglang.write_config_text(config.path, updated, config.document.encoding)
+        backup.prune()
+        state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+        key = _scriptgen_rekey(state, made, enable)
+        return {
+            "path": found.file, "name": found.name, "enabled": enable,
+            "restored": [key] if key and not enable else [], "dropped": 0,
+            "changed": True, "backup": session.stamp,
+            "lines": found.end_line - found.line + 1, "builder": True,
+        }
 
     # The keys this script was holding, and what CS2 does with them itself.
     restored, dropped = [], []
@@ -2624,10 +2883,33 @@ def _cfg_keys(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         if feature.entry:
             features.setdefault(feature.entry.lower(), feature)
 
+    from . import cfgscan
+
+    chain = cfgscan.startup_chain(result)
+    active = _current_profile(result)
+    profile_keys = None
+    if active is not None:
+        from . import layouts
+
+        profile_keys, _gone = cfgscan.profile_layout(
+            result, active, layouts.load_pins(result.root).get(active, []))
     bound = {}
     for key, entries in result.binds.items():
-        # The last bind to load is the one the engine keeps.
-        winner = max(entries, key=lambda b: b.order)
+        # What the game ends up with: the last bind to load at startup, in
+        # any spelling of the key (CS2 reads "e" as scancode8). A match
+        # profile's binds only apply once its key is pressed, so they do not
+        # decide what the board shows.
+        if profile_keys is not None:
+            # A profile is active: the board is that profile's keyboard.
+            winner = profile_keys.get(cfgscan.physical_key(key))
+            if winner is None:
+                continue
+        elif chain:
+            winner = cfgscan.startup_bind(result, chain, key)
+            if winner is None:
+                continue
+        else:
+            winner = max(entries, key=lambda b: b.order)
         command = (winner.body or "").strip().strip('"')
         if not command:
             # bind "key" "" -- cleared, e.g. by a new empty profile. Free.
@@ -3162,6 +3444,57 @@ def _first_binds_file(result) -> Optional[str]:
     return sorted(by_relative)[-1]
 
 
+def _profile_bind(state: State, result, profile_file: str, binding: str,
+                  command: str, clearing: bool) -> Dict[str, Any]:
+    """Change one key in the active profile's own file, then put the
+    profile back on the keyboard so the game gets it too."""
+    from . import cfgscan, commands, keys
+
+    config = next(c for c in result.files.values() if c.relative == profile_file)
+    original = config.path.read_bytes().decode(config.document.encoding, errors="replace")
+    lines = cfglang.restore_newlines(original, chr(10), False).split(chr(10))
+    mine = [b for b in cfgscan.binds_for_key(result, binding) if b.file == profile_file]
+    body_text = "" if clearing else command
+    changed = None
+    for b in sorted(mine, key=lambda b: -b.order):
+        index = b.line - 1
+        if not (0 <= index < len(lines) and "bind" in lines[index]):
+            continue
+        was = (b.body or "").strip().strip(chr(34))
+        lines[index] = lines[index].replace(chr(34) + was + chr(34),
+                                            chr(34) + body_text + chr(34), 1)
+        changed = "unbound" if clearing else f"was {was}"
+        break
+    if changed is None:
+        if clearing:
+            return {"ok": False, "error": f"{keys.label(binding)} is not bound to anything"}
+        while lines and not lines[-1].strip():
+            lines.pop()
+        lines.append(f'bind "{binding}" "{command}"')
+        changed = "added"
+
+    note = ("unbound " if clearing else "bind ") + keys.label(binding)
+    session = backup.BackupSession(note=f"{note} in profile {profile_file}")
+    session.add(config.path)
+    cfglang.write_config_text(
+        config.path,
+        cfglang.restore_newlines(chr(10).join(lines), config.document.newline,
+                                 config.document.trailing_newline),
+        config.document.encoding)
+    backup.prune()
+    state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+    _sync_active_layout(state, state.cfg_scan)
+    return {
+        "ok": True, "binding": binding, "label": keys.label(binding),
+        "command": "" if clearing else command,
+        "unbound": clearing, "changed": changed, "file": profile_file,
+        "profile": profile_file,
+        "backup": session.stamp,
+        "apply_keys": _apply_keys(state.cfg_scan),
+        "unknown": bool(command) and not commands.is_offered(command),
+    }
+
+
 def _cfg_bind(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     """Put a command on a key, or take the key's binding away.
 
@@ -3190,13 +3523,24 @@ def _cfg_bind(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     if not command and not clearing:
         return {"ok": False, "error": "no command given"}
 
-    existing = result.binds.get(binding) or []
-    if clearing and not existing:
+    # A profile is active: the key belongs to that profile alone. Neither the
+    # default layout nor any other profile changes.
+    profile_file = _current_profile(result)
+    if profile_file is not None:
+        return _profile_bind(state, result, profile_file, binding, command, clearing)
+
+    # What CS2 really ends up with for this key: only files that load at
+    # startup count (a match profile binding the same key does nothing until
+    # its own key is pressed), and every spelling of the key counts ("e" and
+    # "scancode8" are one key to the game, and the later one wins).
+    chain = cfgscan.startup_chain(result)
+    existing = [b for b in cfgscan.binds_for_key(result, binding) if b.file in chain]
+    winner = existing[-1] if existing else None
+    if clearing and winner is None:
         return {"ok": False, "error": f"{keys.label(binding)} is not bound to anything"}
 
     # Replacing something the user put there deliberately is worth a question.
-    if existing and not clearing and not body.get("force"):
-        winner = max(existing, key=lambda b: b.order)
+    if winner is not None and not clearing and not body.get("force"):
         already = (winner.body or "").strip().strip(chr(34))
         # An empty bind ("") is a key a fresh profile cleared: free to take.
         if already and already.lower() != command.lower():
@@ -3205,42 +3549,38 @@ def _cfg_bind(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
                                "runs": already}],
                     "error": f"{keys.label(binding)} already runs {already}"}
 
-    # Where to write. An existing bind decides it; otherwise the file that
-    # holds the most binds already is where this one belongs.
-    if existing:
-        target_file = max(existing, key=lambda b: b.order).file
+    # Where to write. The bind that wins at startup decides it; otherwise the
+    # startup file meant for binds. Never a match profile: CS2 does not load
+    # one at launch, so a change written there never reached the game.
+    if winner is not None:
+        target_file = winner.file
     else:
-        counts: Dict[str, int] = {}
-        for entries in result.binds.values():
-            for b in entries:
-                counts[b.file] = counts.get(b.file, 0) + 1
-        if counts:
-            target_file = max(counts.items(), key=lambda kv: kv[1])[0]
-        else:
-            # A collection with no binds in it yet -- a new account, or one the
-            # starter has just built. There is no busiest file to follow, so
-            # fall back to the file meant for binds. Without this the very
-            # first bind anyone makes is refused, which is exactly when the
-            # Keyboard tab most needs to work.
-            target_file = _first_binds_file(result)
-            if target_file is None:
-                return {"ok": False, "error":
-                        "nothing here can hold a bind. Create a starter config on "
-                        "the Settings tab, or point the app at the folder your "
-                        "config already lives in."}
+        target_file = (cfgscan.startup_binds_file(result, chain)
+                       or _first_binds_file(result))
+        if target_file is None:
+            return {"ok": False, "error":
+                    "nothing here can hold a bind. Create a starter config on "
+                    "the Settings tab, or point the app at the folder your "
+                    "config already lives in."}
 
-    config = next((c for c in result.files.values() if c.relative == target_file), None)
-    if config is None:
-        return {"ok": False, "error": f"{target_file} is not part of the scan"}
+    # Clearing takes every startup bind of the key away, not just the last:
+    # otherwise an earlier one quietly takes over again.
+    touched = existing if clearing else ([winner] if winner is not None else [])
+    files = sorted({b.file for b in touched} | {target_file})
 
-    original = config.path.read_bytes().decode(config.document.encoding, errors="replace")
-    flat = cfglang.restore_newlines(original, chr(10), False)
-    lines = flat.split(chr(10))
+    texts: Dict[str, str] = {}
+    configs = {}
+    for name in files:
+        config = next((c for c in result.files.values() if c.relative == name), None)
+        if config is None:
+            return {"ok": False, "error": f"{name} is not part of the scan"}
+        configs[name] = config
+        original = config.path.read_bytes().decode(config.document.encoding, errors="replace")
+        texts[name] = cfglang.restore_newlines(original, chr(10), False)
 
     changed = None
-    for b in sorted(existing, key=lambda b: -b.order):
-        if b.file != target_file:
-            continue
+    for b in sorted(touched, key=lambda b: -b.order):
+        lines = texts[b.file].split(chr(10))
         index = b.line - 1
         if not (0 <= index < len(lines) and "bind" in lines[index]):
             continue
@@ -3255,11 +3595,12 @@ def _cfg_bind(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
             lines[index] = lines[index].replace(chr(34) + was + chr(34),
                                                 chr(34) + command + chr(34), 1)
             changed = f"was {was}"
-        break
+        texts[b.file] = chr(10).join(lines)
 
     if changed is None:
         if clearing:
             return {"ok": False, "error": "could not find that bind to remove"}
+        lines = texts[target_file].split(chr(10))
         anchor = next((i for i, l in enumerate(lines)
                        if l.lstrip().startswith("bind ")), None)
         if anchor is None:
@@ -3272,14 +3613,20 @@ def _cfg_bind(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         else:
             pad = lines[anchor][:len(lines[anchor]) - len(lines[anchor].lstrip())]
             lines.insert(anchor, f'{pad}bind "{binding}" "{command}"')
+        texts[target_file] = chr(10).join(lines)
         changed = "added"
 
     note = ("unbound " if clearing else "bind ") + keys.label(binding)
     session = backup.BackupSession(note=note if clearing else f"{note} to {command}")
-    session.add(config.path)
-    body_text = cfglang.restore_newlines(chr(10).join(lines), config.document.newline,
-                                         config.document.trailing_newline)
-    cfglang.write_config_text(config.path, body_text, config.document.encoding)
+    for name in files:
+        config = configs[name]
+        restored = cfglang.restore_newlines(texts[name], config.document.newline,
+                                            config.document.trailing_newline)
+        current = config.path.read_bytes().decode(config.document.encoding, errors="replace")
+        if restored == current:
+            continue
+        session.add(config.path)
+        cfglang.write_config_text(config.path, restored, config.document.encoding)
     backup.prune()
     state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
 
@@ -3288,6 +3635,7 @@ def _cfg_bind(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         "command": "" if clearing else command,
         "unbound": clearing, "changed": changed, "file": target_file,
         "backup": session.stamp,
+        "apply_keys": _apply_keys(state.cfg_scan),
         # Said rather than refused: an unknown command is more likely an
         # incomplete catalogue than a mistake, but a typo looks identical.
         "unknown": bool(command) and not commands.is_offered(command),
@@ -3303,7 +3651,20 @@ def _scriptgen_binding(body: Dict[str, Any]) -> str:
     return binding
 
 
-def _scriptgen_key(result, binding: str, entry: str) -> Dict[str, Any]:
+def _scriptgen_stock(state, binding: str) -> str:
+    """What CS2 itself binds to a key the config leaves alone (Mouse 1 fires)."""
+    from . import defaults, scriptgen
+
+    stock = ""
+    try:
+        if state is not None and getattr(state, "cs2_install", None):
+            stock = defaults.for_key(defaults.load(state.cs2_install), binding)
+    except Exception:
+        stock = ""
+    return stock or scriptgen.STOCK_FALLBACK.get(binding, "")
+
+
+def _scriptgen_key(result, binding: str, entry: str, state=None) -> Dict[str, Any]:
     """Whether the chosen key is free, and what it runs now if it is not."""
     from . import keys
 
@@ -3313,6 +3674,8 @@ def _scriptgen_key(result, binding: str, entry: str) -> Dict[str, Any]:
     runs = ""
     if entries:
         runs = (max(entries, key=lambda b: b.order).body or "").strip().strip(chr(34))
+    else:
+        runs = _scriptgen_stock(state, binding)
     free = not runs or (bool(entry) and runs.lower() == entry.lower())
     from . import scriptgen
 
@@ -3342,11 +3705,115 @@ def _scriptgen_check(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     binding = _scriptgen_binding(body)
     spec = dict(body.get("spec") or {})
     spec["binding"] = binding
-    key = _scriptgen_key(result, binding, "")
+    if spec.get("target"):
+        spec["target_stock"] = _scriptgen_stock(state, str(spec["target"]))
+    if binding:
+        spec["key_stock"] = _scriptgen_stock(state, binding)
+    key = _scriptgen_key(result, binding, "", state)
     built = scriptgen.build(spec, result, key["label"])
-    key = _scriptgen_key(result, binding, built.entry)
+    key = _scriptgen_key(result, binding, built.entry, state)
+    if (built.target or {}).get("own"):
+        key["free"] = True
     return {"ok": True, "built": built.as_dict(), "key": key,
             "folder": result is not None}
+
+
+def _scriptgen_saved(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Read-only: the scripts Script Builder has saved, to open them again.
+
+    The key shown is the one that really runs the script now (read from the
+    binds, so a key changed on the Keyboard tab shows here too), and whether
+    the script is on is read from the file, the same as the Scripts tab.
+    """
+    from . import cfgscan, keys, plugins, scriptgen
+
+    result = _rescan(state)
+    found = []
+    if result is not None:
+        chain = cfgscan.startup_chain(result)
+        blocks = plugins.find(result)
+        for config in sorted(result.files.values(), key=lambda c: c.relative):
+            try:
+                text = config.path.read_bytes().decode(config.document.encoding, errors="replace")
+            except OSError:
+                continue
+            if scriptgen.MARK not in text:
+                continue
+            for block in scriptgen.own_blocks(text):
+                spec = block["spec"]
+                alias = str(spec.get("alias") or "")
+                plug = next((p for p in blocks if p.file == config.relative
+                             and p.line <= block["last"] and p.end_line >= block["first"]), None)
+                on_keys, on_bindings = [], []
+                for binding in sorted(result.binds):
+                    winner = cfgscan._effective_bind(result, chain, binding)
+                    if (winner is not None and winner.file in chain and alias
+                            and scriptgen._runs_own(winner.body or "", alias)
+                            and keys.label(binding) not in on_keys):
+                        on_keys.append(keys.label(binding))
+                        on_bindings.append(binding)
+                binding = spec.get("binding") or ""
+                enabled = plug.enabled if plug is not None else True
+                found.append({
+                    "spec": spec, "file": config.relative,
+                    "id": f"{plug.file}:{plug.line}" if plug is not None else "",
+                    "enabled": enabled,
+                    "keys": on_keys, "binding_now": on_bindings[0] if on_bindings else "",
+                    "key": ", ".join(on_keys) if on_keys else
+                           (keys.label(binding) if binding and not enabled else ""),
+                    "before": scriptgen.describe(spec["key_before"], result)
+                              if spec.get("key_before") else "",
+                    "target": keys.label(spec["target"]) if spec.get("target") else ""})
+    return {"ok": True, "scripts": found}
+
+
+def _scriptgen_block(text: str, found) -> Optional[Dict[str, Any]]:
+    """The Script Builder spec behind a Scripts-tab block, if it is one."""
+    from . import scriptgen
+
+    if scriptgen.MARK not in text:
+        return None
+    for block in scriptgen.own_blocks(text):
+        if block["first"] <= found.end_line and block["last"] >= found.line:
+            spec = dict(block["spec"])
+            alias = str(spec.get("alias") or "")
+            names = {a.lower() for a in (found.aliases or [])}
+            spec["entry"] = "+" + alias if "+" + alias in names else alias
+            return spec
+    return None
+
+
+def _scriptgen_rekey(state: State, spec: Dict[str, Any], enable: bool) -> Optional[Dict[str, Any]]:
+    """Put a builder script's key on the script, or give it back what it did.
+
+    Switching off: the key goes back to what it did before the script took it
+    (Mouse 5 back to voice chat), else to the game's own default, else is
+    cleared. A key that has since been given to something else is left alone.
+    """
+    from . import cfgscan, keys, scriptgen
+
+    binding = str(spec.get("binding") or "")
+    alias = str(spec.get("alias") or "")
+    result = getattr(state, "cfg_scan", None)
+    if not binding or not alias or result is None:
+        return None
+    chain = cfgscan.startup_chain(result)
+    existing = [b for b in cfgscan.binds_for_key(result, binding) if b.file in chain]
+    now = (existing[-1].body or "").strip().strip(chr(34)) if existing else ""
+    if enable:
+        if now and not scriptgen._runs_own(now, alias) and now != spec.get("key_before"):
+            return None     # the key was given to something else meanwhile
+        _cfg_bind(state, {"binding": binding, "command": spec["entry"], "force": True})
+        return {"key": binding, "command": spec["entry"], "label": keys.label(binding)}
+    if not now or not scriptgen._runs_own(now, alias):
+        return None
+    back = (str(spec.get("key_before") or "")
+            or _scriptgen_stock(state, binding) or scriptgen.STOCK_FALLBACK.get(binding, ""))
+    if back:
+        _cfg_bind(state, {"binding": binding, "command": back, "force": True})
+    else:
+        _cfg_bind(state, {"binding": binding, "unbind": True})
+    return {"key": binding, "command": back, "label": keys.label(binding)}
 
 
 def _scriptgen_save(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -3363,14 +3830,20 @@ def _scriptgen_save(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     binding = _scriptgen_binding(body)
     spec = dict(body.get("spec") or {})
     spec["binding"] = binding
-    key = _scriptgen_key(result, binding, "")
+    if spec.get("target"):
+        spec["target_stock"] = _scriptgen_stock(state, str(spec["target"]))
+    if binding:
+        spec["key_stock"] = _scriptgen_stock(state, binding)
+    key = _scriptgen_key(result, binding, "", state)
     built = scriptgen.build(spec, result, key["label"])
     if not built.ok:
         problems = [c.text for c in built.checks if c.level == "block"]
         return {"ok": False, "built": built.as_dict(),
                 "error": problems[0] if problems else "This script can't be saved yet."}
 
-    key = _scriptgen_key(result, binding, built.entry)
+    key = _scriptgen_key(result, binding, built.entry, state)
+    if (built.target or {}).get("own"):
+        key["free"] = True      # the shift key keeps its own job, nothing is lost
     if not key["free"] and not body.get("force"):
         return {"ok": False, "needs_confirm": True, "key": key,
                 "error": f"{key['label']} already does something else."}
@@ -3393,6 +3866,12 @@ def _scriptgen_save(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     cfglang.write_config_text(config.path, text, config.document.encoding)
     backup.prune()
     state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+
+    # Moved to another key: the old key gets back what it did before.
+    moved = (built.replaces or {}).get("binding") or ""
+    if moved and moved != binding:
+        _scriptgen_rekey(state, {"binding": moved, "alias": built.alias,
+                                 "key_before": built.replaces.get("key_before", "")}, False)
 
     bound = _cfg_bind(state, {"binding": binding, "command": built.entry, "force": True})
     return {"ok": bool(bound.get("ok")), "file": target, "alias": built.entry,
@@ -3608,10 +4087,23 @@ def _ingame_watcher(state: State):
     folder = user.video_cfg.parent
     if not folder.is_dir():
         return None
-    watcher = gamewatch.Watcher(folder, user.account_id)
+    watcher = gamewatch.Watcher(folder, user.account_id, on_found=_ingame_found)
     watcher.start()
     state.ingame = watcher
     return watcher
+
+
+def _ingame_found(account_id: str, payload: Dict[str, Any]) -> None:
+    """A finding from CS2's own files goes straight into the change history.
+
+    The review window is asked for here only when the game is already gone;
+    while it runs, the session watcher asks the moment it closes.
+    """
+    from . import history, sessionwatch
+
+    history.add_game_finding(account_id, payload)
+    if not sessionwatch.game_running():
+        history.request_review()
 
 
 def _ingame(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -3672,6 +4164,222 @@ def _ingame_ack(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         watcher.clear()
     return {"account": user.account_id, "count": 0, "sources": {},
             "note": "Marked as seen."}
+
+
+# Which of CS2's own changes the app can keep or put back, and how. Key
+# binds and in-game settings go into the player's config; picture quality
+# goes into cs2_video.txt (only ever written with the game closed).
+_RESOLVABLE = {"Key binds", "In-game settings", "Picture quality"}
+
+
+def _ingame_resolve(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Answer the changes made inside CS2 during the last session.
+
+    For each change the player says Keep or Put back. Either way the answer
+    is written into the player's own config, because the config runs at every
+    launch: a key changed in the game's menu and not written down would be
+    undone by the next launch anyway. Put back writes the value from before
+    the session, so the next launch and the apply key both bring it back.
+    """
+    found = _ingame(state, {"account": body.get("account")})
+    if not found or found.get("first_run") or not found.get("count"):
+        _ingame_ack(state, {"account": body.get("account")})
+        return {"ok": True, "kept": 0, "put_back": 0, "problems": []}
+    if found.get("running"):
+        return {"ok": False, "error": "Close CS2 first. It saves its settings when it quits."}
+
+    wanted = {}
+    for item in body.get("choices") or []:
+        if isinstance(item, dict):
+            wanted[(str(item.get("source")), str(item.get("key")))] = (
+                "back" if item.get("choice") == "back" else "keep")
+
+    items = []
+    for source, changes in (found.get("sources") or {}).items():
+        for change in changes:
+            key = str(change.get("key") or "")
+            items.append({**change, "source": source, "key": key,
+                          "choice": wanted.get((source, key), "keep")})
+    kept, put_back, problems = _game_write(state, body.get("account"), items)
+    _ingame_ack(state, {"account": body.get("account")})
+    return {"ok": True, "kept": kept, "put_back": put_back, "problems": problems}
+
+
+def _game_write(state: State, account: Any,
+                items: List[Dict[str, Any]]) -> Tuple[int, int, List[str]]:
+    """Write CS2-menu changes into the player's config, kept or put back.
+
+    Each item has source, key, was, now and choice ("keep" or "back").
+    Returns (kept, put back, problems).
+    """
+    from . import defaults as keydefaults
+
+    kept, put_back, problems = 0, 0, []
+    settings: List[Dict[str, Any]] = []
+    for change in items:
+        source = str(change.get("source") or "")
+        if source not in _RESOLVABLE:
+            continue
+        key = str(change.get("key") or "")
+        choice = "back" if change.get("choice") == "back" else "keep"
+        value = change.get("was") if choice == "back" else change.get("now")
+        if source == "Key binds":
+            binding = keydefaults.normalise(key)
+            if state.cfg_scan is None:
+                continue
+            if value is None or not str(value).strip():
+                answer = _cfg_bind(state, {"binding": binding, "unbind": True, "force": True})
+                if not answer.get("ok") and "not bound" in str(answer.get("error", "")):
+                    answer = {"ok": True}
+            else:
+                answer = _cfg_bind(state, {"binding": binding, "command": str(value),
+                                           "force": True})
+            if not answer.get("ok"):
+                problems.append(f"{key}: {answer.get('error')}")
+                continue
+        elif value is None:
+            # A setting that did not exist before cannot be "put back" to
+            # anything; one the game dropped is simply left to the game.
+            continue
+        else:
+            settings.append({"name": key, "value": str(value),
+                             **({"source": "video"} if source == "Picture quality" else {})})
+        if choice == "back":
+            put_back += 1
+        else:
+            kept += 1
+
+    if settings and state.cfg_scan is not None:
+        answer = _cfg_settings_apply(state, {"changes": settings,
+                                             "account": account})
+        if not answer.get("ok"):
+            problems.append(str(answer.get("error")))
+    return kept, put_back, problems
+
+
+def _history(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """The change history, newest first. ``waiting`` limits it to the ones
+    still to be answered, which is what the review window shows."""
+    from . import history, sessionwatch
+
+    found = history.waiting() if body.get("waiting") else history.entries()
+    waiting = sum(1 for e in found if e["status"] == history.WAITING)
+    return {"entries": found, "waiting": waiting,
+            "game_running": sessionwatch.game_running()}
+
+
+def _history_answer(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Keep or Put back, for one change, one line of a change, or many.
+
+    Body: {"answers": [{"id": entry or line id, "choice": "keep"|"back",
+    "force": bool}]} -- or a single {"id", "choice"}.
+    """
+    from . import cfgscan, history, sessionwatch
+
+    answers = body.get("answers")
+    if not isinstance(answers, list):
+        answers = [body]
+    running = sessionwatch.game_running()
+    done, problems, conflicts = 0, [], []
+    by_entry = {e["id"]: e for e in history.entries(200)}
+    game_writes: Dict[str, List[Dict[str, Any]]] = {}
+
+    for answer in answers:
+        if not isinstance(answer, dict):
+            continue
+        target = str(answer.get("id") or "")
+        choice = history.BACK if answer.get("choice") == "back" else history.KEPT
+        entry_id, _, line = target.partition("#")
+        entry = by_entry.get(entry_id)
+        if entry is None:
+            problems.append("That change is no longer in the history.")
+            continue
+
+        if entry["kind"] == "app":
+            if running and any(i.get("file") == "cs2_video.txt" for i in entry["items"]):
+                problems.append(f"{entry['title']}: close CS2 first. It rewrites its "
+                                "picture settings when it quits.")
+                continue
+            with backup.marked("answer"):
+                result = history.swing(entry_id.split(":", 1)[1], choice,
+                                       force=bool(answer.get("force")))
+            if result.get("ok"):
+                done += 1
+            elif result.get("conflict"):
+                conflicts.append({"id": entry_id, "title": entry["title"],
+                                  "error": result.get("error")})
+            else:
+                problems.append(f"{entry['title']}: {result.get('error')}")
+            continue
+
+        # Changes made outside the app: answered line by line.
+        lines = [i for i in entry["items"] if not line or i["id"] == target]
+        event = history.event(entry_id) or {}
+        raw_items = event.get("items") or []
+        for item in lines:
+            index = int(item["id"].rsplit("#", 1)[1])
+            if choice == history.BACK and not item["can_put_back"]:
+                if not line:
+                    continue        # "put all of it back": the rest is done
+                if entry["kind"] == "nvidia":
+                    problems.append(f"{item['what']}: change it back in the NVIDIA app. "
+                                    "This app only reads NVIDIA settings for now.")
+                else:
+                    problems.append(f"{item['what']}: this one can't be put back from here.")
+                continue
+            if (entry["kind"] == "nvidia" and choice == history.BACK
+                    and index < len(raw_items)):
+                from . import nvwatch
+
+                written = nvwatch.put_back(raw_items[index])
+                if not written.get("ok"):
+                    problems.append(f"{item['what']}: " + str(
+                        written.get("error") or "the NVIDIA setting could not be written."))
+                    continue
+            if entry["kind"] == "game" and index < len(raw_items):
+                if running and raw_items[index].get("source") == "Picture quality":
+                    problems.append(f"{item['what']}: close CS2 first.")
+                    continue
+                game_writes.setdefault(event.get("account", ""), []).append(
+                    {**raw_items[index], "choice": "back" if choice == history.BACK else "keep"})
+            history.set_answer(item["id"], choice)
+            done += 1
+
+    for account, items in game_writes.items():
+        with backup.marked("answer"):
+            _kept, _back, trouble = _game_write(state, account or None, items)
+        problems.extend(trouble)
+    if game_writes and state.ingame is not None:
+        state.ingame.clear()
+
+    result = getattr(state, "cfg_scan", None)
+    if result is not None and done:
+        try:
+            state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+        except Exception:
+            pass
+    left = len(history.waiting())
+    if not left:
+        history.review_done()
+    return {"ok": not problems and not conflicts, "done": done, "problems": problems,
+            "conflicts": conflicts, "waiting": left,
+            **({"error": problems[0]} if problems and not conflicts else {})}
+
+
+def _history_later(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Close the review window without answering. Nothing is lost: the
+    changes stay waiting on Settings, Editing."""
+    from . import history
+
+    history.review_done()
+    return {"waiting": len(history.waiting())}
+
+
+def _history_review(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Bring the review window up now, if anything is waiting."""
+    from . import history
+
+    return {"shown": history.request_review()}
 
 
 def _play_fix(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
@@ -4033,14 +4741,120 @@ def _steam_hooks(state: State) -> None:
     """After the shared Steam sign-in, read the match history straight away."""
     from . import steamweb
 
-    steamweb.on_signed_in[:] = [lambda: _steam_history_start(state)]
+    def cloud_too() -> None:
+        state._cloud_quiet_tried = False
+        _cloud_quietly(state)
+
+    steamweb.on_signed_in[:] = [lambda: _steam_history_start(state), cloud_too]
 
 
 def _steam_state() -> Dict[str, Any]:
     from . import steamhistory, steamweb
 
     return {"linked": steamweb.linked(), "available": steamweb.available(),
-            **steamhistory.status}
+            **steamhistory.status, "connection": _steam_connected()}
+
+
+def _cloud_claim_later(state: State, started: Dict[str, Any]) -> None:
+    """Finish a cloud sign-in on the app's side, without the page polling.
+
+    The Steam window does the visible half; this collects the session once
+    Steam hands back, then starts the settings sync straight away.
+    """
+    from . import cloud
+
+    state._steam_login = started
+
+    def run() -> None:
+        try:
+            answer = cloud.wait_for_login(
+                started["state"], started["verifier"],
+                should_stop=lambda: getattr(state, "_steam_login", None) is not started)
+        except cloud.CloudError:
+            return
+        finally:
+            if getattr(state, "_steam_login", None) is started:
+                state._steam_login = None
+        cloud.forget_me()
+        if answer.get("ok", True) and cloud.signed_in():
+            _sync_loop(state).nudge()
+
+    threading.Thread(target=run, name="cloud-claim", daemon=True).start()
+
+
+def _cloud_quietly(state: State) -> None:
+    """Settings sync with nothing for the player to do.
+
+    Once Steam is connected in the app, the app's own cloud signs in with
+    that same Steam session in a hidden window. Tried once per launch; if it
+    does not work the next "Connect Steam" covers it.
+    """
+    from . import cloud, cloudconfig, steamweb
+
+    if getattr(state, "_cloud_quiet_tried", False):
+        return
+    if not (cloudconfig.configured() and steamweb.available() and steamweb.linked()):
+        return
+    if cloud.signed_in() or getattr(state, "_steam_login", None):
+        return
+    if steamweb.mark().get("cloud_off"):
+        return  # signed out of the cloud on purpose, in Settings
+    state._cloud_quiet_tried = True
+
+    def run() -> None:
+        try:
+            started = cloud.begin_login("steam")
+        except cloud.CloudError:
+            return
+        _cloud_claim_later(state, started)
+        if not steamweb.quiet_openid(started["url"]):
+            # Nothing came back: stop asking the cloud about it.
+            if getattr(state, "_steam_login", None) is started:
+                state._steam_login = None
+
+    threading.Thread(target=run, name="cloud-quiet", daemon=True).start()
+
+
+def _steam_connected() -> Dict[str, Any]:
+    """The one Steam connection: Steam's website plus the app's cloud."""
+    from . import cloud, cloudconfig, steamweb
+
+    web = steamweb.linked()
+    has_cloud = cloud.signed_in()
+    return {"web": web, "cloud": has_cloud,
+            "cloud_configured": cloudconfig.configured(),
+            "connected": web and (has_cloud or not cloudconfig.configured())}
+
+
+def _steam_connect(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Connect Steam once: match history, settings sync and anything else.
+
+    One Steam window. When the app's cloud is not signed in yet, the window
+    opens on Steam's OpenID page for it: signing in there also signs Steam's
+    website in for the app, so both are done in one go. When only the
+    website half is missing, Steam's own login page is shown instead.
+    """
+    from . import cloud, cloudconfig, steamweb
+
+    if not steamweb.available():
+        return {**_steam_state(), "ok": False,
+                "error": "Open the app's own window to connect Steam."}
+    _steam_hooks(state)
+    steamweb.mark({"cloud_off": False})
+    if cloudconfig.configured() and not cloud.signed_in():
+        try:
+            started = cloud.begin_login("steam")
+        except cloud.CloudError:
+            started = None
+        if started and steamweb.sign_in(started["url"]):
+            _cloud_claim_later(state, started)
+            return {"ok": True, "opened": True, **_steam_state()}
+    if not steamweb.linked():
+        if not steamweb.sign_in():
+            return {**_steam_state(), "ok": False,
+                    "error": "Open the app's own window to connect Steam."}
+        return {"ok": True, "opened": True, **_steam_state()}
+    return {"ok": True, "opened": False, **_steam_state()}
 
 
 def _stats_steam(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -4055,6 +4869,8 @@ def _stats_steam(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
                     **_steam_state()}
     elif action == "sync" and not _steam_history_start(state):
         return {"ok": False, "error": "Steam account not found", **_steam_state()}
+    elif action == "status":
+        _cloud_quietly(state)
     return {"ok": True, **_steam_state()}
 
 
@@ -4424,11 +5240,29 @@ def _skins_catalog(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     except (steam.SteamError, skins_catalog.CatalogError) as exc:
         return {"ok": False, "error": str(exc)}
 
-    groups: Dict[str, List[Dict[str, Any]]] = {}
+    # Items only: the page groups them itself. Sending a grouped copy as
+    # well doubled the answer once stickers (thousands of them) came in.
+    return {"ok": True, "items": items, "count": len(items)}
+
+
+def _skins_music(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Every music kit with the song parts the player's game files hold
+    (MVP song first). See cs2cfg.econ."""
+    from . import econ, skins_catalog
+
+    try:
+        vpk_path = _skins_vpk(state)
+        items = skins_catalog.build(vpk_path, force=bool(body.get("force")))
+    except (steam.SteamError, skins_catalog.CatalogError) as exc:
+        return {"ok": False, "error": str(exc)}
+    kits = []
     for it in items:
-        groups.setdefault(skins_catalog.group_of(it["weapon_class"]), []).append(it)
-    return {"ok": True, "items": items, "count": len(items),
-            "groups": [{"name": name, "items": entries} for name, entries in groups.items()]}
+        if it["kind"] != "music":
+            continue
+        kits.append({"kit": it["paintkit"], "name": it["skin_name"],
+                     "artist": it.get("artist", ""), "art": it["art"],
+                     "parts": econ.song_parts(vpk_path, it["paintkit"])})
+    return {"ok": True, "kits": kits}
 
 
 def _skins_tool_status(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
@@ -4681,6 +5515,22 @@ def _win_graphics_apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     return wingraphics.apply(state.cs2_install)
 
 
+def _pc_state(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """The PC settings the app has changed, and whether each is on right now."""
+    from . import pcstate
+
+    return pcstate.status()
+
+
+def _pc_state_restore(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Give the PC its own settings back now, without quitting. Never prompts."""
+    from . import pcstate
+
+    result = pcstate.put_back_now()
+    result["ok"] = True
+    return result
+
+
 def _settle_win_graphics(state: State, wanted: bool) -> Dict[str, Any]:
     """Keep Windows in step with the switch, on the way into a launch.
 
@@ -4717,7 +5567,7 @@ def _configs_prepare(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     target = ui.get("target_fps")
     profile = build_profile(state.machine, state.kb,
                             intent=ui.get("intent") or "balanced",
-                            target_fps=int(target) if target else None,
+                            target_fps=_frame_goal(state.machine, target),
                             current_video=steam.read_video_cfg(user) if user else {},
                             hide_crosshair=bool(ui.get("hide_crosshair")),
                             load_bias=str(ui.get("load_bias") or "auto"))
@@ -4796,9 +5646,54 @@ def _sync_round(state: State, force: bool = False) -> Dict[str, Any]:
     if not cloud.signed_in():
         return {"ok": False, "action": "none", "at": time.time(),
                 "reason": "sign in with Steam to sync"}
-    return autosync.run(_active_account(state), _game_cfg_root(state),
-                        state.cfg_folder, load_prefs=load_prefs,
-                        save_prefs=save_prefs, force=force)
+    result = autosync.run(_active_account(state), _game_cfg_root(state),
+                          state.cfg_folder, load_prefs=load_prefs,
+                          save_prefs=save_prefs, force=force)
+    if result.get("action") == "pull" and result.get("ok"):
+        result["applied"] = _after_pull(state, result)
+    return result
+
+
+def _after_pull(state: State, result: Dict[str, Any]) -> Dict[str, Any]:
+    """Put settings that came from another PC to work here, straight away.
+
+    Overlay and lighting take their new settings live. When the cloud brought
+    the player's picture/config choices, the normal apply runs for this PC's
+    own hardware with them -- the same thing the Apply button does, backups
+    included -- so a new PC is ready without anybody pressing anything.
+    """
+    from . import autosync, profiles
+    from .cli import load_prefs
+
+    done: Dict[str, Any] = {}
+    prefs = load_prefs()
+    ui = profiles.ui_for(prefs, _active_account(state))
+    changed = set(result.get("prefs") or [])
+    try:
+        if any(k.startswith("overlay_") for k in changed):
+            from .overlay.settings import read as overlay_read
+            state.overlay.configure(overlay_read(ui))
+            done["overlay"] = True
+        if any(k.startswith("rgb_") for k in changed):
+            from .rgb import read_settings as rgb_read
+            state.rgb.configure(rgb_read(ui))
+            done["lighting"] = True
+        if any(k.startswith("mouse_") for k in changed):
+            from .mouse import read_settings as mouse_read
+            state.mouse.apply_later(mouse_read(ui))
+            done["mouse"] = True
+    except Exception:
+        pass
+    if (changed & set(autosync.APPLY_PREFS) or result.get("written")) \
+            and ui.get(autosync.CFG_WRITE_KEY):
+        body = {k: ui[k] for k in autosync.APPLY_PREFS if k in ui}
+        body["account"] = _active_account(state)
+        try:
+            applied = _apply(state, body)
+            done["apply"] = bool(applied.get("ok"))
+        except Exception:
+            done["apply"] = False
+    return done
 
 
 def _sync_loop(state: State):
@@ -5117,8 +6012,43 @@ def _cloud_password(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
 def _cloud_logout(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     from . import cloud
 
+    from . import steamweb
+
     state._login = None
+    state._steam_login = None
+    # Signing out here is a choice: do not sign the cloud back in quietly.
+    steamweb.mark({"cloud_off": True})
     return cloud.sign_out()
+
+
+def _lineups_pictures(state, body):
+    from .overlay.tools.lineups import creating
+    if body.get('action') == 'stop':
+        legacy = state.overlay.picture_session
+        if legacy and legacy.active:
+            legacy.abort()
+            state.overlay._configure_gsi(state.overlay._settings['overlay_enabled'])
+        if hasattr(state.overlay, 'cancel_creating'):
+            return creating(state, {'action': 'cancel'})
+        return {'available': True, 'active': False, 'text': legacy.text if legacy else 'Pictures stopped.'}
+    if body.get('action') == 'status':
+        return creating(state, {'action': 'status'})
+    if not state.overlay._settings['overlay_enabled'] or 'lineups' not in state.overlay._settings['overlay_tools']:
+        return {'available': False, 'active': False, 'text': 'Turn on the overlay and Lineups first.'}
+    return {'available': True, 'active': False,
+            'text': 'Open Lineups, choose a lineup, then press Make lineup pictures.'}
+
+
+def _lineups_art(state, key):
+    from .lineups.radar import picture
+    from .paths import user_data_dir
+    if not state.overlay._settings['overlay_enabled'] or 'lineups' not in state.overlay._settings['overlay_tools']:
+        return None
+    try:
+        package = _skins_vpk(state)
+    except (OSError, ValueError, AttributeError, steam.SteamError):
+        return None
+    return picture(package, user_data_dir(), key) if package else None
 
 
 def _overlay_pinned_context(state):
@@ -5336,6 +6266,11 @@ def _update_install(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         script = updates.install(release, relaunch=bool(body.get("relaunch", True)))
     except Exception as exc:
         return {"ok": False, "error": str(exc)}
+    # The new version opens a moment later and would set every PC setting
+    # again, so the put-back is skipped for an update (cs2cfg/pcstate.py).
+    from . import pcstate
+
+    pcstate.mark_updating()
     return {"ok": True, "installing": True, "script": str(script),
             "version": release.version}
 
@@ -5401,9 +6336,57 @@ def _refresh_apply_now(state: State) -> None:
     from . import applynow
 
     try:
+        _sync_active_layout(state)
+    except Exception:
+        pass
+    try:
+        _apply_now_auto(state)
+    except Exception:
+        pass
+    try:
         applynow.refresh(_rescan(state))
     except Exception:
         pass
+
+
+def _apply_now_auto(state: State) -> Optional[str]:
+    """Set up the apply key for a player who has none: F12, or the next free
+    F key. Once per collection, so a player's own later choice stands."""
+    from . import applynow, cfgscan
+
+    result = _rescan(state)
+    planned = applynow.ensure_auto_key(result)
+    if planned is None:
+        return None
+    path, text, key = planned
+    session = backup.BackupSession(note="apply-changes key, set up automatically")
+    session.add(path)
+    cfglang.write_config_text(path, text, "utf-8")
+    backup.prune()
+    state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+    return key
+
+
+def _apply_now_follow_game(state: State, running: bool) -> None:
+    """When CS2 starts or stops, rewrite the in-game apply file.
+
+    Started: from now on the key sends only what changes after this point.
+    Stopped: back to the full setup, remembered as what the next launch
+    loads. Runs off the status poll's thread so the poll never waits.
+    """
+    previous = getattr(state, "_apply_game_up", None)
+    state._apply_game_up = running
+    if previous is None or previous == running:
+        return
+
+    def work() -> None:
+        try:
+            with state.lock:
+                _refresh_apply_now(state)
+        except Exception:
+            pass
+
+    threading.Thread(target=work, name="apply-now-follow-game", daemon=True).start()
 
 
 # Every handler that can change a config file CS2 reads. After any of them
@@ -5417,6 +6400,7 @@ _CONFIG_WRITERS = {
     _cfg_layouts_delete, _cfg_layouts_remove, _cfg_layouts_import,
     _cfg_layouts_sync_pull, _cfg_starter, _cfg_convert, _cfg_polish_apply,
     _cfg_rename_apply, _goxlr_bind, _profile_use, _scriptgen_save,
+    _configs_prepare, _firstrun_finish, _ingame_resolve, _history_answer,
 }
 
 
@@ -5428,6 +6412,8 @@ def make_handler(state: State):
         "/api/configs/import/pick": _configs_import_pick,
         "/api/configs/import/preview": _configs_import_preview,
         "/api/apply": _apply,
+        "/api/nvidia": _nvidia_panel,
+        "/api/nvidia/set": _nvidia_set,
         "/api/revert": _revert,
         "/api/backups": _backups,
         "/api/play": _play,
@@ -5435,6 +6421,11 @@ def make_handler(state: State):
         "/api/play/fix": _play_fix,
         "/api/ingame": _ingame,
         "/api/ingame/ack": _ingame_ack,
+        "/api/ingame/resolve": _ingame_resolve,
+        "/api/history": _history,
+        "/api/history/answer": _history_answer,
+        "/api/history/later": _history_later,
+        "/api/history/review": _history_review,
         "/api/prefs": _save_prefs,
         "/api/cfg/scan": _cfg_scan,
         "/api/cfg/tree": _cfg_tree,
@@ -5450,6 +6441,7 @@ def make_handler(state: State):
         "/api/scriptgen/steps": _scriptgen_steps,
         "/api/scriptgen/check": _scriptgen_check,
         "/api/scriptgen/save": _scriptgen_save,
+        "/api/scriptgen/saved": _scriptgen_saved,
         "/api/cfg/settings": _cfg_settings,
         "/api/cfg/settings/apply": _cfg_settings_apply,
         "/api/cfg/apply-script/status": _cfg_apply_script_status,
@@ -5510,6 +6502,7 @@ def make_handler(state: State):
         "/api/faceit/forget": _faceit_forget,
         "/api/stats": _stats,
         "/api/stats/steam": _stats_steam,
+        "/api/steam/connect": _steam_connect,
         "/api/match/state": _match_state,
         "/api/match/accept": _match_accept,
         "/api/match/dismiss": _match_dismiss,
@@ -5539,6 +6532,8 @@ def make_handler(state: State):
         "/api/cloud/password": _cloud_password,
         "/api/cloud/logout": _cloud_logout,
         "/api/wingraphics": _win_graphics,
+        "/api/pcstate": _pc_state,
+        "/api/pcstate/restore": _pc_state_restore,
         "/api/wingraphics/apply": _win_graphics_apply,
         "/api/crosshairx": _crosshairx,
         "/api/crosshairx/start": _crosshairx_start,
@@ -5546,6 +6541,7 @@ def make_handler(state: State):
         "/api/inventory": _inventory,
         "/api/inventory/inspect": _inventory_inspect,
         "/api/skins/catalog": _skins_catalog,
+        "/api/skins/music": _skins_music,
         "/api/skins/tool_status": _skins_tool_status,
         "/api/skins/tool_browse": _skins_tool_browse,
         "/api/skins/tool_set": _skins_tool_set,
@@ -5569,8 +6565,11 @@ def make_handler(state: State):
         "/api/overlay": _overlay,
         "/api/overlay/panel": _overlay_panel,
         "/api/overlay/settings": _overlay_settings,
+        "/api/lineups/pictures": _lineups_pictures,
         "/api/rgb": _rgb,
         "/api/rgb/settings": _rgb_settings,
+        "/api/mouse": _mouse,
+        "/api/mouse/settings": _mouse_settings,
     }
 
     class Handler(BaseHTTPRequestHandler):
@@ -5684,6 +6683,60 @@ def make_handler(state: State):
                 self.send_header("Content-Type", "image/png")
                 self.send_header("Content-Length", str(len(data)))
                 self.send_header("Cache-Control", "max-age=86400")
+                self.end_headers()
+                self.wfile.write(data)
+                return
+            if path.startswith("/item-art/"):
+                # An item's real inventory picture, cut out of the player's own
+                # CS2 files (cs2cfg.econ). Only names the catalog itself handed
+                # out are looked up, so no path can be asked for. 404 when CS2
+                # is not here: the page shows its plain card.
+                from . import econ, skins_catalog
+                from .paths import user_data_dir
+
+                wanted = path[len("/item-art/"):].removesuffix(".png")
+                art = None
+                try:
+                    dir_vpk = _skins_vpk(state)
+                    candidates = skins_catalog.pictures_for(dir_vpk, wanted)
+                    art = econ.picture(dir_vpk, user_data_dir(), wanted, candidates)
+                except Exception:  # noqa: BLE001 -- a missing picture is never an error
+                    art = None
+                if art is None:
+                    self._send_json({"error": "no picture"}, 404)
+                    return
+                data = art.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "image/png")
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Cache-Control", "max-age=86400")
+                self.end_headers()
+                self.wfile.write(data)
+                return
+            if path.startswith("/music-kit/"):
+                # One part of a music kit's songs (the MVP song first), cut
+                # from the player's own CS2 files. Only parts the kit really
+                # has are served (cs2cfg.econ.song_parts).
+                if self.headers.get("X-CS2CFG-Token") != state.token:
+                    self._send_json({"error": "bad or missing token"}, 403)
+                    return
+                from . import econ
+
+                bits = path[len("/music-kit/"):].split("/")
+                found = None
+                if len(bits) == 2 and all(re.fullmatch(r"[A-Za-z0-9_\-]{1,80}", b) for b in bits):
+                    try:
+                        found = econ.song(_skins_vpk(state), bits[0], bits[1])
+                    except Exception:  # noqa: BLE001
+                        found = None
+                if found is None:
+                    self._send_json({"error": "This song part could not be read from your game files."}, 404)
+                    return
+                data, kind = found
+                self.send_response(200)
+                self.send_header("Content-Type", kind)
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Cache-Control", "no-store")
                 self.end_headers()
                 self.wfile.write(data)
                 return
@@ -5881,6 +6934,7 @@ def make_handler(state: State):
                     live.update(_stand_down(state, live["game_running"]))
                 except Exception:
                     pass
+                _apply_now_follow_game(state, live["game_running"])
                 if state.launch is None:
                     self._send_json({"ok": True, "phase": "idle", "active": False,
                                      "lines": [], **live})
@@ -6067,6 +7121,35 @@ def make_handler(state: State):
     return Handler
 
 
+def _history_watchers(state: State) -> None:
+    from . import history, nvwatch, sessionwatch
+
+    def game_closed() -> None:
+        # Read CS2's settings files the moment the game is gone, so the review
+        # has the game's own changes in it rather than waiting for the timer.
+        try:
+            with state.lock:
+                watcher = _ingame_watcher(state)
+            if watcher is not None:
+                watcher.check_now()
+        except Exception:
+            pass
+
+    def nvidia_moved(items: List[Dict[str, Any]]) -> None:
+        history.add_event("nvidia", items)
+        if not sessionwatch.game_running():
+            history.request_review()
+
+    try:
+        sessionwatch.start(on_closed=game_closed)
+    except Exception:
+        pass
+    try:
+        nvwatch.Watcher(nvidia_moved).start()
+    except Exception:
+        pass
+
+
 def serve(port: int = 8765, cfg_folder: str = "mrwhiteer",
           cfg_name: str = "autoperf.vcfg") -> Tuple[ThreadingHTTPServer, State]:
     state = State(cfg_folder, cfg_name)
@@ -6085,6 +7168,16 @@ def serve(port: int = 8765, cfg_folder: str = "mrwhiteer",
     except Exception:
         pass                    # never let a sound preference stop the app
 
+    # The hardware graph on the System page keeps its own history from the
+    # moment the app starts, so it opens full rather than filling in from
+    # the right. The last two minutes survive a restart too.
+    try:
+        from . import monitor, paths
+
+        monitor.shared().start(paths.user_data_dir() / monitor.HISTORY_FILE)
+    except Exception:
+        pass
+
     # Sensors that need administrator, read through the helper setup put in
     # place. Started here because it no longer costs a prompt.
     try:
@@ -6094,6 +7187,10 @@ def serve(port: int = 8765, cfg_folder: str = "mrwhiteer",
             temps.start_helper()
     except Exception:
         pass
+
+    # The change history's two outside eyes: CS2 closing (however it was
+    # closed) and NVIDIA's settings file moving.
+    _history_watchers(state)
 
     # Settings follow the Steam account between PCs without a button. The
     # loop does nothing until somebody is signed in, and never raises.
@@ -6132,4 +7229,12 @@ def serve(port: int = 8765, cfg_folder: str = "mrwhiteer",
         state.rgb.configure(rgb_settings(load_prefs().get("ui")))
     except Exception:
         pass                    # lighting is never worth failing to start over
+    try:
+        from .mouse import read_settings as mouse_settings
+
+        # The mouse keeps a speed in its own memory, but a new mouse, a new
+        # PC or the maker's app may have changed it: put the choice back.
+        state.mouse.apply_later(mouse_settings(load_prefs().get("ui")))
+    except Exception:
+        pass
     return server, state

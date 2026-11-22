@@ -4,9 +4,11 @@ from ..paths import bundle_root
 import math
 import re
 import textwrap
+import zlib
 
 TITLES = {'performance': 'Performance', 'hardware': 'Hardware',
-          'events': 'Stutters and freezes', 'profiles': 'Profiles', 'serverlock': 'Server lock'}
+          'events': 'Stutters and freezes', 'profiles': 'Profiles', 'serverlock': 'Server lock',
+          'lineups': 'Smokes for this round'}
 
 
 def render(tool, data, fields=None):
@@ -18,6 +20,8 @@ def render(tool, data, fields=None):
     from .settings import FIELDS
     fields = set(FIELDS if fields is None else fields)
     graph = ()
+    if tool == 'picture':
+        return {'lines': tuple(['Lineup pictures'] + textwrap.wrap(data.get('status', ''), 42)), 'graph': ()}
     lines = [TITLES[tool]]
     if tool == 'performance':
         current = data.get('current') or {}
@@ -58,8 +62,25 @@ def render(tool, data, fields=None):
                   'Layout: ' + str(data.get('layout') or 'Default')]
     elif tool == 'serverlock':
         lines.append(str(data.get('text') or 'Coming soon'))
+    elif tool == 'lineups':
+        if data.get('picture_status'):
+            lines.append(data['picture_status'])
+        round_state = data.get('round', {})
+        lines.append(str(round_state.get('name','')) + ' · ' + str(round_state.get('side','')) + ' side')
+        names = [f"{i}. {r['name']}" for i,r in enumerate(data.get('rows', []),1)]
+        lines += [', '.join(names[i:i+2]) for i in range(0,len(names),2)] if names else ['No smokes for this side yet']
+        lines.append('Ctrl+Alt+P: browse and pin')
     wrapped = [part for line in lines for part in (textwrap.wrap(str(line), width=42) or [''])]
-    return {'lines': tuple(wrapped[:5]), 'graph': graph}
+    model = {'lines': tuple(wrapped[:10 if tool == 'lineups' else 5]), 'graph': graph}
+    if tool == 'lineups' and data.get('art'):
+        from ..lineups.native import bitmap
+        import json
+        try:
+            model['raster'] = bitmap(json.dumps(data['art'],sort_keys=True),
+                                     json.dumps(data.get('rows',[]),sort_keys=True))
+        except (ValueError, KeyError, zlib.error):
+            pass
+    return model
 
 
 @lru_cache(maxsize=16)
@@ -79,7 +100,7 @@ def palette(theme='violet'):
     return rgb('panel', '#161616'), rgb('ink', '#eeeeee'), rgb('accent', '#b9a2ff')
 
 
-def composite(mask, opacity=60, colors=None):
+def composite(mask, opacity=10, colors=None):
     """GDI white foreground / dark outline mask -> premultiplied BGRA.
 
     GDI destroys alpha. Rebuild it from the mask, keeping every glyph/line

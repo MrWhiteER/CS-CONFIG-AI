@@ -11,7 +11,7 @@
   const response=await fetch(path,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json','X-CS2CFG-Token':window.overlayToken},...(body===undefined?{}:{body:JSON.stringify(body)}),signal});
   const data=await response.json();if(!response.ok||data.ok===false)throw new Error(data.error||'Request failed');return data;
  }
- function entry(id){const row=layout[id]||={open:['performance','hardware'].includes(id),pinned:false};row.opacity??=60;return row;}
+ function entry(id){const row=layout[id]||={open:['performance','hardware'].includes(id),pinned:false};row.opacity??=10;return row;}
  function visible(id){return active&&settings.overlay_tools.includes(id)&&entry(id).open;}
  function cancelTool(id){clearTimeout(timers.get(id));timers.delete(id);requests.get(id)?.abort();requests.delete(id);}
  async function refresh(tool,epoch){
@@ -33,8 +33,9 @@
   const call=async(action,args)=>{
    if(preview||!visible(tool.id))throw new Error('Changes unavailable');
    const epoch=generation;
-   try{const result=await api('/api/overlay/tool',{id:tool.id,action,args});
-    if(!visible(tool.id)||epoch!==generation)throw new DOMException('Tool hidden','AbortError');
+   try{const pictureAction=tool.id==='lineups'&&action==='creating';
+    const result=await api('/api/overlay/tool',{id:tool.id,action,args},pictureAction?null:controller?.signal);
+    if(!pictureAction&&(!visible(tool.id)||epoch!==generation))throw new DOMException('Tool hidden','AbortError');
     if(tool.id==='serverlock'){cancelTool(tool.id);if(result.poll)timers.set(tool.id,setTimeout(()=>refresh(tool,generation),1000));}
     return result;
    }catch(error){report(error);throw error;}
@@ -118,7 +119,7 @@
    dim();
    // Migrate the existing telemetry HUD to the native pinned forms.
    if(!Object.keys(layout).length){entry('performance').pinned=true;entry('hardware').pinned=true;}
-   windows.clear();$('workspace').replaceChildren();for(const tool of manifest.tools)createWindow(tool);
+   for(const tool of manifest.tools){if(!windows.has(tool.id))createWindow(tool);else{const view=windows.get(tool.id);view.element.hidden=!visible(tool.id);place(tool);setOpacity(tool.id,entry(tool.id).opacity);}}
    dock();clock();$('shortcut').textContent=settings.overlay_panel_hotkey+' to return to game';
    if(preview){document.body.classList.add('preview');$('preview').hidden=false;for(const tool of manifest.tools)if(visible(tool.id))render(tool,window.overlayPreview.data[tool.id]);}
    else for(const tool of manifest.tools)if(visible(tool.id))refresh(tool,epoch);

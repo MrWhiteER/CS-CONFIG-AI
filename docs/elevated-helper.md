@@ -43,6 +43,7 @@ When `run` answers `needs_setup`, fall back to your old path, or send the user t
 | `cfg.grant` | `{path: ...\steamapps\common\<x>\game\csgo\cfg}` | makes that folder writable for this user |
 | `temps.watch` | `{pid}` | publishes board and drive temperatures to `results/temps.json` until that process exits (max 12 h); use `wait=False` |
 | `faceit_ac.start` | none | starts FACEIT Anti-Cheat from the path in its own HKLM uninstall entry, never from a request |
+| `nvidia.set` | `{changes: [{id, value}]}` (1–64; value is a number, `null` to remove, or `"default"` for NVIDIA's own) | changes DWORD settings in **CS2's NVIDIA program profile only** (NVIDIA's own, or `CS CONFIG AI - Counter-Strike 2` for cs2.exe if the driver has none), saves, and answers what each held before. Never the global profile. Added in helper version 3. |
 | `helper.uninstall` | none | removes everything the helper made, then the helper itself (run by the uninstaller) |
 | `defender.cs2` | `{program: cs2.exe path, on: bool}` | adds or removes a Defender exclusion for CS2's own install folder only |
 

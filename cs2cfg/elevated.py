@@ -37,7 +37,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 # Must match $Version in helper/broker.ps1.
-HELPER_VERSION = 2
+HELPER_VERSION = 3
 
 TASK = r"\CS CONFIG AI\Helper"
 PROGRAM_DIR_NAME = "CS CONFIG AI Helper"
@@ -48,7 +48,7 @@ OPS = (
     "firewall.lock", "firewall.unlock", "firewall.status",
     "dns.flush", "adapter.restart", "audio.restart", "device.restart",
     "power.set", "cfg.grant", "temps.watch", "faceit_ac.start", "defender.cs2",
-    "helper.uninstall",
+    "nvidia.set", "helper.uninstall",
 )
 
 TIMEOUT = 45.0
@@ -181,6 +181,25 @@ def validate(op: str, args: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         if pid <= 0:
             raise HelperError("no app to watch")
         return {"pid": pid}
+
+    if op == "nvidia.set":
+        changes = args.get("changes")
+        if not isinstance(changes, list) or not 1 <= len(changes) <= 64:
+            raise HelperError("between 1 and 64 NVIDIA settings")
+        clean = []
+        for item in changes:
+            try:
+                setting_id = int((item or {}).get("id"))
+            except (TypeError, ValueError):
+                raise HelperError("bad NVIDIA setting") from None
+            if not 0 < setting_id <= 0xFFFFFFFF:
+                raise HelperError("bad NVIDIA setting")
+            value = (item or {}).get("value")
+            if value is not None and value != "default":
+                if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 0xFFFFFFFF:
+                    raise HelperError("bad NVIDIA value")
+            clean.append({"id": setting_id, "value": value})
+        return {"changes": clean}
 
     if op == "defender.cs2":
         program = str(args.get("program") or "")

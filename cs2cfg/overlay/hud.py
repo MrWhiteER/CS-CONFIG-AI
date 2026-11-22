@@ -83,7 +83,7 @@ class Hud:
                  fields=FIELDS, hotkey="Ctrl+Alt+O", panel_hotkey="Ctrl+Alt+P",
                  on_panel=None, register_hotkeys=True) -> None:
         self.tool = None
-        self.opacity = 60
+        self.opacity = 10
         self.theme = "violet"
         self.exclude = exclude_from_capture
         self.corner, self.fields, self.hotkey = corner, tuple(fields), hotkey
@@ -178,6 +178,7 @@ class Hud:
             self._ready.set()
 
     def _window_loop(self) -> None:
+        height = 580 if self.tool == "lineups" else HEIGHT
         user = ctypes.WinDLL("user32", use_last_error=True)
         gdi = ctypes.WinDLL("gdi32", use_last_error=True)
         kernel = ctypes.WinDLL("kernel32", use_last_error=True)
@@ -286,7 +287,7 @@ class Hud:
             dc = gdi.CreateCompatibleDC(None)
             info = BITMAPINFO()
             info.header = BITMAPINFOHEADER(size=ctypes.sizeof(BITMAPINFOHEADER), width=WIDTH,
-                                           height=-HEIGHT, planes=1, bits=32)
+                                           height=-height, planes=1, bits=32)
             bits = ptr()
             bitmap = gdi.CreateDIBSection(dc, ctypes.byref(info), 0, ctypes.byref(bits), None, 0)
             if not dc or not bitmap:
@@ -296,8 +297,8 @@ class Hud:
             old_font = gdi.SelectObject(dc, font or gdi.GetStockObject(17))
             gdi.SetBkMode(dc, 1)
             gdi.SetTextColor(dc, 0x00EEEEEE)
-            pixels = (ctypes.c_ubyte * (WIDTH * HEIGHT * 4)).from_address(bits.value)
-            background = bytes(WIDTH * HEIGHT * 4)
+            pixels = (ctypes.c_ubyte * (WIDTH * height * 4)).from_address(bits.value)
+            background = bytes(WIDTH * height * 4)
             last_drawn = None
             last_at = -math.inf
             shown = False
@@ -326,6 +327,7 @@ class Hud:
                     model = render(self.tool, self._sample, self.fields) if self.tool else {
                         'lines': display_lines(self._sample, self.fields, self.hotkey), 'graph': ()}
                     lines, graph = model['lines'], model['graph']
+                    raster = model.get('raster')
                     opacity, colors = self.opacity, palette(self.theme)
                     position = self._position
                     if excluded != self.exclude:
@@ -335,7 +337,7 @@ class Hud:
                 if shown and not self.visible:
                     user.ShowWindow(hwnd, 0)
                     shown = False
-                state = lines, graph, position, opacity, colors
+                state = lines, graph, position, opacity, colors, raster
                 now = time.monotonic()
                 changed = state != last_drawn
                 if self.visible and changed and now - last_at >= 0.5:
@@ -347,7 +349,8 @@ class Hud:
                         gdi.SetTextColor(dc, color)
                         for index, line in enumerate(lines):
                             for dx, dy in offsets:
-                                gdi.TextOutW(dc, 12 + dx, 7 + index * 21 + dy, line, len(line))
+                                text_y = (400 + (index-2)*21 if raster and index >= 2 else 7 + index*21)
+                                gdi.TextOutW(dc, 12 + dx, text_y + dy, line, len(line))
                     if len(graph) > 1:
                         peak = max(10, max(graph))
                         points = [(12 + round(i * 300 / (len(graph)-1)), 111 - round(v * 34 / peak))
@@ -362,8 +365,13 @@ class Hud:
                             gdi.DeleteObject(pen)
                     gdi.GdiFlush()
                     output = composite(bytes(pixels), opacity, colors)
+                    if raster:
+                        for row in range(336):
+                            begin = ((row+55)*WIDTH+12)*4
+                            output[begin:begin+336*4] = raster[row*336*4:(row+1)*336*4]
                     ctypes.memmove(bits, bytes(output), len(output))
-                    destination, size, source = w.POINT(*position), w.SIZE(PIN_WIDTH if self.tool else WIDTH, HEIGHT), w.POINT(0, 0)
+                    shown_height = min(height, max(120,len(lines)*21+14)) if self.tool == 'lineups' and not raster else height
+                    destination, size, source = w.POINT(*position), w.SIZE(PIN_WIDTH if self.tool else WIDTH, shown_height), w.POINT(0, 0)
                     blend = BLEND(0, 0, 255, 1)
                     if not user.UpdateLayeredWindow(hwnd, None, ctypes.byref(destination), ctypes.byref(size),
                                                      dc, ctypes.byref(source), 0, ctypes.byref(blend), 2):
