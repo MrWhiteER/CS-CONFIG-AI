@@ -6844,7 +6844,7 @@ const startup = (() => {
             The small tools your config defines &mdash; toggles, hold-keys and
             cycles &mdash; read straight out of the files. Each one shows the key
             it answers to, what it changes, and whether it actually works.
-            Read-only: nothing here is written back.
+            Switch one off, edit it, or delete it: deleted scripts wait in the Trash for 7 days.
           </p>
         </div>
       </div>
@@ -11752,6 +11752,8 @@ function plugCard(p) {
     (starred ? "\u2605" : "\u2606") + "</button>" +
     '<div class="plug-name">' + esc(p.name) + "</div>" +
     '<div class="plug-controls">' +
+    '<button class="btn small ghost plug-del" data-plug-delete="' + esc(p.id) +
+    '" title="Move to Trash. You can put it back for ' + PLUG_TRASH_DAYS + ' days.">Delete</button>' +
     '<button class="btn small ghost plug-open" data-open-file="' + esc(p.file) +
     '" data-open-line="' + p.line + '" title="' + esc(p.file) + ":" + p.line + '">Open</button>' +
     '<label class="switch" title="' +
@@ -11797,6 +11799,20 @@ function plugCard(p) {
 }
 
 let plugTab = null;
+const PLUG_TRASH_DAYS = 7;
+
+// The Trash: deleted scripts, each with the day it goes for good.
+function plugTrash(list) {
+  const day = t => new Date(t * 1000).toLocaleDateString(undefined, {weekday: "long", day: "numeric", month: "long"});
+  return '<p class="sub" style="margin:0 0 10px">Deleted scripts stay here for ' + PLUG_TRASH_DAYS +
+    " days, then they are removed for good. Put one back and its keys go back on it too.</p>" +
+    '<div class="plug-grid">' + list.map(t =>
+      '<div class="plug off"><div class="plug-top"><div class="plug-name">' + esc(t.name) + "</div>" +
+      '<div class="plug-controls"><button class="btn small" data-plug-restore="' + esc(t.id) + '">Put back</button></div></div>' +
+      '<p class="sub" style="margin:8px 0 0;line-height:1.45">' +
+      (t.keys.length ? "Was on " + esc(t.keys.join(", ")) + ". " : "") +
+      "Removed for good on " + esc(day(t.gone_on)) + ".</p></div>").join("") + "</div>";
+}
 
 // The name on the "Generated scripts by ..." tab: the Steam account in use.
 function plugOwner() {
@@ -11834,6 +11850,8 @@ function renderPlugins() {
   if (!box || !plugData) return;
 
   const groups = plugGroups(plugData.plugins);
+  if (plugData.trash && plugData.trash.length)
+    groups.push({ id: "trash", label: "Trash", items: plugData.trash });
   if (!groups.length) {
     strip.innerHTML = "";
     box.innerHTML = '<span class="sub">No scripts found in this folder.</span>';
@@ -11855,7 +11873,8 @@ function renderPlugins() {
     '<span class="n">' + g.items.length + "</span></button>").join("");
 
   const current = groups.find(g => g.id === plugTab);
-  let html = '<div class="plug-grid">' + current.items.map(plugCard).join("") + "</div>";
+  let html = current.id === "trash" ? plugTrash(current.items)
+    : '<div class="plug-grid">' + current.items.map(plugCard).join("") + "</div>";
 
   if (current.id === "shortcuts" && plugData.empty_sections &&
       plugData.empty_sections.length) {
@@ -17677,6 +17696,32 @@ document.addEventListener("click", e => {
   if (d.sbSave !== undefined) { sbSave(false); return; }
   if (d.sbForce !== undefined) { sbSave(true); return; }
   if (d.sbCancel !== undefined) { sb.confirm = null; sbRender(); return; }
+});
+
+// Delete goes to the Trash straight away: nothing is lost, so no question.
+document.addEventListener("click", async e => {
+  const del = e.target.closest("[data-plug-delete]");
+  const back = e.target.closest("[data-plug-restore]");
+  if (!del && !back) return;
+  const btn = del || back;
+  btn.disabled = true;
+  try {
+    if (del) {
+      const r = await api("/api/scripts/delete", {id: del.dataset.plugDelete});
+      const keys = (r.keys || []).map(k => k.key + " is back to " + (k.does === "nothing" ? "doing nothing" : "\u201c" + k.does + "\u201d"));
+      status("Moved \u201c" + r.name + "\u201d to Trash. " + (keys.length ? keys.join(", ") + ". " : "") +
+             "In a match, press your apply key and it stops right away.");
+    } else {
+      const r = await api("/api/scripts/restore", {id: back.dataset.plugRestore});
+      status("Put \u201c" + r.name + "\u201d back" + (r.keys.length ? " on " + r.keys.join(", ") : "") + "." +
+             (r.left.length ? " " + r.left.join(", ") + " does something else now, so it was left alone." : ""));
+    }
+    keyData = null; if (typeof sb !== "undefined") sb.saved = null;
+    await loadPlugins(true);
+  } catch (err) {
+    btn.disabled = false;
+    status("Could not do that: " + (err && err.message || err), true);
+  }
 });
 
 document.addEventListener("click", async e => {

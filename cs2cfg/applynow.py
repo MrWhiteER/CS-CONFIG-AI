@@ -174,6 +174,19 @@ def _builder_groups(result: cfgscan.ScanResult) -> List[Tuple[str, bool, List[st
                 else:
                     lines.append(f'unbind "{target}"')
             groups.append((alias, plug.enabled, lines))
+    # Deleted scripts wait in the Trash; the game still holds their names
+    # until it restarts, so they are emptied the same way.
+    try:
+        from . import scripttrash
+
+        binned = scripttrash.items()
+    except Exception:
+        binned = []
+    for item in binned:
+        names = [a for a in item.get("aliases", []) if result.effective_alias(a.lower()) is None]
+        if names:
+            tag = item.get("alias") or re.sub(r"\W+", "_", str(item.get("name") or "script")).lower()
+            groups.append((tag, False, [f'alias "{a}" ""' for a in names]))
     return groups
 
 

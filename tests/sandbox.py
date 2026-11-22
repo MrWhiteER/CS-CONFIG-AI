@@ -19,7 +19,7 @@ import tempfile
 from pathlib import Path
 from unittest import mock
 
-from cs2cfg import applynow, backup, layouts
+from cs2cfg import applynow, backup, layouts, scripttrash
 
 
 def redirect_backups(case) -> Path:
@@ -54,4 +54,8 @@ def redirect_layouts(case) -> Path:
                              return_value=root / "apply_now_auto.json")
     auto.start()
     case.addCleanup(auto.stop)
+    # Deleted scripts wait in the app's data too.
+    trash = mock.patch.object(scripttrash, "_file", return_value=root / "script_trash.json")
+    trash.start()
+    case.addCleanup(trash.stop)
     return root

@@ -564,6 +564,78 @@ class SyncCase(Base):
         self.assertEqual(self.bind_of("scancode28"), "drop_it")
 
 
+class TrashCase(Base):
+    """Edy, Nov 22: deleting a script puts it in a Trash for seven days."""
+
+    def setUp(self):
+        super().setUp()
+        self.state = mock.Mock()
+        self.state.cfg_scan = self.scan
+        self.state.cs2_install = None
+        body = spec("Talk alt", "shift", {"id": "say_team", "text": "alt"}, binding="mouse5")
+        body.update(target="scancode30", style="next")
+        reply = webui._scriptgen_save(self.state, {"spec": body, "binding": "mouse5"})
+        self.assertTrue(reply["ok"], reply)
+
+    def text(self):
+        return "".join(p.read_text() for p in sorted((self.cfg_root / "me").rglob("*.vcfg")))
+
+    def bind_of(self, key):
+        bind = webui._live_binds(self.state.cfg_scan).get(key)
+        return (bind.body or "").strip('"') if bind else ""
+
+    def made_id(self):
+        return [c for c in webui._cfg_plugins(self.state, {})["plugins"] if c.get("made")][0]["id"]
+
+    def test_delete_moves_to_trash_and_gives_key_back(self):
+        from cs2cfg import applynow
+
+        before_file = (self.cfg_root / "me/settings.vcfg").read_text()
+        reply = webui._script_delete(self.state, {"id": self.made_id()})
+        self.assertTrue(reply["ok"], reply)
+        self.assertNotIn("talk_alt", self.text())
+        self.assertEqual(self.bind_of("mouse5"), "+voicerecord")
+        trash = webui._script_trash(self.state, {})["items"]
+        self.assertEqual([t["name"] for t in trash], ["Talk alt"])
+        self.assertEqual(trash[0]["keys"], ["Mouse 5"])
+        # Still emptied in a running game by the apply key.
+        self.assertIn('alias "+talk_alt" ""', applynow.render(self.state.cfg_scan))
+
+        reply = webui._script_restore(self.state, {"id": trash[0]["id"]})
+        self.assertTrue(reply["ok"], reply)
+        self.assertEqual(reply["keys"], ["Mouse 5"])
+        self.assertEqual(self.bind_of("mouse5"), "+talk_alt")
+        self.assertIn('alias "+talk_alt" "+voicerecord; talk_alt_next"', self.text())
+        self.assertEqual(webui._script_trash(self.state, {})["items"], [])
+        self.assertNotIn('alias "+talk_alt" ""', applynow.render(self.state.cfg_scan))
+        self.assertEqual(before_file.strip(), (self.cfg_root / "me/settings.vcfg").read_text().strip())
+
+    def test_gone_for_good_after_seven_days(self):
+        import time
+        from cs2cfg import scripttrash
+
+        webui._script_delete(self.state, {"id": self.made_id()})
+        self.assertEqual(len(scripttrash.items()), 1)
+        self.assertEqual(len(scripttrash.items(now=time.time() + 6 * 86400)), 1)
+        self.assertEqual(scripttrash.items(now=time.time() + 7 * 86400 + 1), [])
+        self.assertEqual(scripttrash.items(), [])      # removed from the store too
+
+    def test_restore_leaves_a_key_given_away_since(self):
+        webui._script_delete(self.state, {"id": self.made_id()})
+        webui._cfg_bind(self.state, {"binding": "mouse5", "command": "slot5", "force": True})
+        item = webui._script_trash(self.state, {})["items"][0]
+        reply = webui._script_restore(self.state, {"id": item["id"]})
+        self.assertTrue(reply["ok"], reply)
+        self.assertEqual(reply["left"], ["Mouse 5"])
+        self.assertEqual(self.bind_of("mouse5"), "slot5")
+
+    def test_any_script_can_be_deleted(self):
+        card = [c for c in webui._cfg_plugins(self.state, {})["plugins"] if c["name"] == "Jump throw"][0]
+        reply = webui._script_delete(self.state, {"id": card["id"]})
+        self.assertTrue(reply["ok"], reply)
+        self.assertNotIn('alias "+jt"', self.text())
+
+
 def webui_label(binding):
     from cs2cfg import keys
     return keys.label(binding)

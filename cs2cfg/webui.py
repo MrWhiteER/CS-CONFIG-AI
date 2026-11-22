@@ -2665,6 +2665,7 @@ def _cfg_plugins(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     payload = plugins.as_dict(found)
     _mark_made(result, payload["plugins"])
     payload["suspect"] = sum(1 for c in payload["plugins"] if c.get("suspect"))
+    payload["trash"] = _script_trash(state, {})["items"]
     payload["empty_sections"] = [
         {"file": f, "name": n, "line": ln}
         for f, n, ln in getattr(plugins.find, "empty_sections", [])
@@ -3820,6 +3821,150 @@ def _scriptgen_saved(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
                               if spec.get("key_before") else "",
                     "target": keys.label(spec["target"]) if spec.get("target") else ""})
     return {"ok": True, "scripts": found}
+
+
+def _script_delete(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Move one script to the Trash.
+
+    Its lines leave the config file now, its keys get back what they did
+    before it (or CS2's own default), and the apply key empties it in a
+    running game. Everything needed to put it back is kept for seven days.
+    """
+    from . import cfgscan, defaults, keys, plugins, scriptgen, scripttrash
+
+    result = _rescan(state)
+    if result is None:
+        return {"ok": False, "error": "Pick your config folder first (Settings)."}
+    wanted = str(body.get("id") or "")
+    found = next((p for p in plugins.find(result) if f"{p.file}:{p.line}" == wanted), None)
+    if found is None:
+        return {"ok": False, "error": "That script is no longer where it was. Re-read the list."}
+    config = next((c for c in result.files.values() if c.relative == found.file), None)
+    if config is None or config.generated_by:
+        return {"ok": False, "error": "The app can't change the file this script is in."}
+
+    original = config.path.read_bytes().decode(config.document.encoding, errors="replace")
+    flat = cfglang.restore_newlines(original, chr(10), False)
+    made = _scriptgen_block(flat, found)
+    lines = flat.split(chr(10))
+    first = max(1, found.line - 3)          # the banner above the block
+    last = min(found.end_line, len(lines))
+    while last > first and not lines[last - 1].strip():
+        last -= 1                            # blank lines belong to the next block
+    text = chr(10).join(lines[first - 1:last])
+    rest = lines[:first - 1] + lines[last:]
+    if first - 2 >= 0 and first - 1 < len(rest) and not rest[first - 2].strip() \
+            and not rest[first - 1].strip():
+        del rest[first - 1]                  # don't leave two blank lines behind
+
+    names = {a.lower() for a in found.aliases}
+    held = []
+    for bind in _live_binds(result).values():
+        words = [w.lower() for w in re.split(r"[;\s]+", (bind.body or "").strip().strip(chr(34))) if w]
+        if words and any(w in names for w in words):
+            held.append({"binding": bind.key, "body": (bind.body or "").strip().strip(chr(34))})
+
+    updated = cfglang.restore_newlines(chr(10).join(rest), config.document.newline,
+                                       config.document.trailing_newline)
+    session = backup.BackupSession(note=f"deleted {found.name}")
+    session.add(config.path)
+    cfglang.write_config_text(config.path, updated, config.document.encoding)
+    backup.prune()
+    state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+
+    table = None
+    given = []
+    for entry in held:
+        back = ""
+        if made is not None and cfgscan.physical_key(entry["binding"]) == \
+                cfgscan.physical_key(str(made.get("binding") or "")):
+            back = str(made.get("key_before") or "")
+        if not back:
+            if table is None:
+                try:
+                    table = defaults.load(state.cs2_install) if state.cs2_install else {}
+                except Exception:
+                    table = {}
+            back = (defaults.for_key(table, entry["binding"]) if table else "") \
+                or scriptgen.STOCK_FALLBACK.get(entry["binding"], "")
+        if back:
+            _cfg_bind(state, {"binding": entry["binding"], "command": back, "force": True})
+        else:
+            _cfg_bind(state, {"binding": entry["binding"], "unbind": True})
+        entry["after"] = back
+        given.append({"key": keys.label(entry["binding"]), "does": scriptgen.describe(back, state.cfg_scan)
+                      if back else "nothing"})
+
+    item = scripttrash.add({
+        "name": found.name, "file": found.file, "text": text,
+        "aliases": [found.spelled.get(a, a) for a in found.aliases],
+        "keys": held, "made": bool(made), "alias": (made or {}).get("alias", ""),
+    })
+    return {"ok": True, "name": found.name, "keys": given, "trash": item["id"],
+            "days": scripttrash.KEEP_DAYS, "backup": session.stamp}
+
+
+def _script_restore(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Take a script out of the Trash and put it back, keys and all."""
+    from . import cfgscan, keys, scripttrash
+
+    result = _rescan(state)
+    if result is None:
+        return {"ok": False, "error": "Pick your config folder first (Settings)."}
+    item = scripttrash.take(str(body.get("id") or ""))
+    if item is None:
+        return {"ok": False, "error": "That script is no longer in the Trash."}
+    clash = [a for a in item.get("aliases", []) if result.effective_alias(a.lower()) is not None]
+    if clash:
+        scripttrash.put_back(item)
+        return {"ok": False, "error": f"You already have a script that uses the name "
+                f"“{item['name']}”. Rename or delete that one first."}
+    config = next((c for c in result.files.values() if c.relative == item.get("file")
+                   and not c.generated_by), None)
+    if config is None:
+        target = cfgscan.default_target(result)
+        config = next((c for c in result.files.values() if c.relative == target), None)
+    if config is None:
+        scripttrash.put_back(item)
+        return {"ok": False, "error": "No config file here can hold it. Create a starter "
+                "config on the Settings tab first."}
+
+    original = config.path.read_bytes().decode(config.document.encoding, errors="replace")
+    flat = cfglang.restore_newlines(original, chr(10), False).rstrip(chr(10))
+    flat = flat + chr(10) + chr(10) + item["text"] + chr(10)
+    updated = cfglang.restore_newlines(flat, config.document.newline,
+                                       config.document.trailing_newline)
+    session = backup.BackupSession(note=f"restored {item['name']}")
+    session.add(config.path)
+    cfglang.write_config_text(config.path, updated, config.document.encoding)
+    backup.prune()
+    state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
+
+    # Each key goes back on the script, unless it was given something else
+    # since: that is left alone and said.
+    put, left = [], []
+    live = _live_binds(state.cfg_scan)
+    for entry in item.get("keys", []):
+        now = live.get(cfgscan.physical_key(entry["binding"]))
+        now_body = (now.body or "").strip().strip(chr(34)) if now is not None else ""
+        if now_body and now_body != entry.get("after", ""):
+            left.append(keys.label(entry["binding"]))
+            continue
+        _cfg_bind(state, {"binding": entry["binding"], "command": entry["body"], "force": True})
+        put.append(keys.label(entry["binding"]))
+    return {"ok": True, "name": item["name"], "keys": put, "left": left,
+            "backup": session.stamp}
+
+
+def _script_trash(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Read-only: what is in the Trash, and when each one goes for good."""
+    from . import keys, scripttrash
+
+    return {"ok": True, "days": scripttrash.KEEP_DAYS, "items": [
+        {"id": i["id"], "name": i.get("name", ""), "deleted": i.get("deleted", 0),
+         "gone_on": i.get("gone_on", 0), "made": bool(i.get("made")),
+         "keys": [keys.label(k["binding"]) for k in i.get("keys", [])]}
+        for i in scripttrash.items()]}
 
 
 def _scriptgen_block(text: str, found) -> Optional[Dict[str, Any]]:
@@ -6448,6 +6593,7 @@ def _apply_now_follow_game(state: State, running: bool) -> None:
 # succeeds the in-game apply file is rewritten, so the apply key always
 # brings in the latest state.
 _CONFIG_WRITERS = {
+    _script_delete, _script_restore,
     _apply, _revert, _cfg_save, _cfg_plugin_toggle, _cfg_plugin_bind,
     _cfg_plugin_set_state, _cfg_bind, _cfg_settings_apply,
     _cfg_apply_script_install, _cfg_layouts_pin, _cfg_layouts_apply,
@@ -6496,6 +6642,9 @@ def make_handler(state: State):
         "/api/scriptgen/steps": _scriptgen_steps,
         "/api/scriptgen/check": _scriptgen_check,
         "/api/scriptgen/save": _scriptgen_save,
+        "/api/scripts/delete": _script_delete,
+        "/api/scripts/restore": _script_restore,
+        "/api/scripts/trash": _script_trash,
         "/api/scriptgen/saved": _scriptgen_saved,
         "/api/cfg/settings": _cfg_settings,
         "/api/cfg/settings/apply": _cfg_settings_apply,
