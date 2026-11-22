@@ -217,6 +217,9 @@ def describe(command: str, scan=None) -> str:
         if step["command"].lower() == wanted:
             return step["label"]
     if scan is not None and scan.effective_alias(wanted) is not None:
+        made = _own_block(scan, wanted.lstrip("+-"))
+        if made is not None and made["spec"].get("name"):
+            return f"your script \u201c{made['spec']['name']}\u201d"
         return "one of your scripts"
     return "something else"
 

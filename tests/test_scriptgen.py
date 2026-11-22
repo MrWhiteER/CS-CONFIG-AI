@@ -636,6 +636,57 @@ class TrashCase(Base):
         self.assertNotIn('alias "+jt"', self.text())
 
 
+class SharedShiftKeyCase(Base):
+    """Edy, Nov 22: Mouse 5 + 1/2/3 = smoke/molly/HE, all on one Mouse 5,
+    and Mouse 5 still talks."""
+
+    def setUp(self):
+        super().setUp()
+        self.state = mock.Mock()
+        self.state.cfg_scan = self.scan
+        self.state.cs2_install = None
+        for name, target in (("Smoke", "scancode30"), ("Molly", "scancode27"), ("Nade", "scancode28")):
+            body = spec(name, "shift", {"id": "cmd:slot3"}, binding="mouse5")
+            body.update(target=target, style="hold")
+            reply = webui._scriptgen_save(self.state, {"spec": body, "binding": "mouse5"})
+            self.assertTrue(reply["ok"], reply)
+
+    def aliases(self):
+        scan = self.state.cfg_scan
+        return {n: scan.effective_alias(n).body for n in ("+smoke", "+molly", "+nade")
+                if scan.effective_alias(n) is not None}
+
+    def key(self):
+        return webui._live_binds(self.state.cfg_scan)["mouse5"].body.strip('"')
+
+    def card(self, name):
+        return [c for c in webui._cfg_plugins(self.state, {})["plugins"] if c["name"] == name][0]["id"]
+
+    def test_one_key_runs_all_and_still_talks(self):
+        self.assertEqual(self.key(), "+nade")
+        a = self.aliases()
+        self.assertTrue(a["+nade"].startswith("+molly;"))
+        self.assertTrue(a["+molly"].startswith("+smoke;"))
+        self.assertTrue(a["+smoke"].startswith("+voicerecord;"))
+
+    def test_deleting_the_middle_keeps_the_rest(self):
+        self.assertTrue(webui._script_delete(self.state, {"id": self.card("Molly")})["ok"])
+        self.assertEqual(self.key(), "+nade")
+        self.assertTrue(self.aliases()["+nade"].startswith("+smoke;"))
+
+    def test_switching_the_bottom_off_and_on(self):
+        webui._cfg_plugin_toggle(self.state, {"id": self.card("Smoke"), "enable": False})
+        self.assertEqual(self.key(), "+nade")
+        self.assertTrue(self.aliases()["+molly"].startswith("+voicerecord;"))
+        webui._cfg_plugin_toggle(self.state, {"id": self.card("Smoke"), "enable": True})
+        self.assertEqual(self.key(), "+smoke")
+        self.assertTrue(self.aliases()["+smoke"].startswith("+nade;"))
+
+    def test_deleting_the_top_gives_the_key_to_the_next(self):
+        self.assertTrue(webui._script_delete(self.state, {"id": self.card("Nade")})["ok"])
+        self.assertEqual(self.key(), "+molly")
+
+
 def webui_label(binding):
     from cs2cfg import keys
     return keys.label(binding)

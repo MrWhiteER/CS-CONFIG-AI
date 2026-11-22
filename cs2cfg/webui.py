@@ -2812,7 +2812,15 @@ def _cfg_plugin_toggle(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         cfglang.write_config_text(config.path, updated, config.document.encoding)
         backup.prune()
         state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
-        key = _scriptgen_rekey(state, made, enable)
+        if enable and _scriptgen_on_other(state, made):
+            # The key has another shift script on it now: this one goes on
+            # top of it, so the key runs both.
+            _scriptgen_save(state, {"spec": made, "binding": made.get("binding"), "force": True})
+            key = None
+        else:
+            if not enable:
+                _scriptgen_rechain(state, made)
+            key = _scriptgen_rekey(state, made, enable)
         return {
             "path": found.file, "name": found.name, "enabled": enable,
             "restored": [key] if key and not enable else [], "dropped": 0,
@@ -3897,6 +3905,8 @@ def _script_delete(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         given.append({"key": keys.label(entry["binding"]), "does": scriptgen.describe(back, state.cfg_scan)
                       if back else "nothing"})
 
+    if made is not None:
+        _scriptgen_rechain(state, made)
     item = scripttrash.add({
         "name": found.name, "file": found.file, "text": text,
         "aliases": [found.spelled.get(a, a) for a in found.aliases],
@@ -3954,6 +3964,15 @@ def _script_restore(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
             continue
         _cfg_bind(state, {"binding": entry["binding"], "command": entry["body"], "force": True})
         put.append(keys.label(entry["binding"]))
+    if item.get("made") and not put:
+        from . import scriptgen
+
+        for block in scriptgen.own_blocks(item["text"]):
+            spec = dict(block["spec"])
+            if spec.get("binding") and _scriptgen_on_other(state, spec):
+                _scriptgen_save(state, {"spec": spec, "binding": spec["binding"], "force": True})
+                put.append(keys.label(spec["binding"]))
+                left = [k for k in left if k != keys.label(spec["binding"])]
     return {"ok": True, "name": item["name"], "keys": put, "left": left,
             "backup": session.stamp}
 
@@ -3983,6 +4002,47 @@ def _scriptgen_block(text: str, found) -> Optional[Dict[str, Any]]:
             spec["entry"] = "+" + alias if "+" + alias in names else alias
             return spec
     return None
+
+
+def _scriptgen_on_other(state: State, spec: Dict[str, Any]) -> bool:
+    """Whether the script's key now runs another Script Builder shift script."""
+    from . import cfgscan, scriptgen
+
+    result = getattr(state, "cfg_scan", None)
+    binding = str(spec.get("binding") or "")
+    if result is None or not binding or spec.get("mode") != "shift":
+        return False
+    held = _live_binds(result).get(cfgscan.physical_key(binding))
+    body = (held.body or "").strip().strip(chr(34)) if held is not None else ""
+    head = body.lstrip("+-").split(";")[0].strip().lower()
+    return bool(head) and head != spec.get("alias") and scriptgen._own_block(result, head) is not None
+
+
+def _scriptgen_rechain(state: State, gone: Dict[str, Any]) -> None:
+    """Several shift scripts can share one key: each later one runs the one
+    before it. When one in the middle goes (off or deleted), the one built on
+    it is saved again on top of what it ran, so the key keeps every other
+    script and its own job (voice chat)."""
+    from . import scriptgen
+
+    result = getattr(state, "cfg_scan", None)
+    alias = str(gone.get("alias") or "")
+    if result is None or not alias:
+        return
+    for config in list(result.files.values()):
+        try:
+            text = config.path.read_bytes().decode(config.document.encoding, errors="replace")
+        except OSError:
+            continue
+        if scriptgen.MARK not in text:
+            continue
+        for block in scriptgen.own_blocks(text):
+            spec = dict(block["spec"])
+            if (spec.get("alias") != alias and spec.get("binding") == gone.get("binding")
+                    and scriptgen._runs_own(str(spec.get("key_before") or ""), alias)):
+                _scriptgen_save(state, {"spec": spec, "binding": spec["binding"], "force": True,
+                                        "key_now": str(gone.get("key_before") or ""),
+                                        "no_bind": True})
 
 
 def _scriptgen_rekey(state: State, spec: Dict[str, Any], enable: bool) -> Optional[Dict[str, Any]]:
@@ -4036,6 +4096,8 @@ def _scriptgen_save(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     if binding:
         spec["key_stock"] = _scriptgen_stock(state, binding)
     _scriptgen_now(result, spec, binding)
+    if "key_now" in body:          # re-chaining: what the key did under this script
+        spec["key_now"] = str(body["key_now"])
     key = _scriptgen_key(result, binding, "", state)
     built = scriptgen.build(spec, result, key["label"])
     if not built.ok:
@@ -4075,6 +4137,9 @@ def _scriptgen_save(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         _scriptgen_rekey(state, {"binding": moved, "alias": built.alias,
                                  "key_before": built.replaces.get("key_before", "")}, False)
 
+    if body.get("no_bind"):
+        return {"ok": True, "file": target, "alias": built.entry, "key": key,
+                "replaced": bool(built.replaces), "error": "", "backup": session.stamp}
     bound = _cfg_bind(state, {"binding": binding, "command": built.entry, "force": True})
     return {"ok": bool(bound.get("ok")), "file": target, "alias": built.entry,
             "key": key, "replaced": bool(built.replaces),
