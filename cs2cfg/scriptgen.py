@@ -616,6 +616,7 @@ def build(spec: Dict[str, Any], scan=None, key_label: str = "") -> Built:
     target = str(spec.get("target") or "").strip() if mode == "shift" else ""
     style = spec.get("style") if spec.get("style") in SHIFT_STYLES else "next"
     restore = ""
+    let_go = ""
     normal_lines: List[str] = []
     target_label = keys.label(target) if target else ""
     normal_said = ""
@@ -634,6 +635,12 @@ def build(spec: Dict[str, Any], scan=None, key_label: str = "") -> Built:
                 restore = f"unbind {target}"
             elif re.fullmatch(r"[^\s\";]+", normal):
                 restore = f"bind {target} {normal}"
+                if normal.startswith("+") and len(normal) > 1:
+                    # CS2 runs the let-go half of whatever the key is bound to
+                    # when it is let go. Rebinding a key that is held down
+                    # (scoping with Mouse 2) would leave the press running for
+                    # good, so it is let go first.
+                    let_go = "-" + normal[1:]
             elif '"' not in normal and not re.search(r"(^|;)\s*[+-]", normal):
                 # Several commands: kept in an alias of its own, because a
                 # bind inside an alias cannot hold a second pair of quotes.
@@ -645,6 +652,10 @@ def build(spec: Dict[str, Any], scan=None, key_label: str = "") -> Built:
                     f"{target_label} runs several things at once, including a held action, so the "
                     "app can't give it back safely. Put a single action on that key first."))
                 block = True
+            if let_go:
+                checks.append(Check(
+                    "ok", f"If you are holding {target_label} when it changes, it is let go "
+                    "first, so it can't get stuck."))
             if restore:
                 checks.append(Check(
                     "ok", f"{target_label} always goes back to \u201c{normal_said}\u201d. "
@@ -679,10 +690,12 @@ def build(spec: Dict[str, Any], scan=None, key_label: str = "") -> Built:
     name_checks = [c for c in checks[:step_end] if c.text == "Give your script a name."]
     lines: List[str] = []
     entry = alias
+    away = (f"{let_go}; " if let_go else "") + f"bind {target} {alias}_do"
     if alias and press and mode == "shift":
         if restore and style == "hold":
             entry = "+" + alias
-            on = ([own_press] if own_press else []) + [f"bind {target} {alias}_do"]
+            on = (([own_press] if own_press else []) + ([let_go] if let_go else [])
+                  + [f"bind {target} {alias}_do"])
             off = ([own_release] if own_release else []) + [restore]
             lines = normal_lines + own_lines + [
                 f'alias "{alias}_do" "{"; ".join(press)}"',
@@ -695,7 +708,7 @@ def build(spec: Dict[str, Any], scan=None, key_label: str = "") -> Built:
             nxt = alias + "_next"
             lines = normal_lines + own_lines + [
                 f'alias "{alias}_do" "{"; ".join(press + [restore, f"alias {nxt} {alias}_arm"])}"',
-                f'alias "{alias}_arm" "bind {target} {alias}_do; alias {nxt} {alias}_off"',
+                f'alias "{alias}_arm" "{away}; alias {nxt} {alias}_off"',
                 f'alias "{alias}_off" "{restore}; alias {nxt} {alias}_arm"',
                 f'alias "{nxt}" "{alias}_arm"',
                 f'alias "+{alias}" "{own_press}; {nxt}"',
@@ -703,7 +716,7 @@ def build(spec: Dict[str, Any], scan=None, key_label: str = "") -> Built:
         elif restore:
             lines = normal_lines + [
                 f'alias "{alias}_do" "{"; ".join(press + [restore, f"alias {alias} {alias}_arm"])}"',
-                f'alias "{alias}_arm" "bind {target} {alias}_do; alias {alias} {alias}_off"',
+                f'alias "{alias}_arm" "{away}; alias {alias} {alias}_off"',
                 f'alias "{alias}_off" "{restore}; alias {alias} {alias}_arm"',
                 f'alias "{alias}" "{alias}_arm"']
         if any(len(line) > MAX_LINE for line in lines):
