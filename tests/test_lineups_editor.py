@@ -42,3 +42,31 @@ class Editor(unittest.TestCase):
             editing(state, {'active': False})
             self.assertFalse(state.overlay.lineups_editing)
         self.assertEqual(state.overlay._configure_gsi.call_count, 2)
+    def test_position_messages(self):
+        from cs2cfg.overlay.tools.lineups import position_notice
+        state = self.state()
+        state.overlay._gsi_written_at = 200
+        with patch('cs2cfg.lineups.window_capture.process_started', return_value=100):
+            self.assertEqual(position_notice(state), 'Restart CS2 once so the game can share your position.')
+        with patch('cs2cfg.lineups.window_capture.process_started', return_value=300):
+            self.assertEqual(position_notice(state), 'The game has not shared your position yet. Move a step and press again.')
+
+    def test_position_component_before_launch_and_off(self):
+        import tempfile
+        from pathlib import Path
+        from cs2cfg.overlay.service import OverlayService
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root/'game/csgo/cfg').mkdir(parents=True)
+            with patch('cs2cfg.overlay.settings.read', return_value={'overlay_tools':['lineups'],'overlay_enabled':True}), patch('cs2cfg.paths.user_data_dir', return_value=root/'user'):
+                service = OverlayService()
+                service.bind_gsi(root, 1234)
+                service._configure_gsi(True)
+                path = root/'game/csgo/cfg/gamestate_integration_cs2cfg.cfg'
+                self.assertIn('"player_position" "1"', path.read_text())
+                before = path.stat().st_mtime_ns
+                service._configure_gsi(True)
+                self.assertEqual(before, path.stat().st_mtime_ns)
+                service._settings['overlay_tools'] = []
+                service._configure_gsi(True)
+                self.assertNotIn('player_position', path.read_text())

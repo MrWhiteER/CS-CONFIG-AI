@@ -20,6 +20,8 @@ def render(tool, data, fields=None):
     from .settings import FIELDS
     fields = set(FIELDS if fields is None else fields)
     graph = ()
+    if tool == 'picture':
+        return {'lines': tuple(['Lineup pictures'] + textwrap.wrap(data.get('status', ''), 42)), 'graph': ()}
     lines = [TITLES[tool]]
     if tool == 'performance':
         current = data.get('current') or {}
@@ -98,7 +100,7 @@ def palette(theme='violet'):
     return rgb('panel', '#161616'), rgb('ink', '#eeeeee'), rgb('accent', '#b9a2ff')
 
 
-def composite(mask, opacity=60, colors=None):
+def composite(mask, opacity=10, colors=None):
     """GDI white foreground / dark outline mask -> premultiplied BGRA.
 
     GDI destroys alpha. Rebuild it from the mask, keeping every glyph/line

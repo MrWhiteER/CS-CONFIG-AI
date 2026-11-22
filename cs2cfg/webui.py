@@ -5123,63 +5123,21 @@ def _cloud_logout(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _lineups_pictures(state, body):
-    from .lineups import load
-    from .lineups.pictures import PictureSession, game_build, read_binding
-    from .lineups.window_capture import capture_cs2
-    from .paths import user_data_dir
-    from .launcher import launch_via_steam, LaunchError
-    with state.overlay._lock:
-        current = state.overlay.picture_session
-        if body.get('action') == 'stop':
-            if current and current.active:
-                current.abort()
-                state.overlay._configure_gsi(state.overlay._settings['overlay_enabled'])
-            return {'available': True, 'active': False,
-                    'text': current.text if current else 'Pictures stopped.'}
-        if body.get('action') == 'status':
-            return {'available': True, 'active': bool(current and current.active),
-                    'text': current.text if current else ''}
-        settings = state.overlay._settings
-        if not settings['overlay_enabled'] or 'lineups' not in settings['overlay_tools']:
-            return {'available': False, 'text': 'Turn on the overlay and Lineups first.'}
-        if current and current.active:
-            return {'available': True, 'active': True, 'text': current.text}
-        if steam.cs2_running():
-            return {'available': False, 'text': 'Close CS2, then press Make lineup pictures again.'}
-        try:
-            install = state.cs2_install
-            if not install:
-                return {'available': False, 'text': 'Install CS2 in Steam first.'}
-            key = body.get('key', settings.get('overlay_lineups_picture_key', 'F8'))
-            if (key == settings.get('overlay_lineups_create_key', 'F9')
-                    or key in {settings.get(k, '').split('+')[-1].strip().upper()
-                               for k in ('overlay_hotkey', 'overlay_panel_hotkey')}):
-                return {'available': False, 'text': 'Choose different picture keys and overlay shortcuts in Settings.'}
-            paths = []
-            from . import whoami
-            steam_root = getattr(state, 'steam_root', None)
-            account = whoami.current(steam_root, [u.account_id for u in state.users])[0] if steam_root else None
-            for user in state.users:
-                if str(user.account_id) == str(account):
-                    paths.extend(sorted((user.path/'730/local/cfg').glob('cs2_user_keys*.vcfg')))
-            session = PictureSession(load('mirage'), game_build(install), user_data_dir(),
-                                     steam.cfg_dir(install), capture_cs2, key)
-            state.overlay.picture_session = session
-            # Install capture-only GSI components before launching the game.
-            session.active = True
-            state.overlay._configure_gsi(True)
-            if not state.overlay._gsi_token or state.overlay._gsi_notice:
-                session.active = False
-                return {'available': False, 'text': 'Game state setup is unavailable. Close CS2 and try again.'}
-            session.start(lambda args: launch_via_steam(args, require_args=True),
-                          previous=read_binding(paths, key))
-            return {'available': True, 'active': session.active, 'text': session.text}
-        except (OSError, ValueError, KeyError, steam.SteamError, LaunchError):
-            if state.overlay.picture_session:
-                if state.overlay.picture_session.active:
-                    state.overlay.picture_session.abort()
-                state.overlay._configure_gsi(True)
-            return {'available': False, 'text': 'Picture setup could not start. Close CS2 and try again.'}
+    from .overlay.tools.lineups import creating
+    if body.get('action') == 'stop':
+        legacy = state.overlay.picture_session
+        if legacy and legacy.active:
+            legacy.abort()
+            state.overlay._configure_gsi(state.overlay._settings['overlay_enabled'])
+        if hasattr(state.overlay, 'cancel_creating'):
+            return creating(state, {'action': 'cancel'})
+        return {'available': True, 'active': False, 'text': legacy.text if legacy else 'Pictures stopped.'}
+    if body.get('action') == 'status':
+        return creating(state, {'action': 'status'})
+    if not state.overlay._settings['overlay_enabled'] or 'lineups' not in state.overlay._settings['overlay_tools']:
+        return {'available': False, 'active': False, 'text': 'Turn on the overlay and Lineups first.'}
+    return {'available': True, 'active': False,
+            'text': 'Open Lineups, choose a lineup, then press Make lineup pictures.'}
 
 
 def _lineups_art(state, key):

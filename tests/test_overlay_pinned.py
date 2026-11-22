@@ -12,7 +12,7 @@ from cs2cfg.overlay.regionlock import RegionLock
 
 class SeeThroughPreferences(unittest.TestCase):
     def test_default_opacity_clamp_and_invalid_values(self):
-        self.assertEqual(Hud().opacity, 60)
+        self.assertEqual(Hud().opacity, 10)
         for value, expected in [(-20, 0), (0, 0), (60, 60), (100, 100), (170, 100)]:
             self.assertEqual(layout.validate({'hardware': {'opacity': value}})['hardware']['opacity'], expected)
         for value in [True, '60', None, float('nan'), float('inf')]:

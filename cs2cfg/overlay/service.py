@@ -68,6 +68,8 @@ class OverlayService:
         self.pinned_context = lambda: {}
         self.lineups_art = lambda key: None
         self.picture_session = None
+        self.creating_session = None
+        self._picture_widget = None
         self._hardware_widget_failed = False
         self._modes = {}
         self._status = "disabled"
@@ -95,9 +97,9 @@ class OverlayService:
                 from ..paths import user_data_dir
                 self._gsi_token = install_token(user_data_dir())
                 self._gsi_install = install
-                write_cfg(install, port, self._gsi_token,
-                          pictures=bool((self.picture_session and self.picture_session.active) or
-                                        (getattr(self, 'lineups_editing', False) and 'lineups' in self._settings['overlay_tools'])))
+                path = write_cfg(install, port, self._gsi_token,
+                          pictures='lineups' in self._settings['overlay_tools'])
+                self._gsi_written_at = path.stat().st_mtime
             elif not enabled and install:
                 remove_cfg(install)
             elif enabled:
@@ -114,8 +116,7 @@ class OverlayService:
                 raise PermissionError("Overlay is disabled")
             state = parse_payload(raw, self._gsi_token,
                                   include_team='lineups' in self._settings['overlay_tools'],
-                                  pictures=bool((self.picture_session and self.picture_session.active) or
-                                      (getattr(self, 'lineups_editing', False) and 'lineups' in self._settings['overlay_tools'])))
+                                  pictures='lineups' in self._settings['overlay_tools'])
             self._game_state.update(state)
             if self.picture_session and self.picture_session.active:
                 self.picture_session.feed(state)
@@ -143,6 +144,8 @@ class OverlayService:
 
     def configure(self, ui: dict) -> None:
         wanted = settings.read(ui, strict=True)
+        if not wanted["overlay_enabled"] or "lineups" not in wanted["overlay_tools"]:
+            self.cancel_creating()
         if (getattr(self, 'lineups_editing', False)
                 and (not wanted['overlay_enabled'] or 'lineups' not in wanted['overlay_tools'])):
             self.lineups_editing = False
@@ -152,7 +155,9 @@ class OverlayService:
             self.picture_session.abort()
             self._configure_gsi(wanted['overlay_enabled'])
         with self._control:
-            if (wanted["overlay_enabled"] != self._settings["overlay_enabled"]
+            changed = wanted["overlay_enabled"] != self._settings["overlay_enabled"] or wanted["overlay_tools"] != self._settings["overlay_tools"]
+            self._settings = wanted
+            if (changed
                     or not self._thread):
                 self._configure_gsi(wanted["overlay_enabled"])
             if wanted["overlay_enabled"] and self._thread and self._thread.is_alive():
@@ -177,7 +182,27 @@ class OverlayService:
             self._thread = threading.Thread(target=self._run, name="overlay-service", daemon=True)
             self._thread.start()
 
+    def picture_changed(self):
+        session = self.creating_session
+        if self._picture_widget:
+            from .panel import monitor_bounds
+            bounds = monitor_bounds(self.game_hwnd())
+            position = (bounds[0]+20, bounds[1]+20) if bounds else (20,20)
+            self._picture_widget.update({'status': session.text}, position)
+            self._picture_widget.set_allowed(session.active)
+        if not session.active and len(session.frames) == 2 and self.panel and not self.panel.visible:
+            self.panel.toggle()
+
+    def cancel_creating(self):
+        if self.creating_session:
+            self.creating_session.cancel()
+            self.creating_session = None
+        if self._picture_widget:
+            self._picture_widget.stop()
+            self._picture_widget = None
+
     def stop(self) -> None:
+        self.cancel_creating()
         if self.picture_session and self.picture_session.active:
             self.picture_session.abort()
         with self._control:
@@ -380,6 +405,7 @@ class OverlayService:
             self._error = f"HUD: {exc}"
 
     def _end_game(self) -> None:
+        self.cancel_creating()
         from .. import telemetry
 
         if self.panel:
@@ -473,7 +499,7 @@ class OverlayService:
                              hotkey=self._settings['overlay_hotkey'],
                              panel_hotkey=self._settings['overlay_panel_hotkey'],
                              exclude_from_capture=self._settings['overlay_hide_from_capture'],
-                             auto_visible=True, tool=tool, opacity=row.get('opacity', 60),
+                             auto_visible=True, tool=tool, opacity=row.get('opacity', 10),
                              theme=context.get('theme', 'violet'))
             widget.set_allowed(native_visible and pinned)
             if not (native_visible and pinned):
@@ -531,7 +557,7 @@ class OverlayService:
         row = self._settings['overlay_layout'].get('lineups', {})
         widget.configure(fields=(), hotkey=self._settings['overlay_hotkey'],
                          exclude_from_capture=self._settings['overlay_hide_from_capture'],
-                         tool='lineups', opacity=row.get('opacity',60),
+                         tool='lineups', opacity=row.get('opacity', 10),
                          theme=context.get('theme','violet'), auto_visible=True)
         try:
             art = self.lineups_art(round_state['map'])

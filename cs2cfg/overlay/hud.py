@@ -83,7 +83,7 @@ class Hud:
                  fields=FIELDS, hotkey="Ctrl+Alt+O", panel_hotkey="Ctrl+Alt+P",
                  on_panel=None, register_hotkeys=True) -> None:
         self.tool = None
-        self.opacity = 60
+        self.opacity = 10
         self.theme = "violet"
         self.exclude = exclude_from_capture
         self.corner, self.fields, self.hotkey = corner, tuple(fields), hotkey

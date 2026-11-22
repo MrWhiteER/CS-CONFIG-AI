@@ -37,13 +37,15 @@ def write_cfg(install: Path, port: int, token: str, *, pictures=False) -> Path:
         raise OSError("CS2 cfg directory unavailable")
     components = COMPONENTS + (('player_position', 'allplayers_id') if pictures else ())
     data = '\n'.join(f'        "{key}" "1"' for key in components)
-    path.write_text(
+    content = (
         '"CS2 Auto Config"\n{\n'
         f'    "uri" "http://127.0.0.1:{port}/api/overlay/gsi"\n'
         '    "timeout" "2.0"\n    "buffer" "0.1"\n    "throttle" "0.5"\n'
         '    "heartbeat" "5.0"\n'
-        f'    "auth" {{ "token" "{token}" }}\n    "data"\n    {{\n{data}\n    }}\n}}\n',
-        encoding="utf-8")
+        f'    "auth" {{ "token" "{token}" }}\n    "data"\n    {{\n{data}\n    }}\n}}\n'
+    )
+    if not path.is_file() or path.read_text(encoding="utf-8") != content:
+        path.write_text(content, encoding="utf-8")
     return path
 
 

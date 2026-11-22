@@ -1,22 +1,23 @@
 /* Offline preview and browser checks. All output stays inside this worktree. */
 const fs=require('fs'),path=require('path');
-const {render}=require('./overlay_preview.cjs');
+const {render,scenery}=require('./overlay_preview.cjs');
 const root=path.resolve(__dirname,'..'),doc=JSON.parse(fs.readFileSync(path.join(root,'cs2cfg/lineups/data/mirage.json'),'utf8'));
 
 // Original schematic fixtures: no Valve artwork or purported real screenshots.
 const svgData=svg=>'data:image/svg+xml;base64,'+Buffer.from(svg).toString('base64');
 const radarFixture=svgData('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><rect width="1024" height="1024" fill="#1e2630"/><g fill="#374654" stroke="#6c8190" stroke-width="9"><path d="M70 80h350v220H70zM520 80h420v260H520zM80 430h290v510H80zM500 480h440v460H500z"/></g><path d="M450 0v1024M0 380h1024" stroke="#a3b19e" stroke-width="25"/><text x="35" y="990" fill="white" font-size="38">Preview diagram</text></svg>');
-const pictureFixture=kind=>svgData('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#253340"/><path d="M0 290L320 170L640 290M320 170V40" fill="none" stroke="#68808f" stroke-width="3"/><circle cx="320" cy="180" r="18" fill="none" stroke="#ffff00" stroke-width="4"/><text x="20" y="40" fill="white" font-size="24">Preview '+kind+' picture</text></svg>');
+const pictureFixture=kind=>require('url').pathToFileURL(path.join(root,'docs/lineups/preview/placeholder-scenery.png')).href;
 const pictureFixtures=Object.fromEntries(doc.lineups.map(r=>[r.id,{stand:pictureFixture('stand'),aim:pictureFixture('aim')}]));
-const setup=`window.overlayPanelActive(false);
+const setup=scenery+`window.overlayPanelActive(false);
  const fixture=window.overlayPreview;
  fixture.manifest.tools.push({id:'lineups',title:'Lineups',icon:'globe',refresh_hz:0,default_size:[980,610],pinnable:true});
  fixture.manifest.settings.overlay_tools.push('lineups');
  fixture.manifest.settings.overlay_layout=Object.fromEntries(fixture.manifest.tools.map(t=>[t.id,{open:false}]));
- fixture.manifest.settings.overlay_layout.lineups={x:90,y:8,width:1000,height:620,open:true,opacity:95};
+ fixture.manifest.settings.overlay_layout.lineups={x:90,y:8,width:1000,height:620,open:true,opacity:10};
  fixture.data.lineups={maps:[{id:'mirage',name:'Mirage'},{id:'inferno',name:'Inferno'}],document:${JSON.stringify(doc)},art:{overview:${JSON.stringify(doc.overview)},image:${JSON.stringify(radarFixture)}},pictures:${JSON.stringify(pictureFixtures)},round:{show:true,name:'Mirage',side:'T',buying:true}};
  window.overlayPanelActive(true);`;
 const checks=`(async()=>{try{
+ const flush=async()=>{for(let n=0;n<20;n++)await Promise.resolve();};
  const body=document.querySelector('[data-tool="lineups"] .tool-body'),ui=window.lineupsUI;
  if(body.querySelectorAll('[data-lineup]').length!==fixture.data.lineups.document.lineups.length)throw Error('Seed list missing');
  const assertFits=()=>{
@@ -80,7 +81,7 @@ const checks=`(async()=>{try{
  const personalData={...fixture.data.lineups,map_request:true,round:{show:false}};
  const personalCall=async(action,args)=>{
   if(action==='editing'){editing=args.active;return personalData;}
-  if(action==='creating')return {text:'Pictures are unavailable. Save with radar markers.'};
+  if(action==='creating')return {active:args.action!=='cancel',text:'Go to where you stand and press F9'};
   if(action==='change'){
    if(args.action==='delete')return {...personalData,undo_available:true};
    if(args.action==='save')saved=args;
@@ -97,16 +98,16 @@ const checks=`(async()=>{try{
  editor.querySelector('[data-land]').click();if(!editor.querySelector('[data-marker="land"]'))throw Error('Landing ring missing');
  editor.querySelector('[data-clear-land]').click();
  form.dispatchEvent(new Event('submit',{cancelable:true}));
- await Promise.resolve();await Promise.resolve();await Promise.resolve();
+ await flush();
  if(saved?.action!=='save'||saved.row.stand.radar_x!==516||saved.row.land!==null||saved.row.aim!==null||saved.row.steps.length!==2)throw Error('Radar-only save failed');
  if(editing)throw Error('Editing subscription leaked after save');
  if(!personal.textContent.includes('Made by you'))throw Error('Saved personal lineup missing');
- personal.querySelector('[data-edit]').click();await Promise.resolve();await Promise.resolve();
+ personal.querySelector('[data-edit]').click();await flush();
  if(!personal.querySelector('.lineup-editor')?.textContent.includes('Edit lineup'))throw Error('Edit form missing');
- personal.querySelector('[data-cancel]').click();await Promise.resolve();await Promise.resolve();
- personal.querySelector('[data-delete]').click();await Promise.resolve();await Promise.resolve();
+ personal.querySelector('[data-cancel]').click();await flush();
+ personal.querySelector('[data-delete]').click();await flush();
  if(!personal.querySelector('[data-undo]'))throw Error('Delete must offer visible Undo');
- personal.querySelector('[data-undo]').click();await Promise.resolve();await Promise.resolve();
+ personal.querySelector('[data-undo]').click();await flush();
  if(!personal.textContent.includes('Made by you'))throw Error('Undo did not restore lineup');
  await window.lineupsUI.form(personal,personalData,personalCall);
  const live={...personalData,map_request:false,position:{map:'mirage',stand:{x:100,y:200,z:30},aim:{pitch:10,yaw:20}}};
@@ -116,23 +117,34 @@ const checks=`(async()=>{try{
  const moved=personal.querySelector('[data-marker="stand"]').getAttribute('transform');
  window.overlayRenderers.lineups(personal,{...live,position:{...live.position,stand:{x:300,y:400,z:30}}},personalCall);
  if(personal.querySelector('[data-marker="stand"]').getAttribute('transform')!==moved)throw Error('GSI overwrote a manually placed marker');
- personal.querySelector('[data-create]').click();await Promise.resolve();await Promise.resolve();
- if(!personal.querySelector('[data-create-note]').textContent.includes('unavailable'))throw Error('Picture fallback missing');
- personal.querySelector('[data-cancel]').click();await Promise.resolve();await Promise.resolve();personal.remove();
+ personal.querySelector('[data-create]').click();await flush();
+ if(!personal.querySelector('[data-create-note]').textContent.includes('press F9'))throw Error('Picture wait missing');
+ personal.updateLineupCapture({review:true,frames:fixture.data.lineups.pictures[fixture.data.lineups.document.lineups[0].id]});
+ const review=personal.querySelector('.lineup-review');if(!review||review.querySelectorAll('canvas').length!==2)throw Error('Picture review missing');
+ const canvas=review.querySelector('canvas');let held=false;canvas.setPointerCapture=()=>{held=true;};canvas.hasPointerCapture=()=>held;canvas.releasePointerCapture=()=>{held=false;};
+ const cropBounds=canvas.getBoundingClientRect(),event=(x,y)=>({pointerId:1,clientX:cropBounds.left+x*cropBounds.width,clientY:cropBounds.top+y*cropBounds.height});
+ review.querySelector('[data-crop="stand"]').click();canvas.onpointerdown(event(.1,.2));canvas.onpointermove(event(.9,.8));canvas.onpointerup(event(.9,.8));
+ canvas.onpointerdown(event(.3,.4));canvas.onpointerup(event(.3,.4));
+ review.querySelector('[data-done-review]').click();
+ const finalForm=personal.querySelector('form');finalForm.elements.name.value='Picture lineup';finalForm.elements.area.value='Mid';finalForm.elements.steps.value='Stand by the wall.';finalForm.dispatchEvent(new Event('submit',{cancelable:true}));await flush();
+ if(Math.abs(saved.picture_edits.stand.crop[0]-.1)>.001||Math.abs(saved.picture_edits.stand.crop[2]-.8)>.001||Math.abs(saved.picture_edits.stand.marker[0]-.3)>.001)throw Error('Crop or marker coordinates incorrect');
+ if(personal.querySelector('.lineup-editor'))throw Error('Picture save did not close review');personal.remove();
  document.body.dataset.lineupsCheck='OK';
  }catch(error){document.body.dataset.lineupsCheck='ERROR: '+error.message;}})();`;
 if(process.argv.includes('--check')){
+ new Function(setup+checks);
  for(const theme of ['carbon','daylight']){
   const result=render({name:'lineups-check-'+theme,query:'preview=1&theme='+theme,extra:setup+checks,width:1280,height:1100,dump:true});
   if(!result.includes('data-lineups-check="OK"'))throw Error(theme+': '+(result.match(/data-lineups-check="[^"]*/)?.[0]||'Checks did not complete'));
  }
- console.log('Lineups Chromium: catalogue, filters, 18 details, picture view, new/edit/save, radar-only points, landing ring, delete/Undo, GSI placement and picture fallback OK (Carbon and Daylight)');
+ console.log('Lineups Chromium: catalogue, filters, 18 details, picture view, new/edit/save, radar-only points, landing ring, delete/Undo, GSI placement and picture wait OK (Carbon and Daylight)');
 }else{
  const output=path.join(root,'docs/lineups/preview');fs.mkdirSync(output,{recursive:true});
  for(const theme of ['carbon','daylight']){
   render({name:'lineups-'+theme,query:'preview=1&theme='+theme,width:1280,height:1100,extra:setup,screenshot:path.join(output,theme+'.png')});
   console.log(path.join(output,theme+'.png'));
  }
+ render({name:'lineups-pictures',query:'preview=1&theme=carbon',width:1280,height:1100,extra:setup,screenshot:path.join(output,'pictures-card.png')});
  const newForm=setup+`(async()=>{const body=document.querySelector('[data-tool="lineups"] .tool-body');await window.lineupsUI.form(body,fixture.data.lineups,async()=>fixture.data.lineups);const f=body.querySelector('form');f.elements.name.value='My window smoke';f.elements.area.value='Mid';f.elements.steps.value='Stand beside the wall.\\nAim at the roof corner.\\nJump and throw.';})();`;
  render({name:'lineups-new',query:'preview=1&theme=carbon',width:1280,height:1100,extra:newForm,screenshot:path.join(output,'new-lineup.png')});
 }

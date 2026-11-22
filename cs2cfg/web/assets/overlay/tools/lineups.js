@@ -22,6 +22,7 @@
  window.overlayRenderers.lineups=(root,d,call)=>{
   root.lineupLatest=d;
   root.updateLineupPosition?.();
+  root.updateLineupCapture?.(d.creating);
   const updateRound=()=>{
    const status=root.querySelector('.lineup-picture-status');if(status)status.textContent=d.picture_status||'';
    const stop=root.querySelector('[data-stop-pictures]');if(stop)stop.hidden=!d.picture_active;
@@ -45,11 +46,14 @@
   const pictures=(images)=>{
    const slot=root.querySelector('.lineup-pictures');if(!slot)return;
    root.pictureImages=images;
-   const pair=images[state.selected]||{};
-   slot.innerHTML=['stand','aim'].filter(k=>pair[k]).map(k=>'<button class="lineup-thumbnail" data-picture="'+k+'"><img alt="'+(k==='stand'?'Where to stand':'Where to aim')+'" src="'+e(pair[k])+'"><span>'+(k==='stand'?'Stand picture':'Aim picture')+'</span></button>').join('');
+   const pair=images[state.selected]||{},selected=rows.find(r=>r.id===state.selected);
+   const marker=k=>{const m=selected?.pictures?.[k]?.marker||selected?.picture_markers?.[k]||[.5,.5];return '<span class="lineup-image-marker '+(k==='stand'?'feet':'aim')+'" style="left:'+m[0]*100+'%;top:'+m[1]*100+'%" aria-hidden="true">'+(k==='stand'?'?':'')+'</span>';};
+   slot.classList.toggle('has-pictures',!!(pair.stand||pair.aim));
+   slot.innerHTML=!(pair.stand||pair.aim)?'<div class="lineup-no-pictures"><strong>No pictures yet</strong><button data-take-pictures>'+(selected?.mine?'Take pictures':'Make lineup pictures')+'</button></div>':['stand','aim'].map(k=>'<button class="lineup-thumbnail" data-picture="'+k+'"><span class="lineup-photo"><img alt="'+(k==='stand'?'Where to stand':'Where to aim')+'" src="'+e(pair[k]||'')+'">'+marker(k)+'</span><span>'+(k==='stand'?'Where you stand':'Where you aim')+'</span></button>').join('');
+   const take=slot.querySelector('[data-take-pictures]');if(take)take.onclick=async()=>{await root.openLineupForm(selected);root.querySelector('[data-create]')?.click();};
    for(const button of slot.querySelectorAll('[data-picture]'))button.onclick=()=>{
     const dialog=document.createElement('dialog');dialog.className='lineup-picture-large';
-    dialog.innerHTML='<button autofocus>Close picture</button><img alt="'+button.querySelector('img').alt+'" src="'+e(pair[button.dataset.picture])+'">';
+    dialog.innerHTML='<button autofocus>Close picture</button><span class="lineup-photo"><img alt="'+button.querySelector('img').alt+'" src="'+e(pair[button.dataset.picture])+'">'+marker(button.dataset.picture)+'</span>';
     dialog.querySelector('button').onclick=()=>dialog.close();dialog.onclose=()=>dialog.remove();root.append(dialog);dialog.showModal();
    };
   };root.paintPictures=pictures;
@@ -59,8 +63,9 @@
    root.querySelector('.lineup-count').textContent=found.length+' '+(found.length===1?'lineup':'lineups')+' · '+(doc?.name||'Choose a map');
    const list=root.querySelector('.lineups-results');
    list.innerHTML=found.map((r,i)=>'<button class="lineup-row" data-lineup="'+e(r.id)+'" aria-pressed="'+(r===selected)+'"><strong>'+e(r.name)+'</strong>'+(r.mine?'<small>Made by you</small>':'')+'<small>'+e(types[r.type])+' · '+e(r.area+(['A','B'].includes(r.area)?' site':''))+' · '+e(r.side==='both'?'Both sides':r.side+' side')+'</small></button>').join('')||'<p>No lineups match. Try another search or side.</p>';
-   root.querySelector('.lineup-detail').innerHTML=selected?'<h4>'+e(selected.name)+'</h4>'+(selected.mine?'<div class="lineup-own-actions"><span>Made by you</span> <button data-edit>Edit</button> <button data-delete>Delete</button></div>':'')+'<p class="lineup-meta">'+e(types[selected.type])+' · '+e(selected.throw[0].toUpperCase()+selected.throw.slice(1))+' · '+(selected.checked?'Checked in game':'Awaiting game check')+'</p><div class="lineup-detail-body"><div class="lineup-visual">'+radar(d.art,[selected])+'<div class="lineup-pictures"></div></div><ol>'+selected.steps.map(s=>'<li>'+e(s)+'</li>').join('')+'</ol></div>':'<p>Choose a lineup to see where to stand and how to throw.</p>';
+   root.querySelector('.lineup-detail').innerHTML=selected?'<h4>'+e(selected.name)+'</h4>'+(selected.mine?'<div class="lineup-own-actions"><span>Made by you</span> <button data-edit>Edit</button> <button data-delete>Delete</button></div>':'')+'<p class="lineup-meta">'+e(types[selected.type])+' · '+e(selected.throw[0].toUpperCase()+selected.throw.slice(1))+' · '+(selected.checked?'Checked in game':'Awaiting game check')+'</p><div class="lineup-detail-body"><button class="lineup-corner-map" title="Enlarge map" aria-label="Enlarge map">'+radar(d.art,[selected])+'</button><div class="lineup-pictures"></div><ol>'+selected.steps.map(s=>'<li>'+e(s)+'</li>').join('')+'</ol></div>':'<p>Choose a lineup to see where to stand and how to throw.</p>';
    pictures(root.pictureImages||d.pictures||{});
+   const mapButton=root.querySelector('.lineup-corner-map');if(mapButton)mapButton.onclick=()=>{const dialog=document.createElement('dialog');dialog.className='lineup-picture-large';dialog.innerHTML='<button>Close map</button>'+radar(d.art,[selected]);dialog.querySelector('button').onclick=()=>dialog.close();dialog.onclose=()=>dialog.remove();root.append(dialog);dialog.showModal();};
    const remove=root.querySelector('[data-delete]');if(remove)remove.onclick=async()=>{
     const result=await call('change',{action:'delete',map:state.map,id:selected.id});
     window.overlayRenderers.lineups(root,result,call);
@@ -86,10 +91,11 @@
   const edit=!!row, state=root.lineupsState;
   let d=initial, key=row?state.map:(initial.position?.map||initial.round?.map||state.map);
   if(!(initial.maps||[]).some(m=>m.id===key))key=state.map;
+  let pictureEdits=null;
   let stand=row?.stand||null,land=row?.land||null,aim=row?.aim||null,placing='stand',placedByUser=!!row;
   const dialog=document.createElement('dialog');dialog.className='lineup-editor';
   const select=(name,label,values,value)=>'<label>'+label+'<select name="'+name+'">'+values.map(([v,t])=>'<option value="'+e(v)+'" '+(v===value?'selected':'')+'>'+e(t)+'</option>').join('')+'</select></label>';
-  dialog.innerHTML='<form><header><h3>'+(edit?'Edit lineup':'New lineup')+'</h3><button type="button" data-cancel>Cancel</button></header><div class="lineup-editor-columns"><div class="lineup-editor-fields"><label>Name<input name="name" required maxlength="240" value="'+e(row?.name||'')+'" placeholder="My window smoke"></label><div class="lineup-field-pair">'+select('map','Map',(initial.maps||[]).map(m=>[m.id,m.name]),key)+select('side','Side',[['T','T side'],['CT','CT side']],row?.side||'T')+'</div><div class="lineup-field-pair">'+select('type','Type',[['smoke','Smoke'],['fire','Fire'],['flash','Flash'],['grenade','Grenade']],row?.type||'smoke')+select('throw','Throw',[['left click','Left click'],['right click','Right click'],['both','Both'],['jump throw','Jump throw'],['run throw','Run throw'],['walk throw','Walk throw']],row?.throw||'left click')+'</div><label>Area<input name="area" required maxlength="240" value="'+e(row?.area||'')+'" placeholder="A site"></label><label>Steps and details <small>One step per line</small><textarea name="steps" required rows="5">'+e((row?.steps||[]).join('\n'))+'</textarea></label></div><div class="lineup-editor-places"><h4>Where you stand</h4><p>Drag the feet onto the radar. You can also click a spot or move the marker with arrow keys.</p><div data-edit-radar></div><div class="lineup-marker-tools"><button type="button" data-stand>Place feet</button><button type="button" data-land>Place landing ring</button><button type="button" data-clear-land>Remove ring</button></div><button type="button" data-position>Use my game position</button><p data-position-note role="status"></p><button type="button" data-create>Take two pictures</button><p data-create-note role="status"></p></div></div><footer><p data-error role="status"></p><button type="submit">Save lineup</button></footer></form>';
+  dialog.innerHTML='<form><header><h3>'+(edit?'Edit lineup':'New lineup')+'</h3><button type="button" data-cancel>Cancel</button></header><div class="lineup-editor-columns"><div class="lineup-editor-fields"><label>Name<input name="name" required maxlength="240" value="'+e(row?.name||'')+'" placeholder="My window smoke"></label><div class="lineup-field-pair">'+select('map','Map',(initial.maps||[]).map(m=>[m.id,m.name]),key)+select('side','Side',[['T','T side'],['CT','CT side']],row?.side||'T')+'</div><div class="lineup-field-pair">'+select('type','Type',[['smoke','Smoke'],['fire','Fire'],['flash','Flash'],['grenade','Grenade']],row?.type||'smoke')+select('throw','Throw',[['left click','Left click'],['right click','Right click'],['both','Both'],['jump throw','Jump throw'],['run throw','Run throw'],['walk throw','Walk throw']],row?.throw||'left click')+'</div><label>Area<input name="area" required maxlength="240" value="'+e(row?.area||'')+'" placeholder="A site"></label><label>Steps and details <small>One step per line</small><textarea name="steps" required rows="5">'+e((row?.steps||[]).join('\n'))+'</textarea></label></div><div class="lineup-editor-places"><h4>Where you stand</h4><p>Drag the feet onto the radar. You can also click a spot or move the marker with arrow keys.</p><div data-edit-radar></div><div class="lineup-marker-tools"><button type="button" data-stand>Place feet</button><button type="button" data-land>Place landing ring</button><button type="button" data-clear-land>Remove ring</button></div><button type="button" data-position>Use my game position</button><p data-position-note role="status"></p><button type="button" data-create>Take pictures</button><p data-create-note role="status"></p></div></div><footer><p data-error role="status"></p><button type="submit">Save lineup</button></footer></form>';
   root.append(dialog);dialog.showModal();
   const form=dialog.querySelector('form'),field=n=>form.elements.namedItem(n),slot=dialog.querySelector('[data-edit-radar]');
   const overview=()=>d.art?.overview||d.document?.overview;
@@ -108,25 +114,47 @@
    svg.onpointerup=event=>{if(svg.hasPointerCapture(event.pointerId))svg.releasePointerCapture(event.pointerId);};
    for(const g of svg.querySelectorAll('[data-marker]'))g.onkeydown=event=>{const delta={ArrowLeft:[-4,0],ArrowRight:[4,0],ArrowUp:[0,-4],ArrowDown:[0,4]}[event.key];if(!delta)return;event.preventDefault();placing=g.dataset.marker;const p=pixel(placing==='stand'?stand:land);const next={radar_x:Math.max(0,Math.min(o.width,p[0]+delta[0])),radar_y:Math.max(0,Math.min(o.height,p[1]+delta[1]))};if(placing==='stand'){stand=next;aim=null;placedByUser=true;}else land=next;g.setAttribute('transform','translate('+next.radar_x+' '+next.radar_y+')');};
   }
-  function position(){const pos=(root.lineupLatest||d).position;if(pos?.map===key){stand=pos.stand;aim=pos.aim;placedByUser=true;dialog.querySelector('[data-position-note]').textContent='Your game position and aim were placed.';paint();}else dialog.querySelector('[data-position-note]').textContent='Your position is not available. Drag the feet onto the radar.';}
+  function position(){const pos=(root.lineupLatest||d).position;if(pos?.map===key){stand=pos.stand;aim=pos.aim;placedByUser=true;dialog.querySelector('[data-position-note]').textContent='Your game position and aim were placed.';paint();}else dialog.querySelector('[data-position-note]').textContent=(pos?'Choose your current game map to use your position.':(root.lineupLatest||d).position_notice||'The game has not shared your position yet. Move a step and press again.');}
   root.updateLineupPosition=()=>{if(!placedByUser)position();};
-  const close=async()=>{delete root.updateLineupPosition;dialog.close();dialog.remove();await call('editing',{active:false,map:state.map});};
+  const close=async()=>{await call('creating',{action:'cancel'});delete root.updateLineupCapture;delete root.updateLineupPosition;dialog.close();dialog.remove();await call('editing',{active:false,map:state.map});};
   dialog.querySelector('[data-cancel]').onclick=close;dialog.oncancel=event=>{event.preventDefault();close();};
   dialog.querySelector('[data-stand]').onclick=()=>{placing='stand';};
   dialog.querySelector('[data-land]').onclick=()=>{placing='land';if(!land&&overview()){land={radar_x:overview().width*.6,radar_y:overview().height*.4};paint();}};
   dialog.querySelector('[data-clear-land]').onclick=()=>{land=null;placing='stand';paint();};
   dialog.querySelector('[data-position]').onclick=position;
-  dialog.querySelector('[data-create]').onclick=async()=>{const result=await call('creating',{map:key});dialog.querySelector('[data-create-note]').textContent=result.text;};
+  root.updateLineupCapture=capture=>{
+   if(!capture?.review||dialog.querySelector('.lineup-review'))return;
+   pictureEdits??={stand:{crop:[0,0,1,1],marker:[.5,.5]},aim:{crop:[0,0,1,1],marker:[.5,.5]}};
+   const review=document.createElement('section');review.className='lineup-review';
+   review.innerHTML='<h3>Review pictures</h3><p>Crop removes the game HUD. Drag a crop box, then place the feet or aim ring. Keep whole leaves the full picture.</p><div class="lineup-review-pair">'+['stand','aim'].map(k=>'<div><h4>'+(k==='stand'?'Where you stand':'Where you aim')+'</h4><canvas data-review="'+k+'" aria-label="Drag to crop or place marker"></canvas><button type="button" data-crop="'+k+'">Crop</button> <button type="button" data-whole="'+k+'">Keep whole</button> <button type="button" data-mark="'+k+'">Place '+(k==='stand'?'feet':'aim ring')+'</button> <button type="button" data-retake="'+k+'">Retake</button></div>').join('')+'</div><button type="button" data-done-review>Keep pictures</button>';
+   dialog.querySelector('footer').before(review);dialog.querySelector('.lineup-editor-columns').hidden=true;
+   review.querySelector('[data-done-review]').onclick=()=>{review.hidden=true;dialog.querySelector('.lineup-editor-columns').hidden=false;};
+   for(const kind of ['stand','aim']){
+    const canvas=review.querySelector('[data-review="'+kind+'"]'),image=new Image();let mode='marker',origin=null,box=null;
+    const draw=()=>{const ctx=canvas.getContext('2d'),ed=pictureEdits[kind],c=ed.crop,w=canvas.width,h=canvas.height;ctx.clearRect(0,0,w,h);ctx.drawImage(image,c[0]*image.width,c[1]*image.height,c[2]*image.width,c[3]*image.height,0,0,w,h);ctx.strokeStyle='#ffe36a';ctx.fillStyle='#ffe36a';ctx.lineWidth=3;const [x,y]=ed.marker.map((v,i)=>v*(i?h:w));ctx.beginPath();if(kind==='aim')ctx.arc(x,y,12,0,Math.PI*2);else{ctx.ellipse(x-5,y,3,9,-.2,0,Math.PI*2);ctx.ellipse(x+5,y+4,3,9,.2,0,Math.PI*2);}ctx.stroke();if(box)ctx.strokeRect(box[0]*w,box[1]*h,box[2]*w,box[3]*h);};
+    image.onload=()=>{canvas.width=600;canvas.height=Math.round(600*image.height/image.width);draw();};image.src=capture.frames[kind];
+    const point=ev=>{const b=canvas.getBoundingClientRect();return [Math.max(0,Math.min(1,(ev.clientX-b.left)/b.width)),Math.max(0,Math.min(1,(ev.clientY-b.top)/b.height))];};
+    canvas.onpointerdown=ev=>{canvas.setPointerCapture(ev.pointerId);origin=point(ev);if(mode==='marker'){pictureEdits[kind].marker=origin;draw();}};
+    canvas.onpointermove=ev=>{if(!canvas.hasPointerCapture(ev.pointerId))return;const p=point(ev);if(mode==='marker')pictureEdits[kind].marker=p;else box=[Math.min(origin[0],p[0]),Math.min(origin[1],p[1]),Math.abs(p[0]-origin[0]),Math.abs(p[1]-origin[1])];draw();};
+    canvas.onpointerup=ev=>{canvas.releasePointerCapture(ev.pointerId);if(mode==='crop'&&box&&box[2]>.01&&box[3]>.01){const ed=pictureEdits[kind],c=ed.crop;ed.crop=[c[0]+box[0]*c[2],c[1]+box[1]*c[3],box[2]*c[2],box[3]*c[3]];ed.marker=[.5,.5];}box=null;mode='marker';draw();};
+    review.querySelector('[data-crop="'+kind+'"]').onclick=()=>{mode='crop';};
+    review.querySelector('[data-mark="'+kind+'"]').onclick=()=>{mode='marker';};
+    review.querySelector('[data-whole="'+kind+'"]').onclick=()=>{pictureEdits[kind].crop=[0,0,1,1];draw();};
+    review.querySelector('[data-retake="'+kind+'"]').onclick=async()=>{review.remove();pictureEdits[kind]={crop:[0,0,1,1],marker:[.5,.5]};const result=await call('creating',{action:'retake',kind});dialog.querySelector('[data-create-note]').textContent=result.text||'';if(!result.active)dialog.querySelector('.lineup-editor-columns').hidden=false;};
+   }
+  };
+  dialog.querySelector('[data-create]').onclick=async()=>{dialog.querySelector('.lineup-review')?.remove();pictureEdits=null;const result=await call('creating',{action:'start',map:key,builtin:row&&!row.mine?row.id:null});dialog.querySelector('[data-create-note]').textContent=result.text||'';};
   field('map').disabled=edit;
   field('map').onchange=async()=>{key=field('map').value;stand=land=aim=null;placedByUser=false;d=await call('data',{map:key});paint();position();};
   form.onsubmit=async event=>{event.preventDefault();if(!stand||!overview()){dialog.querySelector('[data-error]').textContent='Choose a map and place your feet first.';return;}
-   const values=Object.fromEntries(new FormData(form));const saved={id:row?.id,name:values.name.trim(),side:values.side,type:values.type,throw:values.throw,area:values.area.trim(),steps:values.steps.split('\n').map(s=>s.trim()).filter(Boolean),stand,land,aim};
-   const result=await call('change',{action:'save',map:key,row:saved,overview:overview()});
+   const values=Object.fromEntries(new FormData(form));const saved={id:row?.id,name:(values.name??row?.name??'').trim(),side:values.side??row?.side,type:values.type??row?.type,throw:values.throw??row?.throw,area:(values.area??row?.area??'').trim(),pictures:row?.pictures,steps:(values.steps??row?.steps?.join('\n')??'').split('\n').map(s=>s.trim()).filter(Boolean),stand,land,aim};
+   const result=await call('change',{action:row&&!row.mine?'save_pictures':'save',map:key,row:saved,overview:overview(),picture_edits:pictureEdits});
    if(result.notice){dialog.querySelector('[data-error]').textContent=result.notice;return;}
    state.map=key;await close();window.overlayRenderers.lineups(root,result,call);
   };
   if(key!==d.document?.map)d=await call('data',{map:key});
   paint();
+  if(row&&!row.mine){for(const element of dialog.querySelectorAll('.lineup-editor-fields input,.lineup-editor-fields textarea,.lineup-editor-fields select'))element.disabled=true;dialog.querySelector('h3').textContent='Make lineup pictures';}
   const fresh=await call('editing',{active:true,map:key});root.lineupLatest=fresh||d;if(!edit)position();
  };
 })();

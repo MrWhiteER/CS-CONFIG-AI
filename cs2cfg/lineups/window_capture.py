@@ -115,3 +115,30 @@ def capture_cs2():
             delete_dc(target)
         if source:
             release(hwnd, source)
+
+
+def process_started(hwnd):
+    """Read process creation time through limited query access; no memory read."""
+    if not hwnd:
+        return None
+    try:
+        user, kernel = ctypes.WinDLL('user32'), ctypes.WinDLL('kernel32')
+        user.GetWindowThreadProcessId.argtypes = [w.HWND, ctypes.POINTER(w.DWORD)]
+        kernel.OpenProcess.argtypes = [w.DWORD, w.BOOL, w.DWORD]
+        kernel.OpenProcess.restype = w.HANDLE
+        kernel.GetProcessTimes.argtypes = [w.HANDLE] + [ctypes.POINTER(w.FILETIME)]*4
+        kernel.CloseHandle.argtypes = [w.HANDLE]
+        pid = w.DWORD()
+        user.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        handle = kernel.OpenProcess(0x1000, False, pid.value)
+        if not handle:
+            return None
+        try:
+            times = [w.FILETIME() for _ in range(4)]
+            if kernel.GetProcessTimes(handle, *[ctypes.byref(t) for t in times]):
+                return ((times[0].dwHighDateTime << 32) + times[0].dwLowDateTime)/10000000 - 11644473600
+        finally:
+            kernel.CloseHandle(handle)
+    except (OSError, AttributeError):
+        pass
+    return None

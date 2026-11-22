@@ -465,37 +465,19 @@ class StrictPracticeLaunch(unittest.TestCase):
 
 
 class PictureButton(unittest.TestCase):
-    def test_button_launches_only_from_closed_game_in_temporary_install(self):
+    def test_button_directs_to_selected_lineup_without_game_writes(self):
         from cs2cfg import webui
-        import threading
         import types
-        with tempfile.TemporaryDirectory() as tmp:
-            install = Path(tmp)/'steamapps/common/CS2'
-            cfg = install/'game/csgo/cfg'; cfg.mkdir(parents=True)
-            overlay = types.SimpleNamespace(_lock=threading.RLock(), picture_session=None,
-                _settings={'overlay_enabled': True, 'overlay_tools': ['lineups']},
-                _configure_gsi=mock.Mock(), _gsi_token='a'*64, _gsi_notice='')
-            state = types.SimpleNamespace(overlay=overlay, cs2_install=install, users=[])
-            with mock.patch('cs2cfg.steam.cs2_running', return_value=True), mock.patch('cs2cfg.launcher.launch_via_steam') as launch:
-                self.assertFalse(webui._lineups_pictures(state, {})['available'])
-                self.assertEqual(list(cfg.iterdir()), []); launch.assert_not_called()
-            with mock.patch('cs2cfg.steam.cs2_running', return_value=False), mock.patch('cs2cfg.launcher.launch_via_steam') as launch, mock.patch('cs2cfg.lineups.pictures.game_build', return_value='test'), mock.patch('cs2cfg.paths.user_data_dir', return_value=Path(tmp)/'cache'):
-                self.assertTrue(webui._lineups_pictures(state, {'key': 'F8'})['available'])
-                launch.assert_called_once_with('+map de_mirage +exec cs2cfg_lineup_shots', require_args=True)
-                self.assertEqual(set(p.name for p in cfg.iterdir()), {pictures.SHOTS_CFG, pictures.UNDO_CFG})
-                session = overlay.picture_session
-                session.feed({'provider': {'appid': 730}, 'map': {'name': 'de_mirage', 'mode': 'casual'}})
-                self.assertTrue(session.active)
-                self.assertEqual(session.text, 'Waiting for Mirage practice. Keep the game visible.')
-                # The same action used by the Settings stop button removes both cfgs.
-                stopped = webui._lineups_pictures(state, {'action': 'stop'})
-                self.assertFalse(stopped['active']); self.assertFalse(session.active)
-                self.assertEqual(list(cfg.iterdir()), [])
-                self.assertIn('Pictures stopped', stopped['text'])
-            overlay._settings['overlay_enabled'] = False
-            with mock.patch('cs2cfg.steam.cs2_running') as running:
-                self.assertFalse(webui._lineups_pictures(state, {})['available'])
-                running.assert_not_called()
+        overlay = types.SimpleNamespace(_settings={'overlay_enabled':True,'overlay_tools':['lineups']})
+        state = types.SimpleNamespace(overlay=overlay)
+        with mock.patch('cs2cfg.launcher.launch_via_steam') as launch, mock.patch('pathlib.Path.write_text') as write:
+            answer = webui._lineups_pictures(state, {})
+            self.assertTrue(answer['available'])
+            self.assertIn('choose a lineup', answer['text'])
+            launch.assert_not_called()
+            write.assert_not_called()
+        overlay._settings['overlay_enabled'] = False
+        self.assertFalse(webui._lineups_pictures(state, {})['available'])
 
 
 if __name__ == "__main__": unittest.main()

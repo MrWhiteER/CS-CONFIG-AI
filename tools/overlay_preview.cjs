@@ -95,5 +95,5 @@ if(require.main===module){
  capture('pinned-60',pinned(60),{height:900});
  }
 }
-module.exports={render,bundle,syncThemes};
+module.exports={render,bundle,syncThemes,scenery};
 

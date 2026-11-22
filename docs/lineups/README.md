@@ -1,221 +1,103 @@
-﻿# Lineups fixes and picture prototype
+# Lineups: pictures first
 
-The Lineups tool is off by default. Enable the overlay in Settings, open it
-with Ctrl+Alt+P, open the Settings tool, enable Lineups in Your dock, and save.
-Open Lineups from the dock. It supports search, map and side filters, pinning,
-and the GSI round-start smoke card. Only Mirage has data.
+All work for this revision is in G:\Projects\cs2-lineups-own. No staging,
+commit, push, pull request, merge, tag or release was performed. Tests do not
+use a real game installation. No Valve art is included.
 
-## Radar and instructions
+## What changed
 
-The runtime radar reader supports PNG, RGBA8888, BGRA8888 (format 28), BC1 and
-BC3, including LZ4 and Zstandard mip data. BGRA channels are converted to RGBA.
-No Valve art is shipped. Radar pictures come from the player's own install.
-The detail radar is a small square zoomed around the stand and landing points;
-steps sit beside a 156-pixel radar at the default panel size. Two picture
-thumbnails sit below the radar when available; only the catalogue scrolls. The curve is a direction
-guide, not a simulated flight path.
+1. **Own pictures:** New/Edit lineup ? Take pictures registers the app's
+   Lineup picture key (F9 by default) only while waiting. The panel closes;
+   a pinned status asks for the stand picture, then the aim picture. Each
+   key press captures the foreground CS2 window. After the second picture,
+   the key is released and the panel reopens with both pictures for review.
+   Crop by dragging a box, keep the whole image, retake either picture, and
+   drag to place feet or an aim ring. Cropping removes the game HUD; the app
+   does not change the game's HUD, bindings, camera or settings.
+   Cancel, game exit, overlay off and tool off release the key and frames.
+   Native status is always excluded from capture. Drafts survive panel hiding.
+2. **Position:** Overlay + Lineups enabled requests position before game
+   launch, without needing the editor open. Tool off removes extra components.
+   Unchanged GSI configuration is not rewritten. Missing position explains
+   either Restart CS2 once so the game can share your position, or The game
+   has not shared your position yet. Move a step and press again. A received
+   local position places feet and stores world coordinates and aim angles.
+3. **Pictures first:** Stand and aim pictures lead the detail card; steps
+   follow and the small corner map can be enlarged. Missing pictures have an
+   explicit capture button. Built-in Mirage pictures use the same manual
+   capture and review path. The reported stand position must match; the aim
+   shot must also match the recorded angle. The player moves themselves.
+   The Settings button now directs to a selected lineup. The former launch,
+   game-bind and cheat-cfg flow is retired from the app entry point.
+4. **Transparency:** New tool backgrounds default to 10% opacity. The slider
+   still controls backgrounds while text remains opaque. The default edge
+   shade is a light vignette. Existing saved opacity choices are retained;
+   move the slider to 10% if an older layout still uses another value.
 
-Mid is displayed as Mid; only A and B get the word site. The validator rejects
-invalid areas, repeated step text, marked-point instructions and Mirage steps
-without a named landmark. Each record has separate stand, aim and throw steps.
-Expanded landmark descriptions still need visual checks in CS2.
+Personal records: user data / lineups / mine / map.json.
+Pictures: user data / lineups / pictures / unique folder / stand.png and aim.png.
+Crop and normalized marker positions are stored with the record. Built-in
+picture metadata is in user data / lineups / builtin-map.json. Retaking a
+saved pair leaves the previous files available; no personal pictures are
+stored in this repository or in the game's folders.
 
-Mirage contains 12 T smokes and 6 CT smokes. One CT entry comes from the MIT
-seed; five are app-authored practice candidates. All entries have checked=false
-and display Awaiting game check. The five candidates use an ideal ballistic
-model between overview landmarks. Actual map collision geometry was unavailable;
-wall clearance, bounces and throw accuracy are unverified. This does not fulfill
-the requested geometry-validated throws. THIRD_PARTY.md records the assumptions.
+The existing capture backend in this checkout is **GDI window capture**,
+not Windows Graphics Capture. No new capture dependency was added. DirectX
+capture may fail or return a blank frame; a failure does not advance the
+session. Real-game capture compatibility still needs verification.
 
-## Round 2 data correction
+## Owner: make one lineup with pictures
 
-The Bench proposal no longer has a null pitch. Its old target was outside the
-range of the documented ideal ballistic model. The replacement target is a
-nearby B apartments exit candidate: horizontal distance 310.64, pitch 9.847065,
-yaw 56.821488. This is still an unchecked proposal, not a verified map throw.
-Mirage still has 12 T and 6 CT smokes; all five app-authored CT entries remain
-checked=false. Validator aim errors now name the lineup. Regression tests reject
-a null pitch in every shipped record and check the replacement's model height.
+1. Run cs2cfg.bat from G:\Projects\cs2-lineups-own.
+2. Enable the overlay in Settings ? Overlay and save. Press Ctrl+Alt+P,
+   enable Lineups in the overlay Settings dock list, and save.
+3. If CS2 was already running, restart it once for position sharing. Use
+   Fullscreen Windowed so the overlay can appear over the game. Own pictures
+   need no position report and can be taken in any game mode.
+4. Open Lineups ? New lineup. Enter name, map, side, type, area, throw and
+   steps. Place feet on the radar or press Use my game position. Landing is
+   optional. If position is missing, follow the displayed message.
+5. Press Take pictures. With the panel closed, go to your stand spot and
+   press F9 once. Aim at your throw landmark, then press F9 again when the
+   status asks for the aim picture. Use your chosen Lineup picture key if
+   you changed it in Settings.
+6. The panel reopens for review. For each picture choose Crop and drag a
+   rectangle to remove HUD, or Keep whole. Drag the feet on picture one and
+   the aim ring on picture two. Retake is available for either picture.
+7. Press Keep pictures, then Save lineup. Find it using Made by you. Edit
+   can take a new pair. Delete offers Undo without a confirmation popup.
 
-## Player-triggered pictures (step 4 wiring)
+## Verification
 
-Settings -> Overlay -> Lineups now offers a picture key (F8 by default) and
-Make lineup pictures. Overlay and Lineups must be saved as enabled first.
-Close CS2 before pressing the button. The app writes only its two picture cfgs
-in the discovered install's game/csgo/cfg folder, reads the signed-in Steam account's
-key config to restore a readable previous binding, and launches Mirage using
-the existing Steam launcher. Its strict argument mode refuses a launch if
-Steam cannot pass the map and cfg; the rungameid URL drops these arguments.
-No keyboard/mouse input, console typing, injection or memory reading is used.
-No capture timer, launch deadline, sleep or artificial shot acknowledgement
-was added. Capture-only GSI fields are requested only during this session.
+Passed in this sandbox:
 
-Each key press moves the practice camera to the next view: stand looks down
-at 89 degrees, aim uses the recorded angle. Keep CS2 foreground and wait until
-the overlay advances its picture number before pressing again. Mirage has
-18 lineups, hence 36 pictures. The last press executes the undo cfg, restoring
-a safe readable previous binding (otherwise unbinding) and turning cheats off.
-The app removes its two cfg files on completion, refusal, cancellation or game
-exit, and keeps any pictures already saved.
+- node tools/lineups_preview.cjs --check (Carbon + Daylight, all 18 detail
+  cards fit the default panel, editor save/edit/delete/Undo, position, picture
+  waiting, two-picture review, crop math and marker placement).
+- node tools/overlay_preview.cjs --check (six renderers, ten themes).
+- All four JavaScript harness files; all twelve overlay panel scenarios.
+- git diff --check.
 
-No retail CS2 screenshot console command was confirmed. The wired fallback
-copies the visible CS2 window with the existing external GDI backend only after
-fresh authenticated GSI matches the expected position and forward direction.
-Fake screenshot PNG files and fake frames test ordering without a real game.
-The saved SVG annotations put both markers at screen centre. Caches include
-the map, Steam build ID and validated lineup data hash. Fake caches stay separate.
-The detail card loads available pictures, including partially completed pairs,
-and clicking a thumbnail opens a larger picture with a Close picture button.
+Python and py are unavailable on PATH in this sandbox. Python tests were
+updated but **not run**. On the owner's PC run:
 
-The offline gate accepts only explicit practice/offline GSI mode, Mirage,
-warmup/freezetime/live, the local playing player, and no other humans if a
-roster is supplied. Casual, competitive, missing mode or unclear roster is
-refused. Startup/menu events wait for a map, with no timeout. This is strict:
-normal practice may report casual rather than practice/offline, and playing
-clients may omit position/forward. Such builds stop with a plain explanation;
-they must never silently bypass these gates. This has not been tested on Edy's
-installed CS2. GDI can also fail on DirectX; a failed frame never advances.
+    py -3 -m unittest tests.test_lineups tests.test_lineups_mine tests.test_lineups_editor tests.test_lineups_creating tests.test_lineups_pictures tests.test_lineups_rounds tests.test_overlay_gsi tests.test_overlay_pinned
 
-Deleting a cfg cannot execute undo in a running game. On early stop the app
-asks the player to close CS2 before online play. It cannot promise immediate
-unbind/cheat reset on abort without forbidden game input. CS2 itself may save
-session bindings; file deletion alone is not proof of restoration. The app
-never edits the player's own config to force restoration. Automatic undo on
-an arbitrary early abort remains a limitation of this design.
+Added fake-frame tests cover key lifecycle, stand ? aim order, retry, retake,
+crop pixels, marker metadata, user-data file location, cancel, capture-excluded
+status, panel hiding/reopening, pre-launch GSI components and both missing
+position messages. Older standalone picture helpers remain covered with
+fake installs only; the app no longer launches them.
 
-## What Edy clicks
+Still untested in real CS2: native F9 registration/conflicts and release,
+DirectX frame capture, capture exclusion, overlay focus and review reopening,
+position/forward reports in each mode, startup-time diagnosis, radar extraction,
+landmarks and throw accuracy. Mirage has 12 T and 6 CT smokes; all remain
+Awaiting game check. No real-game success is claimed.
 
-1. Open G:\Projects\cs2-lineups in File Explorer (the codex/lineups worktree).
-2. Double-click cs2cfg.bat to launch this checkout, not an installed release.
-3. Open Settings -> Overlay. Enable the overlay, then Save overlay settings.
-4. Press Ctrl+Alt+P, open the Settings tool, enable Lineups in Your dock, save.
-5. Close CS2 if it is running. Return to Settings -> Overlay in the main app.
-6. Leave Picture key at F8 (or pick another listed key), click Make lineup pictures.
-7. Let Steam launch Mirage. Join the practice side if CS2 asks. Use Fullscreen
-   Windowed so the overlay is visible; do not join an online server.
-8. Press Ctrl+Alt+P and open Lineups. Read the capture status. If it refuses
-   offline mode/camera evidence, close CS2; this build cannot make pictures on
-   that reported game state. No console command is required or suggested.
-9. If it says Picture 1 of 36 - press F8, close the panel with Ctrl+Alt+P,
-   keep the game visible and press F8 once. Reopen Lineups to read progress,
-   close the panel again, and repeat only after the number advances. Pin
-   Lineups for a status line while the panel is closed.
-10. Continue through picture 36. Done - 36 pictures saved means all were saved
-    and the final key press ran undo. Open a lineup and click either thumbnail.
-11. Close CS2 before returning to normal play, especially if capture stopped.
+Regenerate original-art previews with node tools/lineups_preview.cjs:
+carbon.png, daylight.png, new-lineup.png and pictures-card.png. The generated
+placeholder-scenery.png is an invented courtyard illustration, not game art.
 
-## Verification and handoff
-
-Python execution is unavailable in this sandbox: py is not recognized. The
-operator must run tests.test_lineups_pictures, tests.test_overlay_gsi,
-tests.test_lineups_rounds, tests.test_lineups and tests.test_crosshairx_launch
-with py -3 -m unittest tests.<module>. No Python pass result is claimed.
-JavaScript/Chromium results and both cumulative snapshots are recorded under
-tmp/lineups-handoff. No git add, commit, push, PR, merge, release or tag was run.
-Real-game offline reports, camera reports, alias timing, GDI rendering, binding
-restoration, landmarks and throw accuracy remain untested.
-
-Final browser checks passed in Carbon and Daylight at an asserted 1000 x 620
-panel: all 18 detail cards, all three steps, radar, both thumbnails, status
-and larger picture view. The list alone scrolls. Regenerated carbon.png and
-daylight.png use labelled original preview diagrams and fake picture fixtures,
-not Valve artwork. Files with real in their names were untouched.
-
-Passed: node tools/lineups_preview.cjs --check, node tools/overlay_preview.cjs
---check (six renderers, ten themes), tests/overlay_settings_harness.js,
-tests/overlay_panel_harness.js, tests/status_bar_harness.cjs,
-tests/rgb_settings_harness.js, and git diff --check.
-
-## Personal lineups (parts 1 and 2, November 2026)
-
-New lineup opens a form in the overlay with name, map, side, type, throw, area
-and one instruction per line. New drafts use the current map when available.
-Drag the feet on the radar (or click; arrow keys also work). The landing ring
-is optional. Use my game position copies the authenticated local player's
-position and forward direction when GSI supplies them. Dragging feet clears
-that aim, because a radar marker cannot establish a camera angle.
-
-Personal records live under paths.user_data_dir()/lineups/mine/<map>.json.
-Radar-only points use {radar_x, radar_y} in overview pixels; world points keep
-{x, y, z}. Missing landing points and aim are accepted only on personal rows.
-The shipped catalogue still requires finite world coordinates and angles.
-Personal rows share the catalogue search and have a Made by you filter and tag.
-Edit updates the record; Delete applies immediately and shows a visible Undo
-button. Undo is action driven, with no delayed writes or confirmation popup.
-Import/export is not included.
-
-Regenerate previews with node tools/lineups_preview.cjs. The Carbon, Daylight
-and New lineup screenshots contain original schematic fixtures, no game art.
-Run node tools/lineups_preview.cjs --check for the list and editor browser tests.
-Run py -3 -m unittest tests.test_lineups_mine tests.test_lineups_editor
-on the owner's machine: py is not available inside this execution sandbox.
-
-## Personal pictures (part 3: radar-only fallback)
-
-The separate Lineup picture key in Settings -> Overlay -> Lineups defaults to
-F9; the existing catalogue Picture key defaults to F8. Save overlay settings
-persists both. They must differ from one another and from the final key of
-either overlay shortcut. This reserves the new key; it is not currently bound
-in the game. The existing catalogue picture workflow remains available.
-
-Command check on 2026-11-21: the game command registry labels cl_drawhud and
-r_drawviewmodel as cheat commands. The intended hide pair would therefore be
-cl_drawhud 0 and r_drawviewmodel 0, with both restored to 1 afterwards, in an
-app-launched local practice game only. No no-cheats weapon-hiding alternative
-was verified. Registry source:
-https://github.com/SteamDatabase/GameTracking-CS2/blob/master/DumpSource2/convars.txt
-The screenshot, png_screenshot and jpeg_screenshot commands in the companion
-commands.txt are development-only; they are not a confirmed retail alternative.
-
-No supported acknowledgement of a picture-key press or HUD visibility was
-found in the available GSI path. Position/forward and an ordinary heartbeat
-cannot establish either fact. A same-alias hide/restore could restore before
-an external capture, and an early cancel cannot execute an undo file simply by
-deleting it. These are unresolved prerequisites, not things fake GSI flags can
-verify. See cs2cfg/overlay/gsi.py for the fields this app actually accepts.
-
-The least invasive candidate is the existing strict Steam launch with a
-one-session +exec for an app-owned cfg, requiring CS2 to be closed first. It
-avoids changing launch preferences, autoexec or player config files. Loading
-a newly written cfg into an already-running game cannot be assumed. Until
-key/HUD evidence and game-side undo can be verified, the personal picture
-button explains the limitation and saves nothing to the game folders. It
-never launches, binds, enables cheats, hides the overlay or captures a frame.
-The requested two-picture capture, cropping, retake and picture-marker flow
-is NOT implemented. The brief explicitly permits radar-only fallback when
-picture capture cannot be achieved within its hard rules. No creating-mode
-cfg/bind is installed, so there is no creating-mode cleanup to execute.
-
-Tests added: tests.test_lineups_mine (optional land and bounded radar points),
-tests.test_lineups_editor (local pose, stale/malformed reports and editing),
-and tests.test_lineups_creating (key conflicts and refusing unsupported capture
-even with fake frames and invented game-state flags). Existing picture tests
-still cover the earlier catalogue workflow. All Python tests remain unrun here:
-py -3 is not recognized by this sandbox. The operator should run:
-
-    py -3 -m unittest tests.test_lineups tests.test_lineups_mine tests.test_lineups_editor tests.test_lineups_creating tests.test_lineups_pictures tests.test_lineups_rounds tests.test_overlay_gsi
-
-Browser validation passed: node tools/lineups_preview.cjs --check in Carbon and
-Daylight (new/edit/save, radar markers, optional landing ring, delete/Undo,
-automatic GSI placement without overwriting a dragged marker, and the picture
-fallback), node tools/overlay_preview.cjs --check, all four JS harnesses, and
-git diff --check. Preview images are original diagrams. Real-game radar file
-availability, live GSI position/forward availability, capture and restoration,
-and actual throws remain untested. No real game folders were used in tests.
-
-### Make one lineup from this checkout
-
-1. Launch cs2cfg.bat in G:\Projects\cs2-lineups-own.
-2. In Settings -> Overlay, enable the overlay and save.
-3. Press Ctrl+Alt+P. In the overlay Settings tool, enable Lineups in Your dock
-   and save. Open Lineups from the dock.
-4. Click New lineup. Choose the map, name, side, type, throw and area; enter
-   one instruction per line.
-5. Drag the feet to the stand spot. Optionally click Place landing ring and
-   drag the ring. If available, Use my game position also records your aim.
-6. Click Save lineup. Find it with Made by you. Edit changes it; Delete removes
-   it immediately and the visible Undo button restores it.
-
-Cumulative file copies are in tmp/lineups-handoff/part-1, part-2 and part-3,
-with FILES.txt manifests. The operator commits; no git staging, commit, push,
-PR, merge, release or tag was performed. tools/lineups_handoff.cjs was not recreated.
+Cumulative plain file copies and FILES.txt manifests are under
+ tmp/lineups-handoff/part-1 through part-4. Part 4 is the final complete handoff.
