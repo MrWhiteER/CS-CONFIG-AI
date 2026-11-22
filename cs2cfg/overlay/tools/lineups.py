@@ -162,6 +162,22 @@ PLAIN_ERRORS = {'Take pictures first.', 'Take both pictures first.', 'Choose a l
                 'Choose a crop inside the picture.', 'Place the picture marker.', 'This lineup is no longer available.'}
 
 
+def _log_problem(args, exc):
+    """One plain line per failed lineup save, so a single retry shows the cause."""
+    try:
+        import time
+        from ...paths import user_data_dir
+        folder = user_data_dir() / 'logs'
+        folder.mkdir(parents=True, exist_ok=True)
+        path = folder / 'lineups.log'
+        if path.exists() and path.stat().st_size > 200_000:
+            path.write_text('', encoding='utf-8')
+        with path.open('a', encoding='utf-8') as handle:
+            handle.write('%s %s %s: %s\n' % (time.strftime('%Y-%m-%d %H:%M:%S'), (args or {}).get('action'), type(exc).__name__, exc))
+    except OSError:
+        pass
+
+
 def change(state, args=None):
     from ...lineups import mine
     args = args or {}
@@ -199,10 +215,13 @@ def change(state, args=None):
             raise ValueError('Choose a lineup action.')
         state.overlay.lineups_notice = ''
     except ValueError as exc:
+        _log_problem(args, exc)
         state.overlay.lineups_notice = 'Could not save your change. ' + (str(exc) if str(exc) in PLAIN_ERRORS else 'Check the fields and try again.')
     except Exception:
         import logging
         logging.getLogger(__name__).exception('lineup change failed')
+        import sys
+        _log_problem(args, sys.exc_info()[1])
         state.overlay.lineups_notice = 'Could not save your change. Check the fields and try again.'
     result = data(state, {'map': key})
     result['undo_available'] = bool(getattr(state.overlay, 'lineups_undo', None))
