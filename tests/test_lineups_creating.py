@@ -88,3 +88,32 @@ class CreatingPictures(unittest.TestCase):
             creating(state, {'action':'cancel'})
             self.assertIsNone(service.creating_session)
             launch.assert_not_called()
+
+
+class PictureFixes(unittest.TestCase):
+    def test_retake_replaces_frame_and_bumps_shot(self):
+        from cs2cfg.lineups.creating import CreatingSession
+        frames = iter([(1, 1, b'\x01'*4), (1, 1, b'\x02'*4), (1, 1, b'\x03'*4)])
+        session = CreatingSession(lambda: next(frames), hotkey=lambda k, c: Mock())
+        session.wait(); session.press(); session.press()
+        first = session.snapshot()
+        self.assertTrue(first['review'])
+        session.wait('stand'); session.press()
+        second = session.snapshot()
+        self.assertTrue(second['review'])
+        self.assertGreater(second['shot'], first['shot'])
+        self.assertNotEqual(second['frames']['stand'], first['frames']['stand'])
+        self.assertEqual(second['frames']['aim'], first['frames']['aim'])
+        session.cancel()
+        self.assertFalse(session.snapshot()['review'])
+
+    def test_save_problems_become_plain_notice(self):
+        from cs2cfg.overlay.tools import lineups as tool
+        overlay = SimpleNamespace(creating_session=None, cancel_creating=Mock(), lineups_notice='')
+        state = SimpleNamespace(overlay=overlay)
+        with patch.object(tool, 'data', return_value={}):
+            tool.change(state, {'action': 'save', 'map': 'mirage', 'row': {}, 'picture_edits': {}})
+            self.assertEqual(overlay.lineups_notice, 'Could not save your change. Take pictures first.')
+            with patch('cs2cfg.lineups.mine.save', side_effect=AttributeError('x')):
+                tool.change(state, {'action': 'save', 'map': 'mirage', 'row': {}})
+            self.assertTrue(overlay.lineups_notice.startswith('Could not save your change.'))

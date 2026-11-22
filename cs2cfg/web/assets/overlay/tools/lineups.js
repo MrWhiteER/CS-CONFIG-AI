@@ -122,13 +122,17 @@
   dialog.querySelector('[data-land]').onclick=()=>{placing='land';if(!land&&overview()){land={radar_x:overview().width*.6,radar_y:overview().height*.4};paint();}};
   dialog.querySelector('[data-clear-land]').onclick=()=>{land=null;placing='stand';paint();};
   dialog.querySelector('[data-position]').onclick=position;
+  let shownShot=null;
+  const removePictures=async()=>{dialog.querySelector('.lineup-review')?.remove();pictureEdits=null;shownShot=null;await call('creating',{action:'cancel'});dialog.querySelector('.lineup-editor-columns').hidden=false;dialog.querySelector('[data-create-note]').textContent='Pictures removed. Take pictures again or save without them.';};
   root.updateLineupCapture=capture=>{
-   if(!capture?.review||dialog.querySelector('.lineup-review'))return;
-   pictureEdits??={stand:{crop:[0,0,1,1],marker:[.5,.5]},aim:{crop:[0,0,1,1],marker:[.5,.5]}};
+   if(!capture?.review||capture.shot===shownShot)return;
+   const replaced=shownShot!==null;shownShot=capture.shot;dialog.querySelector('.lineup-review')?.remove();
+   pictureEdits={stand:replaced&&pictureEdits?pictureEdits.stand:{crop:[0,0,1,1],marker:[.5,.5]},aim:replaced&&pictureEdits?pictureEdits.aim:{crop:[0,0,1,1],marker:[.5,.5]}};
    const review=document.createElement('section');review.className='lineup-review';
-   review.innerHTML='<h3>Review pictures</h3><p>Crop removes the game HUD. Drag a crop box, then place the feet or aim ring. Keep whole leaves the full picture.</p><div class="lineup-review-pair">'+['stand','aim'].map(k=>'<div><h4>'+(k==='stand'?'Where you stand':'Where you aim')+'</h4><canvas data-review="'+k+'" aria-label="Drag to crop or place marker"></canvas><button type="button" data-crop="'+k+'">Crop</button> <button type="button" data-whole="'+k+'">Keep whole</button> <button type="button" data-mark="'+k+'">Place '+(k==='stand'?'feet':'aim ring')+'</button> <button type="button" data-retake="'+k+'">Retake</button></div>').join('')+'</div><button type="button" data-done-review>Keep pictures</button>';
+   review.innerHTML='<h3>Review pictures</h3><p>Crop removes the game HUD. Drag a crop box, then place the feet or aim ring. Keep whole leaves the full picture.</p><div class="lineup-review-pair">'+['stand','aim'].map(k=>'<div><h4>'+(k==='stand'?'Where you stand':'Where you aim')+'</h4><canvas data-review="'+k+'" aria-label="Drag to crop or place marker"></canvas><button type="button" data-crop="'+k+'">Crop</button> <button type="button" data-whole="'+k+'">Keep whole</button> <button type="button" data-mark="'+k+'">Place '+(k==='stand'?'feet':'aim ring')+'</button> <button type="button" data-retake="'+k+'">Retake</button></div>').join('')+'</div><button type="button" data-done-review>Keep pictures</button> <button type="button" data-remove-pictures>Remove pictures</button>';
    dialog.querySelector('footer').before(review);dialog.querySelector('.lineup-editor-columns').hidden=true;
    review.querySelector('[data-done-review]').onclick=()=>{review.hidden=true;dialog.querySelector('.lineup-editor-columns').hidden=false;};
+   review.querySelector('[data-remove-pictures]').onclick=removePictures;
    for(const kind of ['stand','aim']){
     const canvas=review.querySelector('[data-review="'+kind+'"]'),image=new Image();let mode='marker',origin=null,box=null;
     const draw=()=>{const ctx=canvas.getContext('2d'),ed=pictureEdits[kind],c=ed.crop,w=canvas.width,h=canvas.height;ctx.clearRect(0,0,w,h);ctx.drawImage(image,c[0]*image.width,c[1]*image.height,c[2]*image.width,c[3]*image.height,0,0,w,h);ctx.strokeStyle='#ffe36a';ctx.fillStyle='#ffe36a';ctx.lineWidth=3;const [x,y]=ed.marker.map((v,i)=>v*(i?h:w));ctx.beginPath();if(kind==='aim')ctx.arc(x,y,12,0,Math.PI*2);else{ctx.ellipse(x-5,y,3,9,-.2,0,Math.PI*2);ctx.ellipse(x+5,y+4,3,9,.2,0,Math.PI*2);}ctx.stroke();if(box)ctx.strokeRect(box[0]*w,box[1]*h,box[2]*w,box[3]*h);};
@@ -140,16 +144,20 @@
     review.querySelector('[data-crop="'+kind+'"]').onclick=()=>{mode='crop';};
     review.querySelector('[data-mark="'+kind+'"]').onclick=()=>{mode='marker';};
     review.querySelector('[data-whole="'+kind+'"]').onclick=()=>{pictureEdits[kind].crop=[0,0,1,1];draw();};
-    review.querySelector('[data-retake="'+kind+'"]').onclick=async()=>{review.remove();pictureEdits[kind]={crop:[0,0,1,1],marker:[.5,.5]};const result=await call('creating',{action:'retake',kind});dialog.querySelector('[data-create-note]').textContent=result.text||'';if(!result.active)dialog.querySelector('.lineup-editor-columns').hidden=false;};
+    review.querySelector('[data-retake="'+kind+'"]').onclick=async()=>{review.hidden=true;pictureEdits[kind]={crop:[0,0,1,1],marker:[.5,.5]};const result=await call('creating',{action:'retake',kind});dialog.querySelector('[data-create-note]').textContent=result.text||'';if(!result.active)dialog.querySelector('.lineup-editor-columns').hidden=false;};
    }
   };
-  dialog.querySelector('[data-create]').onclick=async()=>{dialog.querySelector('.lineup-review')?.remove();pictureEdits=null;const result=await call('creating',{action:'start',map:key,builtin:row&&!row.mine?row.id:null});dialog.querySelector('[data-create-note]').textContent=result.text||'';};
+  dialog.querySelector('[data-create]').onclick=async()=>{dialog.querySelector('.lineup-review')?.remove();pictureEdits=null;shownShot=null;const result=await call('creating',{action:'start',map:key,builtin:row&&!row.mine?row.id:null});dialog.querySelector('[data-create-note]').textContent=result.text||'';};
   field('map').disabled=edit;
   field('map').onchange=async()=>{key=field('map').value;stand=land=aim=null;placedByUser=false;d=await call('data',{map:key});paint();position();};
-  form.onsubmit=async event=>{event.preventDefault();if(!stand||!overview()){dialog.querySelector('[data-error]').textContent='Choose a map and place your feet first.';return;}
+  form.noValidate=true;
+  form.onsubmit=async event=>{event.preventDefault();const err=dialog.querySelector('[data-error]');dialog.querySelector('.lineup-review')?.setAttribute('hidden','');dialog.querySelector('.lineup-editor-columns').hidden=false;
+   const missing=[...form.querySelectorAll('[required]')].find(f=>!f.disabled&&!String(f.value).trim());if(missing){err.textContent='Fill in '+(missing.closest('label')?.firstChild?.textContent||'every field').trim()+' first.';missing.focus();return;}
+   if(!stand||!overview()){dialog.querySelector('[data-error]').textContent='Choose a map and place your feet first.';return;}
    const values=Object.fromEntries(new FormData(form));const saved={id:row?.id,name:(values.name??row?.name??'').trim(),side:values.side??row?.side,type:values.type??row?.type,throw:values.throw??row?.throw,area:(values.area??row?.area??'').trim(),pictures:row?.pictures,steps:(values.steps??row?.steps?.join('\n')??'').split('\n').map(s=>s.trim()).filter(Boolean),stand,land,aim};
-   const result=await call('change',{action:row&&!row.mine?'save_pictures':'save',map:key,row:saved,overview:overview(),picture_edits:pictureEdits});
-   if(result.notice){dialog.querySelector('[data-error]').textContent=result.notice;return;}
+   let result;try{result=await call('change',{action:row&&!row.mine?'save_pictures':'save',map:key,row:saved,overview:overview(),picture_edits:pictureEdits});}catch(_){err.textContent='Could not save your change. Try again.';return;}
+   if(!result||result.available===false){err.textContent='Open the overlay panel, then save again.';return;}
+   if(result.notice){err.textContent=result.notice;return;}
    state.map=key;await close();window.overlayRenderers.lineups(root,result,call);
   };
   if(key!==d.document?.map)d=await call('data',{map:key});
