@@ -105,6 +105,10 @@ const view = { entries: [], open: {}, conflicts: {} };
 
 function words(entries) {
   const kinds = new Set(entries.map(e => e.kind === "app" && e.origin.includes("while CS2") ? "game" : e.kind));
+  if (entries.length && entries.every(e => e.script)) {
+    return ["Your new script", "Did it work?",
+            "You made this script. Keep it if it did what you wanted in the game, or remove it."];
+  }
   if (kinds.size === 1 && kinds.has("nvidia")) {
     return ["Changed outside the app", "NVIDIA settings changed",
             "Something changed these in the NVIDIA app or the NVIDIA Control Panel. Keep them if that was you."];

@@ -4293,6 +4293,37 @@ def _ingame_watcher(state: State):
     return watcher
 
 
+_APP_STATE: Dict[str, Any] = {}
+
+
+def _without_app_binds(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """A finding without the key changes the player's own configs make on
+    their own (profiles, scripts, the apply key). Reads the scanned config
+    files once per finding; the game only writes these files when it quits."""
+    from . import history
+
+    state = _APP_STATE.get("state")
+    result = getattr(state, "cfg_scan", None) if state is not None else None
+    if result is None:
+        return payload
+    texts = []
+    paths = [c.path for c in result.files.values()]
+    try:
+        from . import cfgscan
+        paths.append(Path(result.cfg_root) / cfgscan.active_layout_path(result))
+    except Exception:
+        pass
+    for extra in Path(result.cfg_root).glob("cs2cfg_*.cfg"):
+        paths.append(extra)
+    for path in paths:
+        try:
+            texts.append(Path(path).read_text(encoding="utf-8", errors="replace"))
+        except OSError:
+            continue
+    pairs, aliases = history.app_binds(texts)
+    return history.drop_app_binds(payload, pairs, aliases)
+
+
 def _ingame_found(account_id: str, payload: Dict[str, Any]) -> None:
     """A finding from CS2's own files goes straight into the change history.
 
@@ -4301,6 +4332,9 @@ def _ingame_found(account_id: str, payload: Dict[str, Any]) -> None:
     """
     from . import history, sessionwatch
 
+    payload = _without_app_binds(payload)
+    if not payload.get("count"):
+        return
     history.add_game_finding(account_id, payload)
     if not sessionwatch.game_running():
         history.request_review()
@@ -7327,6 +7361,8 @@ def make_handler(state: State):
 
 def _history_watchers(state: State) -> None:
     from . import history, nvwatch, sessionwatch
+
+    _APP_STATE["state"] = state
 
     def game_closed() -> None:
         # Read CS2's settings files the moment the game is gone, so the review

@@ -143,6 +143,66 @@ def add_event(kind: str, items: List[dict], account: str = "",
     return entry_id
 
 
+_BIND_ANY = re.compile(r'\b(un)?bind\s+"?([^"\s;]+)"?(?:\s+"([^"]*)"|\s+([^\s;"]+))?', re.IGNORECASE)
+_ALIAS_ANY = re.compile(r'\balias\s+"?([^"\s;]+)', re.IGNORECASE)
+
+
+def _norm_cmd(command: Optional[str]) -> str:
+    return re.sub(r"\s+", " ", (command or "").strip().strip('"').strip().rstrip(";")).lower()
+
+
+def app_binds(texts: List[str]) -> Tuple[set, set]:
+    """Every (key, command) any of the player's config files can put on a key
+    -- including binds inside scripts, profile files and the apply key's file
+    -- and every script name they define."""
+    try:
+        from .defaults import normalise
+    except Exception:           # pragma: no cover
+        normalise = lambda k: (k or "").lower()  # noqa: E731
+    pairs, aliases = set(), set()
+    for text in texts:
+        for m in _BIND_ANY.finditer(text or ""):
+            key = normalise(m.group(2))
+            command = "" if m.group(1) else (m.group(3) if m.group(3) is not None else m.group(4))
+            pairs.add((key, _norm_cmd(command)))
+        for m in _ALIAS_ANY.finditer(text or ""):
+            aliases.add(m.group(1).lower())
+    return pairs, aliases
+
+
+def drop_app_binds(payload: dict, pairs: set, aliases: set) -> dict:
+    """Take out of a gamewatch finding the key changes the app's own configs
+    made: a profile switch, a script that moves a key and puts it back, the
+    apply key. CS2 saves whatever was on the keys when it quit, so these show
+    up as "changed in the game" though the player never touched them."""
+    try:
+        from .defaults import normalise
+    except Exception:           # pragma: no cover
+        normalise = lambda k: (k or "").lower()  # noqa: E731
+    out = dict(payload)
+    sources = {}
+    for source, changes in (payload.get("sources") or {}).items():
+        if source != "Key binds":
+            sources[source] = changes
+            continue
+        kept = []
+        for c in changes:
+            key = normalise(str(c.get("key") or ""))
+            # Only what the key holds now decides it: a key the player moved
+            # in CS2's own menu away from one of the app's binds is still
+            # their change.
+            command = _norm_cmd(c.get("now"))
+            head = command.split(" ")[0] if command else ""
+            if (key, command) in pairs or (head and head in aliases):
+                continue
+            kept.append(c)
+        if kept:
+            sources[source] = kept
+    out["sources"] = sources
+    out["count"] = sum(len(v) for v in sources.values())
+    return out
+
+
 def add_game_finding(account: str, payload: dict) -> Optional[str]:
     """A gamewatch finding (``gamewatch.as_dict``), as one history entry."""
     items = []
@@ -183,7 +243,12 @@ def answer_of(target: str) -> Optional[str]:
 
 # Writes that are part of launching or of the app's own housekeeping, put
 # back by the app itself. Listing them would bury the changes people made.
-_ROUTINE = ("play:", "enable read-only cs2 server detection")
+_ROUTINE = ("play:", "enable read-only cs2 server detection",
+            # Keys the app moves and puts back on its own: switching keyboard
+            # profiles, and the apply key's file. The player chose the
+            # profile; the keys it moves are not changes to ask about.
+            "keyboard profile file", "restore default layout",
+            "apply-changes key", "live-apply script", "layout profile pins")
 
 _TITLES: Tuple[Tuple[str, str], ...] = (
     (r"^bind (.+) to (.+)$", "BIND"),
@@ -206,7 +271,7 @@ _TITLES: Tuple[Tuple[str, str], ...] = (
     (r"^pull profiles from cloud", "Brought profiles in from the cloud"),
     (r"^settings sync from another pc", "Settings from your other PC"),
     (r"^starter config", "Made a starter config"),
-    (r"^script builder: (.+)$", "Built a script: {0}"),
+    (r"^script builder: (.+)$", "New script added: {0}"),
     (r"^import a saved setup", "Imported a saved setup"),
     (r"^import:", "Imported a config"),
     (r"^region lock", "Region lock settings"),
@@ -561,7 +626,10 @@ def _app_entries(data: dict, limit: int) -> List[dict]:
         when = _stamp_time(s.stamp)
         answer = answers.get(entry_id)
         during_game = _in_session(when, sessions)
-        status = answer or (WAITING if during_game else KEPT)
+        # A new script is asked about until answered: did it work, keep it,
+        # or remove it.
+        is_script = (s.note or "").lower().startswith("script builder:")
+        status = answer or (WAITING if during_game or is_script else KEPT)
         items: List[dict] = []
         for original, (before, after) in _before_after(sets, index).items():
             if not _settings_file(original):
@@ -576,6 +644,8 @@ def _app_entries(data: dict, limit: int) -> List[dict]:
             "title": title_for(s.note), "area": area_for(s.note, list(s.files)),
             "origin": "In CS2 Auto Config" + (" while CS2 was running" if during_game else ""),
             "items": items, "can_put_back": True,
+            **({"script": True, "back_label": "Remove",
+                "question": "Did this script work in the game?"} if is_script else {}),
         })
         if len(out) >= limit:
             break
