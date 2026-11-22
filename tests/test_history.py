@@ -124,6 +124,51 @@ class AppChanges(Case):
         self.assertEqual(history.waiting()[0]["status"], history.WAITING)
 
 
+class AppOwnKeys(Case):
+    CONFIG = [
+        'bind "f" "+use"\n'
+        'alias "+shiftkey" "bind 1 buy_ak; bind 2 drop"\n'
+        'alias "-shiftkey" "bind 1 slot1; bind 2 slot2"\n'
+        'unbind "mouse5"\n',
+    ]
+
+    def finding(self, *changes):
+        return {"count": len(changes), "sources": {"Key binds": list(changes)}}
+
+    def test_keys_moved_by_scripts_and_profiles_are_not_shown(self):
+        pairs, aliases = history.app_binds(self.CONFIG)
+        found = history.drop_app_binds(self.finding(
+            {"key": "1", "was": "slot1", "now": "buy_ak"},       # script left it moved
+            {"key": "mouse5", "was": "+jump", "now": None},      # a profile took it off
+            {"key": "g", "was": "drop", "now": "+shiftkey"},      # a script name
+        ), pairs, aliases)
+        self.assertEqual(found["count"], 0)
+
+    def test_a_key_the_player_changed_in_the_game_still_shows(self):
+        pairs, aliases = history.app_binds(self.CONFIG)
+        found = history.drop_app_binds(self.finding(
+            {"key": "f", "was": "+use", "now": "+jump"}), pairs, aliases)
+        self.assertEqual(found["count"], 1)
+
+
+class NewScript(Case):
+    def test_a_new_script_asks_whether_it_worked(self):
+        cfg = self.root / "autoexec.cfg"
+        cfg.write_text('bind "f" "+use"\n', encoding="utf-8")
+        self.change(cfg, 'bind "f" "+use"\nalias "+x" "+jump"\nbind "j" "+x"\n', "script builder: Jump throw")
+        entry = history.waiting()[0]
+        self.assertEqual(entry["title"], "New script added: Jump throw")
+        self.assertEqual(entry["back_label"], "Remove")
+        self.assertTrue(history.swing(entry["id"].split(":", 1)[1], history.BACK)["ok"])
+        self.assertEqual(cfg.read_text(), 'bind "f" "+use"\n')
+
+    def test_profile_switches_are_not_listed(self):
+        cfg = self.root / "active_layout.vcfg"
+        cfg.write_text("", encoding="utf-8")
+        self.change(cfg, 'bind "f" "+jump"\n', "keyboard profile file (web)")
+        self.assertEqual(history.entries(), [])
+
+
 class Outside(Case):
     def test_game_finding_waits_and_answers(self):
         history.add_game_finding("1", {"after": time.time(), "sources": {

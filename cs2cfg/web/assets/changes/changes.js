@@ -37,13 +37,13 @@
     return v === null || v === undefined || v === "" ? "nothing" : v;
   }
 
-  function pick(id, status, canBack) {
+  function pick(id, status, canBack, backLabel) {
     return '<div class="chg-pick" role="group" aria-label="Keep or put back">' +
       '<button type="button" data-chist-answer="keep" data-id="' + esc(id) + '" aria-pressed="' +
         (status === "kept") + '">Keep</button>' +
       (canBack
         ? '<button type="button" data-chist-answer="back" data-id="' + esc(id) + '" aria-pressed="' +
-            (status === "back") + '">Put back</button>'
+            (status === "back") + '">' + esc(backLabel || "Put back") + "</button>"
         : "") +
       "</div>";
   }
@@ -77,9 +77,13 @@
         '<span class="chist-ic">' + icon(entry) + "</span>" +
         '<div class="chist-what"><b>' + esc(entry.title) + "</b>" +
           "<span>" + esc(entry.origin) + " · " + esc(when(entry.at)) + "</span></div>" +
-        '<span class="chist-state">' + esc(STATE[entry.status] || entry.status) + "</span>" +
-        pick(entry.id, entry.status === "waiting" ? "" : entry.status, entry.can_put_back) +
+        '<span class="chist-state">' + esc(entry.script && entry.status === "back" ? "Removed"
+          : (STATE[entry.status] || entry.status)) + "</span>" +
+        pick(entry.id, entry.status === "waiting" ? "" : entry.status, entry.can_put_back,
+             entry.back_label) +
       "</div>" +
+      (entry.question && entry.status === "waiting"
+        ? '<div class="chist-ask">' + esc(entry.question) + "</div>" : "") +
       '<div class="chist-items">' + visible.map(i => line(i, entry)).join("") + "</div>" +
       (items.length > SHOWN
         ? '<button type="button" class="chist-more" data-chist-more="' + esc(entry.id) + '">' +
