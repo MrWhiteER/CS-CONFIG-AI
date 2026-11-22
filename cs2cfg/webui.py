@@ -2698,13 +2698,21 @@ def _live_binds(result) -> Dict[str, Any]:
     return out
 
 
-def _made_keys(live: Dict[str, Any], alias: str) -> List[Any]:
+def _made_keys(live: Dict[str, Any], alias: str, result=None) -> List[Any]:
     """The binds that run a Script Builder script, in a steady order."""
     from . import scriptgen
 
-    return sorted((b for b in live.values()
-                   if alias and scriptgen._runs_own(b.body or "", alias)),
-                  key=lambda b: b.key.lower())
+    def runs(body: str, depth: int = 0) -> bool:
+        # A shared shift key runs the top script, which runs the one below.
+        if not alias or depth > 12 or not body:
+            return False
+        if scriptgen._runs_own(body, alias):
+            return True
+        head = body.strip().strip(chr(34)).lstrip("+-").split(";")[0].strip().lower()
+        below = scriptgen._own_block(result, head) if result is not None and head else None
+        return below is not None and runs(str(below["spec"].get("key_before") or ""), depth + 1)
+
+    return sorted((b for b in live.values() if runs(b.body or "")), key=lambda b: b.key.lower())
 
 
 def _mark_made(result, cards: list) -> None:
@@ -2722,7 +2730,7 @@ def _mark_made(result, cards: list) -> None:
             continue
         for block in scriptgen.own_blocks(text):
             spec = block["spec"]
-            on = _made_keys(live, str(spec.get("alias") or ""))
+            on = _made_keys(live, str(spec.get("alias") or ""), result)
             for card in cards:
                 if (card["file"] == config.relative and card["line"] <= block["last"]
                         and card["end_line"] >= block["first"]):
@@ -3815,7 +3823,7 @@ def _scriptgen_saved(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
                 alias = str(spec.get("alias") or "")
                 plug = next((p for p in blocks if p.file == config.relative
                              and p.line <= block["last"] and p.end_line >= block["first"]), None)
-                on = _made_keys(live, alias)
+                on = _made_keys(live, alias, result)
                 on_keys = [keys.label(b.key) for b in on]
                 on_bindings = [b.key for b in on]
                 binding = spec.get("binding") or ""
