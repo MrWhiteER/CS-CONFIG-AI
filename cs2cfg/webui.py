@@ -4004,6 +4004,29 @@ def _scriptgen_block(text: str, found) -> Optional[Dict[str, Any]]:
     return None
 
 
+def _scriptgen_chain_below(result, spec: Dict[str, Any], binding: str) -> Optional[str]:
+    """If this script already sits under other shift scripts on its key,
+    what it runs below itself (its earlier job); else None."""
+    from . import cfgscan, scriptgen
+
+    alias = scriptgen.slug(re.sub(r"\s+", " ", str(spec.get("name") or "")).strip())
+    held = _live_binds(result).get(cfgscan.physical_key(binding))
+    body = (held.body or "").strip().strip(chr(34)) if held is not None else ""
+    seen = set()
+    while body:
+        head = body.lstrip("+-").split(";")[0].strip().lower()
+        if not head or head in seen:
+            return None
+        seen.add(head)
+        found = scriptgen._own_block(result, head)
+        if found is None:
+            return None
+        if head == alias:
+            return None if len(seen) == 1 else str(found["spec"].get("key_before") or "")
+        body = str(found["spec"].get("key_before") or "")
+    return None
+
+
 def _scriptgen_on_other(state: State, spec: Dict[str, Any]) -> bool:
     """Whether the script's key now runs another Script Builder shift script."""
     from . import cfgscan, scriptgen
@@ -4098,6 +4121,14 @@ def _scriptgen_save(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     _scriptgen_now(result, spec, binding)
     if "key_now" in body:          # re-chaining: what the key did under this script
         spec["key_now"] = str(body["key_now"])
+    elif binding and spec.get("mode") == "shift":
+        # Saving again a script that other shift scripts on the same key are
+        # built on: it keeps its place, or the scripts would run each other
+        # in a loop and the key would lose its own job.
+        below = _scriptgen_chain_below(result, spec, binding)
+        if below is not None:
+            spec["key_now"] = below
+            body = dict(body, no_bind=True)
     key = _scriptgen_key(result, binding, "", state)
     built = scriptgen.build(spec, result, key["label"])
     if not built.ok:

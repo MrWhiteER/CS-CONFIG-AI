@@ -682,6 +682,13 @@ class SharedShiftKeyCase(Base):
         self.assertEqual(self.key(), "+smoke")
         self.assertTrue(self.aliases()["+smoke"].startswith("+nade;"))
 
+    def test_saving_the_bottom_again_keeps_the_chain(self):
+        body = spec("Smoke", "shift", {"id": "cmd:slot4"}, binding="mouse5")
+        body.update(target="scancode30", style="hold")
+        self.assertTrue(webui._scriptgen_save(self.state, {"spec": body, "binding": "mouse5"})["ok"])
+        self.assertEqual(self.key(), "+nade")
+        self.assertTrue(self.aliases()["+smoke"].startswith("+voicerecord;"))
+
     def test_deleting_the_top_gives_the_key_to_the_next(self):
         self.assertTrue(webui._script_delete(self.state, {"id": self.card("Nade")})["ok"])
         self.assertEqual(self.key(), "+molly")
