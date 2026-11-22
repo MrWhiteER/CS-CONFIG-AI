@@ -681,7 +681,18 @@ def play(
             return 1
         mark("launching")
         report("  launching through Steam...", "")
-        launch_via_steam(extra_args)
+        # Steam was open when the app started, so the app's own launch options
+        # could not be written into Steam yet (they are put back whenever the
+        # app is closed). Hand them to this launch instead.
+        try:
+            from . import pcstate
+
+            borrowed = pcstate.for_launch(user)
+        except Exception:
+            borrowed = ""
+        if borrowed:
+            report(f"  adding the app's launch options for this game: {borrowed}", "dim")
+        launch_via_steam(" ".join(part for part in (borrowed, extra_args) if part.strip()))
 
         if not wait:
             report("  launched; not waiting (desktop mode will not be restored automatically)", "warn")

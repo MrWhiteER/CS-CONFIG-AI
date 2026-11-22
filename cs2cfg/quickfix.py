@@ -985,6 +985,9 @@ def _fix_toggle_defender(_body: Dict[str, Any]) -> Dict[str, Any]:
             "$out.ok = $true\n")
     if not result.get("ok"):
         return result
+    from . import pcstate
+
+    pcstate.note("defender", path, now_excluded, not now_excluded)
     return {"ok": True, "excluded": not now_excluded,
             "detail": ("The exclusion has been removed -- CS2's folder is "
                        "scanned normally again." if now_excluded else
@@ -1047,6 +1050,9 @@ def _fix_toggle_fullscreen_opt(_body: Dict[str, Any]) -> Dict[str, Any]:
                 pass
     except OSError as exc:
         raise FixError(f"could not write the setting: {exc}")
+    from . import pcstate
+
+    pcstate.note("fullscreen_opt", str(exe), current or None, _fs_opt_read(exe) or None)
     return {"ok": True, "disabled": not now_disabled,
             "detail": ("Fullscreen Optimizations are back on for CS2."
                        if now_disabled else
@@ -1197,6 +1203,10 @@ def _fix_toggle_power(_body: Dict[str, Any]) -> Dict[str, Any]:
             record_path.unlink()
         except OSError:
             pass
+        if previous:
+            from . import pcstate
+
+            pcstate.note("power_plan", "active", guid, previous)
         return {"ok": True, "boosted": False,
                 "detail": "Back on the power plan this machine had before."}
 
@@ -1233,6 +1243,9 @@ def _fix_toggle_power(_body: Dict[str, Any]) -> Dict[str, Any]:
             indent=1), encoding="utf-8")
     except OSError:
         pass
+    from . import pcstate
+
+    pcstate.note("power_plan", "active", before, after)
     return {"ok": True, "boosted": True, "plan": target_name,
             "detail": f"Switched to {target_name}. The same button puts "
                       "the previous plan back."}

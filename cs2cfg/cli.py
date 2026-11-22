@@ -676,11 +676,57 @@ def cmd_uninstall_cleanup(ctx: Context) -> int:
     """
     from . import elevated
 
+    # First, while the helper is still there to switch the power plan and the
+    # Security exclusion back: every PC setting the app changed goes back to
+    # how it was before the app (cs2cfg/pcstate.py).
+    try:
+        from . import pcstate
+
+        pcstate.enable(True)
+        put = pcstate.put_back(live_ok=True)
+        for item in put.get("items", []):
+            print(f"{item['label']}: {item['text']}")
+        pcstate.disarm_next_sign_in()
+    except Exception as exc:  # never block the uninstaller
+        print(f"PC settings put-back skipped: {exc}")
+
     try:
         result = elevated.uninstall_cleanup()
         print(result.get("detail") or result.get("error") or "")
     except Exception as exc:  # never block the uninstaller
         print(f"helper cleanup skipped: {exc}")
+    return 0
+
+
+def cmd_pc_guard(ctx: Context) -> int:
+    """Started by the app. Waits for it to end, then gives the PC settings back."""
+    from . import pcstate
+
+    pcstate.enable(True)
+    try:
+        pcstate.guard(int(ctx.args.pid))
+    except Exception:
+        pass
+    return 0
+
+
+def cmd_pc_restore(ctx: Context) -> int:
+    """Put every PC setting the app changed back to how it was before.
+
+    Run at sign-in after Windows was shut down with the app open, and
+    available by hand. Does nothing while the app is open.
+    """
+    from . import pcstate
+
+    pcstate.enable(True)
+    if pcstate.app_running():
+        print("The app is open, so its settings stay on. Quit it to put them back.")
+        return 0
+    result = pcstate.put_back(wait_for_game=True)
+    for item in result.get("items", []):
+        print(f"{item['label']}: {item['text']}")
+    if not result.get("items"):
+        print("Nothing to put back.")
     return 0
 
 
@@ -1499,6 +1545,16 @@ def build_parser() -> argparse.ArgumentParser:
     stretch.add_argument("--list", action="store_true",
                          help="list matching windows ('--process *' for all)")
 
+    guard = sub.add_parser(
+        "pc-guard", parents=[shared], help=argparse.SUPPRESS,
+        description="Started by the app: gives PC settings back when it ends.")
+    guard.add_argument("--pid", required=True, type=int)
+
+    sub.add_parser(
+        "pc-restore", parents=[shared],
+        help="put the PC settings the app changed back to how they were",
+    )
+
     sub.add_parser(
         "uninstall-cleanup", parents=[shared],
         help=argparse.SUPPRESS,
@@ -1624,6 +1680,14 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Optional[List[str]] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    from .paths import is_frozen
+
+    if is_frozen():
+        # The shipped program records every PC setting it changes so it can
+        # be given back (cs2cfg/pcstate.py). Off under the test suite.
+        from . import pcstate
+
+        pcstate.enable(True)
     if args.command == "overlay-probe" and args.seconds is not None and args.seconds <= 0:
         parser.error("--seconds must be a positive integer")
 
@@ -1673,6 +1737,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         "net": cmd_net,
         "temp-helper": cmd_temp_helper,
         "uninstall-cleanup": cmd_uninstall_cleanup,
+        "pc-guard": cmd_pc_guard,
+        "pc-restore": cmd_pc_restore,
         "web": cmd_web,
         "desktop": cmd_desktop,
         "cfg": cmd_cfg,

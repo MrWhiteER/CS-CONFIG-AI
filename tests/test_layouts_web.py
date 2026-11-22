@@ -184,20 +184,29 @@ class TestProfileSelector(LayoutsWebCase):
 
 
 class TestSwitchingProfiles(LayoutsWebCase):
-    """Switching to a profile right now: writing its overrides onto the
-    standard layout in place, the way the new Keyboard-tab switcher bar
-    does when a profile tab (that isn't already active) is clicked."""
+    """Switching to a profile: profiles are separate keyboards. The default
+    layout's own files are never edited; a generated file the autoexec runs
+    last puts the profile's keys on and takes the default's other keys off."""
 
-    def test_switching_writes_the_overrides_onto_the_standard_file(self):
+    KEY_BINDS = "mrwhiteer/mainsettings/key_binds.vcfg"
+    ACTIVE = "mrwhiteer/active_layout.vcfg"
+
+    def read(self, relative):
+        return (self.cfg_root / relative).read_text(encoding="utf-8")
+
+    def test_switching_puts_the_profile_keys_on_without_editing_the_default(self):
+        before = self.read(self.KEY_BINDS)
         result = self.switch("mrwhiteer/lan/warmup.vcfg")
         self.assertTrue(result["ok"], result)
         self.assertTrue(result["changed"])
         self.assertEqual(set(result["applied"]), {"Mouse 3", "Mouse 4"})
 
-        text = (self.cfg_root / "mrwhiteer/mainsettings/key_binds.vcfg").read_text(
-            encoding="utf-8")
-        self.assertIn('bind "mouse3" "noclip"', text)
-        self.assertIn('bind "mouse4" "bot_place"', text)
+        self.assertEqual(self.read(self.KEY_BINDS), before)
+        active = self.read(self.ACTIVE)
+        self.assertIn('bind "mouse3" "noclip"', active)
+        self.assertIn('bind "mouse4" "bot_place"', active)
+        self.assertIn('exec "mrwhiteer/active_layout.vcfg"',
+                      self.read("mrwhiteer/autoexec.vcfg"))
 
     def test_the_profile_reads_back_as_active_afterwards(self):
         self.switch("mrwhiteer/lan/warmup.vcfg")
@@ -210,20 +219,16 @@ class TestSwitchingProfiles(LayoutsWebCase):
         self.assertTrue(result["ok"], result)
         self.assertEqual(result["applied"], ["Mouse 3"])
         self.assertIn("Mouse 4", result["skipped"])
-
-        text = (self.cfg_root / "mrwhiteer/mainsettings/key_binds.vcfg").read_text(
-            encoding="utf-8")
-        self.assertIn('bind "mouse4" "player_ping"', text, "pinned, so unchanged")
+        active = self.read(self.ACTIVE)
+        self.assertNotIn('"mouse4"', active, "pinned, so the default bind stays")
 
     def test_switching_to_an_already_active_profile_changes_nothing(self):
         self.switch("mrwhiteer/lan/warmup.vcfg")
-        before = (self.cfg_root / "mrwhiteer/mainsettings/key_binds.vcfg").read_bytes()
-
+        before = self.read(self.ACTIVE)
         result = self.switch("mrwhiteer/lan/warmup.vcfg")
         self.assertTrue(result["ok"], result)
         self.assertFalse(result["changed"])
-        after = (self.cfg_root / "mrwhiteer/mainsettings/key_binds.vcfg").read_bytes()
-        self.assertEqual(before, after)
+        self.assertEqual(before, self.read(self.ACTIVE))
 
     def test_unchanged_profile_still_returns_apply_keys_for_panel(self):
         self.switch("mrwhiteer/lan/warmup.vcfg")
@@ -247,13 +252,10 @@ class TestSwitchingProfiles(LayoutsWebCase):
         result = self.switch("mrwhiteer/lan/competitive.vcfg")
         self.assertTrue(result["ok"], result)
         self.assertFalse(result["changed"])
-        self.assertTrue(result["empty"], "nothing to compare, so not the same as already active")
+        self.assertTrue(result["empty"], "nothing on it, so switching would take every key away")
+        self.assertTrue(self.profiles()["default_active"])
 
     def test_a_copy_sharing_the_same_binds_does_not_also_read_as_active(self):
-        """Regression: "active" used to mean "the standard layout happens to
-        match this profile's own binds" -- which lit up a copy right
-        alongside the original it was copied from, since both define the
-        exact same overrides. Only the one actually switched to should."""
         self.copy("mrwhiteer/lan/warmup.vcfg", "Warmup Copy")
         self.switch("mrwhiteer/lan/warmup.vcfg")
         found = {p["file"]: p for p in self.profiles()["profiles"]}
@@ -274,48 +276,48 @@ class TestSwitchingProfiles(LayoutsWebCase):
 
 
 class TestDefault(LayoutsWebCase):
-    """Going back to Default: the one way out of a profile that got applied,
-    restoring every key a profile has ever overridden to what it was the
-    first time that happened."""
+    """Going back to Default: your own keys exactly as your files have them."""
 
-    def test_switching_away_and_back_to_default_restores_the_original_binds(self):
+    ACTIVE = "mrwhiteer/active_layout.vcfg"
+
+    def test_switching_away_and_back_leaves_the_default_files_as_they_were(self):
         before = (self.cfg_root / "mrwhiteer/mainsettings/key_binds.vcfg").read_bytes()
         self.switch("mrwhiteer/lan/warmup.vcfg")
-
         result = self.default()
         self.assertTrue(result["ok"], result)
         self.assertTrue(result["changed"])
-        self.assertEqual(set(result["applied"]), {"Mouse 3", "Mouse 4"})
         after = (self.cfg_root / "mrwhiteer/mainsettings/key_binds.vcfg").read_bytes()
         self.assertEqual(before, after)
+        active = (self.cfg_root / self.ACTIVE).read_text(encoding="utf-8")
+        self.assertNotIn("bind ", active)
+        self.assertNotIn("unbind ", active)
 
     def test_default_is_active_again_afterwards(self):
         self.switch("mrwhiteer/lan/warmup.vcfg")
         self.default()
         self.assertTrue(self.profiles()["default_active"])
 
-    def test_default_survives_switching_through_a_second_profile(self):
-        """The original value is remembered the *first* time a key is ever
-        overridden -- switching to a second profile that touches the same
-        key must not forget it."""
-        self.copy("mrwhiteer/lan/warmup.vcfg", "Second")
-        self.switch("mrwhiteer/lan/warmup.vcfg")
-        self.switch("mrwhiteer/lan/second.vcfg")
+    def test_old_switches_written_into_the_default_files_are_still_put_back(self):
+        """Older versions wrote a profile's keys into key_binds.vcfg and
+        recorded the originals; Default still restores those once."""
+        from cs2cfg import layouts
 
-        before = (self.cfg_root / "mrwhiteer/mainsettings/key_binds.vcfg").read_bytes()
+        path = self.cfg_root / "mrwhiteer/mainsettings/key_binds.vcfg"
+        path.write_text(path.read_text(encoding="utf-8").replace(
+            '"say custom text"', '"noclip"'), encoding="utf-8")
+        layouts.record_baseline(self.collection, "mrwhiteer/mainsettings/key_binds.vcfg",
+                                {"mouse3": "say custom text"})
+        self.state.cfg_scan = cfgscan.scan(self.collection, cfg_root=self.cfg_root)
         result = self.default()
-        self.assertTrue(result["ok"], result)
-        after = (self.cfg_root / "mrwhiteer/mainsettings/key_binds.vcfg").read_bytes()
-        self.assertNotEqual(before, after)
-        text = after.decode("utf-8")
-        self.assertIn('bind "mouse3" "say custom text"', text)
-        self.assertIn('bind "mouse4" "player_ping"', text)
+        self.assertEqual(result["applied"], ["Mouse 3"])
+        self.assertIn('bind "mouse3" "say custom text"', path.read_text(encoding="utf-8"))
 
     def test_default_with_nothing_ever_switched_changes_nothing(self):
         result = self.default()
         self.assertTrue(result["ok"], result)
         self.assertFalse(result["changed"])
         self.assertTrue(result["empty"])
+        self.assertFalse((self.cfg_root / self.ACTIVE).exists())
 
     def test_default_once_already_restored_changes_nothing_further(self):
         self.switch("mrwhiteer/lan/warmup.vcfg")
@@ -323,13 +325,7 @@ class TestDefault(LayoutsWebCase):
         result = self.default()
         self.assertTrue(result["ok"], result)
         self.assertFalse(result["changed"])
-        self.assertFalse(result["empty"], "something has been tracked, it just already matches")
-
-    def test_a_pinned_key_is_untouched_by_default_too(self):
-        self.pin("mrwhiteer/lan/warmup.vcfg", ["mouse4"])
-        self.switch("mrwhiteer/lan/warmup.vcfg")
-        result = self.default()
-        self.assertEqual(result["applied"], ["Mouse 3"])
+        self.assertFalse(result["empty"], "a profile has been used, it just is not on now")
 
 
 class TestExportImport(LayoutsWebCase):

@@ -66,6 +66,13 @@ const media=homeMotion.reduced;homeMotion.reduced={matches:true};homeNumber(node
 const panel=document.querySelector('[data-panel="launcher"]');panel.classList.add('hidden');homePause();hardwarePause();check('hidden graph stops frames',!hardwareGraph.raf);check('hidden Launcher pauses animation scheduler',!homeMotion.raf && document.documentElement.classList.contains('home-paused'));panel.classList.remove('hidden');homePause();
 for(const theme of ${JSON.stringify(themes)}){if(theme==='violet')delete document.documentElement.dataset.theme;else document.documentElement.dataset.theme=theme;check('theme '+theme+' keeps controls visible',getComputedStyle($('play')).display!=='none' && getComputedStyle(node.querySelector('.val')).fill!=='none');const tones=[...document.querySelectorAll('.hardware-line')].map(el=>getComputedStyle(el).stroke);check('theme '+theme+' keeps chart series distinct',new Set(tones).size===4&&!tones.includes('none'));}delete document.documentElement.dataset.theme;
 const wasReduced=homeMotion.reduced;homeMotion.reduced={matches:true};hardwareUpdate({at:108,history,gpu:{}});check('reduced motion skips chart scrolling',hardwareGraph.offset===0&&!hardwareGraph.raf);homeMotion.reduced=wasReduced;
+const lineX=key=>{const n=$('hardware-chart').querySelector('[data-hardware="'+key+'"] .hardware-line').getAttribute('d').replace(/[MC]/g,' ').split(' ').filter(Boolean).map(Number);return [n[0],n.at(-2)]};
+hardwareUpdate({at:110,history:{cpu:[30],gpu:[40],ram:[50],vram:[20]},gpu:{}});check('first reading already spans the graph',JSON.stringify(lineX('cpu'))==='[0,600]');
+hardwareUpdate({at:112,history:{cpu:[30,35,32],gpu:[40,44,41],ram:[50,50,51],vram:[20,21,22]},gpu:{}});check('short history spreads across the full width',JSON.stringify(lineX('gpu'))==='[0,600]'&&hardwareGraph.offset===0&&!hardwareGraph.raf);
+hardwareInspect(0);check('spread history keeps real sample ages',$('hardware-tooltip').textContent.includes('~4s ago'));hardwareClearCursor();
+const tempHistory={...history,'temp-cpu':history.cpu.map(v=>v+30),'temp-gpu':history.gpu.map(v=>v+5),'temp-system':history.ram.map(()=>36)};
+hardwareUpdate({at:114,history:tempHistory,gpu:{temperature:60},temps:{parts:[{part:'cpu',known:true,celsius:60}]}});check('temperatures use the app history',hardwareGraph.temperatures['temp-cpu'].length===60);
+hardwareUpdate({at:116,history:tempHistory,gpu:{temperature:60}});hardwarePause();
 
 check('all sixteen hardware glyphs are distinct', Object.keys(HW_ART).length===16&&new Set(Object.values(HW_ART)).size===16);
 const specimen=document.createElement('div');specimen.innerHTML=Object.keys(HW_ART).map(k=>hwIcon(k)).join('');document.body.append(specimen);
@@ -198,6 +205,7 @@ if(location.hash.includes('settings-account')){panel.classList.add('hidden');set
 if(location.hash.includes('preset')){presetBegin('balanced');presetReveal(sample);await new Promise(r=>setTimeout(r,780));clearTimeout(presetSession.timer);$('intents').scrollIntoView({block:'center'});}
 if(location.hash.includes('connection-offline'))renderNet({...measured,download:{mbps:null,error:'offline'}});
 if(location.hash.includes('connection'))$('chip-net').click();
+if(location.hash.includes('cold')){hardwareGraph.at=null;hardwareGraph.data={};hardwareUpdate({at:200,history:{cpu:[22,31,27],gpu:[48,55,51],ram:[52,52,53],vram:[18,19,19]},gpu:{}});hardwarePause();$('live-card').scrollIntoView({block:'start'})}
 if(location.hash.includes('system')){$('live-card').scrollIntoView({block:'start'});hardwareInspect(400)}
 if(location.hash.includes('sound')){const card=$('audio-card');document.querySelector('.scroll').replaceChildren(card);card.scrollIntoView()}
 if(location.hash.includes('machine')){const card=$('machine-card'),frame=document.createElement('div');frame.className='settings-box';frame.append(card);document.querySelector('.scroll').replaceChildren(frame);card.scrollIntoView()}

@@ -369,10 +369,25 @@ def set_scaling(display_id: int, scaling: int = PREFERRED,
     """
     try:
         with _Config() as config:
-            return config.set_scaling(display_id, scaling, commit=apply,
-                                      persist=persist)
+            result = config.set_scaling(display_id, scaling, commit=apply,
+                                        persist=persist)
     except ScalingError as exc:
         return {"ok": False, "changed": False, "error": str(exc)}
+    _note(display_id, result, persist)
+    return result
+
+
+def _note(display_id: int, result: dict, persist: bool) -> None:
+    """Tell cs2cfg.pcstate, which puts scaling back whenever the app is not running.
+
+    ``persist`` marks a change meant to stay while the app runs; the
+    launcher's own per-game change is only ever put back.
+    """
+    if result.get("ok") and result.get("changed"):
+        from . import pcstate
+
+        pcstate.note("scaling", str(display_id), result.get("previous"),
+                     result.get("scaling"), reapply=persist)
 
 
 def ensure_fill(display_id: Optional[int] = None, apply: bool = False,
@@ -409,6 +424,7 @@ def ensure_fill(display_id: Optional[int] = None, apply: bool = False,
                                         commit=apply, persist=persist)
             result["display_id"] = chosen.display_id
             result["was"] = chosen.name
+            _note(chosen.display_id, result, persist)
             return result
     except ScalingError as exc:
         return {"ok": False, "changed": False, "error": str(exc)}
