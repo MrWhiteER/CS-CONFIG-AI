@@ -87,6 +87,7 @@ class CreatingSession:
         self.hotkey = None
         self.text = ''
         self.shot = 0
+        self.id = uuid.uuid4().hex
         self.lock = threading.RLock()
 
     @property
@@ -149,7 +150,7 @@ class CreatingSession:
                     if kind not in self.previews:
                         self.previews[kind] = 'data:image/png;base64,'+base64.b64encode(png(*frame)).decode('ascii')
             return {'active':self.active, 'text':self.text,
-                    'review':bool(not self.active and len(self.frames)==2), 'shot':self.shot,
+                    'review':bool(not self.active and len(self.frames)==2), 'shot':self.shot, 'session':self.id,
                     'frames':dict(self.previews) if not self.active else {}}
 
     def cancel(self):

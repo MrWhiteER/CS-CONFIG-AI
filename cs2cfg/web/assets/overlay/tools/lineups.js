@@ -122,11 +122,11 @@
   dialog.querySelector('[data-land]').onclick=()=>{placing='land';if(!land&&overview()){land={radar_x:overview().width*.6,radar_y:overview().height*.4};paint();}};
   dialog.querySelector('[data-clear-land]').onclick=()=>{land=null;placing='stand';paint();};
   dialog.querySelector('[data-position]').onclick=position;
-  let shownShot=null;
-  const removePictures=async()=>{dialog.querySelector('.lineup-review')?.remove();pictureEdits=null;shownShot=null;await call('creating',{action:'cancel'});dialog.querySelector('.lineup-editor-columns').hidden=false;dialog.querySelector('[data-create-note]').textContent='Pictures removed. Take pictures again or save without them.';};
+  let shownShot=null,shownSession=null;const dropped=new Set();
+  const removePictures=async()=>{if(shownSession)dropped.add(shownSession);dialog.querySelector('.lineup-review')?.remove();pictureEdits=null;shownShot=null;await call('creating',{action:'cancel'});dialog.querySelector('.lineup-editor-columns').hidden=false;dialog.querySelector('[data-create-note]').textContent='Pictures removed. Take pictures again or save without them.';};
   root.updateLineupCapture=capture=>{
-   if(!capture?.review||capture.shot===shownShot)return;
-   const replaced=shownShot!==null;shownShot=capture.shot;dialog.querySelector('.lineup-review')?.remove();
+   if(!capture?.review||dropped.has(capture.session)||(capture.session===shownSession&&capture.shot===shownShot))return;
+   const replaced=shownShot!==null&&capture.session===shownSession;shownShot=capture.shot;shownSession=capture.session;dialog.querySelector('.lineup-review')?.remove();
    pictureEdits={stand:replaced&&pictureEdits?pictureEdits.stand:{crop:[0,0,1,1],marker:[.5,.5]},aim:replaced&&pictureEdits?pictureEdits.aim:{crop:[0,0,1,1],marker:[.5,.5]}};
    const review=document.createElement('section');review.className='lineup-review';
    review.innerHTML='<h3>Review pictures</h3><p>Crop removes the game HUD. Drag a crop box, then place the feet or aim ring. Keep whole leaves the full picture.</p><div class="lineup-review-pair">'+['stand','aim'].map(k=>'<div><h4>'+(k==='stand'?'Where you stand':'Where you aim')+'</h4><canvas data-review="'+k+'" aria-label="Drag to crop or place marker"></canvas><button type="button" data-crop="'+k+'">Crop</button> <button type="button" data-whole="'+k+'">Keep whole</button> <button type="button" data-mark="'+k+'">Place '+(k==='stand'?'feet':'aim ring')+'</button> <button type="button" data-retake="'+k+'">Retake</button></div>').join('')+'</div><button type="button" data-done-review>Keep pictures</button> <button type="button" data-remove-pictures>Remove pictures</button>';
@@ -147,7 +147,7 @@
     review.querySelector('[data-retake="'+kind+'"]').onclick=async()=>{review.hidden=true;pictureEdits[kind]={crop:[0,0,1,1],marker:[.5,.5]};const result=await call('creating',{action:'retake',kind});dialog.querySelector('[data-create-note]').textContent=result.text||'';if(!result.active)dialog.querySelector('.lineup-editor-columns').hidden=false;};
    }
   };
-  dialog.querySelector('[data-create]').onclick=async()=>{dialog.querySelector('.lineup-review')?.remove();pictureEdits=null;shownShot=null;const result=await call('creating',{action:'start',map:key,builtin:row&&!row.mine?row.id:null});dialog.querySelector('[data-create-note]').textContent=result.text||'';};
+  dialog.querySelector('[data-create]').onclick=async()=>{if(shownSession)dropped.add(shownSession);dialog.querySelector('.lineup-review')?.remove();pictureEdits=null;shownShot=null;shownSession=null;const result=await call('creating',{action:'start',map:key,builtin:row&&!row.mine?row.id:null});dialog.querySelector('[data-create-note]').textContent=result.text||'';};
   field('map').disabled=edit;
   field('map').onchange=async()=>{key=field('map').value;stand=land=aim=null;placedByUser=false;d=await call('data',{map:key});paint();position();};
   form.noValidate=true;
