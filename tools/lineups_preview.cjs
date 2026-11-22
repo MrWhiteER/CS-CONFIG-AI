@@ -125,6 +125,7 @@ const checks=`(async()=>{try{
  const cropBounds=canvas.getBoundingClientRect(),event=(x,y)=>({pointerId:1,clientX:cropBounds.left+x*cropBounds.width,clientY:cropBounds.top+y*cropBounds.height});
  review.querySelector('[data-crop="stand"]').click();canvas.onpointerdown(event(.1,.2));canvas.onpointermove(event(.9,.8));canvas.onpointerup(event(.9,.8));
  canvas.onpointerdown(event(.3,.4));canvas.onpointerup(event(.3,.4));
+ personal.updateLineupCapture({review:true,shot:2,frames:fixture.data.lineups.pictures[fixture.data.lineups.document.lineups[0].id]});if(personal.querySelectorAll('.lineup-review').length!==1||!personal.querySelector('[data-remove-pictures]'))throw Error('New pictures did not replace the review');
  review.querySelector('[data-done-review]').click();
  const finalForm=personal.querySelector('form');finalForm.elements.name.value='Picture lineup';finalForm.elements.area.value='Mid';finalForm.elements.steps.value='Stand by the wall.';finalForm.dispatchEvent(new Event('submit',{cancelable:true}));await flush();
  if(Math.abs(saved.picture_edits.stand.crop[0]-.1)>.001||Math.abs(saved.picture_edits.stand.crop[2]-.8)>.001||Math.abs(saved.picture_edits.stand.marker[0]-.3)>.001)throw Error('Crop or marker coordinates incorrect');

@@ -158,6 +158,10 @@ def creating(state, args=None):
         return {'active': False, 'text': str(exc) if isinstance(exc, ValueError) or str(exc).startswith('The picture key') else 'Pictures could not start. Keep CS2 visible and try again.'}
 
 
+PLAIN_ERRORS = {'Take pictures first.', 'Take both pictures first.', 'Choose a larger crop.',
+                'Choose a crop inside the picture.', 'Place the picture marker.', 'This lineup is no longer available.'}
+
+
 def change(state, args=None):
     from ...lineups import mine
     args = args or {}
@@ -194,7 +198,11 @@ def change(state, args=None):
         else:
             raise ValueError('Choose a lineup action.')
         state.overlay.lineups_notice = ''
-    except (ValueError, OSError, TypeError, KeyError):
+    except ValueError as exc:
+        state.overlay.lineups_notice = 'Could not save your change. ' + (str(exc) if str(exc) in PLAIN_ERRORS else 'Check the fields and try again.')
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception('lineup change failed')
         state.overlay.lineups_notice = 'Could not save your change. Check the fields and try again.'
     result = data(state, {'map': key})
     result['undo_available'] = bool(getattr(state.overlay, 'lineups_undo', None))

@@ -86,6 +86,7 @@ class CreatingSession:
         self.waiting = None
         self.hotkey = None
         self.text = ''
+        self.shot = 0
         self.lock = threading.RLock()
 
     @property
@@ -131,6 +132,7 @@ class CreatingSession:
                 return
             self.frames[kind] = frame
             self.previews.pop(kind, None)
+            self.shot += 1
             if kind == 'stand' and 'aim' not in self.frames:
                 self.waiting = 'aim'
                 self.text = 'Now aim where you throw and press ' + self.key
@@ -147,7 +149,7 @@ class CreatingSession:
                     if kind not in self.previews:
                         self.previews[kind] = 'data:image/png;base64,'+base64.b64encode(png(*frame)).decode('ascii')
             return {'active':self.active, 'text':self.text,
-                    'review':bool(not self.active and len(self.frames)==2),
+                    'review':bool(not self.active and len(self.frames)==2), 'shot':self.shot,
                     'frames':dict(self.previews) if not self.active else {}}
 
     def cancel(self):
