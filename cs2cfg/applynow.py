@@ -435,6 +435,16 @@ def refresh(result: Optional[cfgscan.ScanResult],
     else:
         text = full
         _save_baseline(target, _entries(full))
+    # Map setups (warmup, 5v5 ...): after leaving their map the same key
+    # also puts every key and setting they touched back to normal.
+    try:
+        from . import mapconfig
+
+        tail = mapconfig.apply_tail(result)
+    except Exception:
+        tail = ""
+    if tail:
+        text = text.rstrip("\n") + "\n" + tail + "\n"
     if text != previous:
         target.parent.mkdir(parents=True, exist_ok=True)
         cfglang.write_config_text(target, text, "utf-8")

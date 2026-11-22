@@ -172,6 +172,26 @@ def compare(before: Snapshot, after: Snapshot,
     return changes
 
 
+# Changes the app itself caused through the game -- a map setup's binds that
+# CS2 saved at shutdown, for one -- are not "you changed". Each test gets a
+# Change and returns True for one of those. Set by the server.
+APP_OWNED: List = []
+
+
+def _app_owned(change: Change) -> bool:
+    for test in list(APP_OWNED):
+        try:
+            if test(change):
+                return True
+        except Exception:
+            continue
+    return False
+
+
+def without_app_owned(changes: List[Change]) -> List[Change]:
+    return [c for c in changes if not _app_owned(c)]
+
+
 # -- keeping snapshots between runs -----------------------------------------
 
 def _store() -> Path:
@@ -300,11 +320,16 @@ class Watcher:
         if baseline is None:
             save_baseline(self.account_id, current)
             return
-        changes = compare(baseline, current)
+        moved = compare(baseline, current)
+        changes = without_app_owned(moved)
         with self._lock:
             self._checked = time.time()
             if changes:
                 self._pending = as_dict(changes, baseline, current)
+        if moved and not changes:
+            # Only the app's own doing moved: nothing to report, but the
+            # starting point still moves on so it is never reported later.
+            save_baseline(self.account_id, current)
         if changes:
             # The baseline moves forward so the same session is not reported
             # again on the next write; the finding itself is kept above.
