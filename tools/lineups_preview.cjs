@@ -120,12 +120,12 @@ const checks=`(async()=>{try{
  personal.querySelector('[data-create]').click();await flush();
  if(!personal.querySelector('[data-create-note]').textContent.includes('press F9'))throw Error('Picture wait missing');
  personal.updateLineupCapture({review:true,frames:fixture.data.lineups.pictures[fixture.data.lineups.document.lineups[0].id]});
- const review=personal.querySelector('.lineup-review');if(!review||review.querySelectorAll('canvas').length!==2)throw Error('Picture review missing');
+ let review=personal.querySelector('.lineup-review');if(!review||review.querySelectorAll('canvas').length!==2)throw Error('Picture review missing');
+ personal.updateLineupCapture({review:true,shot:2,session:'s1',frames:fixture.data.lineups.pictures[fixture.data.lineups.document.lineups[0].id]});if(personal.querySelectorAll('.lineup-review').length!==1||!personal.querySelector('[data-remove-pictures]'))throw Error('New pictures did not replace the review');personal.querySelector('[data-remove-pictures]').click();await flush();personal.updateLineupCapture({review:true,shot:2,session:'s1',frames:fixture.data.lineups.pictures[fixture.data.lineups.document.lineups[0].id]});if(personal.querySelector('.lineup-review'))throw Error('Removed pictures came back');personal.updateLineupCapture({review:true,shot:1,session:'s2',frames:fixture.data.lineups.pictures[fixture.data.lineups.document.lineups[0].id]});if(personal.querySelectorAll('.lineup-review').length!==1)throw Error('Fresh pictures missing');review=personal.querySelector('.lineup-review');
  const canvas=review.querySelector('canvas');let held=false;canvas.setPointerCapture=()=>{held=true;};canvas.hasPointerCapture=()=>held;canvas.releasePointerCapture=()=>{held=false;};
  const cropBounds=canvas.getBoundingClientRect(),event=(x,y)=>({pointerId:1,clientX:cropBounds.left+x*cropBounds.width,clientY:cropBounds.top+y*cropBounds.height});
  review.querySelector('[data-crop="stand"]').click();canvas.onpointerdown(event(.1,.2));canvas.onpointermove(event(.9,.8));canvas.onpointerup(event(.9,.8));
  canvas.onpointerdown(event(.3,.4));canvas.onpointerup(event(.3,.4));
- personal.updateLineupCapture({review:true,shot:2,frames:fixture.data.lineups.pictures[fixture.data.lineups.document.lineups[0].id]});if(personal.querySelectorAll('.lineup-review').length!==1||!personal.querySelector('[data-remove-pictures]'))throw Error('New pictures did not replace the review');
  review.querySelector('[data-done-review]').click();
  const finalForm=personal.querySelector('form');finalForm.elements.name.value='Picture lineup';finalForm.elements.area.value='Mid';finalForm.elements.steps.value='Stand by the wall.';finalForm.dispatchEvent(new Event('submit',{cancelable:true}));await flush();
  if(Math.abs(saved.picture_edits.stand.crop[0]-.1)>.001||Math.abs(saved.picture_edits.stand.crop[2]-.8)>.001||Math.abs(saved.picture_edits.stand.marker[0]-.3)>.001)throw Error('Crop or marker coordinates incorrect');
