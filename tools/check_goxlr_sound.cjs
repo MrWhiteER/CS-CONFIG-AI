@@ -17,7 +17,16 @@ const file=path.join(work,'preview.html');fs.writeFileSync(file,html.replace(/<s
 const chrome=process.env.CHROME_PATH||'C:/Program Files/Google/Chrome/Application/chrome.exe';
 (async()=>{const browser=cp.spawn(chrome,['--headless','--no-sandbox','--disable-gpu','--allow-file-access-from-files','--remote-debugging-port=0','--user-data-dir='+path.join(work,'chrome'),'about:blank'],{windowsHide:true,stdio:['ignore','ignore','pipe']});let socket;try{
 const endpoint=await new Promise((resolve,reject)=>{let log='';browser.stderr.on('data',b=>{log+=b;const m=log.match(/DevTools listening on (ws:\/\/[^\s]+)/);if(m)resolve(m[1])});browser.on('error',reject);setTimeout(()=>reject(Error('Chrome startup')),15000).unref()});socket=new WebSocket(endpoint);await new Promise(r=>socket.onopen=r);let id=0;const pending=new Map();socket.onmessage=e=>{const r=JSON.parse(e.data),p=pending.get(r.id);if(p){pending.delete(r.id);r.error?p.reject(r.error):p.resolve(r.result)}};const send=(method,params={},sessionId)=>new Promise((resolve,reject)=>{const n=++id;pending.set(n,{resolve,reject});socket.send(JSON.stringify({id:n,method,params,sessionId}))});const {targetId}=await send('Target.createTarget',{url:'about:blank'}),{sessionId}=await send('Target.attachToTarget',{targetId,flatten:true});const cmd=(m,p)=>send(m,p,sessionId),evalJS=async expression=>{const r=await cmd('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true,replMode:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value};
-await cmd('Emulation.setDeviceMetricsOverride',{width:1366,height:900,deviceScaleFactor:1,mobile:false});await cmd('Page.enable');await cmd('Page.navigate',{url:pathToFileURL(file).href});await new Promise(r=>setTimeout(r,400));let checks=0;const check=async(s,label=s)=>{assert(await evalJS(s),label);checks++};
+await cmd('Emulation.setDeviceMetricsOverride',{width:1366,height:900,deviceScaleFactor:1,mobile:false});
+await cmd('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
+await cmd('Page.enable');await cmd('Page.navigate',{url:pathToFileURL(file).href});
+let ready=false;
+for (let i=0; i<100 && !ready; i++) {
+  ready=await evalJS("typeof $ === 'function' && !!$('audio-output')");
+  if (!ready) await new Promise(r=>setTimeout(r,50));
+}
+assert(ready,'Sound fixture initialized');
+let checks=0;const check=async(s,label=s)=>{assert(await evalJS(s),label);checks++};
 const shot=async name=>{await evalJS(`document.getAnimations().forEach(a=>{a.pause();a.currentTime=1000});document.querySelector('.scroll').scrollTop+=document.getElementById('settings-subtabs').getBoundingClientRect().top-84`);const r=await cmd('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(out,'sec7-'+name+'.png'),Buffer.from(r.data,'base64'))};
 await check(`$('audio-output').value==='headphones'&&$('audio-input').value==='chat'`,'existing Sound renderer');
 if(before){await shot('before-sound');console.log('Sound before: '+checks+' passed');return;}

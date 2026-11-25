@@ -77,6 +77,9 @@ const geometry=()=>{
  return [...document.querySelectorAll('.kb-piece')].map(e=>{const b=e.getBoundingClientRect();return [b.left-scene.left,b.top-scene.top,b.width,b.height];});
 };
 const sameGeometry=(a,b)=>a.every((row,i)=>row.every((v,j)=>Math.abs(v-b[i][j])<.1));
+const layoutFreeze=document.createElement('style');
+layoutFreeze.textContent='.kb-scene *, .app { animation: none !important; transition: none !important }';
+document.head.append(layoutFreeze);
 for(const theme of ['violet','ember','carbon','acid','daylight','paper','pro']){
  document.documentElement.dataset.theme=theme;
  const palette=['script','custom','bound','free','missing','adrift','selected'].map(state=>getComputedStyle(document.querySelector('.kb-legend .dot.'+state)).borderColor+' '+getComputedStyle(document.querySelector('.kb-legend .dot.'+state)).backgroundColor);
@@ -84,14 +87,15 @@ for(const theme of ['violet','ember','carbon','acid','daylight','paper','pro']){
  for(const rail of [186,340]){
   document.querySelector('.app').style.setProperty('--rail',rail+'px');
   for(const shape of ['two','four']){
-   mouseShape=shape;renderKeyboard();await settle();const baseline=geometry();
+   mouseShape=shape;renderKeyboard();await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));const baseline=geometry();
    for(const [i,saved] of fixtures.entries()){
-    kbLoadFocus({kb_layout:saved});renderKeyboard();await settle();checkLayout(theme+'/'+rail+'/'+i+'/'+shape);
+    kbLoadFocus({kb_layout:saved});renderKeyboard();await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));checkLayout(theme+'/'+rail+'/'+i+'/'+shape);
     check('legacy geometry ignored',sameGeometry(baseline,geometry()));
    }
   }
  }
 }
+layoutFreeze.remove();
 check('positions never saved',!calls.some(c=>c.route==='/api/prefs'&&(c.body?.kb_layout||c.body?.kb_shown)));
 for(const [saved,expected] of [[{kb_shown:{board:false,mouse:true}},'mouse'],[{kb_shown:{board:true,mouse:false}},'board'],[{kb_shown:{board:false,mouse:false}},'both'],[{kb_focus:'both',kb_shown:{board:false}},'both'],[{kb_focus:'invalid'},'both']]){
  kbLoadFocus(saved);check('focus preference migration',kbFocus===expected);

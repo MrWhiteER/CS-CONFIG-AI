@@ -66,6 +66,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
       return result.result.value;
     };
     await send('Emulation.setDeviceMetricsOverride', {width:1400,height:860,deviceScaleFactor:1,mobile:false});
+    await send('Emulation.setEmulatedMedia', {features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
     await send('Page.navigate', {url:pathToFileURL(preview).href});
     for (let n=0; n<100 && !await evaluate('!!document.getElementById("sp-panel")'); n++) await delay(50);
     await evaluate('document.getElementById("sp-toggle").click()');
