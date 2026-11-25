@@ -5744,9 +5744,21 @@
 .boot-content .boot-mark { width:82px; height:82px; }
 [data-panel="launcher"] { --home-cut:polygon(0 0,calc(100% - 20px) 0,100% 20px,100% 100%,20px 100%,0 calc(100% - 20px)); }
 [data-panel="launcher"] .home-hero { position:relative; isolation:isolate; min-height:370px; display:flex; align-items:center; overflow:hidden; padding:32px 38px; border:1px solid var(--line); border-radius:4px; margin-bottom:30px; background:var(--panel); }
-.hero-art { transition:transform .6s ease-out; position:absolute; inset:0; z-index:-2; overflow:hidden; pointer-events:none; }
-.hero-art img { width:100%; height:100%; object-fit:cover; object-position:70% 52%; transform-origin:76% 60%; animation:home-breathe 12s ease-in-out infinite alternate; }
-.home-hero::after { content:''; position:absolute; inset:0; z-index:-1; background:linear-gradient(90deg,var(--panel) 0%,color-mix(in srgb,var(--panel) 96%,transparent) 24%,color-mix(in srgb,var(--panel) 65%,transparent) 43%,transparent 69%); pointer-events:none; }
+.hero-art { position:absolute; inset:0; z-index:-2; overflow:hidden; pointer-events:none; background:#101820; }
+.hero-scene { position:absolute; inset:0 0 0 auto; width:max(100%,1050px); overflow:hidden; }
+.hero-background,.hero-player-motion { position:absolute; inset:0; width:100%; height:100%; }
+.hero-player-motion { background:var(--hero-frame) right center / 100% 100% no-repeat; }
+.hero-player-head { mask-image:radial-gradient(ellipse 11% 40% at 91% 30%,#000 58%,transparent 100%); transform-origin:94% 50%; animation:hero-head 5.2s ease-in-out infinite alternate; }
+.hero-player-hands { mask-image:radial-gradient(ellipse 17% 15% at 65% 91%,#000 50%,transparent 100%); animation:hero-hands 2.8s ease-in-out infinite alternate; }
+#launcher-clip { position:absolute; top:8%; bottom:26.1%; left:38.4%; right:21.2%; width:40.4%; height:65.9%; object-fit:cover; clip-path:polygon(0 0,100% 2.3%,99.7% 95.4%,.35% 100%); }
+#launcher-clip:not([src]) { display:none; }
+.scene-paused .hero-player-motion { animation-play-state:paused; }
+.hero-gameplay-actions { display:flex; align-items:center; gap:8px; margin-top:8px; }
+.hero-gameplay-actions [hidden] { display:none; }
+@keyframes hero-head { 0%,20% { transform:none; } 60% { transform:translate(-3px,2px) rotate(-.8deg); } 100% { transform:translate(1px,-2px) rotate(.5deg); } }
+@keyframes hero-hands { 0%,18% { transform:none; } 48% { transform:translate(-3px,-1px); } 90%,100% { transform:translate(2px,1px); } }
+@media(prefers-reduced-motion:reduce) { .hero-player-motion { animation:none; } }
+.home-hero::after { content:''; position:absolute; inset:0; z-index:-1; background:linear-gradient(90deg,var(--panel) 0%,color-mix(in srgb,var(--panel) 96%,transparent) 28%,color-mix(in srgb,var(--panel) 76%,transparent) 40%,transparent 55%); pointer-events:none; }
 .home-hero .hero-copy { width:48%; max-width:580px; position:relative; }
 .hero-brand { display:flex; align-items:center; gap:10px; font:600 11px var(--mono); letter-spacing:.18em; color:var(--muted); margin-bottom:24px; }
 .hero-brand .config-mark { width:32px; height:32px; }
@@ -5760,8 +5772,6 @@
 .home-hero #launch-modes { min-width:0; }
 .home-hero #launch-modes .seg-item { font-size:10px; padding:7px 9px; }
 .home-hero #launch-modes .why { font-size:8px; }
-.monitor-light { position:absolute; left:40%; top:18%; width:35%; height:45%; background:radial-gradient(ellipse,var(--accent),transparent 70%); opacity:.08; mix-blend-mode:screen; clip-path:polygon(0 0,100% 8%,97% 91%,0 100%); animation:home-flicker 7s linear infinite; }
-.desk-light { position:absolute; left:36%; top:85%; width:34%; height:3px; background:var(--accent); box-shadow:0 0 20px 4px var(--accent); transform:rotate(-8deg); animation:home-rgb 5s ease-in-out infinite alternate; }
 [data-panel="launcher"] > .panel:has(.mode-cards) { padding:0; background:none; border:0; box-shadow:none; margin-bottom:28px; }
 [data-panel="launcher"] > .panel:has(.mode-cards)::before { display:none; }
 .mode-cards { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; padding-top:5px; }
@@ -5873,14 +5883,11 @@
 .topbar .chip { position:relative; overflow:hidden; }.topbar .chip::after { content:''; position:absolute; inset:auto 0 0; height:2px; background:var(--accent); transform:scaleX(var(--chip-load,0)); transform-origin:left; }
 .score-fg { transition:none; }
 @keyframes home-pan { from { transform:scale(1.08) translateX(-1%); } to { transform:scale(1.15) translateX(1%); } }
-@keyframes home-breathe { from { transform:scale(1.025) translateY(0); } to { transform:scale(1.045) translateY(-3px); } }
-@keyframes home-flicker { 0%,100% { opacity:.06; } 21%,24%,70% { opacity:.12; } 22%,72% { opacity:.04; } }
-@keyframes home-rgb { from { opacity:.35; transform:rotate(-8deg) scaleX(.95); } to { opacity:.8; transform:rotate(-8deg) scaleX(1.04); } }
 @keyframes home-sweep { 0%,65% { transform:translateX(-55%); } 100% { transform:translateX(55%); } }
-.home-paused .mode-card::before, .home-paused :is(.hero-art img,.monitor-light,.desk-light,.mode-card img) { animation-play-state:paused; }
+.home-paused .mode-card::before,.home-paused .mode-card img { animation-play-state:paused; }
 @media(max-width:1150px) { [data-panel="launcher"] .home-hero { padding:26px; min-height:365px; }.home-hero .hero-copy { width:58%; }.home-hero .fix-row { display:flex; flex-direction:column; align-items:flex-start; }.mode-card { height:180px; padding:15px; }.mode-copy strong { font-size:18px; }[data-panel="launcher"] .grid2 { grid-template-columns:1fr; } }
 @media(max-width:700px) { .home-hero .hero-copy { width:100%; }.home-hero::after { background:color-mix(in srgb,var(--panel) 84%,transparent); }.mode-cards { gap:8px; }.mode-card { height:190px; }.mode-copy { left:12px; bottom:15px; }.mode-copy strong { font-size:15px; }.mode-copy > span { font-size:10px; }.mode-index { left:12px; font-size:8px; }[data-panel="launcher"] :is(#live-card,#hw-card,#net-card) { padding:16px; } }
-@media(prefers-reduced-motion:reduce) { .mode-card::before, :is(.hero-art img,.monitor-light,.desk-light,.mode-card img) { animation:none; }.mode-card { transition:none; }.mode-card:hover,.mode-card[aria-pressed="true"] { transform:none; } }
+@media(prefers-reduced-motion:reduce) { .mode-card::before,.mode-card img { animation:none; }.mode-card { transition:none; }.mode-card:hover,.mode-card[aria-pressed="true"] { transform:none; } }
 
 </style>
 <style>
@@ -6531,9 +6538,13 @@ const startup = (() => {
     <div class="scroll">
 
     <div class="tab-panel" data-panel="launcher">
-      <div class="hero home-hero" id="home-hero">
+      <div class="hero home-hero scene-paused" id="home-hero">
         <button type="button" class="sp-chip" id="sp-toggle" aria-expanded="false" aria-controls="sp-panel" aria-haspopup="dialog" title="Ping to Valve's relay in this city. In-game ping is usually within a few ms."><span id="sp-chip-icon" class="sp-tone"></span><span id="sp-summary">Server regions</span><span class="sp-led sp-tone" aria-hidden="true"></span><span aria-hidden="true">⌃</span></button>
-        <div class="hero-art" aria-hidden="true"><img src="assets/home/hero.webp" alt="" fetchpriority="high"><div class="monitor-light"></div><div class="desk-light"></div></div>
+        <div class="hero-art" aria-hidden="true"><div class="hero-scene">
+          <img class="hero-background" src="assets/home/hero-player-navy.webp" alt="" fetchpriority="high">
+          <video id="launcher-clip" muted loop playsinline preload="none"></video>
+          <div class="hero-player-motion hero-player-head"></div><div class="hero-player-motion hero-player-hands"></div>
+        </div></div>
         <div class="hero-copy">
           <div class="hero-brand"><span class="config-mark" aria-hidden="true"></span><span>CS CONFIG AI</span></div><div class="eyebrow" id="home-readiness">Your CS2 workspace</div>
           <h2>Counter-Strike <em>2</em></h2>
@@ -6567,6 +6578,10 @@ const startup = (() => {
             </div>
             <!-- Empty until Fix stretching has something to report. -->
             <span class="sub" id="fix-hint"></span>
+          </div>
+          <div class="hero-gameplay-actions">
+            <button class="btn small" type="button" id="launcher-clip-choose">Add gameplay clip</button>
+            <button class="btn small" type="button" id="launcher-clip-clear" hidden>Remove clip</button>
           </div>
           <div class="stop-row hidden" id="stop-row">
             <button class="btn small danger" id="play-close">Close CS2</button>
@@ -7418,6 +7433,7 @@ const startup = (() => {
 <script src="assets/config/files.js"></script>
 <link rel="stylesheet" href="assets/home/server-lock.css">
 <script src="assets/home/server-lock.js"></script>
+<script src="assets/home/launcher-scene.js"></script>
 <script src="assets/changes/changes.js"></script>
 <script>
 const TOKEN = "__CS2CFG_TOKEN__";
@@ -7918,17 +7934,6 @@ function homePause() {
 }
 document.addEventListener('visibilitychange', homePause);
 homeMotion.reduced.addEventListener('change', homePause);
-const homeHero = document.getElementById('home-hero');
-if (homeHero) {
-  homeHero.addEventListener('pointermove', e => {
-    if (homeMotion.reduced.matches || !homeVisible()) return;
-    const r = homeHero.getBoundingClientRect();
-    const x = (e.clientX - r.left) / r.width - .5;
-    const y = (e.clientY - r.top) / r.height - .5;
-    homeHero.querySelector('.hero-art').style.transform = 'translate(' + x * 7 + 'px,' + y * 5 + 'px) scale(1.02)';
-  });
-  homeHero.addEventListener('pointerleave', () => { homeHero.querySelector('.hero-art').style.transform = ''; });
-}
 new MutationObserver(homePause).observe(document.querySelector('[data-panel="launcher"]'), { attributes: true, attributeFilter: ['class'] });
 function homePatchReadouts(host, markup) {
   if (!host) return;
@@ -18812,6 +18817,7 @@ function renderLaunch(s) {
   if (typeof s.overlay_running === "boolean") overlayUp = s.overlay_running;
   if (s.desktop_restored) status(esc(s.desktop_restored));
   paintRunning();
+  launcherScene.launching(false);
   $("stop-row").classList.toggle("hidden", !busyNow);
   $("stop-hint").textContent = busyNow ? (PHASE_TEXT[s.phase] || s.phase) : "";
 
@@ -18848,6 +18854,7 @@ let liveStatus = {}, gameUp = false, overlayUp = false, runningTimer = null;
 
 function paintRunning() {
   const launching = !!(liveStatus && liveStatus.active);
+  launcherScene.activity(launching || gameUp);
   const play = $("play");
   if (play) {
     play.disabled = launching || gameUp;
@@ -18877,6 +18884,7 @@ function paintRunning() {
 
 function startGameWatch() {
   if (runningTimer) return;
+  launcherScene.connect(api, status);
   const ask = async (reattach = false) => {
     if (document.hidden && !reattach) return;
     try {
@@ -18899,6 +18907,7 @@ function startGameWatch() {
 }
 
 $("play").addEventListener("click", async () => {
+  launcherScene.launching(true);
   busy("Launching through Steam…");
   $("play").disabled = true;
   $("play-sub").textContent = "starting…";
@@ -18924,6 +18933,7 @@ $("play").addEventListener("click", async () => {
     pollTimer = setInterval(pollLaunch, 1000);
     pollLaunch();
   } catch (e) {
+    launcherScene.launching(false);
     status("Could not launch: " + esc(e.message), true);
     $("play").disabled = false;
     $("play-sub").textContent = "through Steam";

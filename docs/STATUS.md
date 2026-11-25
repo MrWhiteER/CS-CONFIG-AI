@@ -2,6 +2,14 @@
 
 | Task | State | Next step |
 | --- | --- | --- |
+| Revise the Launcher gamer scene | Two original variants and lightweight movement implemented | Await GUPDATE |
+| Show actual CS2 gameplay on the Launcher monitor | Local MP4 and WebM selection and rendering implemented | Supply a CS2 recording |
+| Stop Launcher scene during CS2 | Launch, running-process, and reduced-motion behavior checked | Await GUPDATE |
+
+## Prior Inventory batch
+
+| Task | State | Next step |
+| --- | --- | --- |
 | Refresh and filter owned Steam Inventory | Implemented and checked with a live Steam read | Await GUPDATE |
 | Inspect items and listen to owned music kits | Shared previews implemented and browser checked | Await GUPDATE |
 | Interactive sticker showcase | Implemented with map-inspired lighting presets | Await GUPDATE |

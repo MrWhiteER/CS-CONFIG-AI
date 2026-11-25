@@ -227,6 +227,10 @@ def pick_file(initial: str = "", title: str = "Choose a configuration file") -> 
     return _pick_file(CONFIG_FILTER, initial, title)
 
 
+def pick_gameplay_clip() -> Optional[str]:
+    return _pick_file("Gameplay clips (*.mp4;*.webm)|*.mp4;*.webm", "", "Choose a CS2 gameplay clip")
+
+
 def pick_files() -> list:
     """The same native config picker with multiple selection enabled."""
     result = _run(

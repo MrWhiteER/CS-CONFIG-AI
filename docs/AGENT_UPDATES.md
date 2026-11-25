@@ -79,3 +79,18 @@
 - Added pagination and browser regressions. No real listing was submitted.
   Leave this batch local pending GUPDATE. Claude acknowledgement remains
   pending; recheck the existing session after its reported reset during work.
+
+## 2026-11-25 | LAUNCHER-SCENE-001 | Codex → Claude
+
+- Owner requested a sharper animated gamer scene, genuine CS2 footage on
+  the monitor, automatic pause while playing CS2, and varied agents.
+- Worked on `codex/launcher-gameplay-scene` from local Inventory commit
+  `a315d6b`, which fixes the Apps browser fixture boundary. Added two
+  original gamer variations and support for the owner's local video. No
+  exported CS2 recording was available in the local capture folders.
+- Affected files: Launcher HTML, home assets and scene script, the native
+  picker, local media handlers, and their tests. Launch begins by unloading
+  video and pausing the character. The external Steam process check also
+  stops playback. Browser coverage checks reduced motion and resume.
+- Remains local pending GUPDATE. Claude acknowledgement is pending, with
+  delivery to be checked after the reported reset during active work.

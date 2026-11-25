@@ -21,6 +21,7 @@ code+='function busy(){};';
 code+=`let fpsEffect='';function renderFps(){}function markPending(){};`;
 code+=slice('function renderPlan(', '// The last detection,');
 code+=slice('let netTimer = null;', '/* Three scene cards');
+code+=fs.readFileSync(path.join(root,'cs2cfg/web/assets/home/launcher-scene.js'),'utf8')+'\n';
 code+=`const prefsReady=false,startup={finished:false};function moveSegThumb(){};`;
 code+=slice('let settingsSub = "nvidia";', '/* ---------------------------------------------------------------------------\n   Sound devices');
 code+='let cloudData=null;';
@@ -33,6 +34,25 @@ code+=`document.documentElement.dataset.boot='ready';document.querySelector('.bo
 const checks=[];function check(name,ok){checks.push({name,ok});if(!ok)throw Error(name)}
 (async()=>{try{
 check('hero controls remain inside hero', $('home-hero').contains($('play')) && $('home-hero').contains($('launch-modes')));
+const clip=$('launcher-clip'), hero=$('home-hero');
+let plays=0,pauses=0;
+clip.play=()=>{plays++;return Promise.resolve()};clip.pause=()=>{pauses++};clip.load=()=>{};
+launcherScene.connect(async()=>({ok:true,clip:'recording.webm',url:'/launcher-clip?ticket=test'}),()=>{});
+await Promise.resolve();
+check('hero waits for CS2 process status before starting video',!clip.hasAttribute('src')&&hero.classList.contains('scene-paused'));
+launcherScene.activity(false);
+if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  check('reduced motion leaves the hero scene still',plays===0&&hero.classList.contains('scene-paused'));
+} else {
+  check('idle Launcher starts the chosen clip',plays===1&&clip.hasAttribute('src')&&!hero.classList.contains('scene-paused'));
+  launcherScene.launching(true);
+  check('Play immediately releases video and freezes the gamer',pauses===1&&!clip.hasAttribute('src')&&hero.classList.contains('scene-paused'));
+  launcherScene.activity(true);launcherScene.launching(false);
+  check('running CS2 prevents hero playback',plays===1&&!clip.hasAttribute('src'));
+  launcherScene.activity(false);
+  check('Launcher resumes the scene after CS2 closes',plays===2&&clip.hasAttribute('src'));
+}
+launcherScene.activity(true);
 $('intents').querySelector('[data-intent="quality"]').click();check('card selection saves and previews',intent==='quality'&&prefs===1&&previews===1);
 $('intents').dispatchEvent(new KeyboardEvent('keydown',{key:'Home',bubbles:true}));check('keyboard selects competitive',intent==='competitive'&&prefs===2&&previews===2);
 const markup=n=>ring(n,'CPU',null)+ring(42,'GPU','56\\u00b0C')+ring(55,'RAM','16 / 32 GB')+ring(null,'VRAM',null);

@@ -60,6 +60,7 @@ class State:
         self.verification_path = user_data_dir() / "applied-verification.json"
         self.verification_receipt = verification.load(self.verification_path)
         self.token = secrets.token_urlsafe(24)
+        self.clip_token = secrets.token_urlsafe(24)
         self.kb = KnowledgeBase()
         self.cfg_folder = cfg_folder
         self.cfg_name = cfg_name
@@ -5673,6 +5674,23 @@ def _companions(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     return {"ok": True, "companions": companions.survey(ui)}
 
 
+def _launcher_media(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    from . import launcher_media, picker
+
+    try:
+        if body.get("choose"):
+            selected = picker.pick_gameplay_clip()
+            if selected:
+                launcher_media.choose(Path(selected))
+        elif body.get("clear"):
+            launcher_media.choose(None)
+    except (OSError, ValueError) as exc:
+        return {"ok": False, "error": str(exc)}
+    clip = launcher_media.clip()
+    return {"ok": True, "clip": clip.name if clip else "",
+            "url": f"/launcher-clip?ticket={state.clip_token}" if clip else ""}
+
+
 def _inventory(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     """This account's CS2 inventory, read straight from Steam. Read-only."""
     from . import inventory
@@ -7044,6 +7062,7 @@ def make_handler(state: State):
         "/api/crosshairx/start": _crosshairx_start,
         "/api/companions": _companions,
         "/api/inventory": _inventory,
+        "/api/launcher/media": _launcher_media,
         "/api/inventory/inspect": _inventory_inspect,
         "/api/skins/catalog": _skins_catalog,
         "/api/skins/music": _skins_music,
@@ -7128,12 +7147,63 @@ def make_handler(state: State):
             self.wfile.write(data)
 
         # -- verbs ----------------------------------------------------------
+        def _send_launcher_clip(self) -> None:
+            from . import launcher_media
+
+            query = parse_qs(self.path.partition("?")[2])
+            ticket = (query.get("ticket") or [""])[0]
+            if not ticket.isascii() or not secrets.compare_digest(ticket, state.clip_token):
+                self._send_json({"error": "bad or missing ticket"}, 403)
+                return
+            source = launcher_media.clip()
+            try:
+                if source is None:
+                    raise FileNotFoundError
+                stream = source.open("rb")
+            except OSError:
+                self._send_json({"error": "clip not found"}, 404)
+                return
+            with stream:
+                size = os.fstat(stream.fileno()).st_size
+                header = self.headers.get("Range", "")
+                bounds = launcher_media.byte_range(header, size)
+                if bounds is None:
+                    self.send_response(416)
+                    self.send_header("Content-Range", f"bytes */{size}")
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
+                start, end = bounds
+                remaining = end - start + 1
+                self.send_response(206 if header else 200)
+                self.send_header("Content-Type", launcher_media.VIDEO_FORMATS[source.suffix.lower()])
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Accept-Ranges", "bytes")
+                self.send_header("Content-Length", str(remaining))
+                if header:
+                    self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+                self.end_headers()
+                stream.seek(start)
+                while remaining:
+                    chunk = stream.read(min(remaining, 128 * 1024))
+                    if not chunk:
+                        self.close_connection = True
+                        break
+                    try:
+                        self.wfile.write(chunk)
+                    except (ConnectionResetError, BrokenPipeError, ConnectionAbortedError):
+                        break
+                    remaining -= len(chunk)
+
         def do_GET(self) -> None:
             if not self._host_ok():
                 self._send_json({"error": "host not allowed"}, 403)
                 return
 
             path = self.path.split("?", 1)[0]
+            if path == "/launcher-clip":
+                self._send_launcher_clip()
+                return
             if path == "/api/overlay/tools":
                 if self.headers.get("X-CS2CFG-Token") != state.token:
                     self._send_json({"error": "bad or missing token"}, 403)
@@ -7613,7 +7683,7 @@ def make_handler(state: State):
             try:
                 # Local GoXLR I/O has its own nonblocking operation lock. A
                 # disconnected mixer must not hold up other UI requests.
-                if handler in (_goxlr, _goxlr_switch, _goxlr_setup_use, _configs_import_pick):
+                if handler in (_goxlr, _goxlr_switch, _goxlr_setup_use, _configs_import_pick, _launcher_media):
                     self._send_json({"ok": True, **handler(state, body)})
                 else:
                     with state.lock:
