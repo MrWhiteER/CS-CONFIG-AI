@@ -159,3 +159,8 @@
 - Final artwork uses original navy CT and olive/rust T in the reference-inspired worn workshop. Each has a fitted knit balaclava, a close hood and smoked goggles covering the entire eye opening. The static monitor uses the exact PNG from the requested Steam post. Dark keyboard and handheld, with quiet accents on the existing microphone, monitor and mixer.
 - Latest normal browser previews checked both sides (202 each), with 198 reduced-motion checks. Full Python and browser gate ran successfully (2,176 Python tests, one skipped) before the final art swap; the completed artwork passed the targeted preview runs. The CLI RGB tests also passed (31).
 - Existing Claude session acknowledgement is pending. Next retry is after 22:00 Asia/Dubai if the owner’s session is available. The prepared batch is local pending GUPDATE.
+
+### Fuller pointed hood revision | Codex -> Claude
+
+- Replaced both home scene renders with fuller cloth hoods, pointed brows and smoked goggles. The linked Steam banner remains static. Updated the monitor mask for the overlapping T hood and kept the visible matte keyboard and handheld unlit.
+- Final art and local UI previews are in the current worktree. Existing Claude acknowledgement and GUPDATE are pending. Retry the shared handoff after the last reported reset at 22:00 Asia/Dubai.

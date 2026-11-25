@@ -2,7 +2,7 @@
 
 | Task | State | Next step |
 | --- | --- | --- |
-| Create original CT and T Launcher scenes | Dark workshop scenes with fitted balaclavas, hoods and smoked goggles; both previewed in the Launcher | Owner visual review |
+| Create original CT and T Launcher scenes | Dark workshop scenes with fitted balaclavas, fuller pointed hoods and smoked goggles; both previewed in the Launcher | Owner visual review |
 | Remove keyboard and handheld RGB from the Launcher | Removed the visual overlays and Launcher palette request; physical-device RGB tested | Await GUPDATE |
 | Show the CS2 loading banner on the monitor | Bundled the exact static image from the linked Steam post and checked both screen fits | Await GUPDATE |
 | Stop Launcher scene animation during CS2 | Verified launch, running-process and reduced-motion behavior | Await GUPDATE |
