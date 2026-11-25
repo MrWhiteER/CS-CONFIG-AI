@@ -5753,14 +5753,14 @@
 #launcher-clip { position:absolute; top:8%; bottom:26.1%; left:38.4%; right:21.2%; width:40.4%; height:65.9%; object-fit:cover; clip-path:polygon(0 0,100% 2.3%,99.7% 95.4%,.35% 100%); }
 #launcher-clip:not([src]) { display:none; }
 .scene-paused .hero-player-motion { animation-play-state:paused; }
-.hero-gameplay-actions { display:flex; align-items:center; gap:8px; margin-top:8px; }
+.hero-gameplay-actions { display:flex; align-items:center; gap:6px; margin-left:auto; letter-spacing:normal; }
 .hero-gameplay-actions [hidden] { display:none; }
 @keyframes hero-head { 0%,20% { transform:none; } 60% { transform:translate(-3px,2px) rotate(-.8deg); } 100% { transform:translate(1px,-2px) rotate(.5deg); } }
 @keyframes hero-hands { 0%,18% { transform:none; } 48% { transform:translate(-3px,-1px); } 90%,100% { transform:translate(2px,1px); } }
 @media(prefers-reduced-motion:reduce) { .hero-player-motion { animation:none; } }
 .home-hero::after { content:''; position:absolute; inset:0; z-index:-1; background:linear-gradient(90deg,var(--panel) 0%,color-mix(in srgb,var(--panel) 96%,transparent) 28%,color-mix(in srgb,var(--panel) 76%,transparent) 40%,transparent 55%); pointer-events:none; }
 .home-hero .hero-copy { width:48%; max-width:580px; position:relative; }
-.hero-brand { display:flex; align-items:center; gap:10px; font:600 11px var(--mono); letter-spacing:.18em; color:var(--muted); margin-bottom:24px; }
+.hero-brand { display:flex; align-items:center; flex-wrap:wrap; gap:10px; font:600 11px var(--mono); letter-spacing:.18em; color:var(--muted); margin-bottom:24px; }
 .hero-brand .config-mark { width:32px; height:32px; }
 .home-hero .eyebrow { color:var(--accent); letter-spacing:.15em; font-size:10px; }
 [data-panel="launcher"] .home-hero h2 { font-size:clamp(26px,3vw,44px); line-height:1.05; margin:8px 0 14px; letter-spacing:-.04em; }
@@ -6546,7 +6546,13 @@ const startup = (() => {
           <div class="hero-player-motion hero-player-head"></div><div class="hero-player-motion hero-player-hands"></div>
         </div></div>
         <div class="hero-copy">
-          <div class="hero-brand"><span class="config-mark" aria-hidden="true"></span><span>CS CONFIG AI</span></div><div class="eyebrow" id="home-readiness">Your CS2 workspace</div>
+          <div class="hero-brand">
+            <span class="config-mark" aria-hidden="true"></span><span>CS CONFIG AI</span>
+            <div class="hero-gameplay-actions">
+              <button class="btn small" type="button" id="launcher-clip-choose">Add gameplay clip</button>
+              <button class="btn small" type="button" id="launcher-clip-clear" hidden>Remove clip</button>
+            </div>
+          </div><div class="eyebrow" id="home-readiness">Your CS2 workspace</div>
           <h2>Counter-Strike <em>2</em></h2>
           <p>
             Starts the game <strong>through Steam</strong>, so your launch options, the
@@ -6578,10 +6584,6 @@ const startup = (() => {
             </div>
             <!-- Empty until Fix stretching has something to report. -->
             <span class="sub" id="fix-hint"></span>
-          </div>
-          <div class="hero-gameplay-actions">
-            <button class="btn small" type="button" id="launcher-clip-choose">Add gameplay clip</button>
-            <button class="btn small" type="button" id="launcher-clip-clear" hidden>Remove clip</button>
           </div>
           <div class="stop-row hidden" id="stop-row">
             <button class="btn small danger" id="play-close">Close CS2</button>

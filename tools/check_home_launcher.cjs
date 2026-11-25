@@ -82,6 +82,7 @@ $('history-stats').innerHTML='<div class="stat"><b>16</b><span>sessions</span></
 renderHardware({cpu:{name:'Intel Core i9-12900K',cores:16,threads:24},gpu:{name:'NVIDIA GeForce RTX 3090 Ti',vram_gb:24,driver:'621.01'},ram_gb:32,ram_speed:6000,displays:[{width:2560,height:1440,refresh:240,primary:true,confident:true}],power_plan:'Balanced'});
 $('assessment-out').innerHTML='<div class="assess">Selected settings ? Competitive</div>';
 homeFrame(performance.now()+2200);check('gauge reaches its target',node.querySelector('.val').textContent==='80');check('smooth combined area chart',$('hardware-chart').querySelector('.hardware-line').getAttribute('d').includes(' C'));
+await hero.querySelector('.hero-background').decode();
 const errors=[...document.images].filter(i=>i.getAttribute('src')&&(!i.complete||!i.naturalWidth));check('all home image assets load',errors.length===0);
 check('no horizontal overflow',document.documentElement.scrollWidth<=innerWidth);
 const media=homeMotion.reduced;homeMotion.reduced={matches:true};homeNumber(node.querySelector('.val'),31);check('reduced motion sets final reading immediately',node.querySelector('.val').textContent==='31');homeMotion.reduced=media;
