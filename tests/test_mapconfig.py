@@ -60,6 +60,9 @@ class MapCase(unittest.TestCase):
         shared.start()
         self.addCleanup(shared.stop)
         self.result = cfgscan.scan(self.cfg_root / "mrwhiteer", cfg_root=self.cfg_root)
+        # This fixture explicitly knows that the practice-only key was empty.
+        # Missing custom lines alone are not evidence of an unbound game key.
+        mapconfig.remember_baseline(self.result, {"scancode49": ""})
 
     def turn_on(self, maps=()):
         return mapconfig.set_setup(self.result, "mrwhiteer/lan/warmup.vcfg", True, list(maps))

@@ -8,7 +8,7 @@ const fs = require('fs'), os = require('os'), path = require('path');
 const cp = require('child_process'), url = require('url'), assert = require('assert');
 const root = path.resolve(__dirname, '..');
 const work = fs.mkdtempSync(path.join(os.tmpdir(), 'cs-config-setup-'));
-const source = fs.readFileSync(path.join(root, 'cs2cfg/web/index.html'), 'utf8');
+const source = fs.readFileSync(path.join(root, 'cs2cfg/web/index.html'), 'utf8').replace(/\r\n/g, '\n');
 let scripts = 0;
 for (const match of source.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) {
   if (!match[1].trim()) continue;
@@ -85,7 +85,7 @@ async function api(route,body) {
   if (route === '/api/cloud') return {ok:true,configured:true,signed_in:true};
   throw Error('Unexpected API: '+route);
 }
-${slice('/* First-run setup.','/* The Machine card:')}
+${slice('/* First-run setup.','async function loadMachine()')}
 ${fs.readFileSync(path.join(root,'cs2cfg/web/assets/config/files.js'),'utf8')}
 ${slice('/* Administrator helper status','// --- live system readout')}
 document.querySelector('.boot-screen')?.remove();

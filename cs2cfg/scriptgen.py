@@ -47,6 +47,9 @@ SHIFT_STYLES = ("next", "hold")
 MOVE_ACTIONS = {
     "forward", "back", "moveleft", "moveright", "left", "right",
     "jump", "duck", "sprint", "speed", "attack", "attack2",
+    "reload", "use", "turnleft", "turnright", "turnup", "turndown",
+    "moveup", "movedown", "klook", "strafe", "zoom", "yaw", "pitch",
+    "forwardback", "rightleft",
 }
 
 MAX_STEPS = 12
@@ -751,7 +754,7 @@ def build(spec: Dict[str, Any], scan=None, key_label: str = "") -> Built:
             block = True
 
     if not block:
-        checks.insert(0, Check("ok", "Allowed in CS2, VAC and FACEIT. Only plain config lines."))
+        checks.insert(0, Check("ok", "Config syntax and the documented CS2 multi-input rule checked. Server and anti-cheat policies are not certified."))
         if mode == "press":
             checks.insert(1, Check("ok", "Nothing can get stuck. Every step finishes on its own."))
         elif mode == "hold":
@@ -778,13 +781,12 @@ def build(spec: Dict[str, Any], scan=None, key_label: str = "") -> Built:
     if isinstance(edited, str) and alias:
         from . import scriptlines
 
-        lines, problems = scriptlines.lint(edited, scan, alias, entry)
+        lines, problems = scriptlines.lint(edited, scan, alias, entry, mode=mode, target=target)
         checks = name_checks + head_checks
         checks += [Check(p.level, (f"Line {p.line}: " if p.line else "") + p.text) for p in problems]
         block = any(c.level == "block" for c in checks)
         if not block:
-            checks.insert(0, Check("ok", "Your edited lines passed every check: quotes, names, "
-                                         "nothing left held, and the CS2 movement rule."))
+            checks.insert(0, Check("ok", "Edited lines passed syntax, alias flow, reachable release and documented input checks. This is not an anti-cheat certification."))
 
     explained = []
     if alias and lines:

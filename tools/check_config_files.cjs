@@ -2,7 +2,8 @@
 const fs=require('fs'),path=require('path'),os=require('os'),cp=require('child_process'),vm=require('vm'),assert=require('assert'),{pathToFileURL}=require('url');
 const root=path.resolve(__dirname,'..');process.chdir(root);
 const html=fs.readFileSync('cs2cfg/web/index.html','utf8').replace(/\r\n/g,'\n'),before=process.argv.includes('--before');
-const work=fs.mkdtempSync(path.join(os.tmpdir(),'cs2-config-')),out=path.join(root,'docs/redesign/round3/preview');
+const work=fs.mkdtempSync(path.join(os.tmpdir(),'cs2-config-')),out=process.env.CS2CFG_TEST_PREVIEWS||path.join(root,'docs/redesign/round3/preview');
+fs.mkdirSync(out,{recursive:true});
 const slice=(a,b)=>{const i=html.indexOf(a),j=html.indexOf(b,i);assert(i>=0&&j>i,a);return html.slice(i,j)};
 for(const s of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g))new vm.Script(s[1]);
 let code=`const errors=[];window.addEventListener('error',e=>errors.push(e.message));const $=id=>document.getElementById(id),esc=x=>String(x??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');let prefsNow={},scannedFolder=null,treeData=null,plugData=null,keyData=null;const calls=[],notices=[],opened=[];function status(...s){notices.push(s)};let reply={},hold;async function api(route,body){calls.push({route,body});if(hold)await new Promise(r=>hold=r);if(reply instanceof Error)throw reply;return structuredClone(reply)};function openSetupWizard(s){opened.push(s)}function rememberPrefs(){}function busy(){}async function loadCfgSettings(){}window.confirm=()=>true,appAsk=async()=>true,appTell=async()=>true;`;

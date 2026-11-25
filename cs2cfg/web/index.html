@@ -299,6 +299,8 @@
     border: 1px solid var(--line);
     border-radius: 999px;
   }
+  #settings-subtabs { width: 100%; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+  [data-panel="settings"], [data-panel="settings"] .subpane { min-width: 0; max-width: 100%; }
 
   /* The track carries the live category's colour; each item carries its own,
      which is what it shows on hover. */
@@ -4357,6 +4359,8 @@
   .kb-legend .dot.bound { background: #2b4d75; box-shadow: 0 0 9px rgba(61, 139, 253, .6); }
   .kb-legend .dot.custom { background: #8a6412; box-shadow: 0 0 9px rgba(255, 183, 43, .8); }
   .kb-legend .dot.free { background: #2b2e39; }
+  .kb-legend .dot.unknown { background: var(--muted); }
+  .kb-key.unknown { border-style: dashed; opacity: .7; }
 
 
   /* The profile switcher: tabs above the board/mouse, the way Razer Synapse
@@ -6527,7 +6531,7 @@ const startup = (() => {
         <button type="button" class="sp-chip" id="sp-toggle" aria-expanded="false" aria-controls="sp-panel" aria-haspopup="dialog" title="Ping to Valve's relay in this city. In-game ping is usually within a few ms."><span id="sp-chip-icon" class="sp-tone"></span><span id="sp-summary">Server regions</span><span class="sp-led sp-tone" aria-hidden="true"></span><span aria-hidden="true">⌃</span></button>
         <div class="hero-art" aria-hidden="true"><img src="assets/home/hero.webp" alt="" fetchpriority="high"><div class="monitor-light"></div><div class="desk-light"></div></div>
         <div class="hero-copy">
-          <div class="hero-brand"><span class="config-mark" aria-hidden="true"></span><span>CS CONFIG AI</span></div><div class="eyebrow">Ready to play</div>
+          <div class="hero-brand"><span class="config-mark" aria-hidden="true"></span><span>CS CONFIG AI</span></div><div class="eyebrow" id="home-readiness">Your CS2 workspace</div>
           <h2>Counter-Strike <em>2</em></h2>
           <p>
             Starts the game <strong>through Steam</strong>, so your launch options, the
@@ -6882,12 +6886,19 @@ const startup = (() => {
           <p>
             Put several actions on one key without writing any code. Pick what
             should happen, pick a key, and the app writes it into your config.
-            Everything is checked first, so a script can never get stuck or
-            break the game rules.
+            Preview the commands and simulate key presses before saving.
+            Checks cover config syntax, releases and documented input limits;
+            server and anti-cheat policies still apply.
           </p>
         </div>
       </div>
       <div id="sb-out"><span class="sub">Reading&hellip;</span></div>
+      <section class="panel" style="margin-top:16px" id="script-debugger">
+        <h2>Script debugger</h2>
+        <p class="sub">Simulate the current script without saving it or sending input to CS2.</p>
+        <div class="actions"><button class="btn" data-tools-action="debug-auto">Simulate key sequence</button><button class="btn" data-tools-action="debug-down">Press key</button><button class="btn" data-tools-action="debug-up">Release key</button><button class="btn" data-tools-action="debug-target_down">Press target key</button><button class="btn" data-tools-action="debug-target_up">Release target key</button><button class="btn" data-tools-action="debug-reset">Clear simulation</button></div>
+        <div id="tools-debug" aria-live="polite"></div>
+      </section>
     </div>
 
     <div class="tab-panel hidden" data-panel="files">
@@ -6987,6 +6998,7 @@ const startup = (() => {
           <button class="seg-item" data-sub="maps" role="tab" aria-selected="false"><span data-hardware-icon="config"></span> Map configs</button>
           <button class="seg-item" data-sub="editing" role="tab" aria-selected="false"><span data-hardware-icon="history"></span> Editing</button>
           <button class="seg-item" data-sub="logs" role="tab" aria-selected="false"><span data-hardware-icon="logs"></span> Logs</button>
+          <button class="seg-item" data-sub="tools" role="tab" aria-selected="false"><span data-hardware-icon="config"></span> Tools</button>
         </div>
       </div>
 
@@ -7267,6 +7279,9 @@ const startup = (() => {
       </section>
       </div>
 
+      <div class="subpane hidden" data-sub="tools">
+        <div id="tools-workspace"></div>
+      </div>
       <div class="subpane hidden" data-sub="logs">
         <section class="panel">
           <h2>Session history</h2>
@@ -7784,6 +7799,7 @@ document.addEventListener("click", async e => {
 });
 
 function renderHardware(d) {
+  if ($('home-readiness')) $('home-readiness').textContent = d.cs2_install ? 'Game installation found' : 'CS2 installation not found — check Steam settings';
   const bits = [];
   if (d.cpu) bits.push(["CPU", esc(d.cpu.name) + (d.cpu.hybrid ? ' <span class="sub">(hybrid P/E)</span>' : ""),
                         d.cpu.cores + " cores / " + d.cpu.threads + " threads"]);
@@ -9071,7 +9087,7 @@ const profileRail = (() => {
     syncStatus();
     if (before !== current && announce) {
       animate(seat,[{transform:oldTransform,background:`color-mix(in srgb,${oldTone} 16%,transparent)`,borderColor:`color-mix(in srgb,${oldTone} 50%,transparent)`},{transform:seat.style.transform,background:`color-mix(in srgb,var(--tone) 16%,transparent)`,borderColor:'color-mix(in srgb,var(--tone) 50%,transparent)'}],560);
-      const message = `${labels[names.indexOf(before)]} → ${labels[names.indexOf(current)]} · Applying`;
+      const message = `${labels[names.indexOf(before)]} → ${labels[names.indexOf(current)]} · Profile selected`;
       const note = root.querySelector('.pd-transition'); note.textContent = message; note.hidden = false;
       hideCaption();
       root.querySelector('.pd-live').textContent = message;
@@ -9665,6 +9681,9 @@ function renderMapCfg() {
   const d = mapCfgData;
   if (!d) { box.innerHTML = '<span class="sub">Reading your configs&hellip;</span>'; return; }
   let html = '';
+  if (d.restore_missing && d.restore_missing.length) {
+    html += '<p class="warn" role="status">Normal values are unknown for: ' + esc(d.restore_missing.join(', ')) + '. These values will not be guessed or cleared. Save your normal settings with CS2 closed before relying on automatic restoration.</p>';
+  }
   const live = d.live;
   if (live) {
     const where = live.map ? ('You are on ' + live.map + (live.on_setup_map ? ', and a map config can be on here.' : '.'))
@@ -12155,7 +12174,7 @@ function kbCap(spec) {
 
   const label = rawLabel || code;
   const hit = kbLookup(code, label);
-  const cls = !hit ? "free"
+  const cls = !hit ? (keyData?.baseline_known === false ? "unknown" : "free")
     : hit.script ? (hit.enabled ? "script" : "script off")
     : hit.is_default === false ? "custom"
     : "bound";
@@ -12168,7 +12187,7 @@ function kbCap(spec) {
   const missingCls = missing ? " kb-missing" : "";
   const note = cls === "custom" ? " \u2014 changed from CS2 default"
     : cls === "bound" && hit.is_default ? " \u2014 same as CS2 default" : "";
-  const title = (hit ? (hit.script || hit.command) : label + " \u2014 free") + note;
+  const title = (hit ? (hit.script || hit.command) : label + (keyData?.baseline_known === false ? " — assignment unknown; game defaults unavailable" : " — free")) + note;
   const fullTitle = missing
     ? title + " \u2014 CS2 default here is \u201c" + missing.command +
       "\u201d, not set by this profile"
@@ -12188,12 +12207,12 @@ let mouseShape = "two";
 
 function msZone(code, label, shape, labelAt, extra) {
   const hit = kbLookup(code, label);
-  const cls = !hit ? "free" : hit.script ? (hit.enabled ? "script" : "script off")
+  const cls = !hit ? (keyData?.baseline_known === false ? "unknown" : "free") : hit.script ? (hit.enabled ? "script" : "script off")
     : hit.is_default === false ? "custom" : "bound";
   const picked = pickedKey && pickedKey.code === code ? " picked" : "";
   const odd = hit && hit.agrees === false ? " adrift" : "";
   const missing = kbMissingMap.get(kbBindingFor(code));
-  const title = (hit ? (hit.script || hit.command) : "Free — no assignment") +
+  const title = (hit ? (hit.script || hit.command) : keyData?.baseline_known === false ? "Assignment unknown — game defaults unavailable" : "Free — no assignment") +
     (missing ? " — CS2 default: " + missing.command + ", not set by this profile" : "");
   return '<g role="button" tabindex="0" class="ms-zone ' + cls + picked + odd +
     (missing ? ' kb-missing' : '') + '" data-kbcode="' + esc(code) +
@@ -12339,7 +12358,7 @@ function renderKeyboard() {
     '<span><i class="dot script"></i>scripts</span>' +
     '<span><i class="dot custom"></i>changed</span>' +
     '<span><i class="dot bound"></i>default</span>' +
-    '<span><i class="dot free"></i>free</span>' +
+    (keyData.baseline_known === false ? '<span><i class="dot unknown"></i>unknown</span>' : '<span><i class="dot free"></i>free</span>') +
     '<span><i class="dot missing"></i>missing</span>' +
     '<span><i class="dot selected"></i>selected</span>' +
     (keyData.live?.available ? '<span class="kb-live"><i class="dot adrift"></i>' +
@@ -12356,7 +12375,7 @@ function renderKeyboard() {
     '<section class="kb-card">' + kbCardTitle('Mouse', 'How many side buttons your mouse has.') +
     kbShapePicker() + '<div class="kb-mouse-bindings">' +
     ['mouse1','mouse2','mouse3','mouse4','mouse5', ...(mouseShape === 'four' ? ['mouse6','mouse7'] : []), 'mwheelup','mwheeldown'].map(code =>
-      '<div><span>' + esc(code) + '</span><code>' + esc(kbLookup(code, code)?.command || 'Free') + '</code></div>').join('') +
+      '<div><span>' + esc(code) + '</span><code>' + esc(kbLookup(code, code)?.command || (keyData.baseline_known === false ? 'Unknown' : 'Free')) + '</code></div>').join('') +
     '</div></section>' +
     (showPanel ? '<section class="kb-card">' + kbCardTitle('Missing defaults',
       'CS2 binds this profile leaves out.') +
@@ -15232,6 +15251,8 @@ document.addEventListener('visibilitychange',() => { $('setup-wizard').classList
 let syncStatusData = null, syncStatusBusy = false, syncPollBusy = false, syncTimer = null;
 function syncStatusText(data) {
   const last = (data || {}).last || {};
+  if (last.failed && last.failed.length) return {state:'failed',label:'Sync files need attention',detail:'Some files could not be saved. The cloud copy is preserved. Open Tools to compare copies and review the failed files.'};
+  if (last.action === 'conflict') return {state:'conflict',label:'Choose a sync copy',detail:'Both PCs changed. Open Tools to compare and choose which copy to use.'};
   if (last.waiting > 0) return {state:'waiting',label:'Files waiting for permission',detail:Number(last.waiting) + " config files are waiting for permission to write to CS2’s cfg folder."};
   if (last.ok === false) return {state:'idle',label:setupPlain(last.reason,'Sync is unavailable'),detail:setupPlain(last.reason,'Sync is unavailable. Please try again.')};
   if (last.action === 'push') return {state:'ready',label:'Synced to cloud',detail:'Your settings are saved with your Steam account.'};
@@ -16198,13 +16219,14 @@ function stopEdit() {
 }
 
 
-async function saveFile(force) {
+async function saveFile(force, convertUtf8 = false) {
   const f = openFile;
   const button = $("file-save");
   if (button) { button.disabled = true; button.textContent = "Saving…"; }
   try {
     const r = await api("/api/cfg/save",
-                        { path: f.path, text: editDraft, force: !!force });
+                        { path: f.path, text: editDraft, force: !!force,
+                          revision: f.revision, convert_utf8: convertUtf8 });
     if (!r.written) {
       status("Your file is already up to date.");
       stopEdit();
@@ -16218,6 +16240,27 @@ async function saveFile(force) {
     await loadTree(true);
   } catch (err) {
     const msg = String(err && err.message || err);
+    if (err.data && err.data.needs_encoding && !convertUtf8 &&
+        await appAsk(msg, {yes: "Save as UTF-8"})) {
+      await saveFile(force, true);
+      return;
+    }
+    if (err.data && err.data.conflict) {
+      let box = $('file-conflict');
+      if (!box) {
+        box = document.createElement('div'); box.id = 'file-conflict';
+        box.className = 'panel'; box.setAttribute('role', 'alert');
+        $('edit-area').parentElement.append(box);
+      }
+      box.innerHTML = '<h3>File changed outside this editor</h3><p>Your draft is still above. Compare it with the current file below. Copy any changes you want to keep into your draft, then choose “Use this version as the baseline”.</p>' +
+        '<pre style="max-height:260px;overflow:auto;white-space:pre-wrap">' + esc(err.data.current_text || 'Reload the file to review its current contents.') + '</pre>' +
+        '<button type="button" id="file-conflict-baseline">Use this version as the baseline</button>';
+      $('file-conflict-baseline').onclick = () => {
+        if (!err.data.revision) return;
+        openFile.revision = err.data.revision;
+        box.remove(); status('Baseline updated. Review your draft, then save.');
+      };
+    }
     // The server refuses the first time if the edit would leave the file with
     // syntax errors; it is still the user's config, so they get to insist.
     if (/syntax error/.test(msg) &&
@@ -18974,4 +19017,5 @@ $("rescan").addEventListener("click", () => scan(true));
   paint();
 })();
 </script>
+<script src="/workbench.js"></script>
 </html>

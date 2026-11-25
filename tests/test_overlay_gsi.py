@@ -242,7 +242,18 @@ class GsiHttp(unittest.TestCase):
         self.assertEqual(self.post(b'{"auth":{"token":"wrong"}}'), 403)
 
     def test_size_json_host_and_disabled_gates(self):
-        self.assertEqual(self.post(b"x" * (gsi.MAX_BODY + 1)), 413)
+        # The server rejects this from its headers, without consuming a body.
+        # Sending the rejected body races the server closing the TCP socket.
+        from http.client import HTTPConnection
+
+        connection = HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)
+        try:
+            connection.request("POST", "/api/overlay/gsi",
+                               headers={"Content-Length": str(gsi.MAX_BODY + 1)})
+            with connection.getresponse() as response:
+                self.assertEqual(response.status, 413)
+        finally:
+            connection.close()
         self.assertEqual(self.post(b"{"), 400)
         self.assertEqual(self.post(payload(), Host="evil.example"), 403)
         self.service._settings["overlay_enabled"] = False

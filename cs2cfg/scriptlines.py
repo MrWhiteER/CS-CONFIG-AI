@@ -207,7 +207,7 @@ def _holdable(head: str, scan, local: Dict[str, str], labels: Dict[str, str]) ->
             or (scan is not None and scan.effective_alias(head) is not None))
 
 
-def lint(text: str, scan, base: str, entry: str) -> (List[str], List[Problem]):
+def lint(text: str, scan, base: str, entry: str, *, mode: str = "press", target: str = "") -> (List[str], List[Problem]):
     """Clean the edited lines and say everything wrong with them."""
     from . import scriptgen
 
@@ -322,4 +322,9 @@ def lint(text: str, scan, base: str, entry: str) -> (List[str], List[Problem]):
                 problems.append(Problem(
                     "block", f"“{what}” is pressed here but never let go, so it would stay on. "
                     f"Add {let_go} where it should stop.", number))
+    if not any(p.level == "block" for p in problems):
+        from . import scriptdebug
+
+        for error in scriptdebug.validation(lines, entry, scan=scan, mode=mode, target=target):
+            problems.append(Problem("block", error))
     return lines, problems

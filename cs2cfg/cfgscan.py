@@ -133,6 +133,7 @@ class ConfigFile:
     generated_by: Optional[str] = None
     role: str = "config"
     exec_order: Optional[int] = None
+    revision: Optional[str] = None
 
     @property
     def name(self) -> str:
@@ -269,6 +270,7 @@ def discover(folder: Path, cfg_root: Optional[Path] = None) -> Dict[str, ConfigF
             is_commands=is_commands,
             generated_by=generated,
             role=_role_for(relative, generated),
+            revision=hashlib.sha256(raw).hexdigest(),
         )
     return files
 

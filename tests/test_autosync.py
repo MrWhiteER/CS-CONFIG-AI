@@ -242,8 +242,8 @@ class Deciding(unittest.TestCase):
         # newer files of its own -- they are backed up, and any it alone has
         # go up on the next round.
         self.assertEqual(d("a", "b", None, local_time=30, remote_time=20), "pull")
-        self.assertEqual(d("a", "b", "c", local_time=10, remote_time=20), "pull")
-        self.assertEqual(d("a", "b", "c", local_time=30, remote_time=20), "push")
+        self.assertEqual(d("a", "b", "c", local_time=10, remote_time=20), "conflict")
+        self.assertEqual(d("a", "b", "c", local_time=30, remote_time=20), "conflict")
 
     def test_steam_ids(self):
         self.assertEqual(autosync.account_from_steam64(STEAM64), ACCOUNT)

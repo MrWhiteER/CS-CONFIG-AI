@@ -31,7 +31,7 @@ const pre=document.createElement('pre');pre.id='checks';pre.textContent=JSON.str
 const file = path.join(work, 'startup.html');
 // Virtual-time Chrome may skip paint frames. Schedule the two paint-grace
 // callbacks deterministically; task coordination remains production code.
-fs.writeFileSync(file, '<!doctype html><meta charset="utf-8"><div class="boot-screen"><span class="boot-tip"></span></div><script>window.requestAnimationFrame=callback=>setTimeout(()=>callback(performance.now()),16);'+coordinator+'\n'+checks+'</script>');
+fs.writeFileSync(file, '<!doctype html><meta charset="utf-8"><div class="boot-screen"><span class="boot-tip"></span></div><script>function busy(){} function status(){} status.dismiss=()=>{};window.requestAnimationFrame=callback=>setTimeout(()=>callback(performance.now()),16);'+coordinator+'\n'+checks+'</script>');
 const chrome = process.env.CHROME_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const output = cp.execFileSync(chrome, ['--headless','--no-sandbox','--disable-gpu','--user-data-dir='+path.join(work,'chrome'),'--virtual-time-budget=3000','--dump-dom',pathToFileURL(file).href], {maxBuffer:2e6,stdio:['ignore','pipe','ignore']}).toString();
 const found = output.match(/<pre id="checks">(.*?)<\/pre>/s);

@@ -488,7 +488,9 @@ def _fill(script: str, **values) -> str:
     """
     out = script
     for token, value in values.items():
-        out = out.replace("@@" + token.upper() + "@@", str(value))
+        # Tokens occur inside PowerShell single-quoted literals. A literal
+        # apostrophe is doubled there; raw replacement breaks legal paths.
+        out = out.replace("@@" + token.upper() + "@@", str(value).replace("'", "''"))
     return out
 
 

@@ -52,7 +52,7 @@ if(process.env.FACEIT_REDUCED)args.unshift('--force-prefers-reduced-motion');
   assert(results,'browser checks timed out');
 
   const failures=results.filter(c=>c.ok===false||c.error);
-  const preview=path.join(root,'docs/redesign/stats-merge/preview');
+  const preview=process.env.CS2CFG_TEST_PREVIEWS||path.join(root,'docs/redesign/stats-merge/preview');
   fs.mkdirSync(preview,{recursive:true});
   if(failures.length) {
     const shot=await command('Page.captureScreenshot',{format:'png'});

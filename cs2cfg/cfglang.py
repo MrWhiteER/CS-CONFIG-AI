@@ -308,8 +308,9 @@ def write_config_text(path, text: str, encoding: str = "utf-8") -> None:
     Windows editor produces -- would corrupt it. Opening with ``newline=""``
     disables translation and writes exactly what it is given.
     """
-    with open(path, "w", encoding=encoding, newline="") as handle:
-        handle.write(text)
+    from .fileio import write_text
+
+    write_text(path, text, encoding)
 
 
 def restore_newlines(text: str, newline: str = "\n",

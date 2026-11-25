@@ -285,9 +285,29 @@ def decide(local: str, remote: Optional[str], agreed: Optional[str],
     # the next round.
     if not agreed or local_empty:
         return "pull"
-    # Both sides moved since they last agreed. The newer one wins; the pull
-    # side is backed up, so losing is an undo away.
-    return "pull" if remote_time >= local_time else "push"
+    # Clock order cannot decide which intentional edit the player wants.
+    return "conflict"
+
+
+def comparison(local, remote, entry, action, pending=None):
+    import difflib
+
+    rows = []
+    for path in sorted(set(local.get('files', {})) | set(remote.get('files', {}))):
+        here = local.get('files', {}).get(path)
+        there = remote.get('files', {}).get(path)
+        if here == there:
+            continue
+        rows.append({'path': path, 'status': 'different' if here is not None and there is not None else 'only on this PC' if there is None else 'only in cloud',
+                     'diff': '\n'.join(list(difflib.unified_diff((here or '').splitlines(), (there or '').splitlines(), fromfile='This PC', tofile='Cloud', lineterm=''))[:240]),
+                     'local_bytes': len((here or '').encode('utf-8')), 'remote_bytes': len((there or '').encode('utf-8'))})
+    prefs = [{'name': k, 'local': local.get('prefs', {}).get(k), 'remote': remote.get('prefs', {}).get(k)}
+             for k in sorted(set(local.get('prefs', {})) | set(remote.get('prefs', {})))
+             if local.get('prefs', {}).get(k) != remote.get('prefs', {}).get(k)]
+    return {'local_hash': fingerprint(local), 'remote_hash': (entry or {}).get('hash'),
+            'source': (entry or {}).get('from') or 'Cloud', 'updated_at': (entry or {}).get('updated_at'),
+            'action': action, 'files': rows, 'prefs': prefs,
+            'pending': bool((pending or {}).get('pending')), 'failed': (pending or {}).get('failed') or []}
 
 
 # --- remembering what was agreed --------------------------------------------
@@ -307,11 +327,27 @@ def load_agreed() -> Dict[str, Any]:
 
 
 def save_agreed(account: str, digest: str) -> None:
-    held = load_agreed()
-    held[str(account)] = {"hash": digest, "at": time.time()}
-    path = _state_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(held, indent=1), encoding="utf-8")
+    from . import fileio
+
+    with fileio.LOCK:
+        held = load_agreed()
+        held[str(account)] = {"hash": digest, "at": time.time()}
+        path = _state_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fileio.write_text(path, json.dumps(held, indent=1))
+
+
+def save_pending(account: str, remote_hash: str, failed=None) -> None:
+    from . import fileio
+
+    with fileio.LOCK:
+        held = load_agreed()
+        entry = dict(held.get(str(account)) or {})
+        entry.update(pending=remote_hash, failed=list(failed or []))
+        held[str(account)] = entry
+        path = _state_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fileio.write_text(path, json.dumps(held, indent=1))
 
 
 # --- applying a pull ---------------------------------------------------------
@@ -335,6 +371,7 @@ def apply(bundle: Dict[str, Any], prefs: Dict[str, Any], account: str,
     profiles.remember(prefs, account, changes)
 
     written: List[str] = []
+    failed: List[Dict[str, str]] = []
     waiting = 0
     files = bundle.get("files") or {}
     if files and cfg_root and may_write:
@@ -351,12 +388,14 @@ def apply(bundle: Dict[str, Any], prefs: Dict[str, Any], account: str,
                 path.parent.mkdir(parents=True, exist_ok=True)
                 write_config_text(path, text, "utf-8")
                 written.append(relative)
-            except OSError:
-                continue
+            except (OSError, UnicodeError) as exc:
+                failed.append({"path": relative, "error": str(exc)})
+        waiting = len(failed)
         backup.prune()
     elif files:
         waiting = len(files)
-    return {"prefs": sorted(changes), "written": written, "waiting": waiting}
+    return {"prefs": sorted(changes), "written": written, "waiting": waiting,
+            "failed": failed}
 
 
 def safe_folder(cfg_root: Path, relative: str) -> Optional[Path]:
@@ -384,7 +423,8 @@ def _machine_name() -> str:
 def run(account: Optional[str], cfg_root: Optional[Path], generated_folder: str = "",
         *, load_prefs: Callable[[], Dict[str, Any]],
         save_prefs: Callable[[Dict[str, Any]], None],
-        cloud_module: Any = None, force: bool = False) -> Dict[str, Any]:
+        cloud_module: Any = None, force: bool = False, preview: bool = False,
+        resolution: str = "", expected_local: str = "", expected_remote=None) -> Dict[str, Any]:
     """Compare, then push or pull. Never raises; returns what happened."""
     from . import profiles
 
@@ -425,11 +465,38 @@ def run(account: Optional[str], cfg_root: Optional[Path], generated_folder: str 
     entries = document.get("autosync") if isinstance(document.get("autosync"), dict) else {}
     entry = entries.get(str(account))
 
-    agreed = (load_agreed().get(str(account)) or {}).get("hash")
+    sync_state = load_agreed().get(str(account)) or {}
+    agreed = sync_state.get("hash")
     remote_hash = entry.get("hash") if isinstance(entry, dict) else None
     action = decide(local_hash, remote_hash, agreed, local_empty,
                     newest_local_change(cfg_root, local),
                     float(entry.get("updated_at") or 0) if isinstance(entry, dict) else 0.0)
+    # A partial pull is not a local edit. Keep retrying it instead of allowing
+    # the remaining old files to be pushed over the cloud on the next round.
+    if sync_state.get("pending") and remote_hash:
+        action = "pull"
+
+    if preview or action == "conflict" or resolution:
+        try:
+            remote = unpack(entry) if remote_hash else {"prefs": {}, "files": {}}
+        except (SyncError, ValueError) as exc:
+            return {**out, "ok": False, "reason": str(exc)}
+        details = comparison(local, remote, entry, action, sync_state)
+        if preview:
+            return {**out, "comparison": details}
+        if resolution:
+            if resolution not in ("push", "pull"):
+                return {**out, "ok": False, "reason": "Choose this PC or the cloud copy."}
+            if expected_local != local_hash or expected_remote != remote_hash:
+                return {**out, "ok": False, "reason": "Settings changed since the comparison. Compare again before choosing."}
+            if resolution == "pull" and not remote_hash:
+                return {**out, "ok": False, "reason": "There is no cloud copy to use."}
+            if resolution == "push" and sync_state.get("pending"):
+                return {**out, "ok": False, "reason": "Finish the pending download before uploading this PC's files."}
+            action = resolution
+        elif action == "conflict":
+            return {**out, "ok": False, "action": "conflict", "comparison": details,
+                    "reason": "Both PCs changed since the last sync. Compare and choose which copy to use."}
 
     try:
         if action == "push":
@@ -440,6 +507,7 @@ def run(account: Optional[str], cfg_root: Optional[Path], generated_folder: str 
             out.update(action="push", files=len(local["files"]))
         elif action == "pull":
             bundle = unpack(entry)
+            save_pending(account, remote_hash)
             prefs = load_prefs()
             may_write = bool(prefs.get("ui", {}).get(CFG_WRITE_KEY))
             result = apply(bundle, prefs, account, cfg_root, may_write)
@@ -448,6 +516,9 @@ def run(account: Optional[str], cfg_root: Optional[Path], generated_folder: str 
                 # Not agreed yet: the files have not landed. The next round
                 # after permission is given will pull again.
                 out.update(action="pull", **result)
+                save_pending(account, remote_hash, result["failed"])
+                if result["failed"]:
+                    out.update(ok=False, reason="Some files could not be saved. The cloud version is preserved; the download will retry.")
             else:
                 # Agreed on the cloud's copy, not on what is here now: files
                 # this PC has and the cloud lacks then read as a local change
@@ -457,7 +528,7 @@ def run(account: Optional[str], cfg_root: Optional[Path], generated_folder: str 
         else:
             if remote_hash and remote_hash == local_hash and agreed != local_hash:
                 save_agreed(account, local_hash)
-    except (SyncError, cloud_module.CloudError) as exc:
+    except (SyncError, cloud_module.CloudError, OSError, ValueError) as exc:
         return {**out, "ok": False, "reason": str(exc)}
     return out
 

@@ -3,7 +3,8 @@ const fs=require('fs'),path=require('path'),os=require('os'),cp=require('child_p
 const root=path.resolve(__dirname,'..');process.chdir(root);
 const html=fs.readFileSync('cs2cfg/web/index.html','utf8'),before=process.argv.includes('--before');
 for(const s of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g))new vm.Script(s[1]);
-const work=fs.mkdtempSync(path.join(os.tmpdir(),'cs2-apps-')),out=path.join(root,'docs/redesign/round3/preview');
+const work=fs.mkdtempSync(path.join(os.tmpdir(),'cs2-apps-')),out=process.env.CS2CFG_TEST_PREVIEWS||path.join(root,'docs/redesign/round3/preview');
+fs.mkdirSync(out,{recursive:true});
 const slice=(a,b)=>html.slice(html.indexOf(a),html.indexOf(b,html.indexOf(a)));
 // Use the production theme list and switcher so newly added themes are checked too.
 let code=`const $=id=>document.getElementById(id),esc=x=>String(x??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');let activeTab='settings',settingsSub='apps',prefsNow={};const calls=[];function status(){}function startCrosshairWatch(){};async function api(route,body){calls.push({route,body});if(route==='/api/apps')return {ok:true,apps:{discord:{installed:true,running:true,with_game:false},teamspeak:{installed:false,running:false,with_game:false}},teamspeak:{host:'',port:9987,nickname:'',enabled:false}};if(route==='/api/faceit/apps')return {ok:true,apps:{'faceit-client':{installed:true,running:false},'faceit-ac':{installed:true,running:false}}};if(route==='/api/match/settings')return {ok:true,enabled:true};if(route==='/api/crosshairx')return {ok:true,installed:true,running:false};return {ok:true};}`;

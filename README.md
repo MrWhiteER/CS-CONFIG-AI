@@ -40,6 +40,25 @@ Neither needs Python, an account, or a sign-in.
 Both keep their settings, backups and session history in a `cs2cfg-data`
 folder beside the executable.
 
+### Config and performance tools
+
+Open **Settings → Tools** to compare this PC with your cloud copy, trace a
+setting or key back to its config file, or preview and export diagnostics.
+If both PCs have changed since their last sync, choose a copy after reviewing
+the differences. The app keeps failed downloads pending for retry.
+
+For a **Preset A/B benchmark**, enable frame capture in **Settings → Overlay**.
+Choose a preset and arm a run from **Tools**. Repeat the same workload for each
+preset, close the game to save each run, and compare the recordings. The table
+shows the range across runs and flags differences in recorded conditions.
+
+**Guided practice** uses an existing map config. Start with CS2 closed, follow
+the checklist on an offline map, and return to the main menu for restoration.
+Close CS2 again before verifying its saved keybinds and settings.
+
+Use **Script Builder → Script debugger** to simulate press and release events
+and see the commands, changed values, and actions still held.
+
 **Uninstalling removes everything the app made:** the program, its settings,
 backups, caches and update downloads, and the one-time helper with its
 scheduled task, firewall rules and CS2 Defender exclusion -- without an

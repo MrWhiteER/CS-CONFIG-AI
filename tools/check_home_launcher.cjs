@@ -5,8 +5,8 @@ const work=path.join(require('os').tmpdir(),'cs-config-home-'+require('crypto').
 const s=fs.readFileSync('cs2cfg/web/index.html','utf8').replace(/\r\n/g,'\n');
 for(const x of s.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g))new (require('vm').Script)(x[1]);
 const themes=require('vm').runInNewContext(s.slice(s.indexOf('const THEMES = [')+'const THEMES = '.length,s.indexOf('function applyTheme(')).trim().replace(/;$/, '')).map(t=>t[0]);
-const slice=(a,b)=>s.slice(s.indexOf(a),s.indexOf(b,s.indexOf(a)));
-let code=fs.readFileSync(path.join(root,'cs2cfg/web/assets/hardware/icons.js'),'utf8')+'\n'+fs.readFileSync(path.join(root,'cs2cfg/web/assets/fixit/icons.js'),'utf8')+'\n'+`const $=id=>document.getElementById(id); const esc=x=>String(x??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');let intent='balanced',planned={},prefs=0,previews=0;const INTENTS=['competitive','balanced','quality'];function paintModeBadge(){} function rememberPrefs(){prefs++} function noteChange(){} function requestBody(){return {intent,target_fps:240}};let netApi;async function api(url,b){if(url.startsWith("/api/net"))return netApi(url,b);return {intent:b.intent,estimated_fps:{competitive:410,balanced:340,quality:230}[b.intent]}};const tempAlarm={};function status(){};`;
+const slice=(a,b)=>{const start=s.indexOf(a),end=s.indexOf(b,start);assert(start>=0&&end>start,'Missing source boundary: '+a+' to '+b);return s.slice(start,end)};
+let code=fs.readFileSync(path.join(root,'cs2cfg/web/assets/hardware/icons.js'),'utf8')+'\n'+fs.readFileSync(path.join(root,'cs2cfg/web/assets/fixit/icons.js'),'utf8')+'\n'+`const $=id=>document.getElementById(id); const esc=x=>String(x??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');let intent='balanced',planned={},prefs=0,previews=0;function applyProfile(){previews++}function previewPlan(){previews++}const INTENTS=['competitive','balanced','quality'];function paintModeBadge(){} function rememberPrefs(){prefs++} function noteChange(){} function requestBody(){return {intent,target_fps:240}};let netApi;async function api(url,b){if(url.startsWith("/api/net"))return netApi(url,b);return {intent:b.intent,estimated_fps:{competitive:410,balanced:340,quality:230}[b.intent]}};const tempAlarm={};function status(){};`;
 code+=slice("function renderHardware(d) {","/* The machine's scores,");
 code+=`let prefsNow={},audioData=null;`;
 code+=slice('function audioOptions(list, pinned)', 'async function saveAudio');
@@ -14,20 +14,20 @@ code+=slice('let wgData = null;','/* What the launch did about the crosshair.');
 code+=slice('const CHIPS = { CPU:', '// -- 2. the gradient');
 code+=slice('/* Launcher motion:','function renderPlan(');
 code+=`const verificationNavigation=[];function setTab(name){verificationNavigation.push(name);document.querySelectorAll('.tab-panel').forEach(panel=>panel.classList.toggle('hidden',panel.dataset.panel!==name))};`;
-code+=slice('/* Every card uses','$("preview").addEventListener("click", previewPlan);');
+code+=slice('/* Every card uses','const APPLY_WHAT =');
 code+='function busy(){};';
 code+=`let fpsEffect='';function renderFps(){}function markPending(){};`;
 code+=slice('function renderPlan(', '// The last detection,');
 code+=slice('let netTimer = null;', '/* Three scene cards');
 code+=`const prefsReady=false,startup={finished:false};function moveSegThumb(){};`;
-code+=slice('let settingsSub = "apply";', '/* ---------------------------------------------------------------------------\n   Sound devices');
+code+=slice('let settingsSub = "nvidia";', '/* ---------------------------------------------------------------------------\n   Sound devices');
 code+='let cloudData=null;';
 code+=slice('const WAY_ICONS = {', 'async function loadCloud()');
 code+=slice('function cloudWay(', 'function showPasswordForm(');
 code+=slice('function ring(value','function meter(');
 code+=slice('/* Administrator helper status','/* ------');
 code+=slice('// Horizontal thermal strips','// --- live system readout');
-code+=`document.documentElement.dataset.boot='ready';document.querySelector('.boot-screen').remove();$('preview').addEventListener('click',()=>previews++);
+code+=`document.documentElement.dataset.boot='ready';document.querySelector('.boot-screen').remove();$('steam-preview').addEventListener('click',()=>previews++);
 const checks=[];function check(name,ok){checks.push({name,ok});if(!ok)throw Error(name)}
 (async()=>{try{
 check('hero controls remain inside hero', $('home-hero').contains($('play')) && $('home-hero').contains($('launch-modes')));
@@ -74,7 +74,7 @@ const tempHistory={...history,'temp-cpu':history.cpu.map(v=>v+30),'temp-gpu':his
 hardwareUpdate({at:114,history:tempHistory,gpu:{temperature:60},temps:{parts:[{part:'cpu',known:true,celsius:60}]}});check('temperatures use the app history',hardwareGraph.temperatures['temp-cpu'].length===60);
 hardwareUpdate({at:116,history:tempHistory,gpu:{temperature:60}});hardwarePause();
 
-check('all sixteen hardware glyphs are distinct', Object.keys(HW_ART).length===16&&new Set(Object.values(HW_ART)).size===16);
+check('hardware and settings glyphs are distinct', Object.keys(HW_ART).length>=16&&new Set(Object.values(HW_ART)).size===Object.keys(HW_ART).length);
 const specimen=document.createElement('div');specimen.innerHTML=Object.keys(HW_ART).map(k=>hwIcon(k)).join('');document.body.append(specimen);
 if(matchMedia('(prefers-reduced-motion: reduce)').matches)check('reduced motion disables hardware animation',getComputedStyle(specimen.querySelector('svg')).animationName==='none');
 check('every glyph has tooltip and accessible name',[...specimen.children].every(el=>el.title&&el.getAttribute('aria-label')&&el.querySelector('svg')));
@@ -105,7 +105,7 @@ if(matchMedia('(prefers-reduced-motion: reduce)').matches)check('reduced motion 
 
 check('Detected moved exclusively into This PC',!!$('hw-card').closest('[data-sub="this-pc"]')&&!document.querySelector('[data-panel="launcher"] #hw-card'));
 check('connection card removed from Play',!document.querySelector('[data-panel="launcher"] #net-card'));
-setSettingsSub('this-pc',true);check('This PC navigation reveals hardware',!$('hw-card').closest('.subpane').classList.contains('hidden')&&document.querySelector('[data-sub="this-pc"][role="tab"]').getAttribute('aria-selected')==='true');setSettingsSub('apply',true);
+setSettingsSub('this-pc',true);check('This PC navigation reveals hardware',!$('hw-card').closest('.subpane').classList.contains('hidden')&&document.querySelector('[data-sub="this-pc"][role="tab"]').getAttribute('aria-selected')==='true');setSettingsSub('nvidia',true);
 const probe={label:'The internet',host:'1.1.1.1',sent:20,received:20,reachable:true,average:18,jitter:2,loss:0,times:[17,18,19],misses:[]};
 const measured={done:true,running:false,adapter:{name:'Ethernet',speed:'1 Gbps',wireless:false},download:{mbps:245.3,bytes:25000000,seconds:.815,error:''},internet:probe,gateway:{...probe,label:'Your router',host:'192.168.1.1',average:1},findings:[{severity:'good',title:'Steady connection',detail:'No packets lost.'}]};
 let calls=[];netApi=async route=>{calls.push(route);return route.endsWith('/start')?{...measured,done:false,running:true}:measured};
@@ -134,7 +134,7 @@ const noNvidia={...receipt,total:8,verified:8,items:receipt.items.map(item=>item
 await refreshVerification();check('read-back waits for gated startup',!verificationStarted&&!verificationBusy);
 renderVerification({total:0,items:[]});check('no receipt never claims success',$('verification').hidden);
 renderVerification(receipt,true);check('badge uses verified count and time',$('verification-title').textContent==='Your PC is set: 9/9 verified'&&$('verification-time').textContent.startsWith('Checked'));
-$('results').insertAdjacentHTML('afterbegin','<section id="apply-verification" class="verification reveal"></section>');renderApplyVerification();
+$('assessment-out').insertAdjacentHTML('afterbegin','<section id="apply-verification" class="verification reveal"></section>');renderApplyVerification();
 check('Apply results show the same read-back checklist',$('apply-verification').querySelectorAll('.verify-row').length===9&&$('apply-verification').textContent.includes('9/9 verified'));
 check('apply reveals accessible checklist',$('verification').open&&$('verification-list').children.length===9&&$('verification-title').getAttribute('role')==='status');
 check('all three system settings count as verified',$('verification-list').querySelectorAll('[data-state="verified"][data-counted="true"]').length===9);
@@ -150,7 +150,7 @@ check('never applied recommendations are amber Not set',$('verification').datase
 check('both checklists offer existing controls',$('verification-list').querySelectorAll('[data-verify-action]').length===3&&$('apply-verification').querySelectorAll('[data-verify-action]').length===3);
 const actionApi=api,actionRequests=[];api=async(...args)=>{actionRequests.push(args);return {}};
 for(const action of ['nvidia','power','wingraphics'])$('verification-list').querySelector('[data-verify-action="'+action+'"]').click();
-check('review actions navigate to Graphics Fix It and Machine',verificationNavigation.join(',')==='gpu,fix,settings'&&settingsSub==='apply'&&document.activeElement===$('wg-apply'));
+check('review actions navigate to Graphics Fix It and Machine',verificationNavigation.join(',')==='gpu,fix,settings'&&settingsSub==='nvidia'&&document.activeElement===$('wg-apply'));
 check('review actions do not apply settings or call an API',actionRequests.length===0&&!$('wg-apply').disabled);api=actionApi;setTab('launcher');
 renderVerification({...unset,verified:8,items:receipt.items.map((item,i)=>i===6?{...item,status:'not_checked',action:'nvidia',detail:'Not checked: access denied. No extra rights requested.'}:item)});
 check('unreadable system value stays in denominator',$('verification-title').textContent==='Review settings: 8/9 verified'&&$('verification-list').querySelectorAll('[data-state="not_checked"]').length===1);
@@ -169,16 +169,16 @@ if(matchMedia('(prefers-reduced-motion: reduce)').matches)check('reduced motion 
 Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));check('background pauses read-back animation',document.documentElement.classList.contains('verify-paused'));delete document.hidden;document.dispatchEvent(new Event('visibilitychange'));await Promise.resolve();await Promise.resolve();
 for(const theme of ${JSON.stringify(themes)}){document.documentElement.dataset.theme=theme;check('verification readable in '+theme,getComputedStyle($('verification-title')).color!==getComputedStyle($('verification')).backgroundColor);}delete document.documentElement.dataset.theme;
 renderPlan({intent:'balanced',tier:'S',headroom:5.7,estimated_fps:342,settings:[{name:'GPU level',after:'High',changed:true,reason:'Tier S headroom'}],launch_current:'',launch_new:'',launch_added:[],launch_removed:[],advisories:[{title:'Estimated 342 fps',detail:'Tier S',level:'warn'}],changed_count:1});
-check('plan keeps settings without estimates',!/(342|headroom|Tier S)/.test($('results').textContent+$('assessment-out').textContent)&&$('results').textContent.includes('GPU level'));
+check('plan keeps picture guidance without estimates',!/(342|headroom|Tier S)/.test($('assessment-out').textContent)&&fpsEffect.includes('High')&&$('assessment-out').textContent.includes('1 picture settings reviewed'));
 check('Machine has no estimated FPS',!$('machine-out').textContent.includes('FPS')&&!$('machine-out').querySelector('.part-vs'));
 check('launch controls moved once',['w-launch','steam-launch-out','who','who-menu'].every(id=>document.querySelectorAll('#'+id).length===1&&!!$(id).closest('[data-sub="steam"]')));
 check('app Account stays separate',['account-card','account-out'].every(id=>document.querySelectorAll('#'+id).length===1&&!!$(id).closest('.subpane[data-sub="account"]'))&&!document.querySelector('.subpane[data-sub="steam"] #account-card'));
-check('Steam preview moved from Apply',!$('results').textContent.includes('Steam launch options')&&$('steam-launch-out').textContent.includes('Next Apply'));
-check('Worth knowing render removed',!$('results').textContent.includes('Worth knowing'));
-setSettingsSub('account',true);check('saved Account preference restores Account',settingsSub==='account'&&!$('account-card').closest('.subpane').classList.contains('hidden')&&document.querySelector('#settings-subtabs [data-sub="account"]').getAttribute('aria-selected')==='true');setSettingsSub('apply',true);
+check('Steam preview follows mode switches',$('steam-launch-out').textContent.includes('After the next mode switch'));
+check('advisories do not become performance promises',!$('assessment-out').textContent.includes('Estimated'));
+setSettingsSub('account',true);check('saved Account preference restores Account',settingsSub==='account'&&!$('account-card').closest('.subpane').classList.contains('hidden')&&document.querySelector('#settings-subtabs [data-sub="account"]').getAttribute('aria-selected')==='true');setSettingsSub('nvidia',true);
 const settingsPanel=document.querySelector('[data-panel="settings"]');panel.classList.add('hidden');settingsPanel.classList.remove('hidden');
-for(const name of ['apply','this-pc','lighting','steam','account','apps','look','sound','config','editing','logs']){setSettingsSub(name,true);const pane=settingsPanel.querySelector('.subpane[data-sub="'+name+'"]');check('shared grid '+name,getComputedStyle(pane).gap==='16px'&&getComputedStyle(pane).display==='grid');}
-setSettingsSub('apply',true);const machineRect=$('machine-card').getBoundingClientRect(),writeRect=$('w-video').closest('.panel').getBoundingClientRect();check('Machine and Write aligned',innerWidth<=900||Math.abs(machineRect.width-writeRect.width)<1&&machineRect.top===writeRect.top&&machineRect.height===writeRect.height);
+for(const name of ['nvidia','this-pc','lighting','mouse','steam','account','apps','look','sound','overlay','maps','config','editing','logs','tools']){setSettingsSub(name,true);const pane=settingsPanel.querySelector('.subpane[data-sub="'+name+'"]');check('shared grid '+name,getComputedStyle(pane).gap==='16px'&&getComputedStyle(pane).display==='grid');}
+setSettingsSub('nvidia',true);check('NVIDIA workspace replaces old Apply layout',!!settingsPanel.querySelector('.subpane[data-sub="nvidia"]')&&!settingsPanel.querySelector('.subpane[data-sub="apply"]'));
 settingsPanel.classList.add('hidden');panel.classList.remove('hidden');
 const sample={intent:'balanced',settings:[{name:'Texture quality',before:'Low',after:'High',changed:true},{name:'Shadows',before:'Off',after:'On',changed:true},{name:'GPU level',before:'Quality',after:'Quality',before_raw:1,after_raw:3,same_label:true,changed:true}]};
 for(const mode of INTENTS){presetBegin(mode);presetReveal({...sample,intent:mode});check(mode+' uses real preview values',document.querySelector('.preset-row').textContent.includes('Low → High'));check(mode+' dims behind selected card',!!document.querySelector('.preset-veil')&&presetSession.card.dataset.intent===mode);if(!matchMedia('(prefers-reduced-motion: reduce)').matches){check(mode+' reveals sequentially',document.querySelectorAll('.preset-row').length===1);await new Promise(r=>setTimeout(r,780));}check(mode+' displays every changed value',document.querySelectorAll('.preset-row').length===3&&document.querySelector('.preset-rows').textContent.includes('Quality (1) → Quality (3)'));presetClose();}
@@ -188,8 +188,8 @@ presetBegin('balanced');panel.classList.add('hidden');await Promise.resolve();ch
 const oldApi=api;const queue=[];api=(route,body)=>new Promise((resolve,reject)=>queue.push({route,body,resolve,reject}));
 const planFor=name=>({...sample,intent:name,launch_current:'-old',launch_new:'-new',launch_removed:[],launch_added:[],changed_count:3});
 intent='competitive';const first=previewPlan();intent='quality';const second=previewPlan();queue[1].resolve(planFor('quality'));await second;queue[0].resolve(planFor('competitive'));await first;check('late plan cannot overwrite latest selection',planned.intent==='quality'&&$('assessment-out').textContent.includes('quality'));
-check('Steam launch options use latest same plan',$('steam-launch-out').textContent.includes('-new')&&!$('results').textContent.includes('-new'));
-presetBegin('quality');const failed=previewPlan();queue[2].reject(Error('Offline'));await failed;check('plan failure releases dimmer and preview button',!presetSession&&!$('preview').disabled);
+check('Steam launch options use latest same plan',$('steam-launch-out').textContent.includes('-new')&&!$('assessment-out').textContent.includes('-new'));
+presetBegin('quality');const failed=previewPlan();queue[2].reject(Error('Offline'));await failed;check('plan failure releases dimmer and preview button',!presetSession&&!$('steam-preview').disabled);
 api=oldApi;intent='balanced';paintIntent(intent);renderPlan(planFor('balanced'));
 for(const theme of ${JSON.stringify(themes)}){document.documentElement.dataset.theme=theme;presetBegin('balanced');presetReveal(sample);const row=document.querySelector('.preset-row');check('preset readable in '+theme,getComputedStyle(row).color!==getComputedStyle(document.querySelector('.preset-changes')).backgroundColor);check('dimmer cuts window through selected card in '+theme,document.querySelector('.preset-veil').style.clipPath.includes('evenodd'));presetClose();}delete document.documentElement.dataset.theme;
 renderVerification(receipt);$('verification').open=location.hash.includes('verification');
@@ -199,7 +199,7 @@ if(location.hash.includes('notset')){renderVerification(unset,true);api=async()=
 $('status').remove();document.querySelector('.scroll').scrollTop=0;
 if(location.hash.includes('verification'))$('verification').scrollIntoView({block:'start'});
 if(location.hash.includes('this-pc')){document.querySelector('[data-panel="launcher"]').classList.add('hidden');document.querySelector('[data-panel="settings"]').classList.remove('hidden');setSettingsSub('this-pc',true)}
-if(location.hash.includes('settings-apply')){document.querySelector('[data-panel="launcher"]').classList.add('hidden');document.querySelector('[data-panel="settings"]').classList.remove('hidden');setSettingsSub('apply',true)}
+if(location.hash.includes('settings-apply')){document.querySelector('[data-panel="launcher"]').classList.add('hidden');document.querySelector('[data-panel="settings"]').classList.remove('hidden');setSettingsSub('nvidia',true)}
 if(location.hash.includes('settings-steam')){panel.classList.add('hidden');settingsPanel.classList.remove('hidden');setSettingsSub('steam',true);$('who-name').textContent='Edy';$('who-how').textContent='Following Steam';}
 if(location.hash.includes('settings-account')){panel.classList.add('hidden');settingsPanel.classList.remove('hidden');setSettingsSub('account',true);cloudData={configured:true,signed_in:false,google:true};renderCloud();}
 if(location.hash.includes('preset')){presetBegin('balanced');presetReveal(sample);await new Promise(r=>setTimeout(r,780));clearTimeout(presetSession.timer);$('intents').scrollIntoView({block:'center'});}
@@ -215,8 +215,8 @@ if(location.hash.includes('solo'))hardwareSelect('gpu');
 if(!settingsPanel.classList.contains('hidden'))document.querySelectorAll('.tabs .tab').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab==='settings')));
 
 }catch(e){checks.push({error:e.stack})}const freeze=document.createElement('style');freeze.textContent='*,*::before,*::after{transition:none!important;animation:none!important}';document.head.append(freeze);document.body.insertAdjacentHTML('beforeend','<pre id="checks" hidden>'+JSON.stringify(checks)+'</pre>')})();`;
-let html=s.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'');html=html.replace('<head>','<head><base href="'+url.pathToFileURL(path.join(root,'cs2cfg/web/')).href+'">');html=html.replace('</body>','<script>'+code+'</script></body>');
-fs.writeFileSync(path.join(work,'preview.html'),html);
+let html=s.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'');html=html.replace('<head>','<head><base href="'+url.pathToFileURL(path.join(root,'cs2cfg/web/')).href+'">');html=html.replace('</body>',()=>'<script>window.addEventListener("error",e=>{const p=document.createElement("pre");p.id="checks";p.textContent=JSON.stringify([{error:e.error?.stack||e.message}]);document.body.append(p)});</script><script>'+code+'</script></body>');
+new (require('vm').Script)(code);fs.writeFileSync(path.join(work,'preview.html'),html);
 const chrome=process.env.CHROME_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe';const args=['--headless','--no-sandbox','--disable-gpu','--allow-file-access-from-files','--user-data-dir='+path.join(work,'chrome'),'--window-size='+(process.env.HOME_VIEWPORT||'1440,1100'),'--virtual-time-budget=30000',url.pathToFileURL(path.join(work,'preview.html')).href+(process.env.HOME_HASH||'')];
 if(process.env.HOME_REDUCED)args.unshift('--force-prefers-reduced-motion');
 const out=cp.execFileSync(chrome,[...args,'--dump-dom','--screenshot='+(process.env.HOME_SCREENSHOT||path.join(work,'preview.png'))],{maxBuffer:4e6,stdio:['ignore','pipe','ignore']}).toString();fs.writeFileSync(path.join(work,'dom.html'),out);const result=[...out.matchAll(/<pre id="checks"[^>]*>(.*?)<\/pre>/gs)].at(-1);console.log(result?result[1]:'NO TEST RESULTS');assert(result&& !result[1].includes('false')&&!result[1].includes('"error"'));

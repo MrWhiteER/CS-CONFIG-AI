@@ -11,7 +11,7 @@ function kbDecorateWorkspace() {
     inspector.classList.add('is-opening');
     kbOpenInspector = false;
   }
-  const counts = {script:0,custom:0,bound:0,free:0};
+  const counts = {script:0,custom:0,bound:0,free:0,unknown:0};
   out.querySelectorAll('[data-kbcode]').forEach(el => {
     for (const state of Object.keys(counts)) if (el.classList.contains(state)) counts[state]++;
     if (el.dataset.kbcode === kbAssignedCode) el.classList.add('kb-assigned');

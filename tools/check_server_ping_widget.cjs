@@ -6,7 +6,7 @@ const assert = require('assert');
 
 const root = path.resolve(__dirname, '..');
 const work = fs.mkdtempSync(path.join(os.tmpdir(), 'cs-config-ping-'));
-const source = fs.readFileSync(path.join(root, 'cs2cfg/web/index.html'), 'utf8');
+const source = fs.readFileSync(path.join(root, 'cs2cfg/web/index.html'), 'utf8').replace(/\r\n/g,'\n');
 for (const script of source.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g))
   new (require('vm').Script)(script[1]);
 const widget = source.slice(source.indexOf('const serverPingWidget = (() => {'), source.indexOf('let activeTab ='));
@@ -24,14 +24,14 @@ const esc = x => String(x ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').
 const startup = {finished:true};
 const fixture = ${JSON.stringify(fixture)};
 let pingError = '';
-async function api() { return {regions:fixture, error:pingError, updated_at:Date.now()/1000, running:false}; }
+async function api(route) { return route.includes('/lock') ? {firewall:{status:'off'},history:[]} : {regions:fixture, error:pingError, updated_at:Date.now()/1000, running:false}; }
 document.documentElement.dataset.boot = 'ready';
 document.querySelector('.boot-screen').remove();
 document.getElementById('status').remove();
 `;
 const html = source.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, '')
   .replace('<head>', '<head><base href="'+pathToFileURL(path.join(root,'cs2cfg/web/')).href+'">')
-  .replace('</body>', '<script>'+setup+widget+'</script></body>');
+  .replace('</body>', () => '<script>'+setup+fs.readFileSync(path.join(root,'cs2cfg/web/assets/home/server-lock.js'),'utf8')+widget+'</script></body>');
 const preview = path.join(work, 'preview.html');
 fs.writeFileSync(preview, html);
 

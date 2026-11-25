@@ -2633,7 +2633,10 @@ def _cfg_file(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     if config is None:
         return {"ok": False, "error": f"{wanted} is not part of the scan"}
 
-    text = config.path.read_bytes().decode(config.document.encoding, errors="replace")
+    from . import fileio
+
+    raw = config.path.read_bytes()
+    text = raw.decode(config.document.encoding, errors="replace")
     marks: Dict[str, list] = {}
     for issue in result.issues:
         if issue.file == wanted:
@@ -2647,6 +2650,7 @@ def _cfg_file(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         "path": wanted,
         "name": config.name,
         "text": text,
+        "revision": fileio.digest(raw),
         "encoding": config.document.encoding,
         "newline": "CRLF" if config.document.newline == "\r\n" else "LF",
         "commands": config.is_commands,
@@ -3079,6 +3083,7 @@ def _cfg_keys(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         "bound": bound,
         "count": len(bound),
         "scripted": sum(1 for b in bound.values() if b["script"]),
+        "baseline_known": bool(defaults_table or live_binds),
         "live": {"available": bool(live_binds), "count": len(live_binds),
                  "written": written, "differences": differences,
                  "why": live_why},
@@ -4316,7 +4321,7 @@ def _cfg_save(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     and refusing to save half-finished work would be worse than saying what is
     wrong with it.
     """
-    from . import cfgscan
+    from . import cfgscan, fileio
 
     result = getattr(state, "cfg_scan", None)
     if result is None:
@@ -4337,8 +4342,19 @@ def _cfg_save(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     body_text = cfglang.restore_newlines(
         text, newline, config.document.trailing_newline)
 
+    encoding = "utf-8" if body.get("convert_utf8") else config.document.encoding
+    try:
+        encoded = body_text.encode(encoding)
+    except UnicodeEncodeError:
+        return {"ok": False, "needs_encoding": True,
+                "error": f"This edit contains characters {encoding} cannot store. The original is unchanged. Save as UTF-8 to keep them."}
     before = config.path.read_bytes()
-    if body_text.encode(config.document.encoding, errors="replace") == before:
+    expected = str(body.get("revision") or config.revision or fileio.digest(before))
+    if fileio.digest(before) != expected:
+        return {"ok": False, "conflict": True, "revision": fileio.digest(before),
+                "current_text": before.decode(config.document.encoding, errors="replace"),
+                "error": "The file changed since you opened it. Your draft was kept; compare it with the current file before saving."}
+    if encoded == before:
         return {"path": wanted, "written": False, "note": "nothing changed"}
 
     # Problems the tokeniser finds are attached to the line they occur on,
@@ -4359,9 +4375,13 @@ def _cfg_save(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
                 "issues": issues,
                 "error": f"that would leave {errors} syntax error(s) in the file"}
 
-    session = backup.BackupSession(note=f"edited {wanted}")
-    session.add(config.path)
-    cfglang.write_config_text(config.path, body_text, config.document.encoding)
+    with fileio.LOCK:
+        session = backup.BackupSession(note=f"edited {wanted}")
+        session.add(config.path)
+        try:
+            fileio.write_bytes(config.path, encoded, expected=expected)
+        except fileio.RevisionConflict as exc:
+            return {"ok": False, "conflict": True, "error": str(exc)}
     backup.prune()
 
     state.cfg_scan = cfgscan.scan(result.root, result.cfg_root)
@@ -4369,7 +4389,8 @@ def _cfg_save(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         "path": wanted,
         "written": True,
         "backup": session.stamp,
-        "bytes": len(body_text.encode(config.document.encoding, errors="replace")),
+        "bytes": len(encoded),
+        "revision": fileio.digest(encoded),
         "issues": issues,
         "errors": errors,
     }
@@ -5112,6 +5133,22 @@ def _map_scan(state: State):
     return state.cfg_scan
 
 
+def _map_capture_baseline(state: State) -> None:
+    from . import defaults, gamewatch, mapconfig
+
+    result = _map_scan(state)
+    if result is None or mapconfig.load().get("needs_reset"):
+        return
+    bindings = defaults.load(getattr(state, "cs2_install", None))
+    settings = {}
+    if getattr(state, "steam_root", None) and state.users:
+        snap = gamewatch.take(gamewatch.cfg_dir(state.steam_root, _active_account(state)))
+        bindings.update(snap.values.get("Key binds") or {})
+        settings.update(snap.values.get("Machine settings") or {})
+        settings.update(snap.values.get("In-game settings") or {})
+    mapconfig.remember_baseline(result, bindings, settings)
+
+
 def _map_setup_start(state: State) -> None:
     from . import applynow, gamewatch, mapconfig
 
@@ -5121,7 +5158,7 @@ def _map_setup_start(state: State) -> None:
         except Exception:
             pass
 
-    mapconfig.start(lambda: _map_scan(state), refresh)
+    mapconfig.start(lambda: _map_scan(state), refresh, capture=lambda: _map_capture_baseline(state))
     gamewatch.APP_OWNED.append(
         lambda change: mapconfig.app_owned_filter(_map_scan(state))(change))
 
@@ -5138,10 +5175,9 @@ def _map_setups_set(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
 
     result = _rescan(state) or _map_scan(state)
     if "auto_press" in body:
-        data = mapconfig.load()
-        data["auto_press"] = bool(body.get("auto_press"))
-        mapconfig.save(data)
+        mapconfig.update({"auto_press": bool(body.get("auto_press"))})
         return mapconfig.summary(result)
+    _map_capture_baseline(state)
     try:
         out = mapconfig.set_setup(result, str(body.get("file") or ""), bool(body.get("on")),
                                   [str(m) for m in body.get("maps") or []])
@@ -6838,6 +6874,8 @@ _CONFIG_WRITERS = {
 
 
 def make_handler(state: State):
+    from . import workbench
+
     routes_get: Dict[str, Callable[[], Dict[str, Any]]] = {}
     routes_post: Dict[str, Callable[[State, Dict[str, Any]], Dict[str, Any]]] = {
         "/api/plan": _plan_payload,
@@ -7010,6 +7048,8 @@ def make_handler(state: State):
         "/api/mapsetups/set": _map_setups_set,
     }
 
+    routes_post.update(workbench.ROUTES)
+
     class Handler(BaseHTTPRequestHandler):
         server_version = f"cs2cfg/{__version__}"
         protocol_version = "HTTP/1.1"
@@ -7072,6 +7112,9 @@ def make_handler(state: State):
                 return
             if path in ("/", "/index.html"):
                 self._send_file(WEB_ROOT / "index.html")
+                return
+            if path == "/workbench.js":
+                self._send_file(WEB_ROOT / "workbench.js")
                 return
             if path.startswith("/avatar/"):
                 # Steam's cached picture for one account, served as-is.

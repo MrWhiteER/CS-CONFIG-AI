@@ -178,6 +178,7 @@ class SessionRecord:
 
     notes: List[str] = field(default_factory=list)
     overlay: Optional[Dict[str, Any]] = None
+    benchmark: Dict[str, Any] = field(default_factory=dict)
 
 
 class SessionRecorder:
@@ -202,6 +203,12 @@ class SessionRecorder:
             intent=self.meta.get("intent"),
             tier=self.meta.get("tier"),
         )
+        from . import benchmarks
+
+        try:
+            self.record.benchmark = benchmarks.claim(self.meta)
+        except OSError:
+            self.record.notes.append("The benchmark label could not be saved; session recording continues.")
 
         self._cpu_samples: List[float] = []
         self._mem_peak = 0
