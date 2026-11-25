@@ -2287,27 +2287,6 @@
 [data-panel="launcher"] > .grid2 { grid-template-columns:1fr; }
 #settings-subtabs [data-hardware-icon] { display:inline-flex; vertical-align:middle; }
 
-/* Apply receipt: compact persistent status, expandable read-only checklist. */
-.verification { margin:0 0 20px; border:1px solid var(--line); border-radius:12px; background:var(--panel); --verify-tone:var(--warn); }
-.verification[data-state="verified"] { --verify-tone:var(--good); }
-.verification[data-state="failed"] { --verify-tone:var(--bad); }
-.verification summary { list-style:none; display:flex; align-items:center; gap:16px; padding:16px 20px; cursor:pointer; }
-.verification summary::-webkit-details-marker { display:none; }
-.verification summary:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
-.verification summary strong { display:block; font-size:15px; }.verification summary small { display:block; margin-top:4px; color:var(--muted); font:11px var(--mono); }
-.verify-shield { width:34px; height:34px; flex:none; color:var(--verify-tone); }.verify-chevron { margin-left:auto; color:var(--accent); transition:transform .2s; }.verification[open] .verify-chevron { transform:rotate(180deg); }
-.verify-body { padding:4px 20px 16px; border-top:1px solid var(--line); }.verify-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }.verify-head h2 { margin:16px 0; }
-.verification-list { list-style:none; padding:0 0 6px; margin:12px 0 0; max-height:560px; overflow:auto; }
-.verify-row { display:grid; grid-template-columns:24px minmax(0,1fr) auto; gap:10px; padding:10px 0; border-top:1px solid var(--line); align-items:center; }
-.verify-row svg { width:21px; height:21px; color:var(--warn); }.verify-row[data-state="verified"] svg { color:var(--good); }.verify-row[data-state="failed"] svg { color:var(--bad); }.verify-row small { display:block; color:var(--muted); font-size:11px; margin-top:4px; }.verify-row b { font-size:12px; font-weight:500; }.verify-row > span:last-child { font:10px var(--mono); color:var(--muted); }
-.verify-row[data-state="verified"] small { display:none; }
-.verify-row[data-state="not_applicable"] svg { color:var(--muted); }
-.verify-action { display:block; margin-top:6px; font-size:11px; }
-.verification.reveal .verify-row { animation:verify-arrive .25s both; animation-delay:calc(var(--i) * 35ms); }.verification.reveal .verify-tick { animation:verify-arrive .35s both; }
-@keyframes verify-arrive { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
-.hidden .verification *,html.verify-paused .verification *,details.verification:not([open]) .verify-row { animation-play-state:paused!important; }
-@media(prefers-reduced-motion:reduce) { .verification * { animation:none!important; transition:none!important; } }
-@media(max-width:700px) { .verification summary { padding:14px; gap:10px; }.verification summary strong { font-size:13px; }.verify-body { padding:4px 14px 14px; }.verify-row { grid-template-columns:21px minmax(0,1fr); }.verify-row > span:last-child { grid-column:2; } }
 /* Section 5: a shared Settings grid and plan-backed preset reveal. */
 .settings-box .subpane { grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:stretch;padding:16px 18px; }
 .settings-box .subpane > :is(.panel,.card) { min-width:0;min-height:220px;padding:20px; }
@@ -6575,10 +6554,6 @@ const startup = (() => {
       </div>
 
 
-      <details id="verification" class="verification" hidden>
-        <summary><svg class="verify-shield" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M16 3 27 7v9c0 6-5 10-11 13C10 26 5 22 5 16V7Z"/><path class="verify-tick" d="m10 16 4 4 8-9"/></svg><span><strong id="verification-title" role="status">Apply settings to verify</strong><small id="verification-time"></small></span><span class="verify-chevron" aria-hidden="true">&#8964;</span></summary>
-        <div class="verify-body"><div class="verify-head"><h2>Applied and verified</h2><button class="btn small" id="verify-again" type="button">Read again</button></div><p class="sub" id="verification-context"></p><ul id="verification-list" class="verification-list"></ul></div>
-      </details>
       <section class="panel">
         <h2>Optimise for</h2>
         <span class="profile-apply-live" id="profile-apply-live" role="status" aria-live="polite" aria-atomic="true"></span>
@@ -8257,11 +8232,8 @@ let changeSeq = 0;
 
 function noteChange(label, revert) {
   verificationDirty = true;
-  if (!$('verification').hidden) {
-    $('verification').dataset.state = 'changed';
-    $('verification-title').textContent = 'Settings changed \u00b7 apply to verify';
-    renderApplyVerification();
-  }
+  if (verificationState !== 'unknown') verificationState = 'changed';
+  profileRail.syncStatus();
   // The same control moved twice is still one thing to answer for, and the
   // older revert is the one that goes all the way back.
   const already = pendingChanges.find(c => c.label.split("→")[0] === label.split("→")[0]);
@@ -8831,53 +8803,28 @@ function chooseIntent(name, quiet) {
 })();
 
 
-/* Read-only Apply verification; only server receipts supply the counts. */
+/* Read back the saved settings for the existing profile selector status. */
 let verificationBusy = false, verificationRevision = 0, verificationDirty = false, verificationStarted = false;
-function renderVerification(result, animate = false) {
+let verificationState = 'unknown';
+function renderVerification(result) {
   verificationStarted = true;
-  const box = $('verification');
-  box.classList.remove('reveal');
-  if (!result || !result.total) { box.hidden = true; return; }
-  box.hidden = false;
-  const selection = result.selection;
-  const chosen = selection ? requestBody() : {};
-  const selectionChanged = selection && Object.keys(selection).some(k => String(selection[k] ?? '') !== String(chosen[k] ?? ''));
-  const accountChanged = typeof currentAccount === 'function' && currentAccount() && String(currentAccount()) !== String(result.account);
-  const needsApply = verificationDirty || selectionChanged || accountChanged;
-  const complete = result.verified === result.total && !needsApply;
-  box.querySelector('.verify-tick').setAttribute('d', complete ? 'm10 16 4 4 8-9' : 'M16 10v8m0 3v1');
-  box.dataset.state = complete ? 'verified' : result.items.some(x => x.status === 'failed') ? 'failed' : 'changed';
-  $('verification-title').textContent = (complete ? 'Your PC is set: ' : needsApply ? 'Settings changed \u00b7 ' : 'Review settings: ') + result.verified + '/' + result.total + ' verified';
-  $('verification-time').textContent = 'Checked ' + new Date(result.checked_at * 1000).toLocaleString();
-  $('verification-context').textContent = (result.intent || 'Applied') + ' \u00b7 Account ' + (result.account || 'unknown') + ' \u00b7 Applied ' + new Date(result.applied_at * 1000).toLocaleString() + (result.storage_warning ? ' \u00b7 ' + result.storage_warning : '');
-  const labels = {verified:'Matches',changed:'Changed',failed:'Failed',not_checked:'Not checked',not_set:'Not set',not_applicable:'Not applicable'};
-  const actions = {nvidia:'Review NVIDIA settings',power:'Open power control',wingraphics:'Open Windows graphics'};
-  $('verification-list').innerHTML = result.items.map((item, i) => '<li class="verify-row" data-state="' + esc(item.status) + '" data-counted="' + (item.counted !== false) + '" style="--i:' + i + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="' + (item.status === 'verified' ? 'm7 12 3 3 7-7' : item.status === 'failed' ? 'm8 8 8 8m0-8-8 8' : item.status === 'not_applicable' ? 'M8 12h8' : 'M12 6v7m0 3v2') + '"/></svg><span><b>' + esc(item.label) + '</b><small>' + esc(item.detail) + '</small>' + (Object.hasOwn(actions, item.action) && ['not_set','not_checked'].includes(item.status) ? '<button class="btn small verify-action" data-verify-action="' + esc(item.action) + '">' + actions[item.action] + '</button>' : '') + '</span><span>' + (labels[item.status] || labels.not_checked) + '</span></li>').join('');
-  if (animate) { box.open = true; void box.offsetWidth; box.classList.add('reveal'); }
-  renderApplyVerification();
+  verificationState = 'unknown';
+  if (result?.total) {
+    const selection = result.selection;
+    const chosen = selection ? requestBody() : {};
+    const selectionChanged = selection && Object.keys(selection).some(k => String(selection[k] ?? '') !== String(chosen[k] ?? ''));
+    const account = typeof currentAccount === 'function' ? currentAccount() : null;
+    const accountChanged = account && String(account) !== String(result.account);
+    if (verificationDirty || selectionChanged || accountChanged) verificationState = 'changed';
+    else if (result.verified === result.total) verificationState = 'verified';
+    else verificationState = 'failed';
+  }
+  profileRail.syncStatus();
 }
-function renderApplyVerification() {
-  const report = $('apply-verification'), box = $('verification');
-  if (!report || box.hidden) return;
-  report.dataset.state = box.dataset.state;
-  report.innerHTML = '<div class="verify-body"><div class="verify-head"><h2>Applied and verified</h2></div><p class="verify-summary" role="status">' + esc($('verification-title').textContent) + '</p><p class="sub">' + esc($('verification-time').textContent) + '</p><ul class="verification-list">' + $('verification-list').innerHTML + '</ul></div>';
-}
-function openVerificationControl(action) {
-  let target;
-  if (action === 'nvidia') { setTab('gpu'); target = $('gpu-out'); }
-  else if (action === 'power') { setTab('fix'); target = document.querySelector('[data-fix="power.performance"]'); }
-  else if (action === 'wingraphics') { setSettingsSub('nvidia', true); setTab('settings'); target = $('wg-apply') || $('machine-card'); }
-  if (target) { target.scrollIntoView({block:'center'}); if (target.matches('button')) target.focus(); }
-}
-document.addEventListener('click', e => {
-  const button = e.target.closest('[data-verify-action]');
-  if (button) openVerificationControl(button.dataset.verifyAction);
-});
 async function refreshVerification() {
-  if (!verificationStarted || verificationBusy || document.hidden) return;
+  if (!verificationStarted || verificationBusy || profileApplyBusy || document.hidden) return;
   const revision = verificationRevision;
   verificationBusy = true;
-  $('verify-again').disabled = true;
   let timeout;
   try {
     const result = await Promise.race([
@@ -8886,20 +8833,14 @@ async function refreshVerification() {
     ]);
     if (revision === verificationRevision) renderVerification(result);
   } catch (_) {
-    if (revision === verificationRevision && !$('verification').hidden) {
-      $('verification').dataset.state = 'changed';
-      $('verification-title').textContent = 'Not checked \u00b7 read-back unavailable';
-      $('verification-time').textContent = 'Last check could not be refreshed. Use Read again.';
-      renderApplyVerification();
-    }
-  } finally { clearTimeout(timeout); verificationBusy = false; $('verify-again').disabled = false; }
+    if (revision === verificationRevision) renderVerification(null);
+  } finally {
+    clearTimeout(timeout);
+    verificationBusy = false;
+  }
 }
-$('verify-again').addEventListener('click', refreshVerification);
-document.addEventListener('visibilitychange', () => {
-  document.documentElement.classList.toggle('verify-paused', document.hidden);
-  if (!document.hidden) refreshVerification();
-});
-setInterval(() => { if (!document.hidden && !$('verification').hidden) refreshVerification(); }, 15000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshVerification(); });
+setInterval(() => { if (verificationState !== 'unknown') refreshVerification(); }, 15000);
 
 let planRevision = 0, profileApplyBusy = false, profileApplyAgain = null;
 async function previewPlan(quiet = false) {
@@ -9001,10 +8942,7 @@ async function applyProfile(source) {
   profileRail.syncStatus();
   verificationRevision++;
   verificationDirty = true;
-  if (!$('verification').hidden) {
-    $('verification-title').textContent = 'Applying and reading back…';
-    $('verification').dataset.state = 'changed';
-  }
+  verificationState = 'changed';
   const body = requestBody();
   const label = body.intent[0].toUpperCase() + body.intent.slice(1);
   profileApplyFeed.start(body.intent, label);
@@ -9017,7 +8955,7 @@ async function applyProfile(source) {
     }
     verificationDirty = false;
     verificationRevision++;
-    renderVerification(r.verification, false);
+    renderVerification(r.verification);
     settleChanges();          // written to disk; nothing left to answer for
     profileApplyFeed.play(r, label);
     if (typeof loadNvidia === 'function' && settingsSub === 'nvidia') loadNvidia();
@@ -9064,8 +9002,7 @@ const profileRail = (() => {
     [direct,shelf].forEach(group => radios(group).forEach(b => b.tabIndex = b.dataset.pick === current ? 0 : -1));
   }
   function syncStatus() {
-    const box = $('verification');
-    const state = profileApplyBusy ? 'applying' : box.hidden ? 'unknown' : box.dataset.state || 'unknown';
+    const state = profileApplyBusy ? 'applying' : verificationState;
     root.dataset.verify = state;
     root.setAttribute('aria-busy', String(profileApplyBusy));
     const words = {verified:'PC is set', changed:'Not applied yet', failed:'Review settings', unknown:'Not checked', applying:'Applying…'};
@@ -9148,7 +9085,6 @@ const profileRail = (() => {
   });
   document.addEventListener('pointerdown',e => { if (!root.contains(e.target)) { toggle(false); hideCaption(); } });
   new MutationObserver(() => paint()).observe(document.body,{attributes:true,attributeFilter:['data-intent']});
-  new MutationObserver(syncStatus).observe($('verification'),{attributes:true,attributeFilter:['data-state','hidden']});
   function pause() { stop(); toggle(false); hideCaption(); }
   document.addEventListener('visibilitychange',() => { if (document.hidden) pause(); });
   homeMotion.reduced.addEventListener('change',pause);

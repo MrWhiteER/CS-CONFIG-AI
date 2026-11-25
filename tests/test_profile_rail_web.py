@@ -37,9 +37,7 @@ class ProfileRailWeb(unittest.TestCase):
     def test_rail_uses_live_status_and_accessible_manual_selection(self):
         page = PAGE.read_text(encoding="utf-8")
         rail = page[page.index("const profileRail ="):page.index("// --- common settings")]
-        self.assertIn("box.hidden ? 'unknown' : box.dataset.state", rail)
-        self.assertIn("profileApplyBusy ? 'applying'", rail)
-        self.assertIn("attributeFilter:['data-state','hidden']", rail)
+        self.assertIn("profileApplyBusy ? 'applying' : verificationState", rail)
         self.assertIn("setTimeout(peek,120)", rail)
         self.assertIn('role="radiogroup"', rail)
         self.assertIn('aria-controls="profile-shelf"', rail)
@@ -52,10 +50,8 @@ class ProfileRailWeb(unittest.TestCase):
 
 HARNESS = r'''
 const assert = require('node:assert/strict');
-let intent='competitive', planned=null, verificationRevision=0, verificationDirty=false, settingsSub='look';
+let intent='competitive', planned=null, verificationRevision=0, verificationDirty=false, verificationState='unknown', settingsSub='look';
 const INTENTS=['competitive','balanced','quality'];
-const verification={hidden:true,dataset:{}};
-const $=id=>id==='verification'?verification:null;
 let calls=[],undo,begin=0,home=false,open=false,notes=[],pending=[],feed=[],settled=0;
 const homeVisible=()=>home;
 const paintIntent=()=>{};

@@ -4,6 +4,7 @@
 | --- | --- | --- |
 | Bundle offline Stats map pictures | Implemented and verified locally | Await GUPDATE |
 | Animate profile changes inside Launcher cards | Implemented with a transparent background and verified locally | Await GUPDATE |
+| Remove the Launcher Review settings banner | Removed locally | Await GUPDATE |
 | Claude handoff for Stats and Launcher changes | Queued in the agent log | Check the existing session after its reported reset |
 
 The local branch is `codex/offline-map-art-inline-profile`, based on

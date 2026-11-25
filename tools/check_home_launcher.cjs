@@ -13,7 +13,7 @@ code+=slice('function audioOptions(list, pinned)', 'async function saveAudio');
 code+=slice('let wgData = null;','/* What the launch did about the crosshair.');
 code+=slice('const CHIPS = { CPU:', '// -- 2. the gradient');
 code+=slice('/* Launcher motion:','function renderPlan(');
-code+=`const verificationNavigation=[];function setTab(name){verificationNavigation.push(name);document.querySelectorAll('.tab-panel').forEach(panel=>panel.classList.toggle('hidden',panel.dataset.panel!==name))};`;
+code+=`function setTab(name){document.querySelectorAll('.tab-panel').forEach(panel=>panel.classList.toggle('hidden',panel.dataset.panel!==name))};`;
 code+=slice('/* Every card uses','const APPLY_WHAT =');
 code+=slice('const APPLY_WHAT =','/* Profile Rail:').replace('async function applyProfile(', 'async function applyProfileForCheck(');
 code+='const profileRail={syncStatus(){}};function settleChanges(){};';
@@ -131,45 +131,18 @@ renderNet({...measured,download:{mbps:0.24,error:''}});check('slow download reta
 renderNet({...measured,download:{mbps:Infinity,error:''}});check('invalid download is unknown',$('net-summary').textContent==='— · 18 ms');
 netApi=async()=>measured;await runNetCheck();check('re-test recovers after failure',$('net-summary').textContent==='245.3 Mbps · 18 ms'&&!$('net-run').disabled);
 for(const theme of ${JSON.stringify(themes)}){document.documentElement.dataset.theme=theme;$('chip-net').click();check('connection works in theme '+theme,getComputedStyle($('net-card')).display!=='none'&&getComputedStyle($('chip-net')).color!=='transparent');closeNetDetails()}delete document.documentElement.dataset.theme;
-const receipt={total:9,verified:9,checked_at:1794739320,applied_at:1794739300,account:'42',intent:'balanced',items:['CS2 video settings','Config files','Autoexec link','Steam launch options','Launch options reference','Display scaling'].map(label=>({label,status:'verified',detail:'Matches the applied value',counted:true})).concat(['NVIDIA profile','Windows power','Windows graphics'].map(label=>({label,status:'verified',detail:'Matches the recommended settings',counted:true})))};
-const noNvidia={...receipt,total:8,verified:8,items:receipt.items.map(item=>item.label==='NVIDIA profile'?{...item,status:'not_applicable',counted:false,detail:'No NVIDIA GPU/driver. Excluded from the count.'}:item)};
+const receipt={total:9,verified:9,account:'42',intent:'balanced',items:[]};
 await refreshVerification();check('read-back waits for gated startup',!verificationStarted&&!verificationBusy);
-renderVerification({total:0,items:[]});check('no receipt never claims success',$('verification').hidden);
-renderVerification(receipt,true);check('badge uses verified count and time',$('verification-title').textContent==='Your PC is set: 9/9 verified'&&$('verification-time').textContent.startsWith('Checked'));
-$('assessment-out').insertAdjacentHTML('afterbegin','<section id="apply-verification" class="verification reveal"></section>');renderApplyVerification();
-check('Apply results show the same read-back checklist',$('apply-verification').querySelectorAll('.verify-row').length===9&&$('apply-verification').textContent.includes('9/9 verified'));
-check('apply reveals accessible checklist',$('verification').open&&$('verification-list').children.length===9&&$('verification-title').getAttribute('role')==='status');
-check('all three system settings count as verified',$('verification-list').querySelectorAll('[data-state="verified"][data-counted="true"]').length===9);
-$('verification').scrollIntoView({block:'start'});
-check('expanded checklist shows all nine rows without internal scrolling',$('verification-list').scrollHeight<=$('verification-list').clientHeight);
-renderVerification(noNvidia,true);
-check('non NVIDIA case counts eight of eight',$('verification-title').textContent==='Your PC is set: 8/8 verified'&&$('verification-list').children.length===9);
-check('not applicable is visibly excluded',$('verification-list').querySelector('[data-state="not_applicable"][data-counted="false"]').textContent.includes('Not applicable'));
-check('Apply shares the non NVIDIA denominator',$('apply-verification').textContent.includes('8/8 verified')&&$('apply-verification').querySelectorAll('[data-counted="true"]').length===8);
-const unset={...receipt,verified:6,items:receipt.items.map((item,i)=>i<6?item:{...item,status:'not_set',action:['nvidia','power','wingraphics'][i-6],detail:['In NVIDIA Control Panel > Manage 3D settings > Program Settings > cs2.exe: Prefer maximum performance; Vertical sync: application-controlled or Off.','Choose Ultimate Performance in Fix It (High performance is also accepted).','Use Set for performance in Settings > Apply > Machine.'][i-6]})};
-renderVerification(unset,true);
-check('never applied recommendations are amber Not set',$('verification').dataset.state==='changed'&&$('verification-title').textContent==='Review settings: 6/9 verified'&&$('verification-list').querySelectorAll('[data-state="not_set"]').length===3&&$('verification-list').textContent.includes('Not set'));
-check('both checklists offer existing controls',$('verification-list').querySelectorAll('[data-verify-action]').length===3&&$('apply-verification').querySelectorAll('[data-verify-action]').length===3);
-const actionApi=api,actionRequests=[];api=async(...args)=>{actionRequests.push(args);return {}};
-for(const action of ['nvidia','power','wingraphics'])$('verification-list').querySelector('[data-verify-action="'+action+'"]').click();
-check('review actions navigate to Graphics Fix It and Machine',verificationNavigation.join(',')==='gpu,fix,settings'&&settingsSub==='nvidia'&&document.activeElement===$('wg-apply'));
-check('review actions do not apply settings or call an API',actionRequests.length===0&&!$('wg-apply').disabled);api=actionApi;setTab('launcher');
-renderVerification({...unset,verified:8,items:receipt.items.map((item,i)=>i===6?{...item,status:'not_checked',action:'nvidia',detail:'Not checked: access denied. No extra rights requested.'}:item)});
-check('unreadable system value stays in denominator',$('verification-title').textContent==='Review settings: 8/9 verified'&&$('verification-list').querySelectorAll('[data-state="not_checked"]').length===1);
-renderVerification({...receipt,verified:7,items:receipt.items.map((item,i)=>({...item,status:i===0?'changed':i===1?'failed':item.status,detail:i===0?'CS2 changed this value after Apply. Close CS2 and apply again.':i===1?'Config write failed: access denied.':item.detail}))});
-check('partial result cannot claim PC set',$('verification').dataset.state==='failed'&&$('verification-title').textContent==='Review settings: 7/9 verified');
-check('partial result updates Apply checklist too',$('apply-verification').dataset.state==='failed'&&$('apply-verification').textContent.includes('7/9 verified'));
-verificationDirty=true;renderVerification(receipt);check('pending edits invalidate badge',$('verification-title').textContent.startsWith('Settings changed'));verificationDirty=false;
-renderVerification({...receipt,selection:{intent:'quality'}});check('saved selection changes invalidate receipt after reload',$('verification-title').textContent.startsWith('Settings changed'));
 renderVerification(receipt);
-api=async()=>{throw Error('offline')};await refreshVerification();check('read failure invalidates green badge',$('verification-title').textContent.startsWith('Not checked')&&$('verification').dataset.state==='changed');
-api=()=>new Promise(()=>{});await refreshVerification();check('hung read-back settles and enables retry',!verificationBusy&&!$('verify-again').disabled&&$('verification-title').textContent.startsWith('Not checked'));
-api=async()=>receipt;await refreshVerification();check('read again restores actual result',$('verification-title').textContent==='Your PC is set: 9/9 verified'&&!$('verify-again').disabled);
-renderVerification({...receipt,items:[{label:'<unsafe>',detail:'<img src=x>',status:'not_set',action:'constructor'}]});check('read-back escapes text and rejects unknown actions',!$('verification-list').querySelector('img,button')&&$('verification-list').textContent.includes('<unsafe>'));
-renderVerification(receipt,true);
-if(matchMedia('(prefers-reduced-motion: reduce)').matches)check('reduced motion disables checklist reveal',getComputedStyle(document.querySelector('.verify-row')).animationName==='none');
-Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));check('background pauses read-back animation',document.documentElement.classList.contains('verify-paused'));delete document.hidden;document.dispatchEvent(new Event('visibilitychange'));await Promise.resolve();await Promise.resolve();
-for(const theme of ${JSON.stringify(themes)}){document.documentElement.dataset.theme=theme;check('verification readable in '+theme,getComputedStyle($('verification-title')).color!==getComputedStyle($('verification')).backgroundColor);}delete document.documentElement.dataset.theme;
+check('a valid receipt updates the existing profile status without a Launcher banner',verificationState==='verified'&&!$('verification')&&!panel.querySelector('.verification'));
+renderVerification({...receipt,verified:8});check('a partial receipt prompts review',verificationState==='failed');
+verificationDirty=true;renderVerification(receipt);check('pending edits invalidate saved verification',verificationState==='changed');verificationDirty=false;
+renderVerification({...receipt,selection:{intent:'quality'}});check('a different selected profile invalidates saved verification',verificationState==='changed');
+const readApi=api;
+api=async()=>{throw Error('offline')};await refreshVerification();check('read failure clears verified status',verificationState==='unknown');
+api=()=>new Promise(()=>{});await refreshVerification();check('hung read-back releases the refresh guard',!verificationBusy&&verificationState==='unknown');
+api=async()=>receipt;await refreshVerification();check('a successful refresh restores verified status',verificationState==='verified');
+api=readApi;
 renderPlan({intent:'balanced',tier:'S',headroom:5.7,estimated_fps:342,settings:[{name:'GPU level',after:'High',changed:true,reason:'Tier S headroom'}],launch_current:'',launch_new:'',launch_added:[],launch_removed:[],advisories:[{title:'Estimated 342 fps',detail:'Tier S',level:'warn'}],changed_count:1});
 check('plan keeps picture guidance without estimates',!/(342|headroom|Tier S)/.test($('assessment-out').textContent)&&fpsEffect.includes('High')&&$('assessment-out').textContent.includes('1 picture settings reviewed'));
 check('Machine has no estimated FPS',!$('machine-out').textContent.includes('FPS')&&!$('machine-out').querySelector('.part-vs'));
@@ -224,12 +197,7 @@ intent='quality';paintIntent(intent);await applyProfileForCheck('mode');
 check('switching cards cancels the previous feed and reports failure on the new card',!feed.isConnected&&$('intents').querySelector('[data-intent="quality"] .profile-apply').textContent.includes('Access denied'));
 api=oldApi;intent='balanced';paintIntent(intent);
 for(const theme of ${JSON.stringify(themes)}){document.documentElement.dataset.theme=theme;presetBegin('balanced');presetReveal(sample);const row=document.querySelector('.preset-row');check('preset readable in '+theme,getComputedStyle(row).color!==getComputedStyle(document.querySelector('.preset-changes')).backgroundColor);check('dimmer cuts window through selected card in '+theme,document.querySelector('.preset-veil').style.clipPath.includes('evenodd'));presetClose();}delete document.documentElement.dataset.theme;
-renderVerification(receipt);$('verification').open=location.hash.includes('verification');
-if(location.hash.includes('changed')){renderVerification({...receipt,verified:7,items:receipt.items.map((item,i)=>({...item,status:i===0?'changed':i===1?'failed':item.status,detail:i===0?'CS2 changed this value after Apply. Close CS2 and apply again.':i===1?'Config write failed: access denied.':item.detail}))},true);api=async()=>({...receipt,verified:7,items:receipt.items.map((item,i)=>({...item,status:i===0?'changed':i===1?'failed':item.status,detail:i===0?'CS2 changed this value after Apply. Close CS2 and apply again.':i===1?'Config write failed: access denied.':item.detail}))})}
-if(location.hash.includes('notapplicable')){renderVerification(noNvidia,true);api=async()=>noNvidia}
-if(location.hash.includes('notset')){renderVerification(unset,true);api=async()=>unset}
 $('status').remove();document.querySelector('.scroll').scrollTop=0;
-if(location.hash.includes('verification'))$('verification').scrollIntoView({block:'start'});
 if(location.hash.includes('this-pc')){document.querySelector('[data-panel="launcher"]').classList.add('hidden');document.querySelector('[data-panel="settings"]').classList.remove('hidden');setSettingsSub('this-pc',true)}
 if(location.hash.includes('settings-apply')){document.querySelector('[data-panel="launcher"]').classList.add('hidden');document.querySelector('[data-panel="settings"]').classList.remove('hidden');setSettingsSub('nvidia',true)}
 if(location.hash.includes('settings-steam')){panel.classList.add('hidden');settingsPanel.classList.remove('hidden');setSettingsSub('steam',true);$('who-name').textContent='Edy';$('who-how').textContent='Following Steam';}

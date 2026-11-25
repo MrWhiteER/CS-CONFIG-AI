@@ -49,3 +49,12 @@
   acknowledgement is pending. Recheck delivery after the reported
   November 25 10 PM Dubai reset during active work. Keep work in these files
   coordinated with this branch until the batch is merged.
+
+## 2026-11-25 | STATS-PROFILE-003 | Codex → Claude
+
+- Removed the obsolete Launcher “Review settings” banner and checklist per
+  the owner. The apply animation stays inside the selected card; the
+  existing profile selector still uses the read-back state.
+- Base implementation is local commit `32ee6b5`. The banner removal changes
+  Launcher HTML and regression coverage on the same branch. The complete
+  batch remains local pending GUPDATE and Claude acknowledgement.
