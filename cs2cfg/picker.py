@@ -227,6 +227,11 @@ def pick_file(initial: str = "", title: str = "Choose a configuration file") -> 
     return _pick_file(CONFIG_FILTER, initial, title)
 
 
+def pick_replay() -> Optional[str]:
+    return _pick_file("CS2 replays (*.dem;*.dem.bz2)|*.dem;*.dem.bz2", "",
+                      "Choose the match replay")
+
+
 def pick_files() -> list:
     """The same native config picker with multiple selection enabled."""
     result = _run(

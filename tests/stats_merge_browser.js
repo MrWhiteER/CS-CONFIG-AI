@@ -35,7 +35,12 @@ async function api(route,body={}){
   }
   if(route==='/api/faceit/forget'){answer={...answer,linked:false,player:null};return {ok:true};}
   if(route==='/api/demos')return structuredClone(disk);
-  if(route==='/api/demos/stats')return structuredClone(scoreboard);
+  if(route==='/api/demos/stats'){
+    const reply=structuredClone(scoreboard);
+    Object.assign(reply.teams[0].players[0],{enemies_flashed:7,utility_damage:0});
+    return reply;
+  }
+  if(route==='/api/demos/utility')return {ok:true,map:'de_dust2',players:[{name:'Edy',steamid:'76561198000000000',enemies_flashed:4,utility_damage:76}]};
   if(route==='/api/demos/pick'){disk.picked=body.name;return {ok:true};}
   if(route==='/api/demos/waiting')return {waiting:null};
   if(route==='/api/demos/get')return {already:true,name:disk.demos[0].name};
@@ -84,6 +89,9 @@ async function runStatsChecks(){
   document.querySelector('[data-fc-board]').click();
   check('CS2 Tab scoreboard opens',!$('mstat-back').classList.contains('hidden')&&document.querySelectorAll('#mstat-teams tbody tr').length===10);
   check('CS2 scoreboard columns',[...document.querySelectorAll('#mstat-teams thead th')].slice(0,9).map(e=>e.textContent).join('|')==='Player|Ping|K|A|D|MVP|HS%|Score|K/D');
+  check('Premier utility totals start as unavailable',!!$('mstat-utility')&&document.querySelector('[data-stat="enemies_flashed"]').textContent==='—');
+  $('mstat-utility').click();await settle();
+  check('Premier replay applies utility to its player',document.querySelector('.is-you [data-stat="enemies_flashed"]').textContent==='4'&&document.querySelector('.is-you [data-stat="utility_damage"]').textContent==='76');
   check('CS2 scoreboard marks you',document.querySelectorAll('#mstat-teams tr.is-you').length===1&&$('mstat-teams').textContent.includes('Your team'));
   check('CS2 scoreboard has no FACEIT parts',!document.querySelector('#mstat-teams .mstat-level')&&!$('mstat-get')&&!$('mstat-body').textContent.includes('FACEIT'));
   check('CS2 scoreboard plain header',!/\b(de|cs)_|scrimcomp/.test($('mstat-title').textContent+$('mstat-when').textContent));
@@ -95,6 +103,7 @@ async function runStatsChecks(){
   check('trend switch uses combined list',$('fc-trend-plot').querySelector('svg').getAttribute('aria-label').startsWith('ADR over 12'));
   document.querySelector('[data-match]').click();await settle();
   check('FACEIT scoreboard preserved',!$('mstat-back').classList.contains('hidden')&&document.querySelectorAll('.mstat-grid tbody tr').length===10&&calls.some(c=>c.route==='/api/demos/stats'));
+  check('FACEIT utility includes a recorded zero',document.querySelector('[data-stat="enemies_flashed"]').textContent==='7'&&document.querySelector('[data-stat="utility_damage"]').textContent==='0');
   hideStats();
   document.querySelector('[data-demo-pick]').click();await settle();
   check('replay choice preserved',disk.picked===disk.demos[0].name);

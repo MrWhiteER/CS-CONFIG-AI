@@ -13,6 +13,7 @@
 # still travels on a USB stick and leaves nothing behind.
 
 import pathlib
+from importlib.util import find_spec
 
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
@@ -29,6 +30,8 @@ PRESENTMON = pathlib.Path("tools") / "presentmon" / EXECUTABLE_NAME
 if not verify_executable(PRESENTMON):
     raise SystemExit("Fetch the pinned PresentMon binary first: docs/overlay/README.md")
 ICON = str(_appicon.write_ico(pathlib.Path("build") / "cs2cfg.ico"))
+if find_spec("demoparser2") is None:
+    raise SystemExit("Install requirements.txt before building the replay reader.")
 
 # Bundled resources. The probe is a PowerShell script rather than Python, and
 # the knowledge base and web page are data files, so none of them are picked up
@@ -67,6 +70,8 @@ hiddenimports = [
     # Decompresses FACEIT demos, which are zstd. Imported lazily inside
     # demos.py behind a try, so the analyser cannot see it either.
     "zstandard",
+    # The replay reader's Rust extension imports these Python modules itself.
+    "demoparser2", "pandas", "polars", "_polars_runtime_32", "pyarrow",
 ] + collect_submodules("cs2cfg") + collect_submodules("webview")
 
 a = Analysis(

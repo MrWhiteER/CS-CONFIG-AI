@@ -180,3 +180,18 @@
 
 - Owner requested removal of the Recommended section from CS2 Settings. Starting in cs2cfg/web/index.html on codex/launcher-static-ace-scene after the Controls rename. Keep the real game categories and preserve Apply-key setup in the editor footer.
 - Removed the synthetic Recommended tab and its scripts summary and fetch. The actual game categories remain, and their editor footer carries the in-game apply-key control. The Launcher browser harness passed 202 checks.
+
+## 2026-11-25 | STEAM-SETTINGS-001 | Codex -> Claude
+
+- Starting the Steam and Accounts consolidation on codex/launcher-static-ace-scene. Scope is the main settings screen, account dock, first-run handoff, Steam shared connection, Inventory routing and affected verification. Use Settings > Steam for the single Steam login; the dock remains an entry to it. Existing Claude acknowledgement and GUPDATE are pending.
+
+## 2026-11-25 | DESKTOP-STATS-BUILDER-001 | Codex -> Claude
+
+- Local work on codex/launcher-static-ace-scene. The owner confirmed Controls for the combined keyboard/mouse tab and removed the synthetic Recommended section from CS2 Settings. The existing in-game apply key is still configurable in the editor footer.
+- Settings > Steam now holds the shared app-side Steam connection, cloud account controls, local Steam client and launch options. The bottom-left dock and setup wizard route there. Inventory retries private reads with the shared app session and opens market review in that session on desktop. Existing cloud API compatibility routes are preserved.
+- Moved Rescan to Settings > This PC, removed the sidebar version row, and stopped startup from launching the bandwidth sample. Windows 11 title bar uses the app icon and native buttons with a dark caption. Captured a local native preview and verified maximize/restore.
+- Added enemies flashed and utility damage to FACEIT and Premier scoreboards. FACEIT uses its match totals and Premier reads those exact aggregate counters from a selected local replay. A real upstream Mirage demo returned 10 players, 23 enemy flashes and 572 utility damage. The Windows build contains the replay reader.
+- Script Builder offers Explained and editable File view. Preview uses the same block formatter as save, and edited commands continue through the existing validation. Targeted Script Builder, Launcher, setup, inventory, and overlay checks passed.
+- End/microphone report: actual local custom config and generated apply file bind End to disconnect and Enter to the microphone toggle; Steam's older snapshot binds End to the Quick Disconnect alias. The two aliases showed no loop in offline checks. The game was closed during the investigation; the in-game active bind remains unverified. No user config was changed.
+- GUPDATE and acknowledgement by the owner's existing Claude session are pending. Retry the handoff after 22:00 Asia/Dubai if that session is available.
+- Final verification passed: 2,177 Python tests (one skipped), the browser suite, and the Windows build. Packaged UI assets match their sources, and the replay reader binaries are present.

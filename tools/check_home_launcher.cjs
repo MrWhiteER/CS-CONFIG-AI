@@ -13,7 +13,7 @@ code+=slice('function audioOptions(list, pinned)', 'async function saveAudio');
 code+=slice('let wgData = null;','/* What the launch did about the crosshair.');
 code+=slice('const CHIPS = { CPU:', '// -- 2. the gradient');
 code+=slice('/* Launcher motion:','function renderPlan(');
-code+=`function setTab(name){document.querySelectorAll('.tab-panel').forEach(panel=>panel.classList.toggle('hidden',panel.dataset.panel!==name))};`;
+code+=`function setTab(name){activeTab=name;document.querySelectorAll('.tab-panel').forEach(panel=>panel.classList.toggle('hidden',panel.dataset.panel!==name))};`;
 code+=slice('/* Every card uses','const APPLY_WHAT =');
 code+=slice('const APPLY_WHAT =','/* Profile Rail:').replace('async function applyProfile(', 'async function applyProfileForCheck(');
 code+='const profileRail={syncStatus(){}};function settleChanges(){};';
@@ -27,7 +27,8 @@ code+=fs.readFileSync(path.join(root,'cs2cfg/web/assets/home/launcher-scene.js')
 code+='Math.random=sceneRandom;\n';
 code+=`const prefsReady=false,startup={finished:false};function moveSegThumb(){};`;
 code+=slice('let settingsSub = "nvidia";', '/* ---------------------------------------------------------------------------\n   Sound devices');
-code+='let cloudData=null;';
+code+='let cloudData=null, whoData={ok:true,accounts:[]}, activeTab="launcher"; function loadCloud(){} function loadFaceit(){} function paintFace(){}';
+code+=fs.readFileSync(path.join(root,'cs2cfg/web/assets/accounts/dock.js'),'utf8')+'\n';
 code+=slice('const WAY_ICONS = {', 'async function loadCloud()');
 code+=slice('function cloudWay(', 'function showPasswordForm(');
 code+=slice('function ring(value','function meter(');
@@ -183,12 +184,25 @@ renderPlan({intent:'balanced',tier:'S',headroom:5.7,estimated_fps:342,settings:[
 check('plan keeps picture guidance without estimates',!/(342|headroom|Tier S)/.test($('assessment-out').textContent)&&fpsEffect.includes('High')&&$('assessment-out').textContent.includes('1 picture settings reviewed'));
 check('Machine has no estimated FPS',!$('machine-out').textContent.includes('FPS')&&!$('machine-out').querySelector('.part-vs'));
 check('launch controls moved once',['w-launch','steam-launch-out','who','who-menu'].every(id=>document.querySelectorAll('#'+id).length===1&&!!$(id).closest('[data-sub="steam"]')));
-check('app Account stays separate',['account-card','account-out'].every(id=>document.querySelectorAll('#'+id).length===1&&!!$(id).closest('.subpane[data-sub="account"]'))&&!document.querySelector('.subpane[data-sub="steam"] #account-card'));
+check('Steam contains the only account pane and Steam login control',['account-card','account-out','steam-connect'].every(id=>document.querySelectorAll('#'+id).length===1&&!!$(id).closest('.subpane[data-sub="steam"]'))&&!document.querySelector('#settings-subtabs [data-sub="account"]'));
+dockSteam={available:true,linked:false,state:'idle',connection:{connected:false}};
+renderAccountsDock();
+check('dock links to Steam settings and only the pane has Connect',
+  !$('steam-connect').hidden&&$('dock-steam').textContent.includes('Manage')&&!$('dock-steam').querySelector('[data-sign-in]'));
+const oldSteamApi=api;
+api=async route=>route==='/api/stats/steam'?{available:true,linked:false,state:'idle',connection:{connected:false}}:oldSteamApi(route,{});
+$('dock-steam').click();
+check('dock Steam row opens the shared pane',activeTab==='settings'&&settingsSub==='steam');
+check('setup return stays hidden during ordinary use',getComputedStyle($('setup-steam-return')).display==='none');
+await loadDockSteam();
+clearTimeout(dockSteamTimer);
+api=oldSteamApi;
+setTab('launcher');
 check('Steam preview follows mode switches',$('steam-launch-out').textContent.includes('After the next mode switch'));
 check('advisories do not become performance promises',!$('assessment-out').textContent.includes('Estimated'));
-setSettingsSub('account',true);check('saved Account preference restores Account',settingsSub==='account'&&!$('account-card').closest('.subpane').classList.contains('hidden')&&document.querySelector('#settings-subtabs [data-sub="account"]').getAttribute('aria-selected')==='true');setSettingsSub('nvidia',true);
+setSettingsSub('account',true);check('old Account preference opens Steam',settingsSub==='steam'&&!$('account-card').closest('.subpane').classList.contains('hidden')&&document.querySelector('#settings-subtabs [data-sub="steam"]').getAttribute('aria-selected')==='true');setSettingsSub('nvidia',true);
 const settingsPanel=document.querySelector('[data-panel="settings"]');panel.classList.add('hidden');settingsPanel.classList.remove('hidden');
-for(const name of ['nvidia','this-pc','lighting','mouse','steam','account','apps','look','sound','overlay','maps','config','editing','logs','tools']){setSettingsSub(name,true);const pane=settingsPanel.querySelector('.subpane[data-sub="'+name+'"]');check('shared grid '+name,getComputedStyle(pane).gap==='16px'&&getComputedStyle(pane).display==='grid');}
+for(const name of ['nvidia','this-pc','lighting','mouse','steam','apps','look','sound','overlay','maps','config','editing','logs','tools']){setSettingsSub(name,true);const pane=settingsPanel.querySelector('.subpane[data-sub="'+name+'"]');check('shared grid '+name,getComputedStyle(pane).gap==='16px'&&getComputedStyle(pane).display==='grid');}
 setSettingsSub('nvidia',true);check('NVIDIA workspace replaces old Apply layout',!!settingsPanel.querySelector('.subpane[data-sub="nvidia"]')&&!settingsPanel.querySelector('.subpane[data-sub="apply"]'));
 settingsPanel.classList.add('hidden');panel.classList.remove('hidden');
 const sample={intent:'balanced',settings:[{name:'Texture quality',before:'Low',after:'High',changed:true},{name:'Shadows',before:'Off',after:'On',changed:true},{name:'GPU level',before:'Quality',after:'Quality',before_raw:1,after_raw:3,same_label:true,changed:true}]};
@@ -236,7 +250,7 @@ for(const theme of ${JSON.stringify(themes)}){document.documentElement.dataset.t
 $('status').remove();document.querySelector('.scroll').scrollTop=0;
 if(location.hash.includes('this-pc')){document.querySelector('[data-panel="launcher"]').classList.add('hidden');document.querySelector('[data-panel="settings"]').classList.remove('hidden');setSettingsSub('this-pc',true)}
 if(location.hash.includes('settings-apply')){document.querySelector('[data-panel="launcher"]').classList.add('hidden');document.querySelector('[data-panel="settings"]').classList.remove('hidden');setSettingsSub('nvidia',true)}
-if(location.hash.includes('settings-steam')){panel.classList.add('hidden');settingsPanel.classList.remove('hidden');setSettingsSub('steam',true);$('who-name').textContent='Edy';$('who-how').textContent='Following Steam';}
+if(location.hash.includes('settings-steam')){panel.classList.add('hidden');settingsPanel.classList.remove('hidden');setSettingsSub('steam',true);$('who-name').textContent='Edy';$('who-how').textContent='Following Steam';$('net-summary').textContent='Not tested';whoData={accounts:[{active:true,name:'Edy'}]};dockSteam={available:true,linked:false,state:'idle',connection:{connected:false}};cloudData={configured:true,signed_in:false,google:true};renderCloud();}
 if(location.hash.includes('settings-account')){panel.classList.add('hidden');settingsPanel.classList.remove('hidden');setSettingsSub('account',true);cloudData={configured:true,signed_in:false,google:true};renderCloud();}
 if(location.hash.includes('preset')){presetBegin('balanced');presetReveal(sample);await new Promise(r=>setTimeout(r,780));clearTimeout(presetSession.timer);$('intents').scrollIntoView({block:'center'});}
 if(location.hash.includes('profile-apply')){profileApplyFeed.start('balanced','Balanced');profileApplyFeed.play({video:[{name:'Ambient Occlusion',before:'High',after:'Low'},{name:'Texture filtering',before:'Quality',after:'Performance'}],steps:[{what:'Steam launch options',ok:false,skipped:true}]},'Balanced');await sleep(1750);$('intents').scrollIntoView({block:'center'});}

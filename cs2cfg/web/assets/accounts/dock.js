@@ -33,16 +33,27 @@ function dockSteamRow() {
   else if (connected) { detail = 'Connected · '+(web.found ?? 0)+' past matches'; state = 'linked'; action = 'Manage'; }
   else if (web.state==='signed_out') { detail = 'Steam sign-in ended · connect again'; action = 'Connect'; }
   else { detail = pc ? 'Not connected yet' : 'No Steam account on this PC'; action = 'Connect'; }
-  const tip = connected ? 'Match history and settings sync are on' : 'Connect once for match history and settings sync on every PC';
-  return {id:'steam', label:'Steam', name:pc?.name, detail, state, action, picture:pc?.picture,
-    tip, connect:needsConnect, retry:action==='Retry', disabled:dockSteamOpening, updated:web?.updated};
+  const tip = connected ? 'Steam is connected' : 'Manage your Steam connection in Settings';
+  return {id:'steam', label:'Steam', name:pc?.name, detail, state, action:unavailable ? 'Settings' : 'Manage', picture:pc?.picture,
+    tip, connect:needsConnect, retry:action==='Retry', updated:web?.updated};
+}
+
+function renderSteamConnection(row) {
+  const status = $('steam-connection-status'), button = $('steam-connect');
+  if (!status || !button) return;
+  status.textContent = row.detail;
+  button.hidden = !row.connect && !row.retry && !dockSteamWaiting;
+  button.disabled = dockSteamOpening || !!dockSteamWaiting;
+  button.textContent = row.retry ? 'Retry match history' : 'Connect Steam';
 }
 
 function renderAccountsDock() {
+  const steamRow = dockSteamRow();
+  renderSteamConnection(steamRow);
   const box = $('dock-rows');
   if (!box) return;
   const pc = whoData?.accounts?.find(a=>a.active);
-  const rows = [dockSteamRow()];
+  const rows = [steamRow];
   const others = (whoData?.accounts || []).filter(a=>!a.active).map((a,i)=>({
     id:'local-'+i, label:'Steam account', name:a.name || a.login || a.account,
     detail:a.signed_in?'Signed in to Steam':'Available on this PC', state:a.signed_in?'linked':'idle',
@@ -145,6 +156,7 @@ function loadDockSteam() {
         dockSteamWaiting = 0;
         dockSteamNotice = '';
         if (wasWaiting && typeof loadCloud==='function') loadCloud();
+        if (wasWaiting && typeof loadInventory==='function' && activeTab==='inventory') loadInventory(true);
         if (wasWaiting || (wasReading && dockSteam.state==='done')) loadFaceit();
       }
     } catch (err) {
@@ -160,28 +172,39 @@ function loadDockSteam() {
   return dockSteamRequest;
 }
 
-document.addEventListener('click',async e=>{
+function openSteamSettings() {
+  setTab('settings');
+  setSettingsSub('steam');
+  loadDockSteam();
+  const button = $('steam-connect');
+  if (button && !button.hidden) button.focus();
+  else $('who')?.focus();
+}
+
+async function connectSteam() {
+  const row = dockSteamRow();
+  if ((!row.connect && !row.retry) || dockSteamWaiting || dockSteamOpening) return;
+  dockSteamOpening = true;
+  dockSteamNotice = '';
+  renderAccountsDock();
+  try {
+    const result = row.retry ? await api('/api/stats/steam',{action:'sync'}) : await api('/api/steam/connect',{});
+    if (result.ok===false || result.error) throw Error(result.error||'Steam could not be opened');
+    if (result.opened || result.waiting) dockSteamWaiting = Date.now()+10*60*1000;
+  } catch (err) { dockSteamNotice = String(err.message||err); }
+  dockSteamOpening = false;
+  await loadDockSteam();
+}
+
+document.addEventListener('click', e => {
   if (e.target.closest('#dock-main')) { dockToggle(!dockExpanded); return; }
   if (dockExpanded && !e.target.closest('#dock-panel')) dockToggle(false);
   if (e.target.closest('#dock-panel [data-use]')) { dockToggle(false); return; }
-  const button = e.target.closest('[data-dock]');
-  if (!button) return;
-  const row = dockSteamRow();
-  if (row.connect || row.retry) {
-    if (dockSteamWaiting || dockSteamOpening) return;
-    dockSteamOpening = true; dockSteamNotice = ''; renderAccountsDock();
-    try {
-      const result = row.retry ? await api('/api/stats/steam',{action:'sync'}) : await api('/api/steam/connect',{});
-      if (result.ok===false || result.error) throw Error(result.error||'Steam could not be opened');
-      if (result.opened) dockSteamWaiting = Date.now()+10*60*1000;
-    } catch (err) { dockSteamNotice = String(err.message||err); }
-    dockSteamOpening = false;
-    await loadDockSteam();
-    return;
+  if (e.target.closest('#steam-connect')) { connectSteam(); return; }
+  if (e.target.closest('[data-dock="steam"], [data-open-steam-settings]')) {
+    dockToggle(false, false);
+    openSteamSettings();
   }
-  if (dockSteamWaiting) return;
-  dockToggle(false);
-  setTab('settings'); setSettingsSub('steam'); whoOpen(true); $('who')?.focus();
 });
 document.addEventListener('visibilitychange',()=>{
   dockPauseMotion();

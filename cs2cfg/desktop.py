@@ -310,6 +310,29 @@ def show_error(message: str, detail: str = "") -> None:
 # Window
 # ---------------------------------------------------------------------------
 
+def _style_launcher_caption(window) -> None:
+    """Use a dark, quiet Windows 11 caption and keep the native window buttons."""
+    if sys.platform != "win32" or sys.getwindowsversion().build < 22000:
+        return
+    try:
+        hwnd = window.native.Handle.ToInt64()
+        set_attribute = ctypes.WinDLL("dwmapi").DwmSetWindowAttribute
+        set_attribute.argtypes = [
+            wintypes.HWND, wintypes.DWORD, ctypes.c_void_p, wintypes.DWORD,
+        ]
+        set_attribute.restype = ctypes.c_long
+        dark = wintypes.BOOL(True)
+        caption = wintypes.DWORD(0x241B14)  # COLORREF for #141B24.
+        # The caption title is still available to Windows and accessibility.
+        # Only its visible ink blends into the caption. The system draws the
+        # icon, caption buttons, resize frame, and Snap controls separately.
+        set_attribute(hwnd, 20, ctypes.byref(dark), ctypes.sizeof(dark))
+        if set_attribute(hwnd, 35, ctypes.byref(caption), ctypes.sizeof(caption)) == 0:
+            set_attribute(hwnd, 36, ctypes.byref(caption), ctypes.sizeof(caption))
+    except (AttributeError, OSError, TypeError, ValueError, ctypes.ArgumentError):
+        return
+
+
 def _launch_webview(url: str, icon: Optional[Path], on_closed: Callable[[], None], overlay=None) -> bool:
     """Native window via pywebview. Returns False if unavailable."""
     try:
@@ -326,6 +349,8 @@ def _launch_webview(url: str, icon: Optional[Path], on_closed: Callable[[], None
             min_size=(760, 560),
             confirm_close=False,
         )
+        if getattr(window.events, "shown", None) is not None:
+            window.events.shown += lambda: _style_launcher_caption(window)
         window.events.closed += on_closed
         from .overlay.panel import Panel
 

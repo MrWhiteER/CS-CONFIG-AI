@@ -350,6 +350,18 @@ class SaveCase(Base):
         self.assertIn('alias "drop_it" "use weapon_c4; drop"', text)
         self.assertIn('bind "scancode27" "drop_it"', text)
 
+    def test_file_preview_matches_saved_edited_block(self):
+        body = spec("Mine", "press", {"id": "cmd:slot1"})
+        body["lines_text"] = 'alias "mine" "slot1; say_team switching"'
+        request = {"spec": body, "binding": "scancode27"}
+        before = self.all_text()
+        preview = webui._scriptgen_check(self.state, request)["built"]
+        self.assertTrue(preview["ok"], preview)
+        self.assertIn(body["lines_text"], preview["file_text"])
+        self.assertEqual(self.all_text(), before)
+        self.assertTrue(self.save(request)["ok"])
+        self.assertIn(preview["file_text"], self.all_text())
+
     def test_refused_script_is_never_written(self):
         before = self.all_text()
         reply = self.save({"spec": spec("JC", "hold", {"id": "cmd:+jump"}, {"id": "cmd:+duck"}),

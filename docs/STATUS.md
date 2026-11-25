@@ -8,6 +8,16 @@
 | Stop Launcher scene animation during CS2 | Verified launch, running-process and reduced-motion behavior | Await GUPDATE |
 | Launcher profile card labels | Removed the three numbered labels and verified the cards in Chrome | Await GUPDATE |
 | Desk mixer lights | Removed the yellow light overlay and verified the preview in Chrome | Await GUPDATE |
+| Controls tab name | Renamed the keyboard and mouse workspace and its shortcuts | Await GUPDATE |
+| End triggering the microphone script | Saved binds and offline alias flow checked; current game bind unverified | Check the game console while reproduced |
+| Steam and Accounts settings | Merged the login, account options and Steam client settings in the Steam tab | Await GUPDATE |
+| CS2 Settings Recommended tab | Removed the pane; retained the game categories and apply-key control | Await GUPDATE |
+| Connection speed checks | Startup download test removed; the test runs from the Connection card | Await GUPDATE |
+| Sidebar Rescan and version row | Removed the row; hardware rescan is under This PC | Await GUPDATE |
+| FACEIT flash and utility stats | Added both scoreboard fields from FACEIT match totals | Await GUPDATE |
+| Premier flash and utility stats | Added replay-backed totals and verified the reader with a real Mirage demo | Await GUPDATE |
+| Windows title bar | Verified icon-only dark caption with native controls on Windows 11 | Await GUPDATE |
+| Script Builder File view | Added exact generated block preview and validated command editing | Await GUPDATE |
 | Claude Launcher handoff | Queued locally | Retry after reported reset at 22:00 Asia/Dubai |
 
 Work is local on `codex/launcher-static-ace-scene`.

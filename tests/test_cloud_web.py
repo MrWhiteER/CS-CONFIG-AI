@@ -167,13 +167,16 @@ class ThePanel(unittest.TestCase):
         cls.page = (paths.bundle_root() / "web" / "index.html").read_text(
             encoding="utf-8", errors="replace")
 
-    def test_it_has_its_own_place_rather_than_being_wedged_in(self):
-        self.assertIn('data-sub="steam"', self.page)
-        self.assertIn('data-sub="account"', self.page)
-        self.assertIn('id="account-card"', self.page)
+    def test_account_settings_are_in_the_steam_pane(self):
+        steam = self.page.split('<div class="subpane hidden" data-sub="steam">', 1)[1]
+        steam = steam.split('<div class="subpane', 1)[0]
+        self.assertIn('id="account-card"', steam)
+        self.assertEqual(steam.count('id="steam-connect"'), 1)
+        self.assertNotIn('data-sub="account"', self.page)
 
-    def test_all_three_ways_in_are_offered(self):
-        for way in ('cloudWay("steam"', 'cloudWay("google"', 'cloudWay("mail"'):
+    def test_legacy_cloud_options_do_not_add_a_second_steam_login(self):
+        self.assertNotIn('cloudWay("steam"', self.page.split('function showPasswordForm', 1)[0])
+        for way in ('cloudWay("google"', 'cloudWay("mail"'):
             self.assertIn(way, self.page)
 
     def test_an_unconfigured_build_says_so_rather_than_failing(self):
@@ -184,7 +187,7 @@ class ThePanel(unittest.TestCase):
         has to say so rather than let somebody finish and wonder why nothing
         applies to them."""
         self.assertIn("needs_steam", self.page)
-        self.assertIn("Attach Steam to finish", self.page)
+        self.assertIn("Use Connect Steam above to attach Steam", self.page)
 
     def test_the_browser_half_is_polled_not_waited_on(self):
         """So closing this window does not strand a sign-in half done."""

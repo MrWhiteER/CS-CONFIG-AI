@@ -3828,8 +3828,9 @@ def _scriptgen_check(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     key = _scriptgen_key(result, binding, built.entry, state)
     if (built.target or {}).get("own"):
         key["free"] = True
-    return {"ok": True, "built": built.as_dict(), "key": key,
-            "folder": result is not None}
+    preview = built.as_dict()
+    preview["file_text"] = "\n".join(scriptgen.block_lines(built, key["label"])) if built.lines else ""
+    return {"ok": True, "built": preview, "key": key, "folder": result is not None}
 
 
 def _scriptgen_saved(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
@@ -5319,9 +5320,11 @@ def _steam_connected() -> Dict[str, Any]:
 
     web = steamweb.linked()
     has_cloud = cloud.signed_in()
-    return {"web": web, "cloud": has_cloud,
-            "cloud_configured": cloudconfig.configured(),
-            "connected": web and (has_cloud or not cloudconfig.configured())}
+    configured = cloudconfig.configured()
+    needs_steam = bool(configured and has_cloud and cloud.status().get("needs_steam"))
+    return {"web": web, "cloud": has_cloud, "needs_steam": needs_steam,
+            "cloud_configured": configured,
+            "connected": web and (not configured or (has_cloud and not needs_steam))}
 
 
 def _steam_connect(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
@@ -5339,9 +5342,12 @@ def _steam_connect(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
                 "error": "Open the app's own window to connect Steam."}
     _steam_hooks(state)
     steamweb.mark({"cloud_off": False})
-    if cloudconfig.configured() and not cloud.signed_in():
+    connection = _steam_connected()
+    if getattr(state, "_steam_login", None):
+        return {"ok": True, "waiting": True, **_steam_state()}
+    if cloudconfig.configured() and (not connection["cloud"] or connection["needs_steam"]):
         try:
-            started = cloud.begin_login("steam")
+            started = cloud.begin_login("steam", link=connection["needs_steam"])
         except cloud.CloudError:
             started = None
         if started and steamweb.sign_in(started["url"]):
@@ -5439,6 +5445,19 @@ def _demo_stats(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     try:
         return {"ok": True, **demos.stats(str(body.get("link") or ""))}
     except demos.DemoError as exc:
+        return {"ok": False, "error": str(exc)}
+
+
+def _demo_utility(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    """Choose a local Premier match replay and read its utility stats."""
+    from . import picker, replay_stats
+
+    selected = picker.pick_replay()
+    if not selected:
+        return {"ok": True, "cancelled": True}
+    try:
+        return {"ok": True, **replay_stats.read(Path(selected))}
+    except (OSError, replay_stats.ReplayError) as exc:
         return {"ok": False, "error": str(exc)}
 
 
@@ -5677,8 +5696,9 @@ def _inventory(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     """This account's CS2 inventory, read straight from Steam. Read-only."""
     from . import inventory
 
-    state.refresh()
-    user = state.user_for(body.get("account"))
+    with state.lock:
+        state.refresh()
+        user = state.user_for(body.get("account"))
     result = {**inventory.fetch(user.steam_id64, force=bool(body.get("force"))),
               "steam_id": str(user.steam_id64)}
     if result.get("ok"):
@@ -5695,6 +5715,24 @@ def _companions_browse(_state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
         return {"ok": True, "cancelled": True, "path": None}
     return {"ok": True, "cancelled": False, "path": chosen}
 
+
+
+def _inventory_market(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Open an item for the player to review and sell on Steam."""
+    from . import steamweb
+
+    asset = str(body.get("asset") or "")
+    if not asset.isascii() or not asset.isdecimal() or len(asset) > 20:
+        return {"ok": False, "error": "Choose a valid inventory item."}
+    if not steamweb.available() or not steamweb.linked():
+        return {"ok": False, "connect": True, "error": "Connect Steam in Settings to open this item."}
+    state.refresh()
+    user = state.user_for(body.get("account"))
+    if str(user.steam_id64) != str(body.get("steam_id") or ""):
+        return {"ok": False, "error": "That item is from a different Steam inventory."}
+    steamweb.window(f"https://steamcommunity.com/profiles/{user.steam_id64}/inventory/#730_2_{asset}",
+                    hidden=False, title="Steam Inventory")
+    return {"ok": True}
 
 def _inventory_inspect(_state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     """Open Steam's own "Inspect in Game" link for one item.
@@ -7002,6 +7040,7 @@ def make_handler(state: State):
         "/api/demos": _demos,
         "/api/demos/resolve": _demo_resolve,
         "/api/demos/stats": _demo_stats,
+        "/api/demos/utility": _demo_utility,
         "/api/demos/identities": _demo_identities,
         "/api/faceit": _faceit,
         "/api/faceit/forget": _faceit_forget,
@@ -7045,6 +7084,7 @@ def make_handler(state: State):
         "/api/companions": _companions,
         "/api/inventory": _inventory,
         "/api/inventory/inspect": _inventory_inspect,
+        "/api/inventory/market": _inventory_market,
         "/api/skins/catalog": _skins_catalog,
         "/api/skins/music": _skins_music,
         "/api/skins/tool_status": _skins_tool_status,
@@ -7613,7 +7653,7 @@ def make_handler(state: State):
             try:
                 # Local GoXLR I/O has its own nonblocking operation lock. A
                 # disconnected mixer must not hold up other UI requests.
-                if handler in (_goxlr, _goxlr_switch, _goxlr_setup_use, _configs_import_pick):
+                if handler in (_goxlr, _goxlr_switch, _goxlr_setup_use, _configs_import_pick, _inventory, _demo_utility):
                     self._send_json({"ok": True, **handler(state, body)})
                 else:
                     with state.lock:

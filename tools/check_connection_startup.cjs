@@ -1,30 +1,30 @@
-// Exercise the production loading-screen coordinator with a deferred connection.
+// Exercise the production loading-screen coordinator with a deferred local scan.
 const fs = require('fs'), path = require('path'), os = require('os');
 const cp = require('child_process'), {pathToFileURL} = require('url'), assert = require('assert');
 const root = path.resolve(__dirname, '..');
 const source = fs.readFileSync(path.join(root, 'cs2cfg/web/index.html'), 'utf8').replace(/\r\n/g,'\n');
 const coordinator = source.slice(source.indexOf('const startup = (() => {'), source.indexOf('</script>', source.indexOf('const startup = (() => {')));
 const names = JSON.parse(coordinator.match(/const names = (\[[\s\S]*?\]);/)[1]);
-assert(names.includes('connection'));
+assert(!names.includes('connection'), 'Bandwidth tests must not be a startup task');
 const boot = source.slice(source.indexOf('(async () => {\n  await checkFirstRun();'));
-assert(boot.indexOf('startup.run("connection", runNetCheck)') > boot.indexOf('await checkFirstRun()'));
-assert(boot.indexOf('startup.run("connection", runNetCheck)') < boot.indexOf('startup.run("scan"'));
-assert(boot.includes('await Promise.allSettled([\n    connectionReady,'));
+assert(!boot.includes('runNetCheck'), 'Startup must not start a speed test');
+assert(source.includes("$('net-run').addEventListener('click', runNetCheck)"), 'The user can still start a speed test');
+assert(source.includes('id="net-summary">Not tested'), 'No measurements appear before a test');
 const work = fs.mkdtempSync(path.join(os.tmpdir(), 'cs-config-connection-'));
 const checks = `
 const checks=[];
 function check(name,ok){checks.push({name,ok});if(!ok)throw Error(name)}
 (async()=>{try{
   let finishConnection;
-  const connection = startup.run('connection',()=>new Promise(resolve=>{finishConnection=resolve}));
-  await Promise.all(${JSON.stringify(names.filter(n => n !== 'connection'))}.map(name=>startup.run(name,async()=>{})));
+  const connection = startup.run('scan',()=>new Promise(resolve=>{finishConnection=resolve}));
+  await Promise.all(${JSON.stringify(names.filter(n => n !== 'scan'))}.map(name=>startup.run(name,async()=>{})));
   await new Promise(resolve=>setTimeout(resolve,400));
-  check('loading waits for connection after other loads settle',!startup.finished&&!document.querySelector('.boot-screen').classList.contains('is-dismissed'));
-  check('connection counted in loading progress',parseFloat(document.querySelector('.boot-screen').style.getPropertyValue('--boot-progress'))<100);
+  check('loading waits for hardware scan after other loads settle',!startup.finished&&!document.querySelector('.boot-screen').classList.contains('is-dismissed'));
+  check('hardware scan counted in loading progress',parseFloat(document.querySelector('.boot-screen').style.getPropertyValue('--boot-progress'))<100);
   let ready=0;document.addEventListener('cs2cfg:ready',()=>ready++);
   finishConnection();await connection;
   await new Promise(resolve=>setTimeout(resolve,500));
-  check('connection completion dismisses loading',startup.finished&&ready===1);
+  check('hardware scan completion dismisses loading',startup.finished&&ready===1);
   check('startup progress reaches 100 percent',document.querySelector('.boot-screen')===null);
 }catch(error){checks.push({error:error.stack})}
 const pre=document.createElement('pre');pre.id='checks';pre.textContent=JSON.stringify(checks);document.body.append(pre)})();`;

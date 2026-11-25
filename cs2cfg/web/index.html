@@ -305,7 +305,6 @@
   /* The track carries the live category's colour; each item carries its own,
      which is what it shows on hover. */
   .segbar[data-current="nvidia"]  { --cat: var(--cat-apply); }
-  .segbar[data-current="account"] { --cat: var(--cat-account); }
   .segbar[data-current="apps"]    { --cat: var(--cat-apps); }
   .segbar[data-current="look"]    { --cat: var(--cat-look); }
   .segbar[data-current="sound"]   { --cat: var(--cat-sound); }
@@ -313,7 +312,6 @@
   .segbar[data-current="editing"] { --cat: var(--cat-editing); }
   .segbar[data-current="logs"]    { --cat: var(--cat-logs); }
   .seg-item[data-sub="nvidia"]  { --cat: var(--cat-apply); }
-  .seg-item[data-sub="account"] { --cat: var(--cat-account); }
   .seg-item[data-sub="apps"]    { --cat: var(--cat-apps); }
   .seg-item[data-sub="look"]    { --cat: var(--cat-look); }
   .seg-item[data-sub="sound"]   { --cat: var(--cat-sound); }
@@ -5624,7 +5622,7 @@
   .boot-screen.is-dismissed { opacity: 0; visibility: hidden; pointer-events: none; }
   .boot-content { width: min(320px, 100%); text-align: center; }
   .boot-mark { width: 80px; height: 80px; color: var(--accent); margin-bottom: 24px; }
-  .boot-name, .account-brand {
+  .boot-name {
     font-family: var(--display); font-weight: 700; letter-spacing: .12em;
     font-size: 16px; line-height: 1.3;
   }
@@ -5650,12 +5648,11 @@
   }
   #account-card::before, #account-card::after, #account-card > h2::before { content: none; }
   #account-card > h2 { margin: 0; padding: 16px 24px; border-bottom: 1px solid var(--line); }
-  #account-out { padding: 24px; }
-  #account-out:has(> .account-login) { padding: 0; }
-  .account-login { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .9fr); }
-  .account-form { min-width: 0; padding: clamp(24px, 4cqi, 44px); }
-  .account-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
-  .account-brand svg { flex: none; width: 38px; height: 38px; color: var(--accent); }
+  .steam-account-body { padding: 16px 24px; }
+  .steam-account-actions { display:flex; flex-wrap:wrap; gap:8px; }
+  #account-card .steam-account-actions .btn { width:auto; min-height:34px; margin:0; }
+  #account-card [hidden] { display:none !important; }
+  #account-out { margin-top: 12px; }
   #account-card .sub { color: var(--muted); }
   #account-card .ways { grid-template-columns: minmax(0, 1fr); gap: 8px; margin: 20px 0 0; }
   #account-card .way {
@@ -5694,39 +5691,9 @@
   #account-card .need { border-radius: var(--control-radius); overflow-wrap: anywhere; }
   #account-card .acct .who-big { overflow-wrap: anywhere; min-width: 0; }
   #account-card .ident span, #account-card .plan { border-radius: var(--chip-radius); }
-  .account-art {
-    position: relative; isolation: isolate; overflow: hidden; min-height: 460px;
-    border-left: 1px solid var(--line); background: var(--bg);
-  }
-  .account-art::before {
-    content: ""; position: absolute; inset: -20%; opacity: var(--glow);
-    background: radial-gradient(ellipse at 65% 25%, var(--accent) 0%, transparent 48%),
-      linear-gradient(145deg, transparent 25%, var(--accent-dim) 50%, var(--accent-deep) 100%);
-  }
-  .account-art::after {
-    content: ""; position: absolute; inset: 0;
-    background: repeating-linear-gradient(135deg, transparent 0 79px, var(--line-soft) 80px 81px);
-  }
-  .account-art svg {
-    position: absolute; width: 130%; height: 100%; left: -15%; top: 0;
-    color: var(--accent); fill: none; stroke: currentColor; stroke-width: .6;
-  }
-  .account-art .art-solid { fill: var(--accent-dim); stroke: var(--accent); }
-  .account-art .art-axis { stroke: var(--line); }
-  @keyframes account-drift { to { transform: translate3d(-3%, 4%, 0) rotate(-4deg); } }
   @media (prefers-reduced-motion: no-preference) {
     .boot-mark { animation: boot-glow 900ms ease-out both; }
     .boot-tip.is-changing { animation: boot-tip-in 220ms ease-out; }
-    .account-art::before { animation: account-drift 12s ease-in-out infinite alternate; }
-    .account-art svg { animation: account-drift 16s ease-in-out infinite alternate-reverse; }
-  }
-  @container (max-width: 640px) {
-    .account-login { grid-template-columns: minmax(0, 1fr); }
-    .account-art { display: none; }
-  }
-  @media (max-width: 760px) {
-    .account-login { grid-template-columns: minmax(0, 1fr); }
-    .account-art { display: none; }
   }
   @media (prefers-reduced-motion: reduce) {
     .boot-screen { transition-duration: 80ms; }
@@ -6064,7 +6031,7 @@
 .sb-chk .ic { flex: none; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 800; color: var(--bg); margin-top: 1px; }
 .sb-chk.ok .ic { background: var(--good); } .sb-chk.warn .ic { background: var(--warn); } .sb-chk.block .ic { background: var(--bad); }
 .sb-chk .fix { margin-top: 5px; }
-.sb-lines-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.sb-lines-head { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
 .sb-lines-head h4 { margin: 3px 0 0; }
 .sb-lines-head .sp { flex: 1; }
 .sb-lines { display: flex; flex-direction: column; gap: 8px; }
@@ -6077,6 +6044,7 @@
 .sb-cmd code { font: 12.5px/1.45 Consolas, monospace; color: var(--accent); word-break: break-all; }
 .sb-cmd span { color: var(--muted); font-size: 12.5px; }
 .sb-code { width: 100%; box-sizing: border-box; background: var(--sunk); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font: 12.5px/1.6 Consolas, monospace; resize: vertical; margin-bottom: 10px; white-space: pre; overflow-x: auto; }
+.sb-code.sb-file { margin: 0; max-height: 28rem; overflow: auto; }
 .sb-code:focus { outline: none; border-color: var(--accent); }
 .sb-keep { display: inline-flex; align-items: center; gap: 7px; color: var(--ink); font-size: 13px; margin-left: 6px; cursor: pointer; }
 .sb-keep input { accent-color: var(--accent); }
@@ -6322,7 +6290,7 @@ const startup = (() => {
   let nextTip = 0, finished = false, tipTimer;
   const names = ["scan", "prefs", "plan", "machine", "setups", "crosshair",
     "companions", "audio", "history", "suggestions", "starter", "source",
-    "settings-pane", "profile", "launch", "monitor", "updates", "cloud", "connection"];
+    "settings-pane", "profile", "launch", "monitor", "updates", "cloud"];
   let settled = 0;
   const tasks = new Map(names.map(name => {
     let resolve;
@@ -6497,17 +6465,6 @@ const startup = (() => {
         </span>
       </button>
 
-      <!-- Rescan keeps its job but gives up the prominent slot: it is a thing
-           you press once in a while, not a thing you read. -->
-      <div class="rail-end">
-        <button class="rail-mini" id="rescan" title="Re-read hardware">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 10-1 5"/><path d="M20 4v6h-6"/></svg>
-          <span class="tx">Rescan</span>
-        </button>
-        <div class="ver">__CS2CFG_VERSION__</div>
-      </div>
-
-
     </div>
   </aside>
 
@@ -6525,11 +6482,11 @@ const startup = (() => {
       <span class="chip" id="chip-gpu"><span data-hardware-icon="gpu"></span> <b>—</b></span>
       <span class="chip" id="chip-ram"><span data-hardware-icon="ram"></span> <b>—</b></span>
       <div class="net-control">
-        <button type="button" class="chip" id="chip-net" aria-expanded="false" aria-controls="net-card" title="Connection details"><span data-hardware-icon="network"></span> <b id="net-summary">Checking&hellip;</b></button>
+        <button type="button" class="chip" id="chip-net" aria-expanded="false" aria-controls="net-card" title="Connection details"><span data-hardware-icon="network"></span> <b id="net-summary">Not tested</b></button>
         <section id="net-card" class="net-popover" role="region" aria-label="Connection details" hidden>
-          <div class="net-popover-head"><h2>Connection</h2><button type="button" class="btn small" id="net-run" title="Re-test connection">↻ Re-test</button></div>
+          <div class="net-popover-head"><h2>Connection</h2><button type="button" class="btn small" id="net-run" title="Test ping and download speed">Run test</button></div>
           <p class="sub">Real download sample, then router and internet ping.</p>
-          <div id="net-out" aria-live="polite"></div>
+          <div id="net-out" aria-live="polite"><p class="sub">The download sample can briefly slow other traffic.</p></div>
         </section>
       </div>
       <span class="spacer"></span>
@@ -7024,7 +6981,6 @@ const startup = (() => {
           <button class="seg-item" data-sub="lighting" role="tab" aria-selected="false"><span data-hardware-icon="lighting"></span> Lighting</button>
           <button class="seg-item" data-sub="mouse" role="tab" aria-selected="false"><span data-hardware-icon="mouse"></span> Mouse</button>
           <button class="seg-item" data-sub="steam" role="tab" aria-selected="false"><span data-hardware-icon="steam"></span> Steam</button>
-          <button class="seg-item" data-sub="account" role="tab" aria-selected="false"><span data-hardware-icon="accounts"></span> Accounts</button>
           <button class="seg-item" data-sub="apps" role="tab" aria-selected="false"><span data-hardware-icon="apps"></span> Apps</button>
           <button class="seg-item" data-sub="look" role="tab" aria-selected="false"><span data-hardware-icon="look"></span> Look</button>
           <button class="seg-item" data-sub="sound" role="tab" aria-selected="false"><span data-hardware-icon="sound"></span> Sound</button>
@@ -7041,6 +6997,7 @@ const startup = (() => {
         <section class="panel" id="hw-card">
           <h2><span data-hardware-icon="display"></span> This PC</h2>
           <div id="hw"><span class="sub">&hellip;</span></div>
+          <div class="actions"><button class="btn small" id="rescan">Rescan hardware</button></div>
           <!-- The verdict belongs under the hardware it is a verdict on,
                rather than in a card of its own further down the page. -->
           <div id="assessment-out"></div>
@@ -7125,8 +7082,19 @@ const startup = (() => {
            about CS2's configuration and never was. -->
       <!-- Local Steam account, client, launch options and repairs. -->
       <div class="subpane hidden" data-sub="steam">
+        <section class="panel wide" id="account-card">
+          <h2>Steam account</h2>
+          <div class="steam-account-body">
+            <p id="steam-connection-status" class="sub" role="status">Checking your Steam connection…</p>
+            <div class="steam-account-actions">
+              <button type="button" class="btn primary" id="steam-connect" hidden>Connect Steam</button>
+              <button type="button" class="btn" id="setup-steam-return" hidden>Return to setup</button>
+            </div>
+            <div id="account-out"></div>
+          </div>
+        </section>
         <section class="panel" id="steam-client-card"><h2>Steam client</h2><div id="steam-status"></div>
-          <div id="steam-profile"><div class="account-label">Steam account</div>
+          <div id="steam-profile"><div class="account-label">Account on this PC</div>
       <div class="who-menu hidden" id="who-menu"></div>
       <button class="rail-profile" id="who" aria-haspopup="true" aria-expanded="false"
               title="Whose settings are shown">
@@ -7142,14 +7110,6 @@ const startup = (() => {
         </section>
         <div class="wide" id="steam-tools-feedback"><span id="steam-tools-status" class="sub" role="status"></span><button class="btn small" id="steam-tools-retry" hidden>Retry Steam tools</button></div>
         <div id="steam-tools" class="settings-tools wide"></div>
-      </div>
-
-      <!-- App sign-in, linking and subscription stay separate from Steam settings. -->
-      <div class="subpane hidden" data-sub="account">
-        <section class="panel wide" id="account-card">
-          <h2>Accounts</h2>
-          <div id="account-out"></div>
-        </section>
       </div>
 
       <div class="subpane hidden" data-sub="apps">
@@ -8677,7 +8637,7 @@ function renderNet(d) {
   box.innerHTML = html;
 }
 
-// One bounded job covers start + serialized polling. Startup waits for this promise.
+// Run a bandwidth sample only when the user starts the test.
 function runNetCheck() {
   if (netJob) return netJob;
   netJob = (async () => {
@@ -9509,6 +9469,7 @@ let settingsSubChosen = false;
 document.addEventListener('cs2cfg:ready', () => { if (settingsSub === 'steam') loadFixes(); });
 
 function setSettingsSub(name, restoring) {
+  if (name === "account") name = "steam";
   if (!document.querySelector('#settings-subtabs [data-sub="' + name + '"]')) name = "nvidia";
   const was = settingsSub;
   settingsSub = name;
@@ -9538,8 +9499,7 @@ function setSettingsSub(name, restoring) {
     if (name === "config" || name === "editing") ensureScan(false);
     if (name === "editing") loadChanges();
     if (name === "apps") { loadCompanions(); loadAppTiles(); }
-    if (name === "steam") { loadFixes(); loadWho(); }
-    if (name === "account") loadCloud();
+    if (name === "steam") { loadFixes(); loadWho(); loadCloud(); loadDockSteam(); }
     if (name === "nvidia") { loadMachine(); loadNvidia(); }
   }
   rememberPrefs();
@@ -13122,6 +13082,9 @@ function renderStatsTeams(s) {
   const cs2 = s.source === 'cs2';
   // CS2's own Tab screen order. Steam's history has no ADR or multi-kills.
   const cols = cs2 ? [['Ping','ping'],['K','kills'],['A','assists'],['D','deaths'],['MVP','mvps'],['HS%','hs_percent'],['Score','score'],['K/D','kd']] : [['K','kills'],['D','deaths'],['A','assists'],['ADR','adr'],['K/D','kd'],['K/R','kr'],['HS','headshots'],['HS%','hs_percent'],['5K','penta'],['4K','quadro'],['3K','triple'],['2K','double'],['MVP','mvps']];
+  if (!cs2 || fcModeName(s.mode) === 'Premier') {
+    cols.push(['Enemies flashed','enemies_flashed'],['Utility damage','utility_damage']);
+  }
   const multi = new Set(['penta','quadro','triple','double']);
   const all = s.teams.flatMap(t => t.players);
   const numeric = v => typeof v === 'number' && Number.isFinite(v);
@@ -13170,6 +13133,11 @@ function showStats(s) {
     $('mstat-body').innerHTML='<div id="mstat-teams">'+renderStatsTeams(s)+'</div>'+
       '<p class="mstat-note"><span class="mstat-gold-key">✦ Gold = match best, ties included.</span> From your Steam match history. Steam does not keep damage per round or multi-kills for past matches.</p>';
     statsShown=s; statsWaiting=null;
+    if (fcModeName(s.mode) === 'Premier') {
+      $('mstat-body').insertAdjacentHTML('beforeend',
+        '<div class="mstat-get"><button class="btn small" type="button" id="mstat-utility">Read utility stats from replay</button>' +
+        '<span class="sub" role="status" id="mstat-utility-status"></span></div>');
+    }
     $('mstat-back').classList.remove('hidden');
     return;
   }
@@ -13179,6 +13147,44 @@ function showStats(s) {
   paintGetRow(); checkWaiting(false);
   $('mstat-back').classList.remove('hidden');
 }
+document.addEventListener('click', async event => {
+  const button = event.target.closest('#mstat-utility');
+  if (!button || !statsShown) return;
+  const board = statsShown;
+  const feedback = $('mstat-utility-status');
+  button.disabled = true;
+  feedback.textContent = 'Reading replay…';
+  try {
+    const reply = await api('/api/demos/utility', {});
+    if (statsShown !== board || !feedback.isConnected) return;
+    if (reply.cancelled) { feedback.textContent = ''; return; }
+    const normalize = name => String(name || '').toLowerCase().replace(/^de_/, '').replace(/[^a-z0-9]/g, '');
+    if (reply.map && board.map && normalize(reply.map) !== normalize(board.map)) {
+      throw Error('That replay is from a different map.');
+    }
+    const roster = Array.isArray(reply.players) ? reply.players : [];
+    const matches = new Map(roster.map(player=>[String(player.steamid),player]));
+    let merged = 0;
+    for (const player of board.teams.flatMap(team=>team.players)) {
+      const id = player.steamid || player.steam_id;
+      const byName = id ? [] : roster.filter(row => row.name && row.name === player.nickname);
+      const found = id ? matches.get(String(id)) : byName.length === 1 ? byName[0] : null;
+      if (!found) continue;
+      for (const key of ['enemies_flashed','utility_damage']) {
+        if (Number.isInteger(found[key]) && found[key] >= 0) player[key] = found[key];
+      }
+      merged++;
+    }
+    if (!merged) throw Error('No players matched this scoreboard. Choose the replay for this match.');
+    $('mstat-teams').innerHTML = renderStatsTeams(board);
+    feedback.textContent = 'Utility totals loaded from the replay.';
+  } catch (error) {
+    if (feedback.isConnected) feedback.textContent = error.message;
+  } finally {
+    if (button.isConnected) button.disabled = false;
+  }
+});
+
 async function openStats(link) {
   const request=++statsRequest;
   statsFocus=document.activeElement;
@@ -13943,7 +13949,16 @@ async function loadInventory(force = false) {
     invRetryAt = Date.now() + Math.min(300_000, INV_REFRESH * 2 ** invFailures);
     if (!result.ok) {
       const why = result.private ? "Steam reports this inventory is private." : result.error || "Steam did not respond.";
-      $("inv-status").textContent = (inventoryData?.ok ? "Showing the last successful refresh. " : "") + why;
+      const note = $("inv-status");
+      note.textContent = (inventoryData?.ok ? "Showing the last successful refresh. " : "") + why;
+      if (result.private) {
+        const settings = document.createElement('button');
+        settings.type = 'button';
+        settings.className = 'btn small';
+        settings.dataset.openSteamSettings = '';
+        settings.textContent = 'Steam settings';
+        note.append(' ', settings);
+      }
       return;
     }
     const items = result.items || [];
@@ -14031,7 +14046,8 @@ function renderInventorySale() {
     '<p class="sub">Open each selected item in Steam, choose Sell, and confirm the price and fee there.</p><ol>' +
     items.map(it => '<li><b>' + esc(it.name) + '</b> <input type="text" inputmode="decimal" size="10" ' +
       'aria-label="Draft price for ' + esc(it.name) + '" placeholder="Draft price" data-inv-price="' + esc(it.asset_id) + '" value="' +
-      esc(invPrices.get(it.asset_id) || '') + '"><a class="btn small" target="_blank" rel="noopener" href="' +
+      esc(invPrices.get(it.asset_id) || '') + '"><a class="btn small" target="_blank" rel="noopener" data-inv-market="' +
+      esc(it.asset_id) + '" href="' +
       profile + it.asset_id + '">Open in Steam</a></li>').join('') + '</ol>' +
     '<button class="btn small" type="button" id="inv-sale-close">Close review</button>';
   box.hidden = false;
@@ -14068,6 +14084,14 @@ document.addEventListener('visibilitychange', () => {
 
 document.addEventListener("click", async e => {
   if (e.target.closest('#inv-sale-close')) { $('inv-sale').hidden = true; return; }
+  const market = e.target.closest('[data-inv-market]');
+  if (market && typeof dockSteam !== 'undefined' && dockSteam?.available) {
+    e.preventDefault();
+    if (!dockSteam.linked) { openSteamSettings(); return; }
+    try { await api('/api/inventory/market', {account:currentAccount(), steam_id:inventoryData?.steam_id, asset:market.dataset.invMarket}); }
+    catch (error) { status(error.message, true); }
+    return;
+  }
   const preview = e.target.closest('[data-inv-preview]');
   if (preview) {
     const item = inventoryData?.items.find(it => it.asset_id === preview.dataset.invPreview);
@@ -14685,28 +14709,11 @@ function renderCloud() {
 
   if (!d.signed_in) {
     box.innerHTML =
-      '<div class="account-login"><div class="account-form">' +
-      '<div class="account-brand"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">' +
-        '<path fill="currentColor" d="M12 3H6L3 6V10L6 13H12V11H7L5 9V7L7 5H12Z"/>' +
-        '<path fill="var(--ink)" d="M10 5H12V7H14V9H12V11H10V9H8V7H10Z"/>' +
-      '</svg>CS CONFIG AI</div>' +
-      '<p class="sub">One account, three ways in. Whichever you use, you land on ' +
-      "the same settings and the same plan.</p>" +
-      '<div class="ways">' +
-        cloudWay("steam", "Steam", "no password, and the one CS2 needs") +
-        (d.google ? cloudWay("google", "Google", "signs you in, then asks for Steam") : "") +
-        cloudWay("mail", "Email and password", "if you would rather not use either") +
-      "</div><div id=\"pw-area\"></div>" +
-      (d.error ? '<p class="need">The cloud could not be reached: ' +
-                 esc(d.error) + "</p>" : "") +
-      '</div><div class="account-art" aria-hidden="true">' +
-        '<svg viewBox="0 0 400 600" focusable="false" preserveAspectRatio="xMidYMid slice">' +
-          '<path class="art-axis" d="M0 300h400M200 0v600"/>' +
-          '<path class="art-solid" d="M310 80L70 320h110L90 520l250-280H225Z"/>' +
-          '<path d="M340 30L30 340h110L50 570l320-350H265Z"/>' +
-          '<circle cx="200" cy="300" r="155"/><circle cx="200" cy="300" r="170"/>' +
-          '<path d="M200 110v40m0 300v40M10 300h40m300 0h40"/>' +
-        '</svg></div></div>';
+      '<details><summary>Other cloud account sign-in options</summary><div class="ways">' +
+      (d.google ? cloudWay("google", "Google", "Use your existing cloud account") : "") +
+      cloudWay("mail", "Email and password", "Use your existing cloud account") +
+      '</div><div id="pw-area"></div></details>' +
+      (d.error ? '<p class="need">' + esc(d.error) + "</p>" : "");
     return;
   }
 
@@ -14724,12 +14731,7 @@ function renderCloud() {
       '<span class="' + (d.password ? "on" : "") + '">Password' + tick(d.password) + "</span>" +
     "</div>" +
     (d.needs_steam
-      ? '<p class="need"><b>Attach Steam to finish.</b> This application ' +
-        "configures CS2 for a Steam account, so until one is attached there is " +
-        "nothing here for it to configure.</p>" +
-        '<div class="ways">' +
-        cloudWay("steam", "Attach Steam", "opens Steam in your browser", true) +
-        "</div>"
+      ? '<p class="need">Use Connect Steam above to attach Steam to your cloud account.</p>'
       : "") +
     ((d.entitlements || []).length
       ? '<p class="sub" style="margin-top:12px">Your plan includes: ' +
@@ -14966,8 +14968,7 @@ function setupStepHTML(s) {
   const heading = (label,title,lead) => setupHeading(String(s.index+1).padStart(2,'0') + ' / ' + label,title,lead);
   if (step === "sync") return heading("YOUR SETTINGS", "Pick up where you left off.", "Bring your settings with your Steam account, then make this PC yours.") +
     '<div class="setup-split">' + setupVisual("sync") + '<div class="setup-stack"><div id="setup-sync-result" class="setup-sync-result" role="status"></div>' +
-    '<button type="button" id="setup-steam" class="setup-action primary">' + WAY_ICONS.steam + 'Sign in with Steam</button>' +
-    '<a id="setup-steam-link" class="setup-action" target="_blank" rel="noopener noreferrer" hidden>Continue in your browser</a>' +
+    '<button type="button" id="setup-steam" class="setup-action primary">' + WAY_ICONS.steam + 'Open Steam settings</button>' +
     '<button type="button" id="setup-sync-retry" class="setup-action" hidden>Try sync again</button>' +
     '<label class="setup-toggle"><span><b>Keep this PC in sync automatically</b><small>Your settings follow you between PCs</small></span><input id="setup-sync-auto" type="checkbox"' + (draft.sync ? ' checked' : '') + '></label></div></div>';
   if (step === "permission") {
@@ -15169,9 +15170,6 @@ function renderSetupSync(s) {
   if (!setupAlive(s) || setupCurrentStep(s) !== 'sync') return;
   const signed = !!(s.data.cloud || {}).signed_in && !(s.data.cloud || {}).needs_steam;
   $('setup-steam').hidden = signed;
-  $('setup-steam').disabled = !!s.loginPending;
-  $('setup-steam-link').hidden = !s.loginURL;
-  if (s.loginURL) $('setup-steam-link').href = s.loginURL;
   $('setup-sync-retry').hidden = !signed || !s.syncError;
   const last = s.data.sync || {};
   if (s.syncBusy) setupSyncMessage(s,'Bringing your settings together…',false,'Checking your Steam account for your latest setup.');
@@ -15179,7 +15177,7 @@ function renderSetupSync(s) {
   else if (last.action === 'pull') setupSyncMessage(s,'Brought over your settings from ' + setupSource(last) + ': ' + setupFileCount(last) + ' files',true,'The game preset and theme are prefilled from your other PC.' + (last.waiting > 0 ? ' Your config files will wait for permission in the next step.' : ''));
   else if (signed && s.synced) setupSyncMessage(s,'Your Steam account is connected.',true,last.action === 'push' ? 'Your settings are saved and ready to follow you.' : 'This PC has your latest settings.');
   else if (signed) setupSyncMessage(s,'Your Steam account is connected.',true,'Ready to check for your settings.');
-  else setupSyncMessage(s,s.loginPending ? 'Finish signing in on Steam’s page.' : 'Your settings. Every PC.',false,s.loginPending ? 'It closes by itself when Steam has signed you in.' : 'Sign in with Steam once. It brings your setup with you and your match history.');
+  else setupSyncMessage(s,'Connect Steam to bring over your settings.',false,'You can return here after connecting in Steam settings.');
 }
 async function setupSync(s) {
   if (!setupAlive(s) || s.syncBusy) return;
@@ -15206,42 +15204,32 @@ async function setupSync(s) {
     if (setupAlive(s)) s.syncError = setupPlain(err.message,'Sync could not finish.');
   } finally { s.syncBusy = false; renderSetupSync(s); }
 }
-async function setupSteamLogin(s) {
-  if (!setupAlive(s) || s.loginPending) return;
-  s.loginPending = true; s.syncError = ''; renderSetupSync(s);
-  // The app underneath is inert. Stop its account-panel poll so there is only
-  // one claimant of the existing browser sign-in session.
-  clearInterval(cloudPoll); cloudPoll = null;
-  try {
-    const r = await api('/api/cloud/login',{provider:'steam',link:!!(s.data.cloud || {}).needs_steam});
-    if (!setupAlive(s)) return;
-    if (!r.opened && r.url) {
-      const url = new URL(r.url);
-      if (['https:','http:'].includes(url.protocol)) s.loginURL = url.href;
-    }
-    renderSetupSync(s);
-    const deadline = Date.now()+5*60*1000;
-    const poll = async () => {
-      if (!setupAlive(s)) return;
-      try {
-        const result = await api('/api/cloud/poll',{});
-        if (!setupAlive(s)) return;
-        if (result.waiting && Date.now()<deadline) { s.loginTimer = setTimeout(poll,2000); return; }
-        if (result.waiting || result.nothing) throw new Error('Sign-in did not finish. Please try again.');
-        s.loginPending = false; s.loginURL = '';
-        s.data.cloud = await api('/api/cloud',{});
-        if (!setupAlive(s)) return;
-        cloudData = s.data.cloud; renderCloud();
-        if (!s.data.cloud.signed_in || s.data.cloud.needs_steam) throw new Error('Sign in with your Steam account to sync.');
-        await setupSync(s);
-      } catch (err) { if (setupAlive(s)) { s.loginPending = false; s.syncError = setupPlain(err.message,'Sign-in did not finish. Please try again.'); renderSetupSync(s); } }
-    };
-    s.loginTimer = setTimeout(poll,1000);
-  } catch (err) { if (setupAlive(s)) { s.loginPending = false; s.syncError = setupPlain(err.message,'Steam sign-in could not start.'); renderSetupSync(s); } }
+function setupSteamSettings(s) {
+  if (!setupAlive(s)) return;
+  s.steamSettingsOpen = true;
+  $('setup-wizard').hidden = true;
+  document.querySelector('.app').inert = s.appWasInert;
+  $('setup-steam-return').hidden = false;
+  openSteamSettings();
 }
+
+async function resumeSetupSteam(s) {
+  if (!setupAlive(s) || !s.steamSettingsOpen) return;
+  s.steamSettingsOpen = false;
+  $('setup-steam-return').hidden = true;
+  document.querySelector('.app').inert = true;
+  $('setup-wizard').hidden = false;
+  await loadCloud();
+  if (!setupAlive(s)) return;
+  s.data.cloud = cloudData;
+  renderSetup(s);
+}
+$('setup-steam-return').addEventListener('click', () => resumeSetupSteam(setupSession));
+
 async function openSetupWizard({step, data} = {}) {
   if (setupOpening) return setupOpening;
   if (setupSession) {
+    if (setupSession.steamSettingsOpen) await resumeSetupSteam(setupSession);
     const index = setupSession.steps.indexOf(step);
     if (index >= 0 && !setupSession.finishing && !setupSession.moving && !setupSession.helperBusy) { setupSession.index = index; renderSetup(setupSession); }
     return setupSession;
@@ -15266,7 +15254,7 @@ window.openSetupWizard = openSetupWizard;
 async function finishSetupWizard() {
   const s = setupSession;
   if (!setupAlive(s) || s.helperBusy || s.importBusy) return;
-  s.finishing = true; clearTimeout(s.loginTimer); clearTimeout(s.fpsEnd); cancelAnimationFrame(s.fpsFrame);
+  s.finishing = true; clearTimeout(s.fpsEnd); cancelAnimationFrame(s.fpsFrame);
   const controls = [...$('setup-wizard').querySelectorAll('button,input,select,a')];
   controls.forEach(el => { if ('disabled' in el) el.disabled = true; });
   $('setup-error').textContent = ''; $('setup-next').textContent = 'Saving…';
@@ -15289,7 +15277,6 @@ async function finishSetupWizard() {
     pollSyncStatus();
   } catch (err) {
     s.finishing = false; controls.forEach(el => { if ('disabled' in el) el.disabled = false; });
-    s.loginPending = false; s.loginURL = '';
     if (setupCurrentStep(s) === 'sync') renderSetupSync(s);
     // Restore the ready helper view after a failed save, including Next only.
     if (setupCurrentStep(s) === 'permission') renderSetup(s,false);
@@ -15333,7 +15320,7 @@ $('setup-content').addEventListener('click',e => {
   if (button.hasAttribute('data-setup-preset')) setupChoose(s,'preset',button.dataset.setupPreset,button);
   if (button.hasAttribute('data-setup-region')) setupChoose(s,'region',button.dataset.setupRegion || null,button);
   if (button.hasAttribute('data-setup-theme')) setupPreviewTheme(s,button.dataset.setupTheme,button);
-  if (button.id === 'setup-steam') setupSteamLogin(s);
+  if (button.id === 'setup-steam') setupSteamSettings(s);
   if (button.id === 'setup-sync-retry') setupSync(s);
 });
 $('setup-content').addEventListener('change',e => {
@@ -15351,7 +15338,7 @@ $('setup-content').addEventListener('change',e => {
 // Capture shortcuts before the underlying application's global keyboard hooks.
 document.addEventListener('keydown',e => {
   const s = setupSession;
-  if (!s) return;
+  if (!s || s.steamSettingsOpen) return;
   if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); finishSetupWizard(); return; }
   if (e.key === 'Tab') {
     const focusable = [...$('setup-wizard').querySelectorAll('button:not(:disabled),select:not(:disabled),input:not(:disabled),a[href]')].filter(el => el.getClientRects().length && !el.closest('[inert]'));
@@ -17578,7 +17565,7 @@ const SB_IDEAS = [
     steps: [{id: "volume", value: 0}]}},
 ];
 const sb = {data: null, spec: {name: "", mode: "press", steps: []}, binding: "", keyLabel: "",
-            target: "", targetLabel: "",
+            target: "", targetLabel: "", view: "explained", checkRevision: 0,
             cat: "weapons", find: "", built: null, key: null, listening: false, confirm: null,
             saving: false, timer: 0};
 
@@ -17741,7 +17728,7 @@ function sbSide() {
   html += '<div class="sb-btns"><button class="btn" data-sb-clear>Clear</button><button class="btn primary" data-sb-save' +
     (can ? "" : " disabled") + '>' + (sb.saving ? "Saving…" : "Save to my config") + '</button></div>';
   if (sb.data && !sb.data.folder) html += '<p class="sb-hint">Pick your config folder in Settings first, then you can save.</p>';
-  html += '<p class="sb-hint">Saved scripts show up in Scripts and in the Keyboard key picker under “Your scripts”. ' +
+  html += '<p class="sb-hint">Saved scripts show up in Scripts and in the Controls key picker under “Your scripts”. ' +
     'Saving the same name again replaces the old one.</p>';
   html += '<p class="sb-hint" style="margin-top:12px">Ready-made ideas:</p><div class="sb-ideas">' +
     SB_IDEAS.map((idea, i) => '<button class="sb-chip" data-sb-idea="' + i + '">' + esc(idea.label) + '</button>').join("") + '</div>';
@@ -17810,19 +17797,28 @@ function sbSaved() {
 function sbLinesStep() {
   const b = sb.built;
   const editing = typeof sb.spec.lines_text === "string";
+  const fileView = sb.view === "file";
   let html = '<div class="sb-step"><span class="sb-num">5</span><div><div class="sb-lines-head"><h4>Your config lines</h4>' +
-    '<span class="sp"></span>' + (editing
-      ? '<button class="btn small" data-sb-unedit>Undo my edits</button>'
-      : (b && b.lines && b.lines.length ? '<button class="btn small" data-sb-edit>Edit the lines</button>' : "")) + '</div>';
-  if (editing) {
-    html += '<p class="sb-hint" style="margin:0 0 8px">One line per name: <code>alias "name" "command; command"</code>. ' +
-      'Every change is checked on the right before you can save.</p>' +
-      '<textarea class="sb-code" id="sb-lines-edit" spellcheck="false" rows="' + Math.max(4, sb.spec.lines_text.split("\n").length + 1) + '">' +
-      esc(sb.spec.lines_text) + '</textarea>';
+    '<span class="sp"></span><div class="sb-styles" role="group" aria-label="Script preview">' +
+    '<button type="button" class="sb-cat" data-sb-view="explained" aria-pressed="' + !fileView + '">Explained</button>' +
+    '<button type="button" class="sb-cat" data-sb-view="file" aria-pressed="' + fileView + '">File view</button></div>' +
+    (fileView && editing ? '<button class="btn small" data-sb-unedit>Restore generated commands</button>' :
+     fileView && b?.lines?.length ? '<button class="btn small" data-sb-edit>Edit commands</button>' : '') + '</div>';
+  if (fileView) {
+    if (editing) {
+      html += '<label class="sb-hint" for="sb-lines-edit">Edit the commands. The app generates the script header and key binding.</label>' +
+        '<textarea class="sb-code" id="sb-lines-edit" spellcheck="false" rows="' + Math.max(4, sb.spec.lines_text.split("\n").length + 1) + '">' +
+        esc(sb.spec.lines_text) + '</textarea>';
+    } else if (b?.file_text) {
+      html += '<pre class="sb-code sb-file" aria-label="Script file preview" tabindex="0"><code>' + esc(b.file_text) + '</code></pre>';
+    } else {
+      html += '<p class="sb-hint" style="margin:0">Add steps and pick a key to preview the script file.</p>';
+    }
+    return html + '</div></div>';
   }
   const rows = b && b.explained || [];
   if (!rows.length) {
-    html += editing ? "" : '<p class="sb-hint" style="margin:0">Add steps and pick a key, and the lines show up here.</p>';
+    html += '<p class="sb-hint" style="margin:0">Add steps and pick a key, and the lines show up here.</p>';
     return html + '</div></div>';
   }
   html += '<div class="sb-lines">' + rows.map(r =>
@@ -17844,16 +17840,20 @@ function sbDropEdits() {
 }
 
 function sbChanged() {
+  ++sb.checkRevision;
   sb.confirm = null;
   clearTimeout(sb.timer);
   sb.timer = setTimeout(sbCheck, 180);
 }
 
 async function sbCheck() {
+  const revision = ++sb.checkRevision;
   try {
     const r = await api("/api/scriptgen/check", {spec: Object.assign({}, sb.spec, {target: sb.target}), binding: sb.binding});
+    if (revision !== sb.checkRevision) return;
     sb.built = r.built; sb.key = r.key;
   } catch (err) {
+    if (revision !== sb.checkRevision) return;
     sb.built = {ok: false, checks: [{level: "block", text: String(err && err.message || err)}]};
   }
   sbRender();
@@ -17935,6 +17935,7 @@ document.addEventListener("click", e => {
   if (d.sbStyle) { sbDropEdits(); sb.spec.style = d.sbStyle; sbRender(); sbChanged(); return; }
   if (d.sbMode) { sbDropEdits(); sb.spec.mode = d.sbMode; sbRender(); sbChanged(); return; }
   if (d.sbCat) { sb.cat = d.sbCat; sb.find = ""; sbRender(); return; }
+  if (d.sbView) { sb.view = d.sbView; sbRender(); return; }
   if (d.sbAddto) { sb.addTo = d.sbAddto; sbRender(); return; }
   if (d.sbAdd) {
     const [list] = sbArr(sb.spec.mode === "hold" && sb.addTo === "release" ? "r0" : "0");
@@ -18879,7 +18880,6 @@ $("rescan").addEventListener("click", () => scan(true));
 // refresh rather than pretending nothing is happening.
 (async () => {
   await checkFirstRun();
-  const connectionReady = startup.run("connection", runNetCheck);
   startSyncWatch();
   setStretchMode(stretchMode);
   // prefs also calls State.refresh(). Starting it alongside scan can run the
@@ -18896,7 +18896,6 @@ $("rescan").addEventListener("click", () => scan(true));
   // GET monitor/status and independent local loaders need not wait for the
   // starter config. Every promise includes its loader's final render.
   await Promise.allSettled([
-    connectionReady,
     startup.run("plan", previewPlan),
     startup.run("machine", loadMachine),
     startup.run("setups", loadSetups),

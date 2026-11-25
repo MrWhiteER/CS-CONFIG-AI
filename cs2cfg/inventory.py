@@ -29,6 +29,7 @@ import json
 import time
 import urllib.error
 import urllib.request
+from urllib.parse import urlsplit
 from typing import Any, Dict, List, Optional
 
 TIMEOUT = 12.0
@@ -161,6 +162,9 @@ def _page(steam_id64: str, after: str) -> Dict[str, Any]:
             raw = answer.read().decode("utf-8", "replace")
     except urllib.error.HTTPError as exc:
         if exc.code in (403, 401):
+            raw = _signed_in_page(url)
+            if raw:
+                return _inventory_json(raw)
             result = {"ok": False, "private": True,
                      "error": "this inventory is private", "items": []}
         else:
@@ -171,6 +175,47 @@ def _page(steam_id64: str, after: str) -> Dict[str, Any]:
     except OSError as exc:
         return {"ok": False, "error": f"could not reach Steam: {exc}", "items": []}
 
+    return _inventory_json(raw)
+
+
+def _signed_in_page(url: str) -> str:
+    """Retry a private inventory in the app's existing Steam web session."""
+    from . import steamweb
+
+    if not steamweb.available() or not steamweb.linked():
+        return ""
+    window = None
+    try:
+        origin = f"https://{steamweb.COMMUNITY}"
+        window = steamweb.window(origin + "/my/")
+        if not steamweb.wait_for(window, lambda address: (
+            urlsplit(address).hostname == steamweb.COMMUNITY and "/login" not in address), TIMEOUT):
+            return ""
+        path = urlsplit(url)
+        resource = path.path + "?" + path.query
+        window.evaluate_js(
+            "if (location.origin === " + json.dumps(origin) + ") {"
+            "fetch(" + json.dumps(resource) + ", {credentials:'same-origin'})"
+            ".then(r=>r.ok ? r.text() : '').catch(()=> '').then(value=>{window.cs2Inventory=value});}"
+        )
+        end = time.monotonic() + TIMEOUT
+        while time.monotonic() < end:
+            reply = window.evaluate_js("window.cs2Inventory ?? null")
+            if isinstance(reply, str):
+                return reply
+            time.sleep(.15)
+    except Exception:
+        return ""
+    finally:
+        if window is not None:
+            try:
+                window.destroy()
+            except Exception:
+                pass
+    return ""
+
+
+def _inventory_json(raw: str) -> Dict[str, Any]:
     try:
         data = json.loads(raw)
     except ValueError:

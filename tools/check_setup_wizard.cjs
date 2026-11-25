@@ -28,8 +28,8 @@ ${slice('const THEMES = [','function currentTheme()')}
 ${source.match(/const MODE_ART = \{[\s\S]*?\n\};/)[0]}
 ${source.match(/const WAY_ICONS = \{[\s\S]*?\n\};/)[0]}
 let lastScan = null, cloudData = null, cloudPoll = null, prefsReady = false, audioData = null;
-let prefsNow = {}, failures = {}, calls = [], statuses = [], pollCount = 0;
-let syncReply = {ok:true,action:'none'}, loginOpened = true, remoteCurrent = null, syncDelay = 0;
+let prefsNow = {}, failures = {}, calls = [], statuses = [], steamSettingsOpened = 0;
+let syncReply = {ok:true,action:'none'}, remoteCurrent = null, syncDelay = 0;
 let helperReply = null, helperDelay = 40, fixDelay = 40;
 const readyHelper = {supported:true,installed:true,current:true,version:1,wanted:1};
 const regionsFixture = [{id:'dubai',label:'Dubai'},{id:'frankfurt',name:'Frankfurt'},{id:'singapore',label:'Singapore'}];
@@ -48,6 +48,8 @@ let importCancel=false,importDelay=0,importBad=false;
 const importReview={ok:true,token:'review-token',kept:46,merged:3,dropped:2,files:6,profiles:2,note:'Order and later overrides kept. Originals stay untouched.',details:[{kind:'profile',file:'my-match.cfg',line:8,binding:'bind F5',target:'custom/imported_profiles/practice-a873c29e179b.cfg',reason:'Copied profile; runs when its exec is called'},{kind:'profile',file:'tools/aliases.vcfg',line:3,binding:'bind F6 → match → load_match',target:'custom/imported_profiles/match-4089c9b169b2.cfg',reason:'Copied profile via alias chain'},{kind:'dropped',file:'old-settings.cfg',line:8,reason:'Syntax needs review in Advanced'},{kind:'dropped',file:'practice.cfg',line:12,reason:'Exec target missing; choose its folder: missing.cfg'}]};
 function status(text,error) { statuses.push({text,error}); }
 function applyPrefs(ui) { prefsNow = {...ui}; applyTheme(ui.theme); }
+function openSteamSettings() { steamSettingsOpened++; }
+async function loadCloud() { cloudData = await api('/api/cloud', {}); }
 function renderCloud() {} function loadAudio() {} function loadCompanions() {} function loadMachine() {} function previewPlan() {}
 const tempAlarm = {};
 function homeTween(el,key,value,paint) { if(el)paint(value); } function homeCancel() {} function homeNumber() {}
@@ -80,9 +82,7 @@ async function api(route,body) {
   if (route === '/api/sync/now') { if(syncDelay)await new Promise(r=>setTimeout(r,syncDelay));if(syncReply.action==='pull'&&remoteCurrent)Object.assign(response.current,remoteCurrent);return {ok:true,last:structuredClone(syncReply)}; }
   if (route === '/api/sync') return {ok:true,auto:response.current.sync_auto !== false,last:structuredClone(syncReply)};
   if (route === '/api/sync/auto') { response.current.sync_auto=body.on;return {ok:true,auto:body.on}; }
-  if (route === '/api/cloud/login') return {ok:true,opened:loginOpened,url:'https://example.test/steam-login'};
-  if (route === '/api/cloud/poll') { pollCount++;return {ok:true,waiting:false}; }
-  if (route === '/api/cloud') return {ok:true,configured:true,signed_in:true};
+  if (route === '/api/cloud') return structuredClone(response.cloud);
   throw Error('Unexpected API: '+route);
 }
 ${slice('/* First-run setup.','async function loadMachine()')}
@@ -93,7 +93,7 @@ document.documentElement.classList.remove('setup-checking');
 const checks=[];
 function check(name,value) { checks.push({name,ok:!!value});if(!value) throw Error(name); }
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-const reset=()=>{ response=structuredClone(fixture);helperStatus=null;helperReply=null;helperDelay=40;failures={};calls=[];syncReply={ok:true,action:'none'};remoteCurrent=null;syncDelay=0;fixData=null;fixStates.clear();importCancel=false;importDelay=0;importBad=false; };
+const reset=()=>{ steamSettingsOpened=0; response=structuredClone(fixture);helperStatus=null;helperReply=null;helperDelay=40;failures={};calls=[];syncReply={ok:true,action:'none'};remoteCurrent=null;syncDelay=0;fixData=null;fixStates.clear();importCancel=false;importDelay=0;importBad=false; };
 const tap=selector=>{ const el=document.querySelector(selector);if(!el)throw Error('Missing '+selector);el.click(); };
 const move=async(skip=false)=>{ await setupMove(1,skip); };
 async function close() { await finishSetupWizard(); }
@@ -103,7 +103,7 @@ async function suite() {
   const gating=checkFirstRun();await sleep(30);
   check('first request is POST first-run data',calls[0].route==='/api/firstrun'&&calls[0].body);
   check('needed setup opens before startup continues',!!setupSession&&!$('setup-wizard').hidden&&document.querySelector('.app').inert);
-  check('Steam step has a single primary decision',getComputedStyle($('setup-steam')).display!=='none'&&getComputedStyle($('setup-steam-link')).display==='none'&&getComputedStyle($('setup-sync-retry')).display==='none');
+  check('Steam step links to the shared settings',getComputedStyle($('setup-steam')).display!=='none'&&$('setup-steam').textContent.includes('Open Steam settings')&&!$('setup-steam-link')&&$('setup-sync-retry').hidden);
   check('all seven progress segments include Your configs',$('setup-progress').children.length===7&&setupSession.steps[2]==='import');
   await move(true);check('skip sync leaves it unanswered',!Object.hasOwn(setupSession.answers,'sync'));
   await loadFixes(true);
@@ -217,10 +217,10 @@ async function suite() {
   check('save failure preserves answers and keeps wizard open',setupSession.answers.preset==='quality'&&!$('setup-wizard').hidden&&!$('setup-next').disabled&&$('setup-error').textContent==='Save failed');
   failures={};await close();
   reset();syncReply={ok:true,action:'pull',source:'Gaming PC',written:['one.cfg','two.cfg'],waiting:0};remoteCurrent={intent:'quality',theme:'ember'};
-  await openSetupWizard();loginOpened=false;tap('#setup-steam');await sleep(40);
-  check('Steam login uses existing provider contract',calls.some(c=>c.route==='/api/cloud/login'&&c.body.provider==='steam'));
-  check('browser-open fallback is a labelled link',$('setup-steam-link').href==='https://example.test/steam-login'&&!$('setup-steam-link').hidden);
-  await sleep(1200);check('sign-in polls existing endpoint then syncs',pollCount>0&&calls.some(c=>c.route==='/api/sync/now'));
+  await openSetupWizard();tap('#setup-steam');
+  check('setup opens Steam settings without starting sign-in',steamSettingsOpened===1&&$('setup-wizard').hidden&&!document.querySelector('.app').inert&&!$('setup-steam-return').hidden&&!calls.some(c=>c.route==='/api/cloud/login'||c.route==='/api/steam/connect'));
+  response.cloud.signed_in=true;tap('#setup-steam-return');await sleep(80);
+  check('return resumes setup and syncs with the shared connection',!$('setup-wizard').hidden&&document.querySelector('.app').inert&&$('setup-steam-return').hidden&&calls.some(c=>c.route==='/api/sync/now'));
   check('pull counts written arrays and refreshes later prefills',$('setup-sync-result').textContent.includes('Gaming PC: 2 files')&&setupSession.draft.preset==='quality'&&setupSession.draft.theme==='ember');
   await close();
   reset();response.cloud.signed_in=true;syncReply={ok:true,action:'pull',written:['one.cfg'],waiting:0};remoteCurrent={intent:'quality',theme:'ember'};syncDelay=80;

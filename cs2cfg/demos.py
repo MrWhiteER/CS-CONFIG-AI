@@ -390,6 +390,9 @@ def stats(reference: str, opener: Optional[Callable[[str], Any]] = None) -> Dict
                    "player_id": str(person.get("playerId") or "")}
             for name, key in PLAYER_STATS.items():
                 row[name] = _num(person.get(key))
+            # These fields are present on matches with extended stats.
+            row["enemies_flashed"] = _opt(person, "i27", whole=True)
+            row["utility_damage"] = _opt(person, "i30", whole=True)
             # Not published per player, so it is computed rather than left out.
             row["kast"] = 0.0
             players.append(row)
