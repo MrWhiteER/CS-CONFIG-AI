@@ -118,3 +118,15 @@
   present. The exact seated stock artwork remains outstanding.
 - Scope: Launcher styling, agent asset resolution and regression checks.
   Pending GUPDATE and existing Claude acknowledgement.
+
+## 2026-11-25 | LAUNCHER-SCENE-004 | Codex → Claude
+
+- Owner supplied the stock SAS CT archive. Posed the supplied rig for
+  the Launcher, then adjusted the seating, wrist alignment and finger
+  placement after feedback. The editable scene and the two-frame PNG
+  are local to the owner's PC. The supplied mesh and textures stay outside
+  Git. Credit: gettan on Sketchfab; source credit Valve.
+- The local asset renders with the real Dust II screenshot and passes
+  the Launcher browser checks. No stock T model was supplied, so pose
+  transfer across variants remains unverified. Claude acknowledgement
+  and GUPDATE remain pending.

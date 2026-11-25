@@ -36,8 +36,8 @@ const checks=[];function check(name,ok){checks.push({name,ok});if(!ok)throw Erro
 check('hero controls remain inside hero', $('home-hero').contains($('play')) && $('home-hero').contains($('launch-modes')));
 const screen=$('launcher-screenshot'),hero=$('home-hero');
 const still= ${JSON.stringify(process.env.HOME_SCREEN_FILE ? 'data:image/jpeg;base64,' + fs.readFileSync(process.env.HOME_SCREEN_FILE).toString('base64') : 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7')};
-const hasAgent = ${JSON.stringify(!process.env.HOME_SCREEN_FILE)};
-const sheet = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAYAAAABCAYAAAD9yd/wAAAAFklEQVR4nGO8tFTuPwMUdNzdAmMyAABRGwSvVb32FgAAAABJRU5ErkJggg==';
+const hasAgent = ${JSON.stringify(Boolean(process.env.HOME_AGENT_FILE || !process.env.HOME_SCREEN_FILE))};
+const sheet = ${JSON.stringify(process.env.HOME_AGENT_FILE ? url.pathToFileURL(path.resolve(process.env.HOME_AGENT_FILE)).href : 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAYAAAABCAYAAAD9yd/wAAAAFklEQVR4nGO8tFTuPwMUdNzdAmMyAABRGwSvVb32FgAAAABJRU5ErkJggg==')};
 const agent = $('launcher-agent');
 const agentReady = new Promise(resolve => agent.addEventListener('load',resolve,{once:true}));
 launcherScene.connect(async()=>({ok:true,screenshot:'gameplay.jpg',url:still,agents:hasAgent?{ct:sheet}:{}}),()=>{});
