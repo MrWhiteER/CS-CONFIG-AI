@@ -6,6 +6,8 @@
 | Remove keyboard and handheld RGB from the Launcher | Removed the visual overlays and Launcher palette request; physical-device RGB tested | Await GUPDATE |
 | Show the CS2 loading banner on the monitor | Bundled the exact static image from the linked Steam post and checked both screen fits | Await GUPDATE |
 | Stop Launcher scene animation during CS2 | Verified launch, running-process and reduced-motion behavior | Await GUPDATE |
+| Launcher profile card labels | Removed the three numbered labels and verified the cards in Chrome | Await GUPDATE |
+| Desk mixer lights | Removed the yellow light overlay and verified the preview in Chrome | Await GUPDATE |
 | Claude Launcher handoff | Queued locally | Retry after reported reset at 22:00 Asia/Dubai |
 
 Work is local on `codex/launcher-static-ace-scene`.

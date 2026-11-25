@@ -2338,7 +2338,7 @@
 .settings-box .wg-row { margin-top:16px;gap:8px; }
 .preset-veil { position:fixed;inset:0;z-index:50;pointer-events:none;background:color-mix(in srgb,var(--bg) 78%,transparent);animation:preset-fade .18s ease both; }
 .mode-card.preset-active { z-index:51;isolation:isolate;transform:none!important;transition:none!important; }
-.mode-card.preset-active .mode-copy,.mode-card.preset-active .mode-index,.mode-card.preset-active .mode-selected { opacity:0; }
+.mode-card.preset-active .mode-copy,.mode-card.preset-active .mode-selected { opacity:0; }
 .preset-changes { position:absolute;inset:0;display:flex;flex-direction:column;padding:16px;background:color-mix(in srgb,var(--panel) 96%,transparent);text-align:left; }
 .preset-heading { font:600 16px var(--display);color:var(--ink);margin-bottom:10px;display:flex;justify-content:space-between;gap:8px; }
 .preset-heading small { font:11px var(--body);color:var(--muted); }
@@ -5760,7 +5760,6 @@
 .launcher-desk-light { position:absolute; color:var(--desk-light); animation:launcher-rgb-pulse 5s ease-in-out infinite alternate; }
 .launcher-desk-mic { left:31.6%; top:47.7%; width:3%; height:13.3%; border-radius:14% 14% 16% 16%; background:linear-gradient(90deg,transparent,currentColor 52%,transparent); opacity:.32; mix-blend-mode:screen; }
 .launcher-desk-monitor { left:38.5%; top:74%; width:37%; height:1%; clip-path:polygon(0 84%,100% 0,100% 13%,0 100%); background:currentColor; opacity:.45; }
-.launcher-desk-mixer { left:35.1%; top:91.5%; width:7.5%; height:1.4%; background:repeating-linear-gradient(90deg,currentColor 0 5%,transparent 6% 12.5%); filter:blur(.5px); transform:rotate(-2deg); opacity:.52; }
 @keyframes launcher-rgb-pulse { from { filter:brightness(.65); } to { filter:brightness(1.25); } }
 .hero-keypress {
   position:absolute; left:51.29%; top:80.52%; width:10.77%; height:17.96%;
@@ -5799,7 +5798,6 @@
 .mode-card::before { content:''; position:absolute; inset:-30% -60%; pointer-events:none; background:linear-gradient(110deg,transparent 45%,rgba(var(--lift),.18) 50%,transparent 55%); transform:translateX(-55%); animation:home-sweep 9s ease-in-out infinite; }
 .mode-card[aria-pressed="true"] { transform:translateY(-5px); }.mode-card[aria-pressed="true"]::after { border-color:var(--accent); box-shadow:inset 0 -32px 35px -30px var(--accent); }
 .mode-card:hover { transform:translateY(-5px); }.mode-card:focus-visible { outline:0; }.mode-card:focus-visible::after { border:3px solid var(--accent); }
-.mode-index { position:absolute; left:18px; top:16px; font:600 10px var(--mono); color:#fff; letter-spacing:.1em; }
 .mode-copy { position:absolute; left:20px; bottom:20px; right:22px; display:flex; flex-direction:column; color:#fff; gap:5px; }
 .mode-copy strong { font-size:21px; font-weight:700; letter-spacing:-.025em; }.mode-copy > span { font-size:11px; color:#ddd; }
 .mode-selected { position:absolute; bottom:23px; right:18px; color:var(--accent); opacity:0; }.mode-card[aria-pressed="true"] .mode-selected { opacity:1; }
@@ -5836,7 +5834,6 @@
   .profile-apply { padding:8px; }
 }
 @container (max-width:710px) {
-  .mode-card[aria-pressed="true"]:has(.profile-apply) .mode-index { display:none; }
   .mode-card[aria-pressed="true"]:has(.profile-apply) .mode-copy { inset:auto 8px 10px; }
   .mode-card[aria-pressed="true"]:has(.profile-apply) .mode-copy > span { display:none; }
   .profile-apply { inset:5px 5px 49px; width:auto; gap:4px; }
@@ -5902,7 +5899,7 @@
 @keyframes home-sweep { 0%,65% { transform:translateX(-55%); } 100% { transform:translateX(55%); } }
 .home-paused .mode-card::before,.home-paused .mode-card img { animation-play-state:paused; }
 @media(max-width:1150px) { [data-panel="launcher"] .home-hero { padding:26px; min-height:365px; }.home-hero .hero-copy { width:58%; }.home-hero .fix-row { display:flex; flex-direction:column; align-items:flex-start; }.mode-card { height:180px; padding:15px; }.mode-copy strong { font-size:18px; }[data-panel="launcher"] .grid2 { grid-template-columns:1fr; } }
-@media(max-width:700px) { .home-hero .hero-copy { width:100%; }.home-hero::after { background:color-mix(in srgb,var(--panel) 84%,transparent); mask-image:none; }.mode-cards { gap:8px; }.mode-card { height:190px; }.mode-copy { left:12px; bottom:15px; }.mode-copy strong { font-size:15px; }.mode-copy > span { font-size:10px; }.mode-index { left:12px; font-size:8px; }[data-panel="launcher"] :is(#live-card,#hw-card,#net-card) { padding:16px; } }
+@media(max-width:700px) { .home-hero .hero-copy { width:100%; }.home-hero::after { background:color-mix(in srgb,var(--panel) 84%,transparent); mask-image:none; }.mode-cards { gap:8px; }.mode-card { height:190px; }.mode-copy { left:12px; bottom:15px; }.mode-copy strong { font-size:15px; }.mode-copy > span { font-size:10px; }[data-panel="launcher"] :is(#live-card,#hw-card,#net-card) { padding:16px; } }
 @media(prefers-reduced-motion:reduce) { .mode-card::before,.mode-card img { animation:none; }.mode-card { transition:none; }.mode-card:hover,.mode-card[aria-pressed="true"] { transform:none; } }
 
 </style>
@@ -6563,7 +6560,6 @@ const startup = (() => {
           <div class="launcher-desk-rgb">
             <span class="launcher-desk-light launcher-desk-monitor"></span>
             <span class="launcher-desk-light launcher-desk-mic"></span>
-            <span class="launcher-desk-light launcher-desk-mixer"></span>
           </div>
         </div></div>
         <div class="hero-copy">
@@ -6616,9 +6612,9 @@ const startup = (() => {
         <h2>Optimise for</h2>
         <span class="profile-apply-live" id="profile-apply-live" role="status" aria-live="polite" aria-atomic="true"></span>
         <div class="mode-cards" id="intents" role="group" aria-label="Optimise for">
-          <button class="mode-card" data-intent="competitive" type="button" aria-pressed="false" title="Choose Competitive"><img src="assets/home/mode-competitive.webp" alt="Competitive rendering of a Mediterranean training courtyard"><span class="mode-shade"></span><span class="mode-index">01 / FOCUS</span><span class="mode-copy"><strong>Competitive</strong><span>Less detail. Clear sightlines.</span></span><span class="mode-selected" aria-hidden="true">&#10003;</span></button>
-          <button class="mode-card" data-intent="balanced" type="button" aria-pressed="true" title="Choose Balanced"><img src="assets/home/mode-balanced.webp" alt="Balanced rendering of a Mediterranean training courtyard"><span class="mode-shade"></span><span class="mode-index">02 / BALANCE</span><span class="mode-copy"><strong>Balanced</strong><span>Clarity meets atmosphere.</span></span><span class="mode-selected" aria-hidden="true">&#10003;</span></button>
-          <button class="mode-card" data-intent="quality" type="button" aria-pressed="false" title="Choose Quality"><img src="assets/home/mode-quality.webp" alt="Quality rendering of a Mediterranean training courtyard"><span class="mode-shade"></span><span class="mode-index">03 / DETAIL</span><span class="mode-copy"><strong>Quality</strong><span>Every detail. Every shadow.</span></span><span class="mode-selected" aria-hidden="true">&#10003;</span></button>
+          <button class="mode-card" data-intent="competitive" type="button" aria-pressed="false" title="Choose Competitive"><img src="assets/home/mode-competitive.webp" alt="Competitive rendering of a Mediterranean training courtyard"><span class="mode-shade"></span><span class="mode-copy"><strong>Competitive</strong><span>Less detail. Clear sightlines.</span></span><span class="mode-selected" aria-hidden="true">&#10003;</span></button>
+          <button class="mode-card" data-intent="balanced" type="button" aria-pressed="true" title="Choose Balanced"><img src="assets/home/mode-balanced.webp" alt="Balanced rendering of a Mediterranean training courtyard"><span class="mode-shade"></span><span class="mode-copy"><strong>Balanced</strong><span>Clarity meets atmosphere.</span></span><span class="mode-selected" aria-hidden="true">&#10003;</span></button>
+          <button class="mode-card" data-intent="quality" type="button" aria-pressed="false" title="Choose Quality"><img src="assets/home/mode-quality.webp" alt="Quality rendering of a Mediterranean training courtyard"><span class="mode-shade"></span><span class="mode-copy"><strong>Quality</strong><span>Every detail. Every shadow.</span></span><span class="mode-selected" aria-hidden="true">&#10003;</span></button>
         </div>
 
       </section>

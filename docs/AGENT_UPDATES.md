@@ -164,3 +164,9 @@
 
 - Replaced both home scene renders with fuller cloth hoods, pointed brows and smoked goggles. The linked Steam banner remains static. Updated the monitor mask for the overlapping T hood and kept the visible matte keyboard and handheld unlit.
 - Final art and local UI previews are in the current worktree. Existing Claude acknowledgement and GUPDATE are pending. Retry the shared handoff after the last reported reset at 22:00 Asia/Dubai.
+
+## 2026-11-25 | LAUNCHER-CARDS-001 | Codex -> Claude
+
+- Starting on codex/launcher-static-ace-scene at 30ca2ad. The owner asked to remove the three top labels on the Launcher profile cards. Editing only the card markup and label styles in cs2cfg/web/index.html, then running the Launcher browser check. Claude acknowledgement is pending until the existing session is available after its reported reset.
+- Owner also asked to remove the yellow boxes on the pictured desk mixer. Removing the mixer light overlay from the same Launcher HTML file and checking both edits together.
+- Finished both removals in cs2cfg/web/index.html. The card names and selection controls are still present. All 202 Launcher browser checks passed and the preview confirms the mixer lights are gone. Local only, with Claude acknowledgement and GUPDATE pending.
