@@ -2,8 +2,8 @@
 
 | Task | State | Next step |
 | --- | --- | --- |
-| Revise the Launcher gamer scene | Two original variants and lightweight movement implemented | Await GUPDATE |
-| Show actual CS2 gameplay on the Launcher monitor | Local MP4 and WebM selection and rendering implemented | Supply a CS2 recording |
+| Show exact CT and T agents in a seated keyboard pose | Launcher accepts prepared character frames locally | Supply ready-made seated asset frames |
+| Show a static CS2 ace screenshot on the monitor | Existing Dust II screenshot selected locally and still-image support verified | Supply an ace screenshot with its kill feed visible |
 | Stop Launcher scene during CS2 | Launch, running-process, and reduced-motion behavior checked | Await GUPDATE |
 
 ## Prior Inventory batch

@@ -5422,7 +5422,7 @@
     color: var(--accent); background: var(--accent-dim);
   }
 
-  /* Remove clipped corners so shadows and keyboard focus remain visible. */
+  /* Remove screenshotped corners so shadows and keyboard focus remain visible. */
   .stage :is(.panel, .card, .editor, .fix-tile, .inv-item, .skin-viewer-box):not(:where(#account-card, #account-card *)) {
     clip-path: none; border: 1px solid var(--line); border-radius: var(--component-radius);
     background: var(--panel); box-shadow: var(--component-shadow);
@@ -5746,18 +5746,20 @@
 [data-panel="launcher"] .home-hero { position:relative; isolation:isolate; min-height:370px; display:flex; align-items:center; overflow:hidden; padding:32px 38px; border:1px solid var(--line); border-radius:4px; margin-bottom:30px; background:var(--panel); }
 .hero-art { position:absolute; inset:0; z-index:-2; overflow:hidden; pointer-events:none; background:#101820; }
 .hero-scene { position:absolute; inset:0 0 0 auto; width:max(100%,1050px); overflow:hidden; }
-.hero-background,.hero-player-motion { position:absolute; inset:0; width:100%; height:100%; }
-.hero-player-motion { background:var(--hero-frame) right center / 100% 100% no-repeat; }
-.hero-player-head { mask-image:radial-gradient(ellipse 11% 40% at 91% 30%,#000 58%,transparent 100%); transform-origin:94% 50%; animation:hero-head 5.2s ease-in-out infinite alternate; }
-.hero-player-hands { mask-image:radial-gradient(ellipse 17% 15% at 65% 91%,#000 50%,transparent 100%); animation:hero-hands 2.8s ease-in-out infinite alternate; }
-#launcher-clip { position:absolute; top:8%; bottom:26.1%; left:38.4%; right:21.2%; width:40.4%; height:65.9%; object-fit:cover; clip-path:polygon(0 0,100% 2.3%,99.7% 95.4%,.35% 100%); }
-#launcher-clip:not([src]) { display:none; }
-.scene-paused .hero-player-motion { animation-play-state:paused; }
-.hero-gameplay-actions { display:flex; align-items:center; gap:6px; margin-left:auto; letter-spacing:normal; }
+.hero-background,.hero-agent-layer { position:absolute; inset:0; width:100%; height:100%; }
+.hero-agent-layer { overflow:hidden; }
+.hero-agent-layer[hidden] { display:none; }
+#launcher-agent { display:block; width:200%; height:100%; animation:hero-keypress 2.6s steps(1,end) infinite; }
+#launcher-screenshot { position:absolute; top:8%; bottom:26.1%; left:38.4%; right:21.2%; width:40.4%; height:65.9%; object-fit:contain; background:#030304; clip-path:polygon(0 0,100% 2.3%,99.7% 95.4%,.35% 100%); }
+#launcher-screenshot:not([src]) { display:none; }
+.scene-paused #launcher-agent { animation-play-state:paused; }
+.hero-gameplay-actions { display:flex; align-items:center; gap:6px; margin-left:8px; letter-spacing:normal; }
 .hero-gameplay-actions [hidden] { display:none; }
-@keyframes hero-head { 0%,20% { transform:none; } 60% { transform:translate(-3px,2px) rotate(-.8deg); } 100% { transform:translate(1px,-2px) rotate(.5deg); } }
-@keyframes hero-hands { 0%,18% { transform:none; } 48% { transform:translate(-3px,-1px); } 90%,100% { transform:translate(2px,1px); } }
-@media(prefers-reduced-motion:reduce) { .hero-player-motion { animation:none; } }
+@keyframes hero-keypress {
+  0%,28%,48%,68%,100% { transform:none; }
+  21%,41%,61% { transform:translateX(-50%); }
+}
+@media(prefers-reduced-motion:reduce) { #launcher-agent { animation:none; } }
 .home-hero::after { content:''; position:absolute; inset:0; z-index:-1; background:linear-gradient(90deg,var(--panel) 0%,color-mix(in srgb,var(--panel) 96%,transparent) 28%,color-mix(in srgb,var(--panel) 76%,transparent) 40%,transparent 55%); pointer-events:none; }
 .home-hero .hero-copy { width:48%; max-width:580px; position:relative; }
 .hero-brand { display:flex; align-items:center; flex-wrap:wrap; gap:10px; font:600 11px var(--mono); letter-spacing:.18em; color:var(--muted); margin-bottom:24px; }
@@ -6541,16 +6543,16 @@ const startup = (() => {
       <div class="hero home-hero scene-paused" id="home-hero">
         <button type="button" class="sp-chip" id="sp-toggle" aria-expanded="false" aria-controls="sp-panel" aria-haspopup="dialog" title="Ping to Valve's relay in this city. In-game ping is usually within a few ms."><span id="sp-chip-icon" class="sp-tone"></span><span id="sp-summary">Server regions</span><span class="sp-led sp-tone" aria-hidden="true"></span><span aria-hidden="true">⌃</span></button>
         <div class="hero-art" aria-hidden="true"><div class="hero-scene">
-          <img class="hero-background" src="assets/home/hero-player-navy.webp" alt="" fetchpriority="high">
-          <video id="launcher-clip" muted loop playsinline preload="none"></video>
-          <div class="hero-player-motion hero-player-head"></div><div class="hero-player-motion hero-player-hands"></div>
+          <img class="hero-background" src="assets/home/hero-workstation.webp" alt="" fetchpriority="high">
+          <img id="launcher-screenshot" alt="" decoding="async">
+          <div class="hero-agent-layer" hidden><img id="launcher-agent" alt="" decoding="async"></div>
         </div></div>
         <div class="hero-copy">
           <div class="hero-brand">
             <span class="config-mark" aria-hidden="true"></span><span>CS CONFIG AI</span>
             <div class="hero-gameplay-actions">
-              <button class="btn small" type="button" id="launcher-clip-choose">Add gameplay clip</button>
-              <button class="btn small" type="button" id="launcher-clip-clear" hidden>Remove clip</button>
+              <button class="btn small" type="button" id="launcher-screenshot-choose">Add gameplay screenshot</button>
+              <button class="btn small" type="button" id="launcher-screenshot-clear" aria-label="Remove screenshot" hidden>Remove</button>
             </div>
           </div><div class="eyebrow" id="home-readiness">Your CS2 workspace</div>
           <h2>Counter-Strike <em>2</em></h2>

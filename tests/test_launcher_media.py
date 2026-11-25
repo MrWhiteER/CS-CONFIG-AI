@@ -13,14 +13,17 @@ from cs2cfg import launcher_media, webui
 
 
 class LauncherMedia(unittest.TestCase):
-    def test_selection_and_seek_over_local_server(self):
+    def test_screenshot_selection_and_serving_over_local_server(self):
         with TemporaryDirectory() as folder:
             root = Path(folder)
-            source = root / "recording.webm"
+            source = root / "gameplay.png"
             source.write_bytes(b"0123456789")
-            state = SimpleNamespace(token="app-token", clip_token="media-ticket")
+            agents = root / "launcher-agents"
+            agents.mkdir()
+            (agents / "ct.png").write_bytes(b"supplied sheet")
+            state = SimpleNamespace(token="app-token", scene_token="media-ticket")
             with mock.patch.object(launcher_media, "user_data_dir", return_value=root), \
-                 mock.patch("cs2cfg.picker.pick_gameplay_clip", return_value=str(source)), \
+                 mock.patch("cs2cfg.picker.pick_gameplay_screenshot", return_value=str(source)), \
                  ThreadingHTTPServer(("127.0.0.1", 0), webui.make_handler(state)) as server:
                 worker = threading.Thread(target=server.serve_forever, daemon=True)
                 worker.start()
@@ -30,25 +33,22 @@ class LauncherMedia(unittest.TestCase):
                                     headers={"X-CS2CFG-Token": state.token})
                     with urlopen(setup, timeout=3) as response:
                         media = json.load(response)
-                    self.assertEqual(media["clip"], source.name)
+                    self.assertEqual(media["screenshot"], source.name)
+                    self.assertEqual(list(media["agents"]), ["ct"])
+                    with urlopen(base + media["agents"]["ct"], timeout=3) as response:
+                        self.assertEqual(response.read(), b"supplied sheet")
                     with self.assertRaises(HTTPError) as denied:
-                        urlopen(base + "/launcher-clip", timeout=3)
+                        urlopen(base + "/launcher-screenshot", timeout=3)
                     self.assertEqual(denied.exception.code, 403)
                     denied.exception.close()
-                    seek = Request(base + media["url"], headers={"Range": "bytes=2-4"})
-                    with urlopen(seek, timeout=3) as response:
-                        self.assertEqual(response.status, 206)
-                        self.assertEqual(response.headers["Content-Range"], "bytes 2-4/10")
-                        self.assertEqual(response.read(), b"234")
-                    suffix = Request(base + media["url"], headers={"Range": "bytes=-2"})
-                    with urlopen(suffix, timeout=3) as response:
-                        self.assertEqual(response.read(), b"89")
-                    with self.assertRaises(HTTPError) as invalid:
-                        urlopen(Request(base + media["url"], headers={"Range": "bytes=11-"}), timeout=3)
-                    self.assertEqual(invalid.exception.code, 416)
-                    invalid.exception.close()
-                    launcher_media.choose(None)
-                    self.assertIsNone(launcher_media.clip())
+                    with urlopen(base + media["url"], timeout=3) as response:
+                        self.assertEqual(response.headers["Content-Type"], "image/png")
+                        self.assertEqual(response.read(), b"0123456789")
+                    clear = Request(base + "/api/launcher/media", data=b'{"clear":true}',
+                                    headers={"X-CS2CFG-Token": state.token})
+                    with urlopen(clear, timeout=3) as response:
+                        self.assertEqual(json.load(response)["url"], "")
+                    self.assertIsNone(launcher_media.screenshot())
                 finally:
                     server.shutdown()
                     worker.join()

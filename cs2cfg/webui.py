@@ -60,7 +60,7 @@ class State:
         self.verification_path = user_data_dir() / "applied-verification.json"
         self.verification_receipt = verification.load(self.verification_path)
         self.token = secrets.token_urlsafe(24)
-        self.clip_token = secrets.token_urlsafe(24)
+        self.scene_token = secrets.token_urlsafe(24)
         self.kb = KnowledgeBase()
         self.cfg_folder = cfg_folder
         self.cfg_name = cfg_name
@@ -5679,16 +5679,19 @@ def _launcher_media(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
 
     try:
         if body.get("choose"):
-            selected = picker.pick_gameplay_clip()
+            selected = picker.pick_gameplay_screenshot()
             if selected:
                 launcher_media.choose(Path(selected))
         elif body.get("clear"):
             launcher_media.choose(None)
     except (OSError, ValueError) as exc:
         return {"ok": False, "error": str(exc)}
-    clip = launcher_media.clip()
-    return {"ok": True, "clip": clip.name if clip else "",
-            "url": f"/launcher-clip?ticket={state.clip_token}" if clip else ""}
+    screenshot = launcher_media.screenshot()
+    agents = {side: f"/launcher-agent/{side}?ticket={state.scene_token}"
+              for side in launcher_media.AGENT_FILES if launcher_media.agent_sheet(side)}
+    return {"ok": True, "screenshot": screenshot.name if screenshot else "",
+            "url": f"/launcher-screenshot?ticket={state.scene_token}" if screenshot else "",
+            "agents": agents}
 
 
 def _inventory(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -7147,53 +7150,19 @@ def make_handler(state: State):
             self.wfile.write(data)
 
         # -- verbs ----------------------------------------------------------
-        def _send_launcher_clip(self) -> None:
+        def _send_launcher_media(self, side: str = "") -> None:
             from . import launcher_media
 
             query = parse_qs(self.path.partition("?")[2])
             ticket = (query.get("ticket") or [""])[0]
-            if not ticket.isascii() or not secrets.compare_digest(ticket, state.clip_token):
+            if not ticket.isascii() or not secrets.compare_digest(ticket, state.scene_token):
                 self._send_json({"error": "bad or missing ticket"}, 403)
                 return
-            source = launcher_media.clip()
-            try:
-                if source is None:
-                    raise FileNotFoundError
-                stream = source.open("rb")
-            except OSError:
-                self._send_json({"error": "clip not found"}, 404)
+            source = launcher_media.agent_sheet(side) if side else launcher_media.screenshot()
+            if source is None:
+                self._send_json({"error": "Launcher image not found"}, 404)
                 return
-            with stream:
-                size = os.fstat(stream.fileno()).st_size
-                header = self.headers.get("Range", "")
-                bounds = launcher_media.byte_range(header, size)
-                if bounds is None:
-                    self.send_response(416)
-                    self.send_header("Content-Range", f"bytes */{size}")
-                    self.send_header("Content-Length", "0")
-                    self.end_headers()
-                    return
-                start, end = bounds
-                remaining = end - start + 1
-                self.send_response(206 if header else 200)
-                self.send_header("Content-Type", launcher_media.VIDEO_FORMATS[source.suffix.lower()])
-                self.send_header("Cache-Control", "no-store")
-                self.send_header("Accept-Ranges", "bytes")
-                self.send_header("Content-Length", str(remaining))
-                if header:
-                    self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
-                self.end_headers()
-                stream.seek(start)
-                while remaining:
-                    chunk = stream.read(min(remaining, 128 * 1024))
-                    if not chunk:
-                        self.close_connection = True
-                        break
-                    try:
-                        self.wfile.write(chunk)
-                    except (ConnectionResetError, BrokenPipeError, ConnectionAbortedError):
-                        break
-                    remaining -= len(chunk)
+            self._send_file(source)
 
         def do_GET(self) -> None:
             if not self._host_ok():
@@ -7201,8 +7170,11 @@ def make_handler(state: State):
                 return
 
             path = self.path.split("?", 1)[0]
-            if path == "/launcher-clip":
-                self._send_launcher_clip()
+            if path == "/launcher-screenshot":
+                self._send_launcher_media()
+                return
+            if path in ("/launcher-agent/ct", "/launcher-agent/t"):
+                self._send_launcher_media(path.rsplit("/", 1)[1])
                 return
             if path == "/api/overlay/tools":
                 if self.headers.get("X-CS2CFG-Token") != state.token:

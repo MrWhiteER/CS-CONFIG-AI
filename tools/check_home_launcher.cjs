@@ -34,23 +34,30 @@ code+=`document.documentElement.dataset.boot='ready';document.querySelector('.bo
 const checks=[];function check(name,ok){checks.push({name,ok});if(!ok)throw Error(name)}
 (async()=>{try{
 check('hero controls remain inside hero', $('home-hero').contains($('play')) && $('home-hero').contains($('launch-modes')));
-const clip=$('launcher-clip'), hero=$('home-hero');
-let plays=0,pauses=0;
-clip.play=()=>{plays++;return Promise.resolve()};clip.pause=()=>{pauses++};clip.load=()=>{};
-launcherScene.connect(async()=>({ok:true,clip:'recording.webm',url:'/launcher-clip?ticket=test'}),()=>{});
+const screen=$('launcher-screenshot'),hero=$('home-hero');
+const still= ${JSON.stringify(process.env.HOME_SCREEN_FILE ? 'data:image/jpeg;base64,' + fs.readFileSync(process.env.HOME_SCREEN_FILE).toString('base64') : 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7')};
+const hasAgent = ${JSON.stringify(!process.env.HOME_SCREEN_FILE)};
+const sheet = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAYAAAABCAYAAAD9yd/wAAAAFklEQVR4nGO8tFTuPwMUdNzdAmMyAABRGwSvVb32FgAAAABJRU5ErkJggg==';
+const agent = $('launcher-agent');
+const agentReady = new Promise(resolve => agent.addEventListener('load',resolve,{once:true}));
+launcherScene.connect(async()=>({ok:true,screenshot:'gameplay.jpg',url:still,agents:hasAgent?{ct:sheet}:{}}),()=>{});
 await Promise.resolve();
-check('hero waits for CS2 process status before starting video',!clip.hasAttribute('src')&&hero.classList.contains('scene-paused'));
+await screen.decode();
+check('Launcher shows a static screenshot without video playback',screen.naturalWidth>0&&!hero.querySelector('video'));
+if (hasAgent) await agentReady;
+check('Launcher uses a supplied agent sheet or an empty chair',agent.parentElement.hidden===!hasAgent);
+check('hero waits for CS2 process status before animating hands',hero.classList.contains('scene-paused'));
 launcherScene.activity(false);
 if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
-  check('reduced motion leaves the hero scene still',plays===0&&hero.classList.contains('scene-paused'));
+  check('reduced motion keeps the screenshot and leaves the hands still',screen.getAttribute('src')===still&&hero.classList.contains('scene-paused'));
 } else {
-  check('idle Launcher starts the chosen clip',plays===1&&clip.hasAttribute('src')&&!hero.classList.contains('scene-paused'));
+  check('hands animate while Launcher is idle',!hero.classList.contains('scene-paused'));
   launcherScene.launching(true);
-  check('Play immediately releases video and freezes the gamer',pauses===1&&!clip.hasAttribute('src')&&hero.classList.contains('scene-paused'));
+  check('Play immediately freezes hands and keeps the same screenshot',screen.getAttribute('src')===still&&hero.classList.contains('scene-paused'));
   launcherScene.activity(true);launcherScene.launching(false);
-  check('running CS2 prevents hero playback',plays===1&&!clip.hasAttribute('src'));
+  check('running CS2 keeps the hands still',hero.classList.contains('scene-paused'));
   launcherScene.activity(false);
-  check('Launcher resumes the scene after CS2 closes',plays===2&&clip.hasAttribute('src'));
+  check('Launcher resumes hand motion after CS2 closes',!hero.classList.contains('scene-paused')&&screen.getAttribute('src')===still);
 }
 launcherScene.activity(true);
 $('intents').querySelector('[data-intent="quality"]').click();check('card selection saves and previews',intent==='quality'&&prefs===1&&previews===1);

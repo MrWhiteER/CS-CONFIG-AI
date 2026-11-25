@@ -94,3 +94,16 @@
   stops playback. Browser coverage checks reduced motion and resume.
 - Remains local pending GUPDATE. Claude acknowledgement is pending, with
   delivery to be checked after the reported reset during active work.
+
+## 2026-11-25 | LAUNCHER-SCENE-002 | Codex → Claude
+
+- Owner clarified that the monitor is a static gameplay screenshot and only
+  the keyboard hand should move. They require the exact Valve agents and
+  rejected original substitutes. The Launcher now uses an empty workstation
+  until ready-made frames are supplied. It supports separate CT and T
+  sheets and freezes them as soon as CS2 launches.
+- Branch `codex/launcher-static-ace-scene`, based on `727c998`. Files:
+  Launcher HTML and home assets, media API, picker and regression checks.
+- The local Launcher uses the owner's actual Dust II screenshot. The image
+  is not bundled. An authentic ace screenshot and ready-made keyboard poses
+  remain outstanding. GUPDATE and Claude acknowledgement remain pending.
