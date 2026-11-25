@@ -3,21 +3,21 @@
 | Task | State | Next step |
 | --- | --- | --- |
 | Create original CT and T Launcher scenes | Dark workshop scenes with fitted balaclavas, fuller pointed hoods and smoked goggles; both previewed in the Launcher | Owner visual review |
-| Remove keyboard and handheld RGB from the Launcher | Removed the visual overlays and Launcher palette request; physical-device RGB tested | Await GUPDATE |
-| Show the CS2 loading banner on the monitor | Bundled the exact static image from the linked Steam post and checked both screen fits | Await GUPDATE |
-| Stop Launcher scene animation during CS2 | Verified launch, running-process and reduced-motion behavior | Await GUPDATE |
-| Launcher profile card labels | Removed the three numbered labels and verified the cards in Chrome | Await GUPDATE |
-| Desk mixer lights | Removed the yellow light overlay and verified the preview in Chrome | Await GUPDATE |
-| Controls tab name | Renamed the keyboard and mouse workspace and its shortcuts | Await GUPDATE |
+| Remove keyboard and handheld RGB from the Launcher | Removed the visual overlays and Launcher palette request; physical-device RGB tested | Included in the approved v1.27.2 batch |
+| Show the CS2 loading banner on the monitor | Bundled the exact static image from the linked Steam post and checked both screen fits | Included in the approved v1.27.2 batch |
+| Stop Launcher scene animation during CS2 | Verified launch, running-process and reduced-motion behavior | Included in the approved v1.27.2 batch |
+| Launcher profile card labels | Removed the three numbered labels and verified the cards in Chrome | Included in the approved v1.27.2 batch |
+| Desk mixer lights | Removed the yellow light overlay and verified the preview in Chrome | Included in the approved v1.27.2 batch |
+| Controls tab name | Renamed the keyboard and mouse workspace and its shortcuts | Included in the approved v1.27.2 batch |
 | End triggering the microphone script | Saved binds and offline alias flow checked; current game bind unverified | Check the game console while reproduced |
-| Steam and Accounts settings | Merged the login, account options and Steam client settings in the Steam tab | Await GUPDATE |
-| CS2 Settings Recommended tab | Removed the pane; retained the game categories and apply-key control | Await GUPDATE |
-| Connection speed checks | Startup download test removed; the test runs from the Connection card | Await GUPDATE |
-| Sidebar Rescan and version row | Removed the row; hardware rescan is under This PC | Await GUPDATE |
-| FACEIT flash and utility stats | Added both scoreboard fields from FACEIT match totals | Await GUPDATE |
-| Premier flash and utility stats | Added replay-backed totals and verified the reader with a real Mirage demo | Await GUPDATE |
-| Windows title bar | Verified icon-only dark caption with native controls on Windows 11 | Await GUPDATE |
-| Script Builder File view | Added exact generated block preview and validated command editing | Await GUPDATE |
+| Steam and Accounts settings | Merged the login, account options and Steam client settings in the Steam tab | Included in the approved v1.27.2 batch |
+| CS2 Settings Recommended tab | Removed the pane; retained the game categories and apply-key control | Included in the approved v1.27.2 batch |
+| Connection speed checks | Startup download test removed; the test runs from the Connection card | Included in the approved v1.27.2 batch |
+| Sidebar Rescan and version row | Removed the row; hardware rescan is under This PC | Included in the approved v1.27.2 batch |
+| FACEIT flash and utility stats | Added both scoreboard fields from FACEIT match totals | Included in the approved v1.27.2 batch |
+| Premier flash and utility stats | Added replay-backed totals and verified the reader with a real Mirage demo | Included in the approved v1.27.2 batch |
+| Windows title bar | Verified icon-only dark caption with native controls on Windows 11 | Included in the approved v1.27.2 batch |
+| Script Builder File view | Added exact generated block preview and validated command editing | Included in the approved v1.27.2 batch |
 | Claude Launcher handoff | Queued locally | Retry after reported reset at 22:00 Asia/Dubai |
 
 Work is local on `codex/launcher-static-ace-scene`.
@@ -26,9 +26,9 @@ Work is local on `codex/launcher-static-ace-scene`.
 
 | Task | State | Next step |
 | --- | --- | --- |
-| Refresh and filter owned Steam Inventory | Implemented and checked with a live Steam read | Await GUPDATE |
-| Inspect items and listen to owned music kits | Shared previews implemented and browser checked | Await GUPDATE |
-| Interactive sticker showcase | Implemented with map-inspired lighting presets | Await GUPDATE |
+| Refresh and filter owned Steam Inventory | Implemented and checked with a live Steam read | Included in the approved v1.27.2 batch |
+| Inspect items and listen to owned music kits | Shared previews implemented and browser checked | Included in the approved v1.27.2 batch |
+| Interactive sticker showcase | Implemented with map-inspired lighting presets | Included in the approved v1.27.2 batch |
 | Sell multiple Steam items | Local multi-item selection and per-item Steam handoff implemented | Direct bulk submission needs a Valve-supported listing integration |
 
 Inventory work is on `codex/inventory-workspace`, based on local `8171136`.
@@ -37,13 +37,13 @@ Inventory work is on `codex/inventory-workspace`, based on local `8171136`.
 
 | Task | State | Next step |
 | --- | --- | --- |
-| Bundle offline Stats map pictures | Implemented and verified locally | Await GUPDATE |
-| Animate profile changes inside Launcher cards | Implemented with a transparent background and verified locally | Await GUPDATE |
-| Remove the Launcher Review settings banner | Removed locally | Await GUPDATE |
+| Bundle offline Stats map pictures | Implemented and verified locally | Included in the approved v1.27.2 batch |
+| Animate profile changes inside Launcher cards | Implemented with a transparent background and verified locally | Included in the approved v1.27.2 batch |
+| Remove the Launcher Review settings banner | Removed locally | Included in the approved v1.27.2 batch |
 | Claude handoff for Stats and Launcher changes | Queued in the agent log | Check the existing session after its reported reset |
 
 The local branch is `codex/offline-map-art-inline-profile`, based on
-`de0bdb0`. The published version is still 1.27.1.
+`de0bdb0`. Included in the v1.27.2 release batch.
 
 ## Previous audit batch
 

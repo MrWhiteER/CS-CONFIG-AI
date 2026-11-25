@@ -29,8 +29,10 @@ if /i "%~1"=="test" (
     goto :done
 )
 if /i "%~1"=="build" (
-    "%PY%" %PYARGS% -m pip install --quiet --disable-pip-version-check pyinstaller pywebview
+    "%PY%" %PYARGS% -m pip install --quiet --disable-pip-version-check -r "%~dp0requirements.txt" pyinstaller pywebview
+    if errorlevel 1 exit /b !ERRORLEVEL!
     "%PY%" %PYARGS% -m PyInstaller --noconfirm cs2cfg.spec
+    if errorlevel 1 exit /b !ERRORLEVEL!
     echo.
     echo Built: %~dp0dist\"CS2 Launcher.exe"  ^(app^)
     echo        %~dp0dist\cs2cfg.exe          ^(command line^)

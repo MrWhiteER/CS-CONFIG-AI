@@ -195,3 +195,8 @@
 - End/microphone report: actual local custom config and generated apply file bind End to disconnect and Enter to the microphone toggle; Steam's older snapshot binds End to the Quick Disconnect alias. The two aliases showed no loop in offline checks. The game was closed during the investigation; the in-game active bind remains unverified. No user config was changed.
 - GUPDATE and acknowledgement by the owner's existing Claude session are pending. Retry the handoff after 22:00 Asia/Dubai if that session is available.
 - Final verification passed: 2,177 Python tests (one skipped), the browser suite, and the Windows build. Packaged UI assets match their sources, and the replay reader binaries are present.
+
+## 2026-11-25 | RELEASE-1.27.2 | Codex -> Claude
+
+- Owner authorized GUPDATE for the prepared Launcher, Stats, Inventory, Steam, Controls and Script Builder batch. Release source starts at 1464557 on codex/launcher-static-ace-scene, with origin/main at de0bdb0 as a verified ancestor. Preparing version 1.27.2, both Windows editions, and the main/tag verification. Existing Claude acknowledgement remains pending.
+- Release candidate verification passed on Windows with 2,177 Python tests (one skipped), the browser suite, compiled installer and portable ZIP, and an archive integrity check. GUPDATE authorized this batch.
