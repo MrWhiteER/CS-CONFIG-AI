@@ -114,6 +114,13 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
     })()`));
     await send('Emulation.setEmulatedMedia', {features:[{name:'prefers-reduced-motion',value:'reduce'}]});
     check('reduced motion disables panel and row animations', await evaluate(`getComputedStyle(document.getElementById('sp-panel')).animationName==='none' && getComputedStyle(document.querySelector('.sp-row')).animationName==='none'`));
+    // The tests above exercise motion. Geometry and final theme colors below
+    // should not depend on which frame the browser samples after a theme swap.
+    await evaluate(`(() => {
+      const style = document.createElement('style');
+      style.textContent = '.sp-panel, .sp-panel * { transition: none !important }';
+      document.head.append(style);
+    })()`);
 
     for (const [width,height] of [[1400,860],[1400,650],[1400,560],[1100,700],[900,650],[640,700]]) {
       await send('Emulation.setDeviceMetricsOverride', {width,height,deviceScaleFactor:1,mobile:false});
