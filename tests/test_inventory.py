@@ -118,6 +118,33 @@ class Fetching(unittest.TestCase):
         self.assertTrue(result["ok"])
         self.assertEqual(result["count"], 1)
 
+    def test_pagination_adds_later_items_without_duplicating_assets(self):
+        first = {"success": 1, "more_items": 1, "last_assetid": "99",
+                 "assets": [{"assetid": "99", "classid": "5"}]}
+        last = {"success": 1, "assets": [{"assetid": "99", "classid": "5"},
+                                         {"assetid": "100", "classid": "5"}],
+                "descriptions": [{"classid": "5", "name": "Case", "marketable": "0"}]}
+        requests = []
+
+        def reply(request, timeout=None):
+            requests.append(request.full_url)
+            return _replies(last if "start_assetid=99" in request.full_url else first)(request)
+
+        with mock.patch.object(inventory.urllib.request, "urlopen", side_effect=reply):
+            result = inventory.fetch(123)
+        self.assertEqual(len(requests), 2)
+        self.assertEqual([item["asset_id"] for item in result["items"]], ["99", "100"])
+        self.assertFalse(any(item["marketable"] for item in result["items"]))
+
+    def test_repeated_page_cursor_does_not_cache_a_partial_inventory(self):
+        page = {"success": 1, "more_items": 1, "last_assetid": "99"}
+        with mock.patch.object(inventory.urllib.request, "urlopen",
+                               side_effect=_replies(page)) as read:
+            result = inventory.fetch(123)
+        self.assertFalse(result["ok"])
+        self.assertEqual(read.call_count, 2)
+        self.assertNotIn("123", inventory._SEEN)
+
     def test_a_private_inventory_says_so_rather_than_a_bare_403(self):
         with mock.patch.object(inventory.urllib.request, "urlopen",
                                side_effect=_replies({}, status=403)):

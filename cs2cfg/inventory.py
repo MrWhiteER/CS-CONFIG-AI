@@ -108,8 +108,8 @@ def _combine(assets: List[Dict[str, Any]],
             "weapon": tags.get("Weapon", ""),
             "category": tags.get("ItemSet", ""),
             "stattrak": "StatTrak" in (description.get("name") or ""),
-            "tradable": bool(description.get("tradable")),
-            "marketable": bool(description.get("marketable")),
+            "tradable": description.get("tradable") in (1, "1"),
+            "marketable": description.get("marketable") in (1, "1"),
             "icon": _icon_url(description),
             "inspect": _inspect_link(description),
         })
@@ -123,17 +123,38 @@ def fetch(steam_id64: int, force: bool = False) -> Dict[str, Any]:
     if cached and not force and time.time() - cached["at"] < CACHE_TTL:
         return cached["data"]
 
-    # 5000 is the figure the community usually quotes as the ceiling, and it
-    # is not: it gets a bare 400 from this endpoint when nothing else about
-    # the request is wrong, measured against a real account rather than
-    # assumed. 2000 is what is actually used, well past any inventory an
-    # ordinary player holds; a very large one falls back to what "more" below
-    # already reports rather than silently losing anything past the first page.
+    assets, descriptions = [], []
+    after = ""
+    cursors = set()
+    for _ in range(20):
+        data = _page(key, after)
+        if not data.get("ok"):
+            return data
+        assets.extend(data.get("assets") or [])
+        descriptions.extend(data.get("descriptions") or [])
+        if not data.get("more_items"):
+            items = _combine(list({a["assetid"]: a for a in assets if a.get("assetid")}.values()),
+                             descriptions)
+            checked_at = time.time()
+            result = {"ok": True, "items": items, "count": len(items),
+                      "more": False, "checked_at": checked_at}
+            _SEEN[key] = {"at": checked_at, "data": result}
+            return result
+        after = str(data.get("last_assetid") or "")
+        if not after.isascii() or not after.isdecimal() or after in cursors:
+            break
+        cursors.add(after)
+    return {"ok": False, "error": "Steam did not finish sending the inventory", "items": []}
+
+
+def _page(steam_id64: str, after: str) -> Dict[str, Any]:
     url = (f"https://steamcommunity.com/inventory/{steam_id64}/{APP_ID}/"
-          f"{CONTEXT_ID}?count=2000&l=english")
-    request = urllib.request.Request(url, method="GET")
-    request.add_header("accept", "application/json")
-    request.add_header("user-agent", _user_agent())
+           f"{CONTEXT_ID}?count=2000&l=english")
+    if after:
+        url += f"&start_assetid={after}"
+    request = urllib.request.Request(url, method="GET", headers={
+        "Accept": "application/json", "User-Agent": _user_agent(),
+    })
 
     try:
         with urllib.request.urlopen(request, timeout=TIMEOUT) as answer:
@@ -158,11 +179,7 @@ def fetch(steam_id64: int, force: bool = False) -> Dict[str, Any]:
     if not isinstance(data, dict) or not data.get("success"):
         return {"ok": False, "error": "could not read that inventory", "items": []}
 
-    items = _combine(data.get("assets") or [], data.get("descriptions") or [])
-    result = {"ok": True, "items": items, "count": len(items),
-              "more": bool(data.get("more_items"))}
-    _SEEN[key] = {"at": time.time(), "data": result}
-    return result
+    return {**data, "ok": True}
 
 
 # Rough groupings for the page to sort into sections. An item whose Type tag

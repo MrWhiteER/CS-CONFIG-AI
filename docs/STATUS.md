@@ -2,6 +2,17 @@
 
 | Task | State | Next step |
 | --- | --- | --- |
+| Refresh and filter owned Steam Inventory | Implemented and checked with a live Steam read | Await GUPDATE |
+| Inspect items and listen to owned music kits | Shared previews implemented and browser checked | Await GUPDATE |
+| Interactive sticker showcase | Implemented with map-inspired lighting presets | Await GUPDATE |
+| Sell multiple Steam items | Local multi-item selection and per-item Steam handoff implemented | Direct bulk submission needs a Valve-supported listing integration |
+
+Inventory work is on `codex/inventory-workspace`, based on local `8171136`.
+
+## Prior Stats and Launcher batch
+
+| Task | State | Next step |
+| --- | --- | --- |
 | Bundle offline Stats map pictures | Implemented and verified locally | Await GUPDATE |
 | Animate profile changes inside Launcher cards | Implemented with a transparent background and verified locally | Await GUPDATE |
 | Remove the Launcher Review settings banner | Removed locally | Await GUPDATE |

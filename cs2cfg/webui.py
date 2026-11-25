@@ -5679,7 +5679,8 @@ def _inventory(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
 
     state.refresh()
     user = state.user_for(body.get("account"))
-    result = inventory.fetch(user.steam_id64, force=bool(body.get("force")))
+    result = {**inventory.fetch(user.steam_id64, force=bool(body.get("force"))),
+              "steam_id": str(user.steam_id64)}
     if result.get("ok"):
         result["groups"] = inventory.grouped(result["items"])
     return result

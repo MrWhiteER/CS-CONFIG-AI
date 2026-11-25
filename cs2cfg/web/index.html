@@ -791,12 +791,6 @@
   }
 
   /* Inventory: one section per kind of item, a grid of tiles inside each. */
-  .inv-group { margin: 0 0 20px; }
-  .inv-group:last-child { margin-bottom: 0; }
-  .inv-group h3 {
-    font-size: 10px; text-transform: uppercase; letter-spacing: .14em;
-    color: var(--muted); margin: 0 0 9px; font-weight: 700;
-  }
   .inv-grid {
     display: grid; gap: 10px;
     grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
@@ -824,6 +818,36 @@
   .inv-item button.inspect {
     font-size: 10px; padding: 4px 9px; margin-top: 2px;
   }
+
+  .inv-heading,.inv-toolbar,.inv-sell-bar,.inv-item-actions { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+  .inv-heading { justify-content:space-between; margin-bottom:12px; }
+  .inv-heading h2 { margin:0; }
+  .inv-toolbar :is(select,input[type="search"]) { background:var(--chip); color:var(--ink); border:1px solid var(--line); padding:8px; border-radius:6px; min-width:0; }
+  .inv-toolbar input[type="search"] { flex:1 1 200px; }
+  .inv-toolbar label { display:flex; align-items:center; gap:5px; }
+  .inv-status { color:var(--muted); margin:10px 0; font-size:12px; }
+  .inv-sell-bar { margin:10px 0; }
+  #inv-card [hidden] { display:none; }
+  .inv-sell-bar b { margin-right:auto; }
+  .inv-sale { margin:10px 0 14px; padding:12px; border:1px solid var(--line); border-radius:8px; }
+  .inv-sale h3 { margin:0 0 6px; }
+  .inv-sale ol { max-height:300px; overflow:auto; padding-left:24px; }
+  .inv-sale li { padding:6px 0; }
+  .inv-sale li a { margin-left:8px; }
+  .inv-item-actions { justify-content:center; margin-top:auto; }
+  .inv-item .inv-pick { align-self:flex-start; }
+  .inv-item:has(.inv-pick:checked) { border-color:var(--accent); }
+  #inv-more { margin-top:12px; }
+
+  .sticker-lights { display:flex; align-items:center; gap:8px; padding:10px 14px; }
+  .sticker-lights select { color:var(--ink); background:var(--panel); border:1px solid var(--line); padding:5px; }
+  .sticker-stage { --light:#ffddab; --shade:#6e4c37; --rx:0deg; --ry:0deg; --gx:50%; --gy:35%; perspective:900px; min-height:330px; height:min(53vh,520px); display:grid; place-items:center; overflow:hidden; background:radial-gradient(ellipse at 50% 20%, var(--shade),#141416 78%); cursor:grab; touch-action:none; }
+  .sticker-stage:focus-visible { outline:2px solid var(--accent); outline-offset:-3px; }
+  .sticker-stage:active { cursor:grabbing; }
+  .sticker-plane { position:relative; width:min(64%,340px); aspect-ratio:1; display:grid; place-items:center; transform:rotateX(var(--rx)) rotateY(var(--ry)); filter:drop-shadow(0 24px 22px #000a); }
+  .sticker-plane img { width:100%; height:100%; object-fit:contain; pointer-events:none; user-select:none; filter:drop-shadow(1px 2px 2px var(--shade)); }
+  .sticker-plane i { position:absolute; inset:0; mask-image:var(--sticker-art); mask-position:center; mask-size:contain; mask-repeat:no-repeat; pointer-events:none; mix-blend-mode:screen; background:radial-gradient(circle at var(--gx) var(--gy),color-mix(in srgb,var(--light) 65%,transparent),transparent 54%); }
+  .sticker-hint { padding:0 14px 10px; }
 
   /* All Skins: the full catalog, filterable, with an on-demand 3D look. */
   .skins-kind-tabs {
@@ -6641,26 +6665,28 @@ const startup = (() => {
       </section>
     </div>
 
-    <!-- The account's CS2 inventory, read from Steam's own public page --
-         nothing here extracts anything from the game's own files. Icons and
-         "Inspect in Game" links are Steam's own, used exactly as Steam hands
-         them over. -->
     <div class="tab-panel hidden" data-panel="inventory">
-      <div class="hero">
-        <div class="hero-copy">
-          <div class="eyebrow">What you own</div>
-          <h2>Inventory</h2>
-          <p>
-            Read straight from your own Steam inventory &mdash; nothing here is
-            extracted from the game. <b>Inspect in Game</b> opens CS2 on the item
-            the same way Steam's own inspect button does &mdash; including a
-            music kit, which previews its own moments the same way.
-          </p>
-        </div>
-      </div>
       <section class="panel wide" id="inv-card">
-        <h2>Items</h2>
-        <div id="inv-out"><span class="sub"><span class="spin"></span> Reading&hellip;</span></div>
+        <div class="inv-heading"><h2>Inventory</h2><button class="btn small" id="inv-reload" type="button">Refresh</button></div>
+        <div class="inv-toolbar">
+          <input id="inv-search" type="search" aria-label="Search inventory" placeholder="Search inventory">
+          <select id="inv-type" aria-label="Item type"><option value="">All types</option></select>
+          <select id="inv-rarity" aria-label="Rarity"><option value="">All rarities</option></select>
+          <select id="inv-exterior" aria-label="Wear"><option value="">All wear levels</option></select>
+          <select id="inv-sort" aria-label="Sort items"><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="name">Name A–Z</option></select>
+          <label><input id="inv-marketable" type="checkbox"> Marketable only</label>
+        </div>
+        <div class="inv-status" id="inv-status" role="status">Reading from Steam…</div>
+        <div class="inv-sell-bar" id="inv-sell-bar" hidden>
+          <b id="inv-selection-count"></b>
+          <button class="btn small" id="inv-select-page" type="button">Select shown</button>
+          <button class="btn small" id="inv-clear" type="button">Clear</button>
+          <button class="btn primary small" id="inv-review" type="button">Review sale batch</button>
+        </div>
+        <section id="inv-sale" class="inv-sale" aria-label="Steam sale batch" hidden></section>
+        <div id="inv-player-slot"></div>
+        <div id="inv-out"></div>
+        <button class="btn small" id="inv-more" type="button" hidden>Show more</button>
       </section>
     </div>
 
@@ -6705,6 +6731,7 @@ const startup = (() => {
           <button class="btn small" id="skins-reload">Re-read</button>
         </div>
         <div id="skins-out"><span class="sub"><span class="spin"></span> Reading&hellip;</span></div>
+        <div id="skins-player-slot"></div>
         <div class="mk-player hidden" id="mk-player" role="status">
           <button class="mk-stop" id="mk-stop" title="Stop">&#9632;</button>
           <span class="mk-now"><b id="mk-now-kit"></b><span id="mk-now-part"></span></span>
@@ -6716,7 +6743,7 @@ const startup = (() => {
     </div>
 
     <div class="skin-viewer-overlay hidden" id="skin-viewer-overlay">
-      <div class="skin-viewer-box">
+      <div class="skin-viewer-box" role="dialog" aria-modal="true" aria-labelledby="skin-viewer-title">
         <div class="skin-viewer-head">
           <span id="skin-viewer-title">&nbsp;</span>
           <span class="skin-viewer-head-actions">
@@ -13946,75 +13973,180 @@ function startCompanionsWatch() {
   }, 5000);
 }
 
-/* Inventory: read from Steam, nothing extracted from the game. Icons and
-   "Inspect in Game" links both come from Steam's own response and are used
-   exactly as given. */
-let inventoryData = null;
+/* Inventory watches the selected account only while its view is visible. */
+let inventoryData = null, inventoryRequest = null, inventoryAccount = null;
+let invRows = [], invLimit = 120, invSnapshot = '', invRetryAt = 0, invFailures = 0;
+const invSelected = new Set(), invPrices = new Map(), invSeen = new Map();
+const INV_REFRESH = 45_000;
+const invItemId = value => /^[0-9]+$/.test(String(value));
 
-async function loadInventory(force) {
-  const box = $("inv-out");
-  if (box) box.innerHTML = '<span class="sub"><span class="spin"></span> Reading&hellip;</span>';
+async function loadInventory(force = false) {
+  const account = currentAccount();
+  if (inventoryRequest && inventoryAccount === account) return inventoryRequest;
+  if (inventoryAccount !== account) {
+    inventoryAccount = account;
+    inventoryData = null;
+    invSnapshot = '';
+    invSeen.clear();
+    invRetryAt = 0;
+    invFailures = 0;
+    invSelected.clear();
+    invPrices.clear();
+    $("inv-sale").hidden = true;
+    renderInventory();
+  }
+  if (!force && Date.now() < invRetryAt) return;
+  $("inv-reload").disabled = true;
+  if (!inventoryData) $("inv-status").textContent = "Reading from Steam…";
+  const request = api("/api/inventory", {account, force: true})
+    .catch(err => ({ok:false, error:String(err?.message || err)}));
+  inventoryRequest = request;
   try {
-    inventoryData = await api("/api/inventory", { force: !!force });
-  } catch (err) {
-    inventoryData = { ok: false, error: String(err && err.message || err) };
+    const result = await request;
+    if (inventoryRequest !== request || account !== currentAccount()) return;
+    invFailures = result.ok ? 0 : invFailures + 1;
+    invRetryAt = Date.now() + Math.min(300_000, INV_REFRESH * 2 ** invFailures);
+    if (!result.ok) {
+      const why = result.private ? "Steam reports this inventory is private." : result.error || "Steam did not respond.";
+      $("inv-status").textContent = (inventoryData?.ok ? "Showing the last successful refresh. " : "") + why;
+      return;
+    }
+    const items = result.items || [];
+    if (inventoryData && inventoryData.steam_id !== result.steam_id) {
+      invSeen.clear();
+      invSelected.clear();
+      invPrices.clear();
+      $("inv-sale").hidden = true;
+    }
+    const first = !invSeen.size;
+    for (const item of items) if (!invSeen.has(item.asset_id)) invSeen.set(item.asset_id, first ? 0 : Date.now());
+    const signature = JSON.stringify(items);
+    const changed = invSnapshot !== signature;
+    inventoryData = result;
+    invSnapshot = signature;
+    const valid = new Set(items.filter(item => item.marketable && invItemId(item.asset_id)).map(item => item.asset_id));
+    for (const id of invSelected) if (!valid.has(id)) { invSelected.delete(id); invPrices.delete(id); }
+    if (changed) {
+      fillInventoryFilters(items);
+      renderInventory();
+      if (!$("inv-sale").hidden) renderInventorySale();
+    }
+    $("inv-status").textContent = items.length + " items · Updated " +
+      new Date((result.checked_at || Date.now() / 1000) * 1000).toLocaleTimeString() +
+      " · Newest uses first-seen order and Steam asset IDs";
+  } finally {
+    if (inventoryRequest === request) {
+      inventoryRequest = null;
+      $("inv-reload").disabled = false;
+    }
   }
-  renderInventory();
 }
-
+function fillInventoryFilters(items) {
+  for (const [id, key, label] of [["inv-type","type","All types"],["inv-rarity","rarity","All rarities"],["inv-exterior","exterior","All wear levels"]]) {
+    const select = $(id), value = select.value;
+    const choices = [...new Set(items.map(item => item[key]).filter(Boolean))].sort((a,b) => a.localeCompare(b));
+    select.replaceChildren(new Option(label, ""), ...choices.map(text => new Option(text,text)));
+    if (choices.includes(value)) select.value = value;
+  }
+}
 function invTile(it) {
-  const badges = [];
-  if (it.stattrak) badges.push('<span class="badge stattrak">StatTrak</span>');
-  if (it.exterior) badges.push('<span class="badge">' + esc(it.exterior) + "</span>");
-  if (!it.tradable) badges.push('<span class="badge">Not tradable</span>');
-  const img = it.icon
-    ? '<img src="' + esc(it.icon) + '" alt="" loading="lazy">'
-    : '<div style="width:72px;height:72px"></div>';
-  const inspect = it.inspect
-    ? '<button class="btn inspect" data-inspect="' + esc(it.inspect) + '">Inspect in Game</button>'
-    : "";
-  return '<div class="inv-item">' + img +
-    '<span class="nm">' + esc(it.name) + "</span>" +
-    (badges.length ? '<span class="badges">' + badges.join("") + "</span>" : "") +
-    inspect + "</div>";
+  const id = esc(it.asset_id), name = esc(it.name);
+  const badge = [it.exterior, it.rarity, !it.marketable && "Not marketable"].filter(Boolean);
+  const pick = it.marketable && invItemId(it.asset_id)
+    ? '<input class="inv-pick" type="checkbox" data-inv-pick="' + id + '" aria-label="Select ' + name + '"' +
+      (invSelected.has(it.asset_id) ? ' checked' : '') + '>' : '';
+  const inspect = it.inspect ? '<button type="button" class="btn inspect" data-inspect="' + esc(it.inspect) + '">Inspect in CS2</button>' : '';
+  return '<article class="inv-item">' + pick +
+    (it.icon ? '<img src="' + esc(it.icon) + '" alt="" loading="lazy">' : '') +
+    '<span class="nm" title="' + name + '">' + name + '</span>' +
+    '<span class="badges">' + badge.map(text => '<span class="badge">' + esc(text) + '</span>').join('') + '</span>' +
+    '<div class="inv-item-actions"><button type="button" class="btn inspect" data-inv-preview="' + id + '">' +
+    (it.type === 'Music Kit' ? 'Listen' : 'Preview') + '</button>' + inspect + '</div></article>';
 }
-
 function renderInventory() {
-  const box = $("inv-out");
-  if (!box) return;
-  const d = inventoryData;
-  if (!d || !d.ok) {
-    const why = (d && d.private) ? "Your inventory is set to private."
-      : (d && d.error) || "Could not read your inventory.";
-    box.innerHTML = '<p class="sub warn">' + esc(why) + "</p>" +
-      '<div class="actions"><button class="btn" id="inv-reload">Try again</button></div>';
-    return;
-  }
-  if (!d.count) {
-    box.innerHTML = '<p class="sub">Nothing in this CS2 inventory yet.</p>';
-    return;
-  }
-  box.innerHTML = (d.groups || []).map(g =>
-    '<div class="inv-group"><h3>' + esc(g.name) + " · " + g.items.length + "</h3>" +
-    '<div class="inv-grid">' + g.items.map(invTile).join("") + "</div></div>"
-  ).join("") +
-    '<div class="actions" style="margin-top:14px">' +
-      '<button class="btn small" id="inv-reload">Re-read</button></div>';
+  const q = $("inv-search").value.trim().toLowerCase();
+  const type = $("inv-type").value, rarity = $("inv-rarity").value, exterior = $("inv-exterior").value;
+  const order = $("inv-sort").value, marketable = $("inv-marketable").checked;
+  invRows = (inventoryData?.items || []).filter(it =>
+    (!type || it.type === type) && (!rarity || it.rarity === rarity) && (!exterior || it.exterior === exterior) &&
+    (!marketable || it.marketable) && (!q || [it.name,it.weapon,it.category].join(' ').toLowerCase().includes(q)));
+  const newer = (a,b) => (invSeen.get(b.asset_id) || 0) - (invSeen.get(a.asset_id) || 0) ||
+    b.asset_id.length - a.asset_id.length || b.asset_id.localeCompare(a.asset_id);
+  invRows.sort(order === 'name' ? (a,b) => a.name.localeCompare(b.name) :
+    order === 'oldest' ? (a,b) => newer(b,a) : newer);
+  $("inv-out").innerHTML = invRows.length ? '<div class="inv-grid">' + invRows.slice(0,invLimit).map(invTile).join('') + '</div>' :
+    inventoryData ? '<p class="sub">' + (inventoryData.count ? 'No items match these filters.' : 'This CS2 inventory is empty.') + '</p>' : '';
+  $("inv-more").hidden = invRows.length <= invLimit;
+  renderInventorySelection();
 }
+function renderInventorySelection() {
+  const count = invSelected.size;
+  $("inv-selection-count").textContent = count + ' selected';
+  $("inv-sell-bar").hidden = !count && !invRows.some(it => it.marketable);
+  $("inv-clear").disabled = !count;
+  $("inv-review").disabled = !count;
+}
+function renderInventorySale() {
+  const box = $("inv-sale");
+  const steamId = inventoryData?.steam_id;
+  const items = inventoryData?.items.filter(it => invSelected.has(it.asset_id) && it.marketable) || [];
+  if (!items.length || !invItemId(steamId)) { box.hidden = true; return; }
+  const profile = 'https://steamcommunity.com/profiles/' + steamId + '/inventory/#730_2_';
+  box.innerHTML = '<h3>Steam sale batch · ' + items.length + '</h3>' +
+    '<p class="sub">Open each selected item in Steam, choose Sell, and confirm the price and fee there.</p><ol>' +
+    items.map(it => '<li><b>' + esc(it.name) + '</b> <input type="text" inputmode="decimal" size="10" ' +
+      'aria-label="Draft price for ' + esc(it.name) + '" placeholder="Draft price" data-inv-price="' + esc(it.asset_id) + '" value="' +
+      esc(invPrices.get(it.asset_id) || '') + '"><a class="btn small" target="_blank" rel="noopener" href="' +
+      profile + it.asset_id + '">Open in Steam</a></li>').join('') + '</ol>' +
+    '<button class="btn small" type="button" id="inv-sale-close">Close review</button>';
+  box.hidden = false;
+}
+for (const id of ['inv-search','inv-type','inv-rarity','inv-exterior','inv-sort','inv-marketable']) {
+  $(id).addEventListener('input', () => { invLimit = 120; renderInventory(); });
+}
+$('inv-out').addEventListener('change', e => {
+  const id = e.target.dataset.invPick;
+  if (!id) return;
+  if (e.target.checked) invSelected.add(id);
+  else { invSelected.delete(id); invPrices.delete(id); }
+  renderInventorySelection();
+  if (!$("inv-sale").hidden) renderInventorySale();
+});
+$('inv-sale').addEventListener('input', e => {
+  if (e.target.dataset.invPrice) invPrices.set(e.target.dataset.invPrice,e.target.value);
+});
+$('inv-reload').onclick = () => loadInventory(true);
+$('inv-more').onclick = () => { invLimit += 120; renderInventory(); };
+$('inv-select-page').onclick = () => {
+  for (const it of invRows.slice(0,invLimit)) if (it.marketable && invItemId(it.asset_id)) invSelected.add(it.asset_id);
+  renderInventory();
+  if (!$("inv-sale").hidden) renderInventorySale();
+};
+$('inv-clear').onclick = () => { invSelected.clear(); invPrices.clear(); $("inv-sale").hidden = true; renderInventory(); };
+$('inv-review').onclick = renderInventorySale;
+setInterval(() => {
+  if (!document.hidden && activeTab === 'inventory') loadInventory();
+}, 5000);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && activeTab === 'inventory') loadInventory();
+});
 
 document.addEventListener("click", async e => {
-  const reload = e.target.closest("#inv-reload");
-  if (reload) { loadInventory(true); return; }
-
+  if (e.target.closest('#inv-sale-close')) { $('inv-sale').hidden = true; return; }
+  const preview = e.target.closest('[data-inv-preview]');
+  if (preview) {
+    const item = inventoryData?.items.find(it => it.asset_id === preview.dataset.invPreview);
+    if (item) await previewInventoryItem(item);
+    return;
+  }
   const inspect = e.target.closest("[data-inspect]");
   if (!inspect) return;
-  const link = inspect.dataset.inspect;
   inspect.disabled = true;
   try {
-    const r = await api("/api/inventory/inspect", { link });
+    const r = await api("/api/inventory/inspect", { link:inspect.dataset.inspect });
     status(r.ok ? "Your selection is opening." : r.error, !r.ok);
   } catch (err) {
-    status(String(err && err.message || err), true);
+    status(String(err?.message || err), true);
   } finally {
     inspect.disabled = false;
   }
@@ -14214,6 +14346,7 @@ async function playMusic(kitId, part) {
   $("mk-now-part").textContent = label + " · loading…";
   $("mk-bar-fill").style.width = "0";
   $("mk-time").textContent = "0:00";
+  placeMusicPlayer();
   $("mk-player").classList.remove("hidden");
   document.querySelector('[data-mk-card="' + CSS.escape(kitId) + '"]')?.classList.add("playing");
   document.querySelector('.mk-part[data-mk-kit="' + CSS.escape(kitId) + '"][data-mk-part="' + CSS.escape(part) + '"]')?.classList.add("on");
@@ -14263,15 +14396,140 @@ document.addEventListener("input", e => {
 
 /* A picture-only look for items that have no 3D model here (agents,
    stickers, graffiti, patches, charms): the same window, the real picture. */
-function openPictureViewer(art, displayName) {
+function openPictureViewer(art, displayName, icon = "") {
   if (skinRenderAbort) { skinRenderAbort.abort(); skinRenderAbort = null; }
   skinViewerCurrent = null;
   $("skin-viewer-title").textContent = displayName;
   $("skin-viewer-market").href = "https://steamcommunity.com/market/search?appid=730&q=" +
     encodeURIComponent(displayName);
-  $("skin-viewer-body").innerHTML = '<img class="skin-picture" src="/item-art/' + encodeURIComponent(art) +
-    '.png" alt="" onerror="this.outerHTML=\'<p class=&quot;sub&quot;>No picture for this item in your game files.</p>\'">';
+  const body = $("skin-viewer-body"), picture = document.createElement("img");
+  const player = $("mk-player");
+  if (body.contains(player)) $("inv-player-slot").append(player);
+  body.replaceChildren();
+  if (art || icon) {
+    picture.className = "skin-picture";
+    picture.src = art ? "/item-art/" + encodeURIComponent(art) + ".png" : icon;
+    picture.alt = displayName;
+    picture.onerror = () => { picture.replaceWith(document.createTextNode("No picture is available for this item.")); };
+    body.append(picture);
+  } else {
+    body.textContent = "No picture is available for this item.";
+  }
   $("skin-viewer-overlay").classList.remove("hidden");
+}
+
+const STICKER_LIGHTS = {
+  Mirage: ['#ffe3b3','#86654e'], DustII: ['#ffcd8b','#775042'],
+  Ancient: ['#cde7bc','#3c5942'], Nuke: ['#d2edff','#3d5469'],
+  Inferno: ['#ffd6b2','#805a48'], Vertigo: ['#eff4ff','#626b83'],
+};
+
+function openStickerViewer(src, name) {
+  openPictureViewer('', name, src);
+  const body = $("skin-viewer-body");
+  const picture = body.querySelector('img');
+  picture.className = '';
+  picture.draggable = false;
+  const stage = document.createElement('div');
+  stage.className = 'sticker-stage';
+  stage.tabIndex = 0;
+  stage.setAttribute('aria-label', 'Sticker preview. Drag or use the arrow keys to rotate.');
+  stage.style.setProperty('--sticker-art', 'url(' + JSON.stringify(src) + ')');
+  stage.innerHTML = '<div class="sticker-plane"><i aria-hidden="true"></i></div>';
+  stage.firstChild.prepend(picture);
+  body.innerHTML = '<label class="sticker-lights">Map-inspired lighting <select>' +
+    Object.keys(STICKER_LIGHTS).map(key => '<option value="' + key + '">' + (key === 'DustII' ? 'Dust II' : key) + '</option>').join('') +
+    '</select></label><p class="sub sticker-hint">Drag or use the arrow keys to rotate. Press Home to reset.</p>';
+  body.append(stage);
+  const lighting = body.querySelector('select');
+  lighting.onchange = () => {
+    const [light, shade] = STICKER_LIGHTS[lighting.value];
+    stage.style.setProperty('--light', light);
+    stage.style.setProperty('--shade', shade);
+  };
+  lighting.onchange();
+  let x = 0, y = 0, drag = null;
+  function tilt(dx,dy) {
+    x = Math.min(55, Math.max(-55, x + dx));
+    y = Math.min(65, Math.max(-65, y + dy));
+    stage.style.setProperty('--rx', x + 'deg');
+    stage.style.setProperty('--ry', y + 'deg');
+    stage.style.setProperty('--gx', 50 - y / 2 + '%');
+    stage.style.setProperty('--gy', 45 + x / 2 + '%');
+  }
+  stage.onpointerdown = event => {
+    if (event.button !== 0) return;
+    drag = {id:event.pointerId, x:event.clientX, y:event.clientY};
+    stage.setPointerCapture(event.pointerId);
+  };
+  stage.onpointermove = event => {
+    if (drag?.id !== event.pointerId) return;
+    tilt((drag.y - event.clientY) / 3, (event.clientX - drag.x) / 3);
+    drag.x = event.clientX;
+    drag.y = event.clientY;
+  };
+  stage.onlostpointercapture = () => { drag = null; };
+  stage.onkeydown = event => {
+    const direction = {ArrowUp:[5,0],ArrowDown:[-5,0],ArrowLeft:[0,-5],ArrowRight:[0,5],Home:[-x,-y]}[event.key];
+    if (!Array.isArray(direction)) return;
+    event.preventDefault();
+    tilt(...direction);
+  };
+  stage.focus();
+}
+
+let inventoryPreviewRevision = 0;
+let inventoryCatalogRequest = null;
+function inventoryCatalogName(name) {
+  return name.replace(/\bStatTrak[™®]?\s*|\bSouvenir\s+/ig, '')
+    .replace(/\s+\((Factory New|Minimal Wear|Field-Tested|Well-Worn|Battle-Scarred)\)$/i, '')
+    .trim().toLowerCase();
+}
+async function previewInventoryItem(item) {
+  const revision = ++inventoryPreviewRevision, original = inventoryData;
+  if (item.type === 'Sticker' && item.icon) {
+    openStickerViewer(item.icon, item.name);
+    return;
+  }
+  if (!skinsData?.ok) {
+    inventoryCatalogRequest ??= loadSkinsCatalog(false).finally(() => { inventoryCatalogRequest = null; });
+    await inventoryCatalogRequest;
+  }
+  if (activeTab !== 'inventory' || revision !== inventoryPreviewRevision || original?.steam_id !== inventoryData?.steam_id) return;
+  const key = inventoryCatalogName(item.name);
+  const catalog = skinsData?.items?.find(entry => inventoryCatalogName(entry.display_name) === key);
+  if (catalog?.kind === 'music') {
+    if (!musicKits) await loadMusicKits();
+    if (activeTab !== 'inventory' || revision !== inventoryPreviewRevision) return;
+    openPictureViewer('', item.name);
+    $("skin-viewer-body").innerHTML = musicCard(catalog);
+  } else if (catalog && SKINS_3D.has(catalog.kind)) {
+    openSkinViewer(catalog.weapon_class, catalog.paintkit, item.name);
+  } else {
+    openPictureViewer(catalog?.art || '', item.name, item.icon || '');
+    if (item.type === 'Music Kit') $("skin-viewer-body").insertAdjacentHTML('beforeend',
+      '<p class="sub">This kit could not be matched to audio in your CS2 installation.</p>');
+  }
+}
+
+function closeSkinViewer() {
+  inventoryPreviewRevision++;
+  if (skinRenderAbort) { skinRenderAbort.abort(); skinRenderAbort = null; }
+  $('skin-viewer-overlay').classList.add('hidden');
+  skinViewerCurrent = null;
+  placeMusicPlayer();
+}
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && !$('skin-viewer-overlay').classList.contains('hidden')) {
+    event.preventDefault();
+    closeSkinViewer();
+  }
+});
+function placeMusicPlayer() {
+  const slot = activeTab === 'inventory'
+    ? ($('skin-viewer-overlay').classList.contains('hidden') ? $('inv-player-slot') : $('skin-viewer-body'))
+    : $('skins-player-slot');
+  slot.append($('mk-player'));
 }
 
 document.addEventListener("input", e => {
@@ -14400,19 +14658,13 @@ document.addEventListener("click", async e => {
   const card = e.target.closest(".skin-card");
   if (card) {
     if (SKINS_3D.has(card.dataset.kind)) openSkinViewer(card.dataset.weapon, card.dataset.paintkit, card.dataset.name);
+    else if (card.dataset.kind === "sticker" && card.dataset.art)
+      openStickerViewer("/item-art/" + encodeURIComponent(card.dataset.art) + ".png", card.dataset.name);
     else openPictureViewer(card.dataset.art, card.dataset.name);
     return;
   }
-  if (e.target.closest("#skin-viewer-close")) {
-    if (skinRenderAbort) { skinRenderAbort.abort(); skinRenderAbort = null; }
-    $("skin-viewer-overlay").classList.add("hidden");
-    skinViewerCurrent = null;
-    return;
-  }
-  if (e.target.closest("#skin-viewer-overlay") && e.target.id === "skin-viewer-overlay") {
-    if (skinRenderAbort) { skinRenderAbort.abort(); skinRenderAbort = null; }
-    $("skin-viewer-overlay").classList.add("hidden");
-    skinViewerCurrent = null;
+  if (e.target.closest("#skin-viewer-close") || e.target.id === "skin-viewer-overlay") {
+    closeSkinViewer();
     return;
   }
   const chooseTool = e.target.closest("#skins-tool-choose");
@@ -17864,14 +18116,16 @@ function setTab(name) {
   if (!document.querySelector('.tab-panel[data-panel="' + name + '"]')) {
     name = "launcher";
   }
+  if (activeTab !== name && !$('skin-viewer-overlay').classList.contains('hidden')) closeSkinViewer();
   activeTab = name;
+  if (musicNow && (name === "skins" || name === "inventory")) placeMusicPlayer();
   if (name === "cs2" && !cs2Data) loadCs2Settings();
   if (name === "gpu" && !gpuData) loadGpu();
   if (name === "files") loadTree(false);
   if (name === "faceit") loadDemos().then(loadFaceit);
-  if (name === "inventory" && !inventoryData) loadInventory(false);
+  if (name === "inventory") loadInventory();
   if (name === "skins") { if (!skinsToolStatus) loadSkinsToolStatus(); if (!skinsData) loadSkinsCatalog(false); }
-  else if (musicNow) stopMusic();
+  if (name !== "skins" && name !== "inventory" && musicNow) stopMusic();
   if (name === "scripts") loadPlugins(false);
   if (name === "builder") sbLoad(false).then(sbRefreshSaved);
   if (name === "keyboard") loadKeyboard(false);

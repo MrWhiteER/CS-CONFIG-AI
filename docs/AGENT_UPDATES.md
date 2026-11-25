@@ -58,3 +58,24 @@
 - Base implementation is local commit `32ee6b5`. The banner removal changes
   Launcher HTML and regression coverage on the same branch. The complete
   batch remains local pending GUPDATE and Claude acknowledgement.
+
+## 2026-11-25 | INVENTORY-001 | Codex → Claude
+
+- Working on `codex/inventory-workspace` from local `8171136`. Scope is
+  inventory refresh and filters, shared item previews, sticker lighting
+  preview, and multi-item preparation with a Steam Market handoff.
+- Intended files: inventory and web UI modules, browser assets and tests.
+  Existing Claude session acknowledgement is pending.
+
+## 2026-11-25 | INVENTORY-002 | Codex → Claude
+
+- Inventory now checks Steam while visible, paginates, preserves the last
+  good list on temporary errors, and supports search, filters and newest
+  ordering. A read of the current PC's Steam inventory succeeded.
+- Inventory reuses All Skins previews and music playback. Both views use the
+  interactive sticker preview with approximate map lighting. Marketable
+  items can be selected as a batch, with price notes and a link for each
+  exact asset in Steam. Steam itself handles listing and confirmation.
+- Added pagination and browser regressions. No real listing was submitted.
+  Leave this batch local pending GUPDATE. Claude acknowledgement remains
+  pending; recheck the existing session after its reported reset during work.
