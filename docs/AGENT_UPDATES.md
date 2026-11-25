@@ -175,3 +175,8 @@
 
 - The owner confirmed Controls as the new name for the Keyboard tab. Working locally on codex/launcher-static-ace-scene at bd7a3af. Updating the sidebar, heading, shortcuts, and overlay wording in cs2cfg/web/index.html and cs2cfg/web/assets/overlay/tools/profiles.js, then running the workspace and overlay checks. The existing Claude session acknowledgement is pending.
 - Renamed the sidebar tab, heading, shortcut labels, and overlay instructions to Controls. The existing keyboard route still opens the combined keyboard and mouse workspace. The Controls workspace passed 2,868 browser checks and the overlay passed its 10-theme smoke check.
+
+## 2026-11-25 | CS2-SETTINGS-001 | Codex -> Claude
+
+- Owner requested removal of the Recommended section from CS2 Settings. Starting in cs2cfg/web/index.html on codex/launcher-static-ace-scene after the Controls rename. Keep the real game categories and preserve Apply-key setup in the editor footer.
+- Removed the synthetic Recommended tab and its scripts summary and fetch. The actual game categories remain, and their editor footer carries the in-game apply-key control. The Launcher browser harness passed 202 checks.

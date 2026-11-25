@@ -6856,6 +6856,7 @@ const startup = (() => {
         <div class="editor-foot">
           <span class="sub" id="cs2-status">&nbsp;</span>
           <span class="spacer"></span>
+          <button class="btn small" id="cs2-apply-now-key" disabled>Choose in-game apply key</button>
           <button class="btn" id="cs2-reset" disabled>&#10005; Discard</button>
           <button class="btn primary" id="cs2-apply" disabled>&#10003; Save changes</button>
         </div>
@@ -10639,23 +10640,6 @@ let cs2Section = null;
 let cs2Group = null;
 const cs2Edits = new Map();
 
-// The "Recommended" section is not a real part of the game's menu: it is a
-// curated subset of cvars that already live under their own real section
-// (see cfg_settings.json's "recommended" list), grouped together here for a
-// quick first pass. A setting belongs to it by name, not by the "group" the
-// server tags it with -- cl_color is still genuinely Game > Team underneath,
-// it just also shows up here. This is the one place that distinction has to
-// be made; everywhere else that used to compare `x.group === id` now asks
-// this instead, so the synthetic section cannot silently fall out of sync.
-const RECOMMENDED_GROUP = "recommended_main";
-
-function cs2InGroup(x, groupId) {
-  if (groupId === RECOMMENDED_GROUP) {
-    return !!(cs2Data && cs2Data.recommended && cs2Data.recommended.includes(x.name));
-  }
-  return x.group === groupId;
-}
-
 function cs2Key(x) { return x.source + "|" + x.file + "|" + x.line + "|" + x.name; }
 
 function cs2Control(x) {
@@ -10714,13 +10698,9 @@ function cs2Visible(x) {
 
 function cs2GroupCounts() {
   const counts = {};
-  const recommended = (cs2Data && cs2Data.recommended) || [];
   for (const x of cs2Data.settings) {
     if (!cs2Visible(x)) continue;
     counts[x.group] = (counts[x.group] || 0) + 1;
-    if (recommended.includes(x.name)) {
-      counts[RECOMMENDED_GROUP] = (counts[RECOMMENDED_GROUP] || 0) + 1;
-    }
   }
   return counts;
 }
@@ -10862,84 +10842,13 @@ document.addEventListener("keydown", e => {
   top.click();
 });
 
-function cs2DisplayValue(x) {
-  const spec = x.spec || {};
-  const v = String(x.value);
-  if (x.control === "toggle") return v.trim() !== "0" ? "on" : "off";
-  if (x.control === "select" && spec.options && spec.options[v.trim()] != null) {
-    return spec.options[v.trim()];
-  }
-  return v;
-}
-
-// A plain, read-only reminder of what the player's own configs and scripts
-// already do -- not another control surface, just the "I already have X"
-// half of the Recommended page. Reuses the same quiet .chg-list look as the
-// profile diff's "already correct" list, since both are "nothing to do here".
-function cs2YoursHtml() {
-  const scripts = (plugData && plugData.plugins) || [];
-  const recommended = cs2Data.recommended || [];
-  // Video settings always carry a value -- cs2_video.txt has every one of
-  // them from the moment Steam writes it, whether you ever opened the video
-  // menu or not -- so "set" there means nothing about what you chose. Only
-  // convars written in your own config files say that.
-  const settings = cs2Data.settings.filter(x =>
-    !x.unset && x.source !== "video" && !recommended.includes(x.name));
-  if (!scripts.length && !settings.length) return "";
-
-  let html = "";
-  if (scripts.length) {
-    html += '<div class="subcat">Your scripts</div><div class="chg-list quiet">' +
-      scripts.map(p => '<div class="chg-row"><div class="chg-name">' + esc(p.name) + "</div>" +
-        '<div class="chg-move"><span class="chg-chip same">' +
-        esc(p.bound_labels.length ? p.bound_labels.join(" / ") : "not bound") +
-        (p.enabled ? "" : " — off") + "</span></div></div>").join("") +
-      "</div>";
-  }
-  if (settings.length) {
-    html += '<div class="subcat">Your settings</div><div class="chg-list quiet">' +
-      settings.map(x => '<div class="chg-row"><div class="chg-name">' + esc(x.label) + "</div>" +
-        '<div class="chg-move"><span class="chg-chip same">' + esc(cs2DisplayValue(x)) +
-        "</span></div></div>").join("") +
-      "</div>";
-  }
-  return html;
-}
-
-// One key brings every change made in the app into a running game: the app
-// keeps one config file up to date with your full current setup, and this
-// key runs it. Pure config file -- nothing runs beside CS2.
-function cs2ApplyCardHtml() {
-  const st = applyScriptStatus;
-  let note, label;
-  if (st && st.needs_folder) {
-    return '<div class="subcat">Apply changes during a match</div>' +
-      '<p class="subcat-note">Pick your config folder on the Configs page first, ' +
-      "then come back here to choose your apply key.</p>";
-  }
-  if (st && st.ready) {
-    note = "Press <b>" + esc(st.key_label) + "</b> in game and everything you changed " +
-      "here (keys, keyboard profiles, settings) takes effect right away, no restart. " +
-      "It only reads your own config files, so it is safe on FACEIT and Valve servers.";
-    label = "Change key";
-  } else {
-    note = "Changes you make here while CS2 is open normally wait for the next launch. " +
-      "Pick one key and pressing it in game applies all of them at once. " +
-      "It only uses your own config files, so it is safe on FACEIT and Valve servers.";
-    label = "Choose apply key";
-  }
-  return '<div class="subcat">Apply changes during a match</div>' +
-    '<p class="subcat-note">' + note + "</p>" +
-    '<button class="btn primary small" id="cs2-apply-now-key">' + esc(label) + "</button>";
-}
-
 async function setApplyNowKey(code, force) {
   try {
     const r = await api("/api/cfg/apply-now/key", { code: code, force: !!force });
     applyScriptStatus = r;
     status("Apply key set to " + r.key_label + ". It works from your next CS2 start. " +
            "If CS2 is open now, restart it once." + (r.backup ? " A backup was saved." : ""));
-    renderCs2Body();
+    renderApplyNowKey();
   } catch (err) {
     const msg = String(err && err.message || err);
     if (/already runs/.test(msg) && confirm(msg + "\n\nUse this key for applying changes anyway?")) {
@@ -10983,11 +10892,11 @@ function renderCs2Body() {
   const group = section.groups.find(g => g.id === cs2Group) || section.groups[0];
   if (!group) { $("cs2-body").innerHTML = ""; return; }
 
-  const mine = cs2Data.settings.filter(x => cs2InGroup(x, group.id) && cs2Visible(x));
+  const mine = cs2Data.settings.filter(x => x.group === group.id && cs2Visible(x));
   const subgroups = group.subgroups && group.subgroups.length
     ? group.subgroups : [{ id: null, label: group.label }];
 
-  let html = group.id === RECOMMENDED_GROUP ? cs2ApplyCardHtml() : "";
+  let html = "";
   const placed = new Set();
   for (const sub of subgroups) {
     const items = sub.id === null ? mine : mine.filter(x => x.subgroup === sub.id);
@@ -11010,10 +10919,16 @@ function renderCs2Body() {
     for (const x of orphans) html += cs2Row(x, "");
   }
 
-  if (group.id === RECOMMENDED_GROUP) html += cs2YoursHtml();
-
   $("cs2-body").innerHTML = html ||
     '<span class="sub">Nothing in this category was found in your files.</span>';
+}
+
+function renderApplyNowKey() {
+  const button = $("cs2-apply-now-key");
+  const state = applyScriptStatus;
+  button.disabled = !state || !!state.needs_folder;
+  button.textContent = state?.ready ? "In-game apply key · " + state.key_label : "Choose in-game apply key";
+  button.title = state?.needs_folder ? "Choose a configuration folder first" : "Choose the key that applies your saved changes during a match";
 }
 
 function updateCs2Buttons() {
@@ -11037,7 +10952,7 @@ function cs2PendingIn(sectionId) {
   const out = [];
   for (const [key, edit] of cs2Edits) {
     const original = cs2Data.settings.find(x => cs2Key(x) === key);
-    if (original && [...groups].some(gid => cs2InGroup(original, gid))) {
+    if (original && groups.has(original.group)) {
       out.push({ key, name: edit.name, label: original.label, file: original.file,
                  was: original.value, value: edit.value });
     }
@@ -16641,24 +16556,6 @@ async function loadCs2Settings(force, keepEdits) {
       scannedFolder = folder;
     }
     cs2Data = await api("/api/cfg/settings", { account: currentAccount() });
-    // A curated front page, not part of the game's own menu -- see
-    // cs2InGroup's own comment for why membership in it is by name rather
-    // than by the "group" every other section is keyed on.
-    if ((cs2Data.recommended || []).length) {
-      cs2Data.sections.unshift({
-        id: "recommended", label: "Recommended",
-        groups: [{ id: RECOMMENDED_GROUP, label: "Recommended", subgroups: [] }],
-      });
-    }
-    // The scripts your own config already defines, for the "what I already
-    // have" list on the Recommended page. Reuses the Scripts tab's own cache
-    // so opening Recommended first does not cost a second read of the same
-    // files, and failing to load them (no folder scanned yet, odd config)
-    // should not take the rest of the settings page down with it.
-    if (!plugData || force) {
-      try { plugData = await api("/api/cfg/plugins", {}); }
-      catch (e) { /* Recommended just shows no scripts; the rest still works. */ }
-    }
     // Read-only: whether something already reloads the startup chain on a
     // key, so the apply card knows its state before anyone clicks anything.
     if (!applyScriptStatus || force) {
@@ -16666,9 +16563,10 @@ async function loadCs2Settings(force, keepEdits) {
       catch (e) { /* The card just offers to set one up; nothing else depends on it. */ }
     }
     if (!keepEdits) cs2Edits.clear();
-    if (!cs2Section) cs2Section = (cs2Data.sections[0] || {}).id;
+    if (!currentSection()) cs2Section = cs2Data.sections[0]?.id ?? null;
     renderCs2Sections();
     renderCs2Body();
+    renderApplyNowKey();
     updateCs2Buttons();
   } catch (e) {
     $("cs2-body").innerHTML = '<span class="sub">Could not load settings: ' + esc(e.message) + "</span>";
