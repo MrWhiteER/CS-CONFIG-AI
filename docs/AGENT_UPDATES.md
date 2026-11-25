@@ -143,3 +143,19 @@
   during launch or play. Affected files: Launcher home art, HTML,
   scene script, media tests, and web UI. The supplied SAS asset remains
   local. No GUPDATE or existing Claude acknowledgement.
+
+## 2026-11-25 | LAUNCHER-SCENE-006 | Codex -> Claude
+
+- Starting the owner's Launcher art revision in codex/launcher-static-ace-scene at 2cf2639. In scope: home asset art, monitor image, Launcher scene HTML/JS and obsolete Launcher-specific lighting/media hooks. Replace the exact SAS with original seated CT/T variants, remove keyboard and handheld lighting, and use the linked Steam news banner on the screen.
+- Checking the official banner and preparing local artwork. Delivery to the existing Claude session is pending; retry after the last reported reset if the session is available. No GUPDATE for this batch.
+
+### Style direction update | Codex -> Claude
+
+- Owner supplied a visual reference for the character and lighting. Final direction is a fitted knit balaclava covering the face, worn desk, cool industrial shadows and grounded original CT/T gear, with the official static CS2 Steam banner on the monitor. Supersedes the visible-profile trial and the oversized hood trial. Keyboard and handheld remain unlit. The old gameplay picker and exact SAS sheet are no longer part of the Launcher scene.
+- Restored the physical RGB frame helper after the early suite caught its internal sync caller. All 31 targeted RGB tests now pass. Existing Claude acknowledgement remains pending; last reported reset is 22:00 Asia/Dubai.
+
+### Local verification and handoff | Codex -> Claude
+
+- Final artwork uses original navy CT and olive/rust T in the reference-inspired worn workshop. Each has a fitted knit balaclava, a close hood and smoked goggles covering the entire eye opening. The static monitor uses the exact PNG from the requested Steam post. Dark keyboard and handheld, with quiet accents on the existing microphone, monitor and mixer.
+- Latest normal browser previews checked both sides (202 each), with 198 reduced-motion checks. Full Python and browser gate ran successfully (2,176 Python tests, one skipped) before the final art swap; the completed artwork passed the targeted preview runs. The CLI RGB tests also passed (31).
+- Existing Claude session acknowledgement is pending. Next retry is after 22:00 Asia/Dubai if the owner’s session is available. The prepared batch is local pending GUPDATE.

@@ -2,11 +2,13 @@
 
 | Task | State | Next step |
 | --- | --- | --- |
-| Show exact CT and T agents in a seated keyboard pose | Stock SAS CT posed and tested locally with a typing motion | Supply the stock T model to test pose transfer |
-| Move the chair in front of the gaming desk and fit the hands | Implemented in the local SAS scene | Await GUPDATE |
-| Add theme and CS2 keybind lighting to the Launcher desk | Implemented using the existing keybind palette | Await GUPDATE |
-| Show a static CS2 ace screenshot on the monitor | Dust II screenshot fills the monitor and retains the top-right area | Supply an ace screenshot with its kill feed visible |
-| Stop Launcher scene during CS2 | Launch, running-process, and reduced-motion behavior checked | Await GUPDATE |
+| Create original CT and T Launcher scenes | Dark workshop scenes with fitted balaclavas, hoods and smoked goggles; both previewed in the Launcher | Owner visual review |
+| Remove keyboard and handheld RGB from the Launcher | Removed the visual overlays and Launcher palette request; physical-device RGB tested | Await GUPDATE |
+| Show the CS2 loading banner on the monitor | Bundled the exact static image from the linked Steam post and checked both screen fits | Await GUPDATE |
+| Stop Launcher scene animation during CS2 | Verified launch, running-process and reduced-motion behavior | Await GUPDATE |
+| Claude Launcher handoff | Queued locally | Retry after reported reset at 22:00 Asia/Dubai |
+
+Work is local on `codex/launcher-static-ace-scene`.
 
 ## Prior Inventory batch
 

@@ -60,7 +60,6 @@ class State:
         self.verification_path = user_data_dir() / "applied-verification.json"
         self.verification_receipt = verification.load(self.verification_path)
         self.token = secrets.token_urlsafe(24)
-        self.scene_token = secrets.token_urlsafe(24)
         self.kb = KnowledgeBase()
         self.cfg_folder = cfg_folder
         self.cfg_name = cfg_name
@@ -1070,15 +1069,6 @@ def _overlay_settings(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
 def _rgb(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     """Keyboard/mouse lighting: the setting, and which lighting APIs are live."""
     return {"ok": True, **state.rgb.status()}
-
-
-def _launcher_lighting(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
-    from dataclasses import asdict
-
-    if getattr(state, "cfg_scan", None) is not None:
-        _cfg_keys(state, {})
-    frame = state.rgb.frame()
-    return {"ok": True, "frame": asdict(frame) if frame is not None else None}
 
 
 def _rgb_settings(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -5683,26 +5673,6 @@ def _companions(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     return {"ok": True, "companions": companions.survey(ui)}
 
 
-def _launcher_media(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
-    from . import launcher_media, picker
-
-    try:
-        if body.get("choose"):
-            selected = picker.pick_gameplay_screenshot()
-            if selected:
-                launcher_media.choose(Path(selected))
-        elif body.get("clear"):
-            launcher_media.choose(None)
-    except (OSError, ValueError) as exc:
-        return {"ok": False, "error": str(exc)}
-    screenshot = launcher_media.screenshot()
-    agents = {side: f"/launcher-agent/{side}?ticket={state.scene_token}"
-              for side in launcher_media.AGENT_FILES if launcher_media.agent_sheet(side)}
-    return {"ok": True, "screenshot": screenshot.name if screenshot else "",
-            "url": f"/launcher-screenshot?ticket={state.scene_token}" if screenshot else "",
-            "agents": agents}
-
-
 def _inventory(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     """This account's CS2 inventory, read straight from Steam. Read-only."""
     from . import inventory
@@ -7074,8 +7044,6 @@ def make_handler(state: State):
         "/api/crosshairx/start": _crosshairx_start,
         "/api/companions": _companions,
         "/api/inventory": _inventory,
-        "/api/launcher/media": _launcher_media,
-        "/api/launcher/lighting": _launcher_lighting,
         "/api/inventory/inspect": _inventory_inspect,
         "/api/skins/catalog": _skins_catalog,
         "/api/skins/music": _skins_music,
@@ -7160,32 +7128,12 @@ def make_handler(state: State):
             self.wfile.write(data)
 
         # -- verbs ----------------------------------------------------------
-        def _send_launcher_media(self, side: str = "") -> None:
-            from . import launcher_media
-
-            query = parse_qs(self.path.partition("?")[2])
-            ticket = (query.get("ticket") or [""])[0]
-            if not ticket.isascii() or not secrets.compare_digest(ticket, state.scene_token):
-                self._send_json({"error": "bad or missing ticket"}, 403)
-                return
-            source = launcher_media.agent_sheet(side) if side else launcher_media.screenshot()
-            if source is None:
-                self._send_json({"error": "Launcher image not found"}, 404)
-                return
-            self._send_file(source)
-
         def do_GET(self) -> None:
             if not self._host_ok():
                 self._send_json({"error": "host not allowed"}, 403)
                 return
 
             path = self.path.split("?", 1)[0]
-            if path == "/launcher-screenshot":
-                self._send_launcher_media()
-                return
-            if path in ("/launcher-agent/ct", "/launcher-agent/t"):
-                self._send_launcher_media(path.rsplit("/", 1)[1])
-                return
             if path == "/api/overlay/tools":
                 if self.headers.get("X-CS2CFG-Token") != state.token:
                     self._send_json({"error": "bad or missing token"}, 403)
@@ -7665,7 +7613,7 @@ def make_handler(state: State):
             try:
                 # Local GoXLR I/O has its own nonblocking operation lock. A
                 # disconnected mixer must not hold up other UI requests.
-                if handler in (_goxlr, _goxlr_switch, _goxlr_setup_use, _configs_import_pick, _launcher_media):
+                if handler in (_goxlr, _goxlr_switch, _goxlr_setup_use, _configs_import_pick):
                     self._send_json({"ok": True, **handler(state, body)})
                 else:
                     with state.lock:

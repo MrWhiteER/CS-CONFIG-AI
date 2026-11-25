@@ -5746,29 +5746,33 @@
 [data-panel="launcher"] .home-hero { position:relative; isolation:isolate; min-height:370px; display:flex; align-items:center; overflow:hidden; padding:32px 38px; border:1px solid var(--line); border-radius:4px; margin-bottom:30px; background:var(--panel); }
 .hero-art { position:absolute; inset:0; z-index:-2; overflow:hidden; pointer-events:none; background:#101820; }
 .hero-scene { position:absolute; inset:0 0 0 auto; width:max(100%,1050px); overflow:hidden; }
-.hero-background,.hero-agent-layer { position:absolute; inset:0; width:100%; height:100%; }
+.hero-background { position:absolute; inset:0; width:100%; height:100%; }
+.hero-banner {
+  position:absolute; left:38.26%; top:7.46%; width:39.64%; height:66.44%;
+  clip-path:polygon(0.00% 0.21%,99.77% 2.08%,99.77% 95.22%,0.23% 99.79%);
+}
+/* The T artwork uses a wider monitor, with the shoulder in front of its lower corner. */
+.hero-scene[data-side="t"] .hero-banner {
+  width:40.47%;
+  clip-path:polygon(0.23% 0.62%,99.66% 2.29%,99.54% 74.43%,98.98% 76.30%,97.72% 78.79%,96.25% 81.91%,95.45% 84.41%,94.77% 87.53%,94.20% 90.85%,93.86% 93.76%,93.63% 95.63%,0.57% 99.58%);
+}
 .launcher-desk-rgb { position:absolute; inset:0; --desk-light:color-mix(in srgb,var(--accent) 78%,white); }
 .launcher-desk-light { position:absolute; color:var(--desk-light); animation:launcher-rgb-pulse 5s ease-in-out infinite alternate; }
-.launcher-desk-mic { left:31.6%; top:47.7%; width:3%; height:13.3%; border-radius:14% 14% 16% 16%; background:linear-gradient(90deg,transparent,currentColor 52%,transparent); opacity:.62; mix-blend-mode:screen; }
-.launcher-desk-monitor { left:38.5%; top:71.3%; width:40.1%; height:3%; clip-path:polygon(0 84%,100% 0,100% 13%,0 100%); background:currentColor; opacity:.68; }
-.launcher-desk-mixer { left:34.4%; top:91.5%; width:9%; height:1.4%; background:repeating-linear-gradient(90deg,currentColor 0 5%,transparent 6% 12.5%); filter:blur(.5px); transform:rotate(-2deg); }
-.launcher-desk-handheld { left:19%; top:93.4%; width:10.2%; height:4.6%; background:radial-gradient(ellipse,currentColor,transparent 69%); opacity:.38; mix-blend-mode:screen; }
-.launcher-desk-keys { position:absolute; inset:0; }
-.launcher-desk-keys i { position:absolute; width:.65%; height:.45%; border-radius:30%; color:var(--key-light,var(--desk-light)); background:currentColor; box-shadow:0 0 .32em currentColor; transform:translate(-50%,-50%) rotate(-5deg); opacity:.84; }
+.launcher-desk-mic { left:31.6%; top:47.7%; width:3%; height:13.3%; border-radius:14% 14% 16% 16%; background:linear-gradient(90deg,transparent,currentColor 52%,transparent); opacity:.32; mix-blend-mode:screen; }
+.launcher-desk-monitor { left:38.5%; top:74%; width:37%; height:1%; clip-path:polygon(0 84%,100% 0,100% 13%,0 100%); background:currentColor; opacity:.45; }
+.launcher-desk-mixer { left:35.1%; top:91.5%; width:7.5%; height:1.4%; background:repeating-linear-gradient(90deg,currentColor 0 5%,transparent 6% 12.5%); filter:blur(.5px); transform:rotate(-2deg); opacity:.52; }
 @keyframes launcher-rgb-pulse { from { filter:brightness(.65); } to { filter:brightness(1.25); } }
-.hero-agent-layer { overflow:hidden; }
-.hero-agent-layer[hidden] { display:none; }
-#launcher-agent { display:block; width:200%; height:100%; animation:hero-keypress 2.6s steps(1,end) infinite; }
-#launcher-screenshot { position:absolute; top:8%; bottom:26.1%; left:38.4%; right:21.2%; width:40.4%; height:65.9%; object-fit:cover; object-position:right top; background:#030304; clip-path:polygon(0 0,100% 2.3%,99.7% 95.4%,.35% 100%); }
-#launcher-screenshot:not([src]) { display:none; }
-.scene-paused :is(#launcher-agent,.launcher-desk-light) { animation-play-state:paused; }
-.hero-gameplay-actions { display:flex; align-items:center; gap:6px; margin-left:8px; letter-spacing:normal; }
-.hero-gameplay-actions [hidden] { display:none; }
-@keyframes hero-keypress {
-  0%,28%,48%,68%,100% { transform:none; }
-  21%,41%,61% { transform:translateX(-50%); }
+.hero-keypress {
+  position:absolute; left:51.29%; top:80.52%; width:10.77%; height:17.96%;
+  opacity:0; mask-image:radial-gradient(ellipse closest-side, #000 54%, transparent 100%);
+  animation:hero-keypress 2.6s steps(1,end) infinite;
 }
-@media(prefers-reduced-motion:reduce) { #launcher-agent,.launcher-desk-light { animation:none; } }
+.scene-paused :is(.hero-keypress,.launcher-desk-light) { animation-play-state:paused; }
+@keyframes hero-keypress {
+  0%,28%,48%,68%,100% { opacity:0; }
+  21%,41%,61% { opacity:1; }
+}
+@media(prefers-reduced-motion:reduce) { .hero-keypress,.launcher-desk-light { animation:none; } }
 .home-hero::after { content:''; position:absolute; inset:0; z-index:-1; background:linear-gradient(90deg,var(--panel) 0%,color-mix(in srgb,var(--panel) 96%,transparent) 28%,color-mix(in srgb,var(--panel) 76%,transparent) 40%,transparent 55%); mask-image:linear-gradient(#000 0 70%,#000a 85%,#0004 100%); pointer-events:none; }
 .home-hero .hero-copy { width:48%; max-width:580px; position:relative; }
 .hero-brand { display:flex; align-items:center; flex-wrap:wrap; gap:10px; font:600 11px var(--mono); letter-spacing:.18em; color:var(--muted); margin-bottom:24px; }
@@ -6552,23 +6556,19 @@ const startup = (() => {
     <div class="tab-panel" data-panel="launcher">
       <div class="hero home-hero scene-paused" id="home-hero">
         <button type="button" class="sp-chip" id="sp-toggle" aria-expanded="false" aria-controls="sp-panel" aria-haspopup="dialog" title="Ping to Valve's relay in this city. In-game ping is usually within a few ms."><span id="sp-chip-icon" class="sp-tone"></span><span id="sp-summary">Server regions</span><span class="sp-led sp-tone" aria-hidden="true"></span><span aria-hidden="true">⌃</span></button>
-        <div class="hero-art" aria-hidden="true"><div class="hero-scene">
-          <img class="hero-background" src="assets/home/hero-gaming-desk.webp" alt="" fetchpriority="high">
-          <img id="launcher-screenshot" alt="" decoding="async">
+        <div class="hero-art" aria-hidden="true"><div class="hero-scene" data-side="ct">
+          <img class="hero-background" src="assets/home/hero-agent-ct.webp" alt="" decoding="sync" fetchpriority="high">
+          <img class="hero-banner" src="assets/home/hero-steam-banner.png" alt="" decoding="sync">
+          <img class="hero-keypress" alt="" decoding="sync">
           <div class="launcher-desk-rgb">
-            <span class="launcher-desk-light launcher-desk-monitor"></span><span class="launcher-desk-light launcher-desk-mic"></span>
-            <span class="launcher-desk-light launcher-desk-mixer"></span><span class="launcher-desk-light launcher-desk-handheld"></span>
-            <div class="launcher-desk-keys" id="launcher-key-lights"></div>
+            <span class="launcher-desk-light launcher-desk-monitor"></span>
+            <span class="launcher-desk-light launcher-desk-mic"></span>
+            <span class="launcher-desk-light launcher-desk-mixer"></span>
           </div>
-          <div class="hero-agent-layer" hidden><img id="launcher-agent" alt="" decoding="sync"></div>
         </div></div>
         <div class="hero-copy">
           <div class="hero-brand">
             <span class="config-mark" aria-hidden="true"></span><span>CS CONFIG AI</span>
-            <div class="hero-gameplay-actions">
-              <button class="btn small" type="button" id="launcher-screenshot-choose">Add gameplay screenshot</button>
-              <button class="btn small" type="button" id="launcher-screenshot-clear" aria-label="Remove screenshot" hidden>Remove</button>
-            </div>
           </div><div class="eyebrow" id="home-readiness">Your CS2 workspace</div>
           <h2>Counter-Strike <em>2</em></h2>
           <p>
@@ -18170,7 +18170,7 @@ function setTab(name) {
     b.setAttribute("aria-selected", String(b.dataset.tab === name)));
   document.querySelectorAll(".tab-panel").forEach(panel =>
     panel.classList.toggle("hidden", panel.dataset.panel !== name));
-  if (name === 'launcher') { serverPingWidget.shown(); launcherScene.refreshLighting(); }
+  if (name === 'launcher') serverPingWidget.shown();
   else serverPingWidget.hidden();
   // Now that the panel is on screen there is something to measure.
   if (name === "settings") moveSegThumb("settings-subtabs");
@@ -18904,7 +18904,6 @@ function paintRunning() {
 
 function startGameWatch() {
   if (runningTimer) return;
-  launcherScene.connect(api, status);
   const ask = async (reattach = false) => {
     if (document.hidden && !reattach) return;
     try {
@@ -19029,7 +19028,6 @@ $("rescan").addEventListener("click", () => scan(true));
         // makeStarter already awaits loadSource after creating a collection.
         if (!created) await loadSource();
       });
-      launcherScene.refreshLighting();
       await startup.run("settings-pane", async () => {
         if (settingsSub === "overlay") await loadOverlay();
         if (settingsSub === "config" || settingsSub === "editing") await ensureScan(false);

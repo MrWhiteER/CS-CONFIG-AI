@@ -21,7 +21,10 @@ code+='function busy(){};';
 code+=`let fpsEffect='';function renderFps(){}function markPending(){};`;
 code+=slice('function renderPlan(', '// The last detection,');
 code+=slice('let netTimer = null;', '/* Three scene cards');
+const side=process.env.HOME_AGENT_SIDE==='t'?'t':'ct';
+code+='const sceneRandom=Math.random;Math.random=()=>'+(side==='ct'?.25:.75)+';\n';
 code+=fs.readFileSync(path.join(root,'cs2cfg/web/assets/home/launcher-scene.js'),'utf8')+'\n';
+code+='Math.random=sceneRandom;\n';
 code+=`const prefsReady=false,startup={finished:false};function moveSegThumb(){};`;
 code+=slice('let settingsSub = "nvidia";', '/* ---------------------------------------------------------------------------\n   Sound devices');
 code+='let cloudData=null;';
@@ -31,38 +34,35 @@ code+=slice('function ring(value','function meter(');
 code+=slice('/* Administrator helper status','/* ------');
 code+=slice('// Horizontal thermal strips','// --- live system readout');
 code+=`document.documentElement.dataset.boot='ready';document.querySelector('.boot-screen').remove();$('steam-preview').addEventListener('click',()=>previews++);
-const checks=[];function check(name,ok){checks.push({name,ok});if(!ok)throw Error(name)}
+const checks=[];function check(name,ok){checks.push({name,ok});document.documentElement.dataset.lastCheck=name;if(!ok)throw Error(name)}
 (async()=>{try{
 check('hero controls remain inside hero', $('home-hero').contains($('play')) && $('home-hero').contains($('launch-modes')));
-const screen=$('launcher-screenshot'),hero=$('home-hero');
-const still= ${JSON.stringify(process.env.HOME_SCREEN_FILE ? 'data:image/jpeg;base64,' + fs.readFileSync(process.env.HOME_SCREEN_FILE).toString('base64') : 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7')};
-const hasAgent = ${JSON.stringify(Boolean(process.env.HOME_AGENT_FILE || !process.env.HOME_SCREEN_FILE))};
-const sheet = ${JSON.stringify(process.env.HOME_AGENT_FILE ? url.pathToFileURL(path.resolve(process.env.HOME_AGENT_FILE)).href : 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAYAAAABCAYAAAD9yd/wAAAAFklEQVR4nGO8tFTuPwMUdNzdAmMyAABRGwSvVb32FgAAAABJRU5ErkJggg==')};
-const agent = $('launcher-agent');
-const agentReady = new Promise(resolve => agent.addEventListener('load',resolve,{once:true}));
-launcherScene.connect(async route=>route==='/api/launcher/lighting'?
-  {ok:true,frame:{keys:{26:[61,139,253],4:[255,183,43],22:[61,139,253],7:[61,139,253],9:[255,45,149],21:[61,139,253],44:[61,139,253]},base:[14,14,20]}}:
-  {ok:true,screenshot:'gameplay.jpg',url:still,agents:hasAgent?{ct:sheet}:{}},()=>{});
-await Promise.resolve();
-await screen.decode();
-check('Launcher shows a static screenshot without video playback',screen.naturalWidth>0&&!hero.querySelector('video'));
-const screenStyle=getComputedStyle(screen);
-check('gameplay fills the monitor and keeps the top-right kill feed in frame',screenStyle.objectFit==='cover'&&screenStyle.objectPosition==='100% 0%');
-const keyLights=$('launcher-key-lights');
-check('desk keyboard uses the CS2 RGB palette for individual keys',
-  keyLights.querySelector('[data-usage="26"]').style.getPropertyValue('--key-light')==='rgb(61,139,253)'&&
-  keyLights.querySelector('[data-usage="4"]').style.getPropertyValue('--key-light')==='rgb(255,183,43)');
-if (hasAgent) await agentReady;
-check('Launcher uses a supplied agent sheet or an empty chair',agent.parentElement.hidden===!hasAgent);
+const hero=$('home-hero'),scene=hero.querySelector('.hero-scene');
+const screen=scene.querySelector('.hero-banner'),agent=scene.querySelector('.hero-background'),keypress=scene.querySelector('.hero-keypress');
+const side=${JSON.stringify(side)};
+const still=screen.getAttribute('src');
+await Promise.all([screen,agent,keypress].map(image=>new Promise((resolve,reject)=>{
+  if (image.complete) return image.naturalWidth ? resolve() : reject(Error(image.src));
+  image.addEventListener('load',resolve,{once:true});
+  image.addEventListener('error',()=>reject(Error(image.src)),{once:true});
+})));
+check('Launcher loads both static banner and selected original agent',
+  still.endsWith('hero-steam-banner.png')&&screen.naturalWidth===800&&screen.naturalHeight===450&&
+  agent.getAttribute('src').endsWith('hero-agent-'+side+'.webp')&&agent.naturalWidth===2172&&keypress.naturalWidth===234&&
+  scene.dataset.side===side&&!hero.querySelector('video'));
+check('Launcher keyboard and handheld have no RGB overlays',
+  !hero.querySelector('.launcher-desk-keys,.launcher-desk-handheld'));
 check('hero waits for CS2 process status before animating hands',hero.classList.contains('scene-paused'));
 launcherScene.activity(false);
 if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
-  check('reduced motion keeps the screenshot and leaves the hands still',screen.getAttribute('src')===still&&hero.classList.contains('scene-paused'));
+  check('reduced motion keeps the banner and leaves the hands still',
+    screen.getAttribute('src')===still&&hero.classList.contains('scene-paused')&&getComputedStyle(keypress).animationName==='none');
 } else {
-  check('hands animate while Launcher is idle',!hero.classList.contains('scene-paused'));
+  check('hands animate while Launcher is idle',getComputedStyle(keypress).animationPlayState==='running');
   launcherScene.launching(true);
-  check('Play immediately freezes hands and keeps the same screenshot',screen.getAttribute('src')===still&&hero.classList.contains('scene-paused'));
-  check('Play freezes the desk RGB animation',getComputedStyle(hero.querySelector('.launcher-desk-light')).animationPlayState==='paused');
+  check('Play immediately freezes hands and keeps the same banner',
+    screen.getAttribute('src')===still&&getComputedStyle(keypress).animationPlayState==='paused');
+  check('Play freezes the desk accent animation',getComputedStyle(hero.querySelector('.launcher-desk-light')).animationPlayState==='paused');
   launcherScene.activity(true);launcherScene.launching(false);
   check('running CS2 keeps the hands still',hero.classList.contains('scene-paused'));
   launcherScene.activity(false);
@@ -98,7 +98,6 @@ $('history-stats').innerHTML='<div class="stat"><b>16</b><span>sessions</span></
 renderHardware({cpu:{name:'Intel Core i9-12900K',cores:16,threads:24},gpu:{name:'NVIDIA GeForce RTX 3090 Ti',vram_gb:24,driver:'621.01'},ram_gb:32,ram_speed:6000,displays:[{width:2560,height:1440,refresh:240,primary:true,confident:true}],power_plan:'Balanced'});
 $('assessment-out').innerHTML='<div class="assess">Selected settings ? Competitive</div>';
 homeFrame(performance.now()+2200);check('gauge reaches its target',node.querySelector('.val').textContent==='80');check('smooth combined area chart',$('hardware-chart').querySelector('.hardware-line').getAttribute('d').includes(' C'));
-await hero.querySelector('.hero-background').decode();
 const errors=[...document.images].filter(i=>i.getAttribute('src')&&(!i.complete||!i.naturalWidth));check('all home image assets load',errors.length===0);
 check('no horizontal overflow',document.documentElement.scrollWidth<=innerWidth);
 const media=homeMotion.reduced;homeMotion.reduced={matches:true};homeNumber(node.querySelector('.val'),31);check('reduced motion sets final reading immediately',node.querySelector('.val').textContent==='31');homeMotion.reduced=media;
@@ -257,5 +256,5 @@ let html=s.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'');html=html.replace('<
 new (require('vm').Script)(code);fs.writeFileSync(path.join(work,'preview.html'),html);
 const chrome=process.env.CHROME_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe';const args=['--headless','--no-sandbox','--disable-gpu','--allow-file-access-from-files','--user-data-dir='+path.join(work,'chrome'),'--window-size='+(process.env.HOME_VIEWPORT||'1440,1100'),'--virtual-time-budget=30000',url.pathToFileURL(path.join(work,'preview.html')).href+(process.env.HOME_HASH||'')];
 if(process.env.HOME_REDUCED)args.unshift('--force-prefers-reduced-motion');
-const out=cp.execFileSync(chrome,[...args,'--dump-dom','--screenshot='+(process.env.HOME_SCREENSHOT||path.join(work,'preview.png'))],{maxBuffer:4e6,stdio:['ignore','pipe','ignore']}).toString();fs.writeFileSync(path.join(work,'dom.html'),out);const result=[...out.matchAll(/<pre id="checks"[^>]*>(.*?)<\/pre>/gs)].at(-1);console.log(result?result[1]:'NO TEST RESULTS');assert(result&& !result[1].includes('false')&&!result[1].includes('"error"'));
-console.log('Browser checks: '+JSON.parse(result[1]).length+' passed');
+const out=cp.execFileSync(chrome,[...args,'--dump-dom','--screenshot='+(process.env.HOME_SCREENSHOT||path.join(work,'preview.png'))],{maxBuffer:4e6,stdio:['ignore','pipe','ignore']}).toString();fs.writeFileSync(path.join(work,'dom.html'),out);const result=out.match(/<pre id="checks"(?:\s[^>]*)?>(\[[\s\S]*?\])<\/pre>/)?.[1];console.log(result??'NO TEST RESULTS. Last check: '+(out.match(/data-last-check="([^"]+)"/)?.[1]??'unavailable'));assert(result&& !result.includes('false')&&!result.includes('"error"'));
+console.log('Browser checks: '+JSON.parse(result).length+' passed');

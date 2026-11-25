@@ -227,11 +227,6 @@ def pick_file(initial: str = "", title: str = "Choose a configuration file") -> 
     return _pick_file(CONFIG_FILTER, initial, title)
 
 
-def pick_gameplay_screenshot() -> Optional[str]:
-    return _pick_file("Gameplay screenshots (*.png;*.jpg;*.jpeg;*.webp)|*.png;*.jpg;*.jpeg;*.webp", "",
-                      "Choose a CS2 gameplay screenshot")
-
-
 def pick_files() -> list:
     """The same native config picker with multiple selection enabled."""
     result = _run(
