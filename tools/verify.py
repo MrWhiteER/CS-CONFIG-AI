@@ -15,8 +15,10 @@ def main():
     parser.add_argument('--browser',action='store_true',help='Require Node and Chrome browser checks too')
     args=parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='cs2cfg-verify-') as data:
-        env=dict(os.environ,CS2CFG_DATA=data,PYTHONUTF8='1',
-                 CS2CFG_TEST_PREVIEWS=str(Path(data) / 'browser-previews'))
+        data = str(Path(data).resolve())
+        env = dict(os.environ, CS2CFG_DATA=data, PYTHONUTF8='1',
+                   TEMP=data, TMP=data, TMPDIR=data,
+                   CS2CFG_TEST_PREVIEWS=str(Path(data) / 'browser-previews'))
         commands=[[sys.executable,'-m','unittest','discover','-s','tests']]
         if args.browser:
             node=shutil.which('node')

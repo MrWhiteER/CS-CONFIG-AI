@@ -164,7 +164,7 @@ def snapshot(paths, folder=False):
             raise ValueError("Choose original files rather than linked folders.")
         if not path.is_file() or path.suffix.lower() not in cfgscan.CONFIG_SUFFIXES:
             continue
-        relative = safe_relative(path.relative_to(cfg_root).as_posix())
+        relative = safe_relative(path.resolve().relative_to(cfg_root).as_posix())
         size = path.stat().st_size
         if len(texts) >= MAX_FILES or total + size > MAX_BYTES:
             raise ValueError("Choose a smaller set (up to 256 files / 4 MiB).")

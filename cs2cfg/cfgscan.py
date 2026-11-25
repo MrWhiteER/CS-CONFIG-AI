@@ -230,7 +230,9 @@ def _role_for(relative: str, generated: Optional[str]) -> str:
 def discover(folder: Path, cfg_root: Optional[Path] = None) -> Dict[str, ConfigFile]:
     """Read every config file under ``folder``, recursively."""
     folder = Path(folder).resolve()
-    root = cfg_root or find_cfg_root(folder)
+    # Windows can spell one directory with either its short or long name.
+    # Compare paths in the same form before deriving exec-relative filenames.
+    root = Path(cfg_root).resolve() if cfg_root is not None else find_cfg_root(folder)
     files: Dict[str, ConfigFile] = {}
 
     for path in sorted(folder.rglob("*")):
@@ -297,7 +299,7 @@ class Scanner:
 
     def __init__(self, folder: Path, cfg_root: Optional[Path] = None) -> None:
         self.folder = Path(folder).resolve()
-        self.cfg_root = cfg_root or find_cfg_root(self.folder)
+        self.cfg_root = Path(cfg_root).resolve() if cfg_root is not None else find_cfg_root(self.folder)
         self.result = ScanResult(root=self.folder, cfg_root=self.cfg_root)
         self._order = 0
 
