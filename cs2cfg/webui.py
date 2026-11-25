@@ -33,7 +33,7 @@ from urllib.parse import parse_qs
 from . import __version__, backup, cfglang, emit, profiles, steam, window, verification
 from .hardware import Machine, ProbeError, detect
 from .kb import KnowledgeBase
-from .profile import build_profile, plan_launch_options
+from .profile import Profile, build_profile, plan_launch_options
 
 from .paths import bundle_root
 
@@ -300,6 +300,7 @@ def _scaling_step() -> Dict[str, Any]:
                 "detail": result.get("note", "unchanged")}
     return {"ok": True, "what": what,
             "verification": expected,
+            "changes": [{"name": what, "before": result.get("was"), "after": "Full-screen"}],
             "detail": f"{result.get('was', 'letterboxed')} -> full-screen, "
                       f"so a stretched resolution has no black bars down the sides"}
 
@@ -364,6 +365,24 @@ def _verification(state):
         state.verification_receipt, state.cs2_install, state.verification_path.parent))
 
 
+def _profile_convar_changes(path: Path, profile: Profile) -> List[Dict[str, Any]]:
+    try:
+        previous = path.read_text(encoding="utf-8", errors="replace")
+    except FileNotFoundError:
+        previous = ""
+    after = {name: value for name, value, _ in profile.convars}
+    before = {}
+    generated = emit.GENERATED_MARKER in previous
+    for line in cfglang.parse(previous).lines:
+        for cmd in line.commands:
+            if len(cmd.args) == 1 and (cmd.lname in after or
+                                       (generated and cmd.lname != "echo")):
+                before[cmd.lname] = cmd.arg_text(0)
+    return [{"name": name, "before": before.get(name), "after": after.get(name, "Removed")}
+            for name in sorted(before.keys() | after.keys())
+            if before.get(name) != after.get(name)]
+
+
 def _apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     state.refresh()
     user = state.user_for(body.get("account"))
@@ -380,8 +399,9 @@ def _apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         hide_crosshair=bool(body.get("hide_crosshair")),
         load_bias=str(body.get("load_bias") or "auto"),
     )
+    launch_before = steam.read_launch_options(user)
     launch = plan_launch_options(
-        steam.read_launch_options(user), state.machine, kb,
+        launch_before, state.machine, kb,
         exec_path=_exec_entry_point(
             steam.cfg_dir(state.cs2_install) if state.cs2_install else Path("."),
             state.cfg_folder, state.cfg_name),
@@ -428,19 +448,15 @@ def _apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
 
     video_changes: List[Dict[str, Any]] = []
     if write_video:
-        current = steam.read_video_cfg(user)
-        for key in sorted(profile.video):
-            was = current.get(key)
-            if was is not None and str(profile.video[key]) == str(was):
-                continue
-            try:
-                before = kb.label(key, int(was)) if was is not None else None
-            except ValueError:
-                before = was
-            video_changes.append({"name": kb.ui_name(key), "before": before,
-                                  "after": kb.label(key, profile.video[key])})
         try:
             diff = steam.write_video_cfg(user, profile.video, session)
+            for key, (was, now) in sorted(diff.items()):
+                try:
+                    before = kb.label(key, int(was)) if was is not None else None
+                except (TypeError, ValueError):
+                    before = was
+                video_changes.append({"name": kb.ui_name(key), "before": before,
+                                      "after": kb.label(key, int(now))})
             steps.append({"ok": True, "what": "cs2_video.txt",
                           "detail": f"{len(diff)} setting(s) changed"})
         except (steam.SteamError, OSError) as exc:
@@ -456,8 +472,12 @@ def _apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
         ):
             generated[path.name] = content
             try:
+                changes = []
+                if path == target_path:
+                    changes = _profile_convar_changes(path, profile)
                 emit.write_text_file(path, content, session)
-                steps.append({"ok": True, "what": path.name, "detail": str(path)})
+                steps.append({"ok": True, "what": path.name, "detail": str(path),
+                              "changes": changes})
             except OSError as exc:
                 steps.append({"ok": False, "what": path.name, "detail": str(exc)})
 
@@ -467,14 +487,25 @@ def _apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
                     root / state.cfg_folder / "autoexec.vcfg",
                     f"{state.cfg_folder}/{state.cfg_name}", session
                 )
-                steps.append({"ok": True, "what": "autoexec.vcfg", "detail": result})
+                step = {"ok": True, "what": "autoexec.vcfg", "detail": result}
+                if result.startswith("appended "):
+                    step["changes"] = [{"name": "Autoexec line", "before": None,
+                                        "after": f'exec "{state.cfg_folder}/{state.cfg_name}"'}]
+                elif result.startswith("autoexec not found"):
+                    step.update(ok=False, skipped=True)
+                steps.append(step)
             except OSError as exc:
                 steps.append({"ok": False, "what": "autoexec.vcfg", "detail": str(exc)})
 
     if write_launch:
         try:
             action = steam.write_launch_options(user, launch.line, session)
-            steps.append({"ok": True, "what": "Steam launch options", "detail": action})
+            changes = []
+            if launch_before != launch.line:
+                changes.append({"name": "Steam launch options", "before": launch_before or "None",
+                                "after": launch.line or "None"})
+            steps.append({"ok": True, "what": "Steam launch options", "detail": action,
+                          "changes": changes})
         except (steam.SteamError, OSError) as exc:
             steps.append({"ok": False, "what": "Steam launch options", "detail": str(exc)})
 
@@ -486,8 +517,7 @@ def _apply(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     for stood_down in skipped:
         steps.append({"ok": False, "skipped": True, **stood_down})
 
-    # CS2's NVIDIA profile follows the mode too. Its own list, so the page can
-    # show each driver change and end on the NVIDIA mark.
+    # CS2's NVIDIA profile follows the mode too and reports each driver change.
     nv = None
     if body.get("write_nvidia", True):
         try:

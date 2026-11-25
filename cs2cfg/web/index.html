@@ -2379,46 +2379,6 @@
 .bias-why { margin:8px 0 0; }
 @media(max-width:700px) { .nv-row { grid-template-columns:1fr; gap:6px; } .nv-val,.nv-pick { justify-self:start; } }
 
-.apply-feed { position:fixed; right:20px; bottom:20px; z-index:520; width:min(360px,calc(100vw - 40px)); max-height:min(460px,calc(100vh - 40px)); display:flex; flex-direction:column; color:var(--ink); border-radius:14px; border:1px solid var(--line); background:linear-gradient(var(--panel-2),var(--panel-2)),var(--bg); box-shadow:0 18px 50px rgba(0,0,0,.45); overflow:hidden; animation:af-in .32s cubic-bezier(.2,.9,.25,1.15) both; }
-.apply-feed.leaving { animation:af-out .25s ease both; }
-.apply-feed header { display:flex; align-items:center; gap:10px; padding:12px 14px; border-bottom:1px solid var(--line); font-size:13px; }
-.apply-feed header b { flex:1; font-weight:600; }
-.af-x { background:none; border:0; color:var(--muted); font-size:18px; line-height:1; cursor:pointer; padding:0 2px; }
-.af-spin { width:14px; height:14px; border-radius:50%; border:2px solid color-mix(in srgb,var(--accent) 30%,transparent); border-top-color:var(--accent); animation:af-spin .8s linear infinite; }
-.af-rows { list-style:none; margin:0; padding:6px 14px; overflow:auto; flex:1; min-height:0; }
-.af-row { display:grid; grid-template-columns:22px minmax(0,1fr); column-gap:10px; row-gap:2px; align-items:center; padding:7px 0; font-size:12.5px; animation:af-row .34s cubic-bezier(.2,.9,.25,1.1) both; }
-.af-row + .af-row { border-top:1px solid color-mix(in srgb,var(--line) 70%,transparent); }
-.af-ic { display:grid; place-items:center; width:22px; height:22px; border-radius:6px; color:var(--accent); background:color-mix(in srgb,var(--accent) 14%,transparent); }
-.af-ic svg { width:14px; height:14px; }
-.af-row.nv .af-ic { background:color-mix(in srgb,#76b900 16%,transparent); }
-.af-row.nv .af-ic .nv-mark { width:15px; height:15px; }
-.af-row.warn .af-ic { color:var(--warn); background:color-mix(in srgb,var(--warn) 16%,transparent); font-weight:700; }
-.af-name small { display:block; color:var(--muted); font-size:11px; margin-top:2px; }
-.af-move { grid-column:2; font-size:12px; }
-.af-move s { color:var(--muted); text-decoration-thickness:1px; margin-right:2px; }
-.af-move b { color:var(--good); font-weight:600; }
-.af-row.nv .af-move b { color:#8fd11a; }
-.af-end { position:relative; display:grid; grid-template-columns:auto auto minmax(0,1fr); gap:12px; align-items:center; padding:14px; border-top:1px solid var(--line); background:color-mix(in srgb,var(--good) 8%,transparent); }
-.af-end.nvidia { background:color-mix(in srgb,#76b900 12%,transparent); }
-.af-end.partly { background:color-mix(in srgb,var(--warn) 10%,transparent); }
-.nv-badge,.af-badge { display:grid; place-items:center; width:44px; height:44px; border-radius:12px; background:color-mix(in srgb,#76b900 20%,transparent); animation:af-pop .5s cubic-bezier(.2,1.4,.4,1) both; }
-.af-badge { display:none; }
-.af-end:not(.nvidia) { grid-template-columns:auto minmax(0,1fr); }
-.af-end .af-tick { display:block; width:30px; height:30px; fill:none; stroke:var(--good); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
-.af-end.nvidia .af-tick { stroke:#8fd11a; }
-.af-end.partly .af-tick { stroke:var(--warn); }
-.af-tick circle { stroke-dasharray:63; stroke-dashoffset:63; animation:af-draw .5s .15s ease-out forwards; }
-.af-tick path { stroke-dasharray:16; stroke-dashoffset:16; animation:af-draw .32s .55s ease-out forwards; }
-.af-done b { display:block; font-size:13.5px; }
-.af-done small { color:var(--muted); font-size:11.5px; }
-.af-done { animation:af-row .35s .3s both; }
-@keyframes af-in { from { opacity:0; transform:translate(24px,12px) scale(.97); } to { opacity:1; transform:none; } }
-@keyframes af-out { to { opacity:0; transform:translateX(30px); } }
-@keyframes af-row { from { opacity:0; transform:translateX(14px); } to { opacity:1; transform:none; } }
-@keyframes af-pop { 0% { transform:scale(.4) rotate(-12deg); opacity:0; } 100% { transform:none; opacity:1; } }
-@keyframes af-draw { to { stroke-dashoffset:0; } }
-@keyframes af-spin { to { transform:rotate(360deg); } }
-@media(prefers-reduced-motion:reduce) { .apply-feed,.apply-feed * { animation:none!important; } .af-tick circle,.af-tick path { stroke-dashoffset:0; } }
 </style>
 <style>
   /* ------------------------------------------------------------------------
@@ -5814,6 +5774,47 @@
 .mode-copy { position:absolute; left:20px; bottom:20px; right:22px; display:flex; flex-direction:column; color:#fff; gap:5px; }
 .mode-copy strong { font-size:21px; font-weight:700; letter-spacing:-.025em; }.mode-copy > span { font-size:11px; color:#ddd; }
 .mode-selected { position:absolute; bottom:23px; right:18px; color:var(--accent); opacity:0; }.mode-card[aria-pressed="true"] .mode-selected { opacity:1; }
+.mode-cards { container-type:inline-size; }
+.mode-card { --apply-width:50%; }
+.mode-card[aria-pressed="true"]:has(.profile-apply) .mode-copy { right:calc(var(--apply-width) + 12px); }
+.mode-card:has(.profile-apply) .mode-selected { opacity:0; }
+.mode-card[aria-pressed="false"] .profile-apply { display:none; }
+.profile-apply-live { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+.profile-apply { position:absolute; inset:6px 6px 6px auto; z-index:1; width:var(--apply-width); pointer-events:none; padding:12px; display:grid; grid-template-rows:auto minmax(0,1fr) 3px; gap:8px; overflow:hidden; color:#f0fcf7; background:transparent; font:11px/1.3 var(--mono); text-shadow:0 1px 3px #000,0 0 6px #000; animation:profile-apply-open .23s ease-out both; }
+.profile-apply-head { display:flex; gap:6px; align-items:center; min-width:0; }
+.profile-apply-head i { flex:none; width:7px; height:7px; background:#a5efce; border-radius:50%; box-shadow:0 0 10px #a5efce7a; }
+.profile-apply-head small { color:#b5c9c0; margin-left:auto; white-space:nowrap; font-size:10px; }
+.profile-apply[data-phase="warn"] .profile-apply-head i { background:#ffcb86; box-shadow:none; }
+.profile-apply[data-phase="working"] .profile-apply-head i { animation:profile-apply-blink 1.1s infinite alternate; }
+.profile-apply-history { display:flex; flex-direction:column; gap:5px; min-height:0; overflow:hidden; justify-content:flex-end; }
+.profile-apply-line { display:block; flex:none; padding:4px 5px 4px 8px; border-left:2px solid #80c9a9; background:linear-gradient(90deg,#0e1915b8,transparent); animation:profile-apply-line .24s ease-out both; }
+.profile-apply-line.warn { border-color:#ffcb86; }
+.profile-apply-line > b { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; }
+.profile-apply-line > span { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; color:#ffdaaa; }
+.profile-apply-line strong { color:#a5efce; font-weight:600; }
+.profile-apply-line s,.profile-apply-line i { color:#bdd1c9; font-style:normal; }
+.profile-apply-track { display:block; background:#a5efce26; overflow:hidden; }
+.profile-apply-track i { display:block; height:100%; transform:scaleX(0); transform-origin:left; background:#a5efce; transition:transform .24s; }
+.profile-apply[data-phase="warn"] .profile-apply-track i { background:#ffcb86; }
+.profile-apply[data-phase="done"] .profile-apply-track i { transform:scaleX(1); }
+@keyframes profile-apply-open { from { opacity:0; transform:translateX(4px); } }
+@keyframes profile-apply-line { from { clip-path:inset(0 100% 0 0); opacity:.5; } }
+@keyframes profile-apply-blink { to { opacity:.35; } }
+@container (max-width:840px) {
+  .mode-card { --apply-width:57%; }
+  .mode-card:has(.profile-apply) .mode-copy { left:12px; bottom:12px; }
+  .mode-card:has(.profile-apply) .mode-copy strong { font-size:clamp(13px,1.9cqw,16px); }
+  .profile-apply { padding:8px; }
+}
+@container (max-width:710px) {
+  .mode-card[aria-pressed="true"]:has(.profile-apply) .mode-index { display:none; }
+  .mode-card[aria-pressed="true"]:has(.profile-apply) .mode-copy { inset:auto 8px 10px; }
+  .mode-card[aria-pressed="true"]:has(.profile-apply) .mode-copy > span { display:none; }
+  .profile-apply { inset:5px 5px 49px; width:auto; gap:4px; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .profile-apply,.profile-apply * { animation:none!important; transition:none!important; }
+}
 .mode-note { margin:12px 0 0; font-size:10px; }
 [data-panel="launcher"] .grid2 { gap:20px; }
 [data-panel="launcher"] :is(#live-card,#hw-card,#net-card) { background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:22px; box-shadow:none; }
@@ -6580,6 +6581,7 @@ const startup = (() => {
       </details>
       <section class="panel">
         <h2>Optimise for</h2>
+        <span class="profile-apply-live" id="profile-apply-live" role="status" aria-live="polite" aria-atomic="true"></span>
         <div class="mode-cards" id="intents" role="group" aria-label="Optimise for">
           <button class="mode-card" data-intent="competitive" type="button" aria-pressed="false" title="Choose Competitive"><img src="assets/home/mode-competitive.webp" alt="Competitive rendering of a Mediterranean training courtyard"><span class="mode-shade"></span><span class="mode-index">01 / FOCUS</span><span class="mode-copy"><strong>Competitive</strong><span>Less detail. Clear sightlines.</span></span><span class="mode-selected" aria-hidden="true">&#10003;</span></button>
           <button class="mode-card" data-intent="balanced" type="button" aria-pressed="true" title="Choose Balanced"><img src="assets/home/mode-balanced.webp" alt="Balanced rendering of a Mediterranean training courtyard"><span class="mode-shade"></span><span class="mode-index">02 / BALANCE</span><span class="mode-copy"><strong>Balanced</strong><span>Clarity meets atmosphere.</span></span><span class="mode-selected" aria-hidden="true">&#10003;</span></button>
@@ -8797,8 +8799,7 @@ function chooseIntent(name, quiet) {
   planned = null;
   rememberPrefs();
   if (!quiet) {
-    // Picking a mode applies it (Edy, Nov 21): the live list bottom right
-    // shows each change as it lands. No question first, no Apply button.
+    // Picking a mode applies it and the selected card shows the result.
     noteChange("Optimise for → " + name, () => { chooseIntent(before, true); applyProfile('mode'); });
     applyProfile('mode');
   }
@@ -8808,8 +8809,13 @@ function chooseIntent(name, quiet) {
   const cards = $("intents");
   cards.addEventListener("click", e => {
     const card = e.target.closest(".mode-card");
-    if (card?.classList.contains('preset-active')) presetClose();
-    else if (card) { if(card.dataset.intent === intent) { presetBegin(intent); previewPlan(); } else chooseIntent(card.dataset.intent); }
+    if (!card) return;
+    if (card.classList.contains('preset-active')) { presetClose(); return; }
+    if (card.dataset.intent !== intent) { chooseIntent(card.dataset.intent); return; }
+    if (profileApplyBusy) return;
+    const feed = card.querySelector('.profile-apply');
+    if (feed?.dataset.phase === 'warn') applyProfile('mode');
+    else if (!feed) { presetBegin(intent); previewPlan(); }
   });
   cards.addEventListener("keydown", e => {
     let at = INTENTS.indexOf(intent);
@@ -8896,105 +8902,96 @@ document.addEventListener('visibilitychange', () => {
 setInterval(() => { if (!document.hidden && !$('verification').hidden) refreshVerification(); }, 15000);
 
 let planRevision = 0, profileApplyBusy = false, profileApplyAgain = null;
-async function previewPlan() {
-  busy("Preparing your settings preview…");
+async function previewPlan(quiet = false) {
+  if (!quiet) busy("Preparing your settings preview…");
   const revision = ++planRevision, body = requestBody();
   try { const plan = await api("/api/plan", body); if (revision === planRevision && body.intent === intent) renderPlan(plan); }
-  catch (e) { if (revision === planRevision) { presetClose(); status("Plan failed: " + esc(e.message), true); } }
+  catch (e) { if (revision === planRevision) { presetClose(); if (!quiet) status("Plan failed: " + esc(e.message), true); } }
 }
 
-/* The live "applying" list, bottom right (Edy, Nov 21).
-
-   Every change the app makes for a mode -- CS2's picture settings, then
-   CS2's NVIDIA profile -- arrives as its own row, one after another, and the
-   list ends on the NVIDIA mark with a tick drawn in. A PC without NVIDIA ends
-   on a plain tick. It closes by itself; hovering keeps it open. */
 const APPLY_WHAT = {
   'cs2_video.txt': 'CS2 picture settings',
-  'Steam launch options': 'Steam launch options',
-  'Display scaling': 'Screen scaling',
+  'Display scaling': 'Display scaling',
   'autoexec.vcfg': 'Autoexec line',
   'NVIDIA settings for CS2': 'NVIDIA settings for CS2',
 };
-const applyFeed = (() => {
-  let box = null, timers = [], closeTimer = 0, hovered = false;
-  const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
-  function clear() { timers.forEach(clearTimeout); timers = []; clearTimeout(closeTimer); }
-  function close() {
-    clear();
-    if (!box) return;
-    const gone = box; box = null;
-    gone.classList.add('leaving');
-    setTimeout(() => gone.remove(), reduced() ? 0 : 260);
+const profileApplyFeed = (() => {
+  let pane, timer;
+  const statusLine = $('profile-apply-live');
+  const ready = (label, message) => { statusLine.textContent = label + ': ' + message; };
+  function start(mode, label) {
+    clearTimeout(timer);
+    pane?.remove();
+    pane = document.createElement('span');
+    pane.className = 'profile-apply';
+    pane.setAttribute('aria-hidden', 'true');
+    pane.dataset.phase = 'working';
+    pane.innerHTML = '<span class="profile-apply-head"><i aria-hidden="true"></i><b>Applying…</b><small></small></span>' +
+      '<span class="profile-apply-history"></span><span class="profile-apply-track"><i></i></span>';
+    $('intents').querySelector('[data-intent="' + mode + '"]').append(pane);
+    ready(label, 'Applying settings');
   }
-  function later(fn, ms) { timers.push(setTimeout(fn, reduced() ? 0 : ms)); }
-  function closeSoon(ms) {
-    clearTimeout(closeTimer);
-    closeTimer = setTimeout(function wait() { if (hovered) closeTimer = setTimeout(wait, 800); else close(); }, ms);
+  function row(item) {
+    const line = document.createElement('span');
+    line.className = 'profile-apply-line ' + item.kind;
+    const values = item.note ? esc(item.note) :
+      (item.before != null ? '<s>' + esc(String(item.before)) + '</s><i> → </i>' : '') +
+      '<strong>' + esc(String(item.after ?? '')) + '</strong>';
+    line.innerHTML = '<b>' + esc(item.name) + '</b><span>' + values + '</span>';
+    const history = pane.querySelector('.profile-apply-history');
+    if (history.childElementCount === 2) history.firstElementChild.remove();
+    history.append(line);
   }
-  function start(title) {
-    clear();
-    if (box) box.remove();
-    box = document.createElement('aside');
-    box.className = 'apply-feed';
-    box.setAttribute('role', 'status');
-    box.setAttribute('aria-live', 'polite');
-    box.innerHTML = '<header><span class="af-spin" aria-hidden="true"></span><b>' + esc(title) + '</b><button type="button" class="af-x" aria-label="Close">&times;</button></header><ol class="af-rows"></ol><footer class="af-end" hidden></footer>';
-    box.querySelector('.af-x').onclick = close;
-    box.addEventListener('pointerenter', () => { hovered = true; });
-    box.addEventListener('pointerleave', () => { hovered = false; });
-    document.body.append(box);
-    return box;
+  function finish(label, message, phase) {
+    pane.dataset.phase = phase;
+    pane.querySelector('.profile-apply-head b').textContent = message;
+    ready(label, message);
+    if (phase !== 'warn') timer = setTimeout(() => pane.remove(), 6500);
   }
-  function row(kind, name, from, to, note) {
-    if (!box) return;
-    const list = box.querySelector('.af-rows');
-    const li = document.createElement('li');
-    li.className = 'af-row ' + kind;
-    li.innerHTML = '<span class="af-ic" aria-hidden="true">' + (kind === 'nv' ? '<span class="nv-mark"></span>' : kind === 'warn' ? '!' : hwIcon('display')) + '</span>' +
-      '<span class="af-name">' + esc(name) + (note ? '<small>' + esc(note) + '</small>' : '') + '</span>' +
-      (to != null ? '<span class="af-move">' + (from != null ? '<s>' + esc(String(from)) + '</s> ' : '') + '<b>' + esc(String(to)) + '</b></span>' : '');
-    list.append(li);
-    list.scrollTop = list.scrollHeight;
+  function fail(label, message) {
+    row({kind: 'warn', name: 'Apply failed', note: message});
+    finish(label, 'Apply failed', 'warn');
+    ready(label, 'Apply failed. ' + message);
   }
-  function finish(r) {
-    if (!box) return;
-    const nv = r && r.nvidia;
-    const trouble = r && ((r.skipped || []).length || (r.steps || []).some(s => !s.ok && !s.skipped));
-    const end = box.querySelector('.af-end');
-    box.querySelector('.af-spin').hidden = true;
-    if (r && r.intent) box.querySelector('header b').textContent = r.intent[0].toUpperCase() + r.intent.slice(1) + ' applied';
-    end.hidden = false;
-    end.className = 'af-end' + (nv && nv.ok ? ' nvidia' : '') + (trouble ? ' partly' : '');
-    end.innerHTML = (nv && nv.ok
-      ? '<span class="nv-badge" aria-hidden="true"><span class="nv-mark big"></span></span>'
-      : '<span class="af-badge" aria-hidden="true"></span>') +
-      '<svg class="af-tick" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m7 12.5 3.2 3.2L17 9"/></svg>' +
-      '<span class="af-done"><b>' + (trouble ? 'Applied, with a note above' : nv && nv.ok ? 'NVIDIA settings applied' : 'Settings applied') + '</b>' +
-      '<small>' + esc(r && r.intent ? r.intent[0].toUpperCase() + r.intent.slice(1) + ' mode is set' : '') + '</small></span>';
-    box.classList.add('done');
-    closeSoon(trouble ? 9000 : 4200);
+  function play(r, label) {
+    const steps = r.steps || (r.skipped || []).map(step => ({...step, ok: false, skipped: true}));
+    const changes = [
+      ...(r.video || []),
+      ...steps.flatMap(s => s.ok ? s.changes || [] : []),
+      ...(r.nvidia?.ok ? r.nvidia.changed || [] : []),
+    ];
+    const warnings = steps.filter(s => !s.ok && !(s.what === 'NVIDIA settings for CS2' && r.nvidia?.no_driver));
+    const items = [
+      ...changes.map(change => ({...change, kind: 'change'})),
+      ...warnings.map(step => ({
+        kind: 'warn',
+        name: (APPLY_WHAT[step.what] || step.what) + (step.skipped ? ' skipped' : ' failed'),
+        note: step.skipped && step.what === 'cs2_video.txt' ? 'Close CS2 and apply again.' :
+          step.skipped && step.what === 'Steam launch options' ? 'Close Steam and apply again.' :
+          step.detail || 'This setting was not changed.',
+      })),
+    ];
+    const total = items.length;
+    const head = pane.querySelector('.profile-apply-head');
+    const count = head.querySelector('small');
+    const fill = pane.querySelector('.profile-apply-track i');
+    const message = changes.length ? changes.length + ' updated' + (warnings.length ? ' · ' + warnings.length + ' to review' : '') :
+      warnings.length ? 'Review settings' : 'Already up to date';
+    let index = 0;
+    function next() {
+      if (index === total) {
+        finish(label, message, warnings.length ? 'warn' : 'done');
+        return;
+      }
+      row(items[index++]);
+      count.textContent = index + '/' + total;
+      fill.style.transform = 'scaleX(' + index / total + ')';
+      timer = setTimeout(next, 560);
+    }
+    if (total) head.querySelector('b').textContent = 'Settings';
+    next();
   }
-  function fail(text) {
-    if (!box) start('Applying');
-    row('warn', 'Not applied', null, null, text);
-    box.querySelector('.af-spin').hidden = true;
-    closeSoon(9000);
-  }
-  // Rows land one after another so each change can be read as it happens.
-  function play(r, title) {
-    if (!box) start(title);
-    const items = [];
-    (r.video || []).forEach(v => items.push(['cs2', v.name, v.before, v.after]));
-    if (r.nvidia && r.nvidia.ok) (r.nvidia.changed || []).forEach(v => items.push(['nv', v.name, v.before, v.after]));
-    (r.skipped || []).forEach(x => items.push(['warn', APPLY_WHAT[x.what] || x.what, null, null,
-      x.what === 'cs2_video.txt' ? 'CS2 is open. Close it, then pick the mode again.' : 'Steam is open. Close it, then pick the mode again.']));
-    if (r.nvidia && !r.nvidia.ok && !r.nvidia.no_driver) items.push(['warn', 'NVIDIA settings for CS2', null, null, r.nvidia.error || 'Not changed']);
-    if (!items.length) items.push(['cs2', 'Everything already matches', null, null]);
-    items.forEach((it, i) => later(() => row(...it), 120 + i * 170));
-    later(() => finish(r), 160 + items.length * 170 + 220);
-  }
-  return {start, play, fail, close};
+  return {start, play, fail};
 })();
 
 async function applyProfile(source) {
@@ -9008,22 +9005,25 @@ async function applyProfile(source) {
     $('verification-title').textContent = 'Applying and reading back…';
     $('verification').dataset.state = 'changed';
   }
-  const label = intent[0].toUpperCase() + intent.slice(1);
-  applyFeed.start('Applying ' + label);
   const body = requestBody();
+  const label = body.intent[0].toUpperCase() + body.intent.slice(1);
+  profileApplyFeed.start(body.intent, label);
   try {
     const r = await api("/api/apply", body);
-    if (!r.ok) throw new Error(r.error || 'Settings could not be applied');
-    r.intent = body.intent;
+    if (!r.ok) {
+      if (!r.skipped?.length) throw new Error(r.error || 'Settings could not be applied');
+      profileApplyFeed.play(r, label);
+      return;
+    }
     verificationDirty = false;
     verificationRevision++;
     renderVerification(r.verification, false);
     settleChanges();          // written to disk; nothing left to answer for
-    applyFeed.play(r, 'Applying ' + label);
+    profileApplyFeed.play(r, label);
     if (typeof loadNvidia === 'function' && settingsSub === 'nvidia') loadNvidia();
-    previewPlan();
+    previewPlan(true);
   } catch (e) {
-    applyFeed.fail(String(e && e.message || e));
+    profileApplyFeed.fail(label, String(e && e.message || e));
   } finally {
     profileApplyBusy = false;
     profileRail.syncStatus();
@@ -9088,10 +9088,12 @@ const profileRail = (() => {
     if (before !== current && announce) {
       animate(seat,[{transform:oldTransform,background:`color-mix(in srgb,${oldTone} 16%,transparent)`,borderColor:`color-mix(in srgb,${oldTone} 50%,transparent)`},{transform:seat.style.transform,background:`color-mix(in srgb,var(--tone) 16%,transparent)`,borderColor:'color-mix(in srgb,var(--tone) 50%,transparent)'}],560);
       const message = `${labels[names.indexOf(before)]} → ${labels[names.indexOf(current)]} · Profile selected`;
-      const note = root.querySelector('.pd-transition'); note.textContent = message; note.hidden = false;
       hideCaption();
       root.querySelector('.pd-live').textContent = message;
-      noteTimer = setTimeout(() => note.hidden = true, 1600);
+      if (!homeVisible()) {
+        const note = root.querySelector('.pd-transition'); note.textContent = message; note.hidden = false;
+        noteTimer = setTimeout(() => note.hidden = true, 1600);
+      }
     }
   }
   function peek() {

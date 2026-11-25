@@ -25,7 +25,7 @@ class ProfileRailWeb(unittest.TestCase):
             self.skipTest("Node is needed to exercise the profile selection path")
         page = PAGE.read_text(encoding="utf-8")
         choose = page[page.index("function chooseIntent("):page.index("(function wireModeCards")]
-        preview = page[page.index("let planRevision = 0"):page.index("/* The live \"applying\" list")]
+        preview = page[page.index("let planRevision = 0"):page.index("const APPLY_WHAT =")]
         start = page.index("async function applyProfile(")
         preview += page[start:page.index("/* Profile Rail:", start)]
         motion = page[page.index("function homeAnimate("):page.index("function homeVisible()")]
@@ -70,7 +70,7 @@ const toggle=()=>{};
 const settleChanges=()=>settled++;
 const renderVerification=()=>{};
 const profileRail={syncStatus(){}};
-const applyFeed={start:t=>feed.push(['start',t]),play:(r)=>feed.push(['play',r.intent]),fail:t=>feed.push(['fail',t])};
+const profileApplyFeed={start:(mode,label)=>feed.push(['start',mode,label]),play:(_,label)=>feed.push(['play',label]),fail:(_,text)=>feed.push(['fail',text])};
 const requestBody=()=>({intent});
 const api=(url,body)=>{calls.push([url,body]);return new Promise((resolve,reject)=>pending.push({url,resolve,reject}));};
 const renderPlan=p=>{planned=p;};
@@ -85,12 +85,12 @@ eval(source+`\n
   select('balanced');
   assert.equal(intent,'balanced');assert.equal(begin,0);assert.equal(notes.length,1);
   assert.equal(calls[0][0],'/api/apply');assert.equal(calls[0][1].intent,'balanced');
-  assert.deepEqual(feed[0],['start','Applying Balanced']);
+  assert.deepEqual(feed[0],['start','balanced','Balanced']);
   // A second pick while the first is still applying waits, then applies the newest.
   select('quality');assert.equal(intent,'quality','selection is never locked');
   assert.equal(calls.length,1,'one apply at a time');
   pending.shift().resolve({ok:true,steps:[],verification:{}});await tick();
-  assert.deepEqual(feed[1],['play','balanced']);
+  assert.deepEqual(feed[1],['play','Balanced']);
   assert.equal(calls[1][0],'/api/plan');
   assert.equal(calls[2][0],'/api/apply');assert.equal(calls[2][1].intent,'quality','queued pick applies the latest mode');
   pending.shift().resolve({intent:'balanced'});

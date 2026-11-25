@@ -1,8 +1,20 @@
 # Current batch
 
+| Task | State | Next step |
+| --- | --- | --- |
+| Bundle offline Stats map pictures | Implemented and verified locally | Await GUPDATE |
+| Animate profile changes inside Launcher cards | Implemented with a transparent background and verified locally | Await GUPDATE |
+| Claude handoff for Stats and Launcher changes | Queued in the agent log | Check the existing session after its reported reset |
+
+The local branch is `codex/offline-map-art-inline-profile`, based on
+`de0bdb0`. The published version is still 1.27.1.
+
+## Previous audit batch
+
 Owner authorized fixing the audit findings and building the proposed tools,
 then explicitly authorized GUPDATE after completion and verification.
-Codex owns branch codex/audit-hardening-and-tools from 1.26.8 / bec72dd.
+The audit batch shipped in 1.27.1. The table below records its prior local
+handoff before publication.
 
 | Task | State | Next step |
 | --- | --- | --- |

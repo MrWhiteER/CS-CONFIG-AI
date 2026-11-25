@@ -28,17 +28,18 @@ class _Session:
     stamp = "test"
 
 
-def _run(body, steam_up, cs2_up):
+def _run(body, steam_up, cs2_up, video_error=None, video_diff=None):
     """Drive _apply with everything underneath it stubbed out.
 
     Nothing real is written: the two write calls are mocks, and what is
     asserted is whether they were reached at all.
     """
     state = types.SimpleNamespace(
-        refresh=lambda *a, **k: None, kb=object(), machine=object(),
+        refresh=lambda *a, **k: None, kb=types.SimpleNamespace(
+            label=lambda key, value: str(value), ui_name=lambda key: key), machine=object(),
         cs2_install=None, cfg_folder="mrwhiteer", cfg_name="autoperf.vcfg",
         user_for=lambda account: object())
-    profile = types.SimpleNamespace(intent="quality", tier="C", video={})
+    profile = types.SimpleNamespace(intent="quality", tier="C", video={"setting.vsync": 0})
     launch = types.SimpleNamespace(line="", removed=[], added=[])
 
     with mock.patch.object(webui, "build_profile", return_value=profile), \
@@ -47,7 +48,8 @@ def _run(body, steam_up, cs2_up):
          mock.patch.object(webui.steam, "read_launch_options", return_value=""), \
          mock.patch.object(webui.steam, "steam_running", return_value=steam_up), \
          mock.patch.object(webui.steam, "cs2_running", return_value=cs2_up), \
-         mock.patch.object(webui.steam, "write_video_cfg", return_value={}) as wrote_video, \
+         mock.patch.object(webui.steam, "write_video_cfg", return_value=video_diff or {},
+                           side_effect=video_error) as wrote_video, \
          mock.patch.object(webui.steam, "write_launch_options", return_value="set") as wrote_launch, \
          mock.patch.object(webui.backup, "BackupSession", return_value=_Session()), \
          mock.patch.object(webui.backup, "prune"), \
@@ -131,6 +133,16 @@ class NothingInTheWay(unittest.TestCase):
         out, video, _ = _run(body, steam_up=False, cs2_up=False)
         video.assert_not_called()
         self.assertEqual(out["skipped"], [])
+
+    def test_video_receipt_describes_values_returned_by_the_writer(self):
+        out, _, _ = _run(BOTH, steam_up=False, cs2_up=False,
+                         video_diff={"setting.vsync": ("1", "0")})
+        self.assertEqual(out["video"], [{"name": "setting.vsync", "before": "1", "after": "0"}])
+
+    def test_failed_video_write_does_not_report_a_change(self):
+        out, _, _ = _run(BOTH, steam_up=False, cs2_up=False, video_error=OSError("Access denied"))
+        self.assertEqual(out["video"], [])
+        self.assertIn({"what": "cs2_video.txt", "ok": False, "detail": "Access denied"}, out["steps"])
 
 
 if __name__ == "__main__":

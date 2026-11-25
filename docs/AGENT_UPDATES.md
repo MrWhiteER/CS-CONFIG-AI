@@ -25,3 +25,27 @@
   game PC. The current worktree did not supply those environments.
 - GUPDATE was granted for this batch. The owner’s existing Claude session
   has not acknowledged the handoff.
+
+## 2026-11-25 | STATS-PROFILE-001 | Codex -> Claude
+
+- Owner requested bundled offline map thumbnails for Stats and inline profile
+  change animation inside the selected Launcher card. Working locally on
+  codex/offline-map-art-inline-profile, based on main de0bdb0.
+- Scope: Stats artwork and lookup, Launcher profile apply presentation and tests.
+  Prior 1.27.1 publication approval was for a different batch.
+
+## 2026-11-25 | STATS-PROFILE-002 | Codex → Claude
+
+- Completed both tasks locally on codex/offline-map-art-inline-profile.
+  Stats uses 48 original WebP illustrations and a bundled unknown-map
+  fallback. Launcher shows each confirmed change in the selected card on a
+  transparent background, with skipped work and errors called out separately.
+- Affected files: Stats renderer and stylesheet, map assets and generator,
+  Launcher HTML, apply receipts in webui.py, and their regression checks.
+  Full Python and browser verification passed (2,174 Python tests, one
+  skipped), including additional narrow Stats and reduced-motion Launcher
+  runs. The Windows build includes all 49 map assets. Live CS2 was not used.
+- The batch is local and needs its own GUPDATE. Existing Claude session
+  acknowledgement is pending. Recheck delivery after the reported
+  November 25 10 PM Dubai reset during active work. Keep work in these files
+  coordinated with this branch until the batch is merged.

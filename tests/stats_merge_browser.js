@@ -73,7 +73,14 @@ async function runStatsChecks(){
   check('ELO chart excludes CS2',document.querySelector('.fc-chart .fc-plot').getAttribute('aria-label').includes('8 matches'));
   check('no map or mode ids on screen',!/\b(de|cs|ar)_[a-z]|scrimcomp|premier-/.test($('fc-wrap').textContent));
   check('Dust II by its name',$('fc-wrap').textContent.includes('Dust II')&&$('fc-wrap').textContent.includes('Wingman'));
-  check('map picture from the game',document.querySelector('.fc-map-art').getAttribute('src').startsWith('/map-art/de_'));
+  const mapPicture = document.querySelector('.fc-map-art');
+  await mapPicture.decode();
+  check('Stats loads and displays offline art',mapPicture.getAttribute('src')==='assets/maps/de_mirage.webp'&&mapPicture.naturalWidth>0&&mapPicture.clientWidth>0);
+  check('map aliases and unknown maps use the right local assets',fcMapAsset('de_dustii')==='assets/maps/de_dust2.webp'&&fcMapAsset('unknown_workshop_map')===FC_MAP_PLAIN);
+  await Promise.all([FC_MAP_PLAIN,...Object.keys(FC_MAP_NAMES).map(fcMapAsset)].map(async src=>{
+    const image=new Image();image.src=src;await image.decode();
+  }));
+  check('every known map and fallback has decodable bundled art',true);
   document.querySelector('[data-fc-board]').click();
   check('CS2 Tab scoreboard opens',!$('mstat-back').classList.contains('hidden')&&document.querySelectorAll('#mstat-teams tbody tr').length===10);
   check('CS2 scoreboard columns',[...document.querySelectorAll('#mstat-teams thead th')].slice(0,9).map(e=>e.textContent).join('|')==='Player|Ping|K|A|D|MVP|HS%|Score|K/D');

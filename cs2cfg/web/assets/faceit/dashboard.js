@@ -15,16 +15,16 @@ const FC_MAP_BY_NAME = Object.fromEntries(Object.entries(FC_MAP_NAMES).map(([k,v
 function fcMapId(map) {
   const key = String(map || '').trim().toLowerCase().replace(/\\/g,'/').split('/').pop().replace(/\s+/g,'_');
   if (!key) return '';
-  if (FC_MAP_NAMES[key]) return key;
-  if (FC_MAP_ALIASES[key]) return FC_MAP_ALIASES[key];
+  if (Object.hasOwn(FC_MAP_NAMES, key)) return key;
+  if (Object.hasOwn(FC_MAP_ALIASES, key)) return FC_MAP_ALIASES[key];
   const flat = fcFlat(key.replace(FC_MAP_PREFIX, ''));
-  if (FC_MAP_BY_NAME[flat]) return FC_MAP_BY_NAME[flat];
+  if (Object.hasOwn(FC_MAP_BY_NAME, flat)) return FC_MAP_BY_NAME[flat];
   return FC_MAP_PREFIX.test(key) || key.includes('_') ? key : 'de_' + key;
 }
 function fcMapName(map) {
   const key = fcMapId(map);
   if (!key) return 'Unknown map';
-  if (FC_MAP_NAMES[key]) return FC_MAP_NAMES[key];
+  if (Object.hasOwn(FC_MAP_NAMES, key)) return FC_MAP_NAMES[key];
   return key.replace(FC_MAP_PREFIX, '').split(/[_-]+/).filter(Boolean).map(w => w[0].toUpperCase() + w.slice(1)).join(' ') || 'Unknown map';
 }
 /* The mode as CS2 shows it: the game's own icon (from the player's install)
@@ -48,12 +48,11 @@ function fcModeName(mode) {
   return FC_MODE_NAMES[text.toLowerCase().replace(/[\s_-]/g, '')] ||
     text.split(/[\s_-]+/).filter(Boolean).map(w => w[0].toUpperCase() + w.slice(1).toLowerCase()).join(' ');
 }
-/* The real picture from the player's own CS2 install, cut out of the game's
-   files by the app (/map-art/). No CS2 on this PC: a plain card instead. */
+/* Bundled thumbnails are available as soon as Stats opens. */
 const FC_MAP_PLAIN = 'assets/maps/fallback.webp';
 function fcMapAsset(map) {
   const key = fcMapId(map);
-  return key ? '/map-art/' + encodeURIComponent(key) + '.png' : FC_MAP_PLAIN;
+  return Object.hasOwn(FC_MAP_NAMES, key) ? 'assets/maps/' + key + '.webp' : FC_MAP_PLAIN;
 }
 function fcMapFallback(img) {
   img.onerror = null;

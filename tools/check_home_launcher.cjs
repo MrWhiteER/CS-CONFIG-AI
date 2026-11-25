@@ -15,6 +15,8 @@ code+=slice('const CHIPS = { CPU:', '// -- 2. the gradient');
 code+=slice('/* Launcher motion:','function renderPlan(');
 code+=`const verificationNavigation=[];function setTab(name){verificationNavigation.push(name);document.querySelectorAll('.tab-panel').forEach(panel=>panel.classList.toggle('hidden',panel.dataset.panel!==name))};`;
 code+=slice('/* Every card uses','const APPLY_WHAT =');
+code+=slice('const APPLY_WHAT =','/* Profile Rail:').replace('async function applyProfile(', 'async function applyProfileForCheck(');
+code+='const profileRail={syncStatus(){}};function settleChanges(){};';
 code+='function busy(){};';
 code+=`let fpsEffect='';function renderFps(){}function markPending(){};`;
 code+=slice('function renderPlan(', '// The last detection,');
@@ -191,6 +193,36 @@ intent='competitive';const first=previewPlan();intent='quality';const second=pre
 check('Steam launch options use latest same plan',$('steam-launch-out').textContent.includes('-new')&&!$('assessment-out').textContent.includes('-new'));
 presetBegin('quality');const failed=previewPlan();queue[2].reject(Error('Offline'));await failed;check('plan failure releases dimmer and preview button',!presetSession&&!$('steam-preview').disabled);
 api=oldApi;intent='balanced';paintIntent(intent);renderPlan(planFor('balanced'));
+const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+const selectedCard=$('intents').querySelector('[aria-pressed="true"]');
+api=async route=>route==='/api/apply'?{
+  ok:true,verification:receipt,video:[{name:'Ambient Occlusion',before:'High',after:'Low'}],
+  nvidia:{ok:true,changed:[{name:'Texture filtering',before:'Quality',after:'Performance'}]},
+  steps:[{what:'Steam launch options',skipped:true,ok:false}],
+}:planFor(intent);
+const applying=applyProfileForCheck('mode');
+const feed=selectedCard.querySelector('.profile-apply');
+check('apply starts inside the selected profile card',!!feed&&feed.textContent.includes('Applying')&&!document.querySelector('.apply-feed,.preset-veil'));
+await applying;
+check('first change shows former and new values',feed.querySelectorAll('.profile-apply-line').length===1&&feed.textContent.includes('High → Low'));
+const cardRect=selectedCard.getBoundingClientRect(),feedRect=feed.getBoundingClientRect();
+check('apply animation stays within the profile card',feedRect.left>cardRect.left&&feedRect.right<=cardRect.right&&feedRect.top>=cardRect.top&&feedRect.bottom<=cardRect.bottom);
+check('apply feed has a transparent background',getComputedStyle(feed).backgroundColor==='rgba(0, 0, 0, 0)'&&getComputedStyle(feed).backgroundImage==='none');
+const cards=$('intents');cards.style.maxWidth='520px';
+const narrowCard=selectedCard.getBoundingClientRect(),narrowFeed=feed.getBoundingClientRect();
+const narrowTitle=selectedCard.querySelector('.mode-copy').getBoundingClientRect();
+check('compact cards keep the change feed above the profile title',narrowFeed.width>100&&narrowFeed.left>=narrowCard.left&&narrowFeed.right<=narrowCard.right&&narrowFeed.bottom<narrowTitle.top);
+cards.style.removeProperty('max-width');
+if(matchMedia('(prefers-reduced-motion: reduce)').matches)check('reduced motion keeps rows static',getComputedStyle(feed.querySelector('.profile-apply-line')).animationName==='none');
+await sleep(650);
+check('the next setting appears in sequence',feed.querySelectorAll('.profile-apply-line').length===2&&feed.textContent.includes('Texture filtering'));
+await sleep(1200);
+check('skipped settings are announced separately',feed.dataset.phase==='warn'&&feed.textContent.includes('Close Steam')&&$('profile-apply-live').textContent.includes('2 updated · 1 to review'));
+const beforeRetry=previews;selectedCard.click();check('clicking the card with a warning retries the same profile',previews===beforeRetry+1);
+api=async route=>route==='/api/apply'?{ok:false,error:'Access denied'}:planFor(intent);
+intent='quality';paintIntent(intent);await applyProfileForCheck('mode');
+check('switching cards cancels the previous feed and reports failure on the new card',!feed.isConnected&&$('intents').querySelector('[data-intent="quality"] .profile-apply').textContent.includes('Access denied'));
+api=oldApi;intent='balanced';paintIntent(intent);
 for(const theme of ${JSON.stringify(themes)}){document.documentElement.dataset.theme=theme;presetBegin('balanced');presetReveal(sample);const row=document.querySelector('.preset-row');check('preset readable in '+theme,getComputedStyle(row).color!==getComputedStyle(document.querySelector('.preset-changes')).backgroundColor);check('dimmer cuts window through selected card in '+theme,document.querySelector('.preset-veil').style.clipPath.includes('evenodd'));presetClose();}delete document.documentElement.dataset.theme;
 renderVerification(receipt);$('verification').open=location.hash.includes('verification');
 if(location.hash.includes('changed')){renderVerification({...receipt,verified:7,items:receipt.items.map((item,i)=>({...item,status:i===0?'changed':i===1?'failed':item.status,detail:i===0?'CS2 changed this value after Apply. Close CS2 and apply again.':i===1?'Config write failed: access denied.':item.detail}))},true);api=async()=>({...receipt,verified:7,items:receipt.items.map((item,i)=>({...item,status:i===0?'changed':i===1?'failed':item.status,detail:i===0?'CS2 changed this value after Apply. Close CS2 and apply again.':i===1?'Config write failed: access denied.':item.detail}))})}
@@ -203,6 +235,7 @@ if(location.hash.includes('settings-apply')){document.querySelector('[data-panel
 if(location.hash.includes('settings-steam')){panel.classList.add('hidden');settingsPanel.classList.remove('hidden');setSettingsSub('steam',true);$('who-name').textContent='Edy';$('who-how').textContent='Following Steam';}
 if(location.hash.includes('settings-account')){panel.classList.add('hidden');settingsPanel.classList.remove('hidden');setSettingsSub('account',true);cloudData={configured:true,signed_in:false,google:true};renderCloud();}
 if(location.hash.includes('preset')){presetBegin('balanced');presetReveal(sample);await new Promise(r=>setTimeout(r,780));clearTimeout(presetSession.timer);$('intents').scrollIntoView({block:'center'});}
+if(location.hash.includes('profile-apply')){profileApplyFeed.start('balanced','Balanced');profileApplyFeed.play({video:[{name:'Ambient Occlusion',before:'High',after:'Low'},{name:'Texture filtering',before:'Quality',after:'Performance'}],steps:[{what:'Steam launch options',ok:false,skipped:true}]},'Balanced');await sleep(1750);$('intents').scrollIntoView({block:'center'});}
 if(location.hash.includes('connection-offline'))renderNet({...measured,download:{mbps:null,error:'offline'}});
 if(location.hash.includes('connection'))$('chip-net').click();
 if(location.hash.includes('cold')){hardwareGraph.at=null;hardwareGraph.data={};hardwareUpdate({at:200,history:{cpu:[22,31,27],gpu:[48,55,51],ram:[52,52,53],vram:[18,19,19]},gpu:{}});hardwarePause();$('live-card').scrollIntoView({block:'start'})}

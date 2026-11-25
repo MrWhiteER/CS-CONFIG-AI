@@ -183,9 +183,8 @@
  [data-panel="faceit"] .fc-form { margin:10px 0; }
  [data-panel="faceit"] .fc-sources button { padding:8px; gap:6px; }
  [data-panel="faceit"] .fc-sources .fc-source-icon { display:none; }
- [data-panel="faceit"] .fc-match-toggle { grid-template-columns:minmax(70px,1fr) 26px 65px; padding:12px; }
- [data-panel="faceit"] .fc-map-art { display:none; }
- [data-panel="faceit"] .fc-match-toggle > .fc-result { grid-column:2; }
+ [data-panel="faceit"] .fc-match-toggle { grid-template-columns:48px minmax(55px,1fr) 26px 60px; padding-right:8px; }
+ [data-panel="faceit"] .fc-map-art { width:48px; }
  [data-panel="faceit"] .fc-player { gap:10px; }
  [data-panel="faceit"] .fc-rating { margin-left:0; }
 }
