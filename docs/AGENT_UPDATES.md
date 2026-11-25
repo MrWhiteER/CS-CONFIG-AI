@@ -107,3 +107,14 @@
 - The local Launcher uses the owner's actual Dust II screenshot. The image
   is not bundled. An authentic ace screenshot and ready-made keyboard poses
   remain outstanding. GUPDATE and Claude acknowledgement remain pending.
+
+## 2026-11-25 | LAUNCHER-SCENE-003 | Codex → Claude
+
+- Removed the monitor's letterboxing and anchored the screenshot crop to
+  the top right to preserve the kill feed. Added preferred stock agent
+  filenames `ct-default.png` and `t-default.png` for supplied frames.
+- The local CS2 config and Steam inventory response do not establish which
+  agent is equipped. The stock files are the Launcher default when
+  present. The exact seated stock artwork remains outstanding.
+- Scope: Launcher styling, agent asset resolution and regression checks.
+  Pending GUPDATE and existing Claude acknowledgement.

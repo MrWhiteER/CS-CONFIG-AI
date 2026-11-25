@@ -20,7 +20,7 @@ class LauncherMedia(unittest.TestCase):
             source.write_bytes(b"0123456789")
             agents = root / "launcher-agents"
             agents.mkdir()
-            (agents / "ct.png").write_bytes(b"supplied sheet")
+            (agents / "ct.png").write_bytes(b"unspecified agent")
             state = SimpleNamespace(token="app-token", scene_token="media-ticket")
             with mock.patch.object(launcher_media, "user_data_dir", return_value=root), \
                  mock.patch("cs2cfg.picker.pick_gameplay_screenshot", return_value=str(source)), \
@@ -34,9 +34,10 @@ class LauncherMedia(unittest.TestCase):
                     with urlopen(setup, timeout=3) as response:
                         media = json.load(response)
                     self.assertEqual(media["screenshot"], source.name)
-                    self.assertEqual(list(media["agents"]), ["ct"])
-                    with urlopen(base + media["agents"]["ct"], timeout=3) as response:
-                        self.assertEqual(response.read(), b"supplied sheet")
+                    self.assertEqual(media["agents"], {})
+                    (agents / "ct-default.png").write_bytes(b"stock CT sheet")
+                    with urlopen(base + "/launcher-agent/ct?ticket=" + state.scene_token, timeout=3) as response:
+                        self.assertEqual(response.read(), b"stock CT sheet")
                     with self.assertRaises(HTTPError) as denied:
                         urlopen(base + "/launcher-screenshot", timeout=3)
                     self.assertEqual(denied.exception.code, 403)

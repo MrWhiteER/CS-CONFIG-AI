@@ -10,7 +10,7 @@ from .paths import user_data_dir
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 MAX_SIZE = 20 * 1024 * 1024
-AGENT_FILES = {"ct": "ct.png", "t": "t.png"}
+AGENT_FILES = {"ct": "ct-default.png", "t": "t-default.png"}
 
 
 def _config() -> Path:
@@ -28,14 +28,16 @@ def screenshot() -> Path | None:
 
 
 def agent_sheet(side: str) -> Path | None:
+    """Load the supplied stock agent sheet for the selected side."""
     filename = AGENT_FILES.get(side)
-    if filename:
-        path = user_data_dir() / "launcher-agents" / filename
-        try:
-            if _valid(path):
-                return path
-        except OSError:
-            pass
+    if not filename:
+        return None
+    path = user_data_dir() / "launcher-agents" / filename
+    try:
+        if _valid(path):
+            return path
+    except OSError:
+        pass
     return None
 
 

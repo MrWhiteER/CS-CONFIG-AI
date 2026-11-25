@@ -44,6 +44,8 @@ launcherScene.connect(async()=>({ok:true,screenshot:'gameplay.jpg',url:still,age
 await Promise.resolve();
 await screen.decode();
 check('Launcher shows a static screenshot without video playback',screen.naturalWidth>0&&!hero.querySelector('video'));
+const screenStyle=getComputedStyle(screen);
+check('gameplay fills the monitor and keeps the top-right kill feed in frame',screenStyle.objectFit==='cover'&&screenStyle.objectPosition==='100% 0%');
 if (hasAgent) await agentReady;
 check('Launcher uses a supplied agent sheet or an empty chair',agent.parentElement.hidden===!hasAgent);
 check('hero waits for CS2 process status before animating hands',hero.classList.contains('scene-paused'));

@@ -2,8 +2,8 @@
 
 | Task | State | Next step |
 | --- | --- | --- |
-| Show exact CT and T agents in a seated keyboard pose | Launcher accepts prepared character frames locally | Supply ready-made seated asset frames |
-| Show a static CS2 ace screenshot on the monitor | Existing Dust II screenshot selected locally and still-image support verified | Supply an ace screenshot with its kill feed visible |
+| Show exact CT and T agents in a seated keyboard pose | Launcher prefers supplied stock CT and T frames | Supply ready-made stock seated frames |
+| Show a static CS2 ace screenshot on the monitor | Dust II screenshot fills the monitor and retains the top-right area | Supply an ace screenshot with its kill feed visible |
 | Stop Launcher scene during CS2 | Launch, running-process, and reduced-motion behavior checked | Await GUPDATE |
 
 ## Prior Inventory batch
