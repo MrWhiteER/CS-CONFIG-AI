@@ -27,11 +27,16 @@ def main():
             checks=sorted(p for p in (ROOT/'tools').glob('check_*.cjs') if p.name!='check_faceit_dashboard.cjs')
             commands.extend([node,str(p)] for p in checks)
             commands.extend([[node,'tools/lineups_preview.cjs','--check'],[node,'tools/overlay_preview.cjs','--check']])
+        failures = []
         for command in commands:
             print('\nRunning: '+' '.join(command),flush=True)
             result=subprocess.run(command,cwd=ROOT,env=env)
             if result.returncode:
-                return result.returncode
+                failures.append((' '.join(command), result.returncode))
+        if failures:
+            for command, code in failures:
+                print(f'Failed ({code}): {command}')
+            return 1
     print('\nAll required verification checks passed.')
     return 0
 
