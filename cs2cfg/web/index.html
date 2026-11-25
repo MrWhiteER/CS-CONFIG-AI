@@ -6459,8 +6459,8 @@ const startup = (() => {
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13l-7 7a2 2 0 01-3 0l-7-7V4h9l8 6a2 2 0 010 3z"/><circle cx="7.5" cy="8" r="1"/></svg></i><span class="tx">All Skins</span></button>
       <button class="tab" data-tab="cs2" role="tab" aria-selected="false" title="CS2 Settings">
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.3"/><circle cx="10" cy="17" r="2.3"/></svg></i><span class="tx">CS2 Settings</span></button>
-      <button class="tab" data-tab="keyboard" role="tab" aria-selected="false" title="Keyboard">
-        <i class="ic"><span data-hardware-icon="keyboard"></span></i><span class="tx">Keyboard</span></button>
+      <button class="tab" data-tab="keyboard" role="tab" aria-selected="false" title="Controls">
+        <i class="ic"><span data-hardware-icon="keyboard"></span></i><span class="tx">Controls</span></button>
       <button class="tab" data-tab="scripts" role="tab" aria-selected="false" title="Scripts">
         <i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7l-5 5 5 5M15 7l5 5-5 5"/></svg></i><span class="tx">Scripts</span></button>
       <button class="tab" data-tab="builder" role="tab" aria-selected="false" title="Script Builder">
@@ -6836,7 +6836,7 @@ const startup = (() => {
       <section class="editor">
         <div class="editor-head">
           <span class="etitle" id="cs2-etitle">Settings</span>
-          <button class="kb-open small" data-goto-keyboard title="Open the keyboard view">
+          <button class="kb-open small" data-goto-keyboard title="Open Controls">
             <span class="kb-open-ring"></span>
             <span class="kb-open-glyph">&#9000;</span>
           </button>
@@ -6865,10 +6865,10 @@ const startup = (() => {
     <div class="tab-panel hidden" data-panel="keyboard">
       <div class="hero">
         <div class="hero-copy">
-          <div class="eyebrow">Binds</div>
-          <h2>Keyboard &amp; mouse</h2>
+          <div class="eyebrow">Keyboard &amp; mouse</div>
+          <h2>Controls</h2>
           <p>
-            Click a key to see or change its bind.
+            Select a key or mouse button to view or change its bind.
           </p>
         </div>
       </div>
@@ -6902,10 +6902,10 @@ const startup = (() => {
           <span class="spacer"></span>
           <button class="btn ghost small" id="plug-reload">Re-read</button>
         </div>
-        <button class="kb-open" data-goto-keyboard title="Open the keyboard view">
+        <button class="kb-open" data-goto-keyboard title="Open Controls">
           <span class="kb-open-ring"></span>
           <span class="kb-open-glyph">&#9000;</span>
-          <span class="kb-open-text">Keyboard<small>see your binds</small></span>
+          <span class="kb-open-text">Controls<small>see your binds</small></span>
         </button>
         <div class="subtabs" id="plug-tabs"></div>
         <div id="plug-out"><span class="sub">Scan a configuration folder first.</span></div>
@@ -7238,7 +7238,7 @@ const startup = (() => {
         <div class="config-guide">
           <article><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3H15L20 8V21H5ZM15 3V8H20M8 13H16M8 17H14"/></svg><div><b>Start here</b><small>Loads the other files when CS2 starts.</small><code>autoexec.vcfg</code></div></article>
           <article><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V12M10 19V5M16 19V9M22 19V3"/></svg><div><b>Performance</b><small>Applies the preset chosen for this PC.</small><code>Generated performance config</code></div></article>
-          <article><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7H21V18H3ZM6 10H7M10 10H11M14 10H15M18 10H19M7 14H17"/></svg><div><b>Your keys</b><small>Saves shortcuts from the Keyboard tab.</small><code>mainsettings/key_binds.vcfg</code></div></article>
+          <article><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7H21V18H3ZM6 10H7M10 10H11M14 10H15M18 10H19M7 14H17"/></svg><div><b>Your keys</b><small>Saves shortcuts from the Controls tab.</small><code>mainsettings/key_binds.vcfg</code></div></article>
           <article><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6H20M4 12H20M4 18H20M8 3V9M16 9V15M10 15V21"/></svg><div><b>Game settings</b><small>Keeps your crosshair, radar and sound.</small><code>mainsettings/gamesettings.vcfg</code></div></article>
           <article><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4L3 12L8 20M16 4L21 12L16 20M14 3L10 21"/></svg><div><b>Your scripts</b><small>Gives a name to a sequence of actions.</small><code>tools/alias.vcfg</code></div></article>
           <article><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3V16M7 11L12 16L17 11M4 16V21H20V16"/></svg><div><b>Brought from your files</b><small>Keeps imported commands in their load order.</small><code>mainsettings/imported.vcfg · optional</code></div></article>
@@ -7258,7 +7258,7 @@ const startup = (() => {
         <p class="sub" style="margin:0 0 9px">
           This account has no config of its own yet, so there is nothing to read and nowhere
           to write a key bind to. Creating one lays out the usual folders and an
-          <code>autoexec.vcfg</code> that execs them, ready for the Keyboard and Scripts tabs.
+          <code>autoexec.vcfg</code> that execs them, ready for the Controls and Scripts tabs.
           Nothing that already exists is ever overwritten.
         </p>
         <div id="starter-what" class="sub2"></div>
@@ -14737,7 +14737,7 @@ async function loadCloud() {
   try { cloudData = await api("/api/cloud", {}); }
   catch (err) { cloudData = { configured: false, error: String(err && err.message || err) }; }
   renderCloud();
-  // The Keyboard tab's sync buttons depend on this too, and may already be
+  // The Controls tab's sync buttons depend on this too, and may already be
   // drawn with a stale "signed out" state from before this resolved.
   if (typeof renderKbProfiles === "function") renderKbProfiles();
 }
@@ -16346,7 +16346,7 @@ document.addEventListener("change", async e => {
                (r.backup ? ", backup " + r.backup : ""));
       }
     }
-    // The Keyboard tab and Script Builder read the same files: re-read them.
+    // The Controls tab and Script Builder read the same files: re-read them.
     keyData = null; sb.saved = null;
     await loadPlugins(true);
   } catch (err) {
@@ -17685,7 +17685,7 @@ const sb = {data: null, spec: {name: "", mode: "press", steps: []}, binding: "",
             saving: false, timer: 0};
 
 // The saved list is read again on every visit: a script switched off on the
-// Scripts tab, or moved to another key on the Keyboard tab, shows that here.
+// Scripts tab, or moved to another key on the Controls tab, shows that here.
 async function sbRefreshSaved() {
   try { sb.saved = (await api("/api/scriptgen/saved", {})).scripts || []; } catch (_) { return; }
   if (activeTab === "builder" && sb.data) sbRender();
@@ -17697,7 +17697,7 @@ function sbOpenSaved(x) {
     steps: (sp.steps || []).map(s => Object.assign(sbNewStep(s.id), s)),
     release_steps: (sp.release_steps || []).map(s => Object.assign(sbNewStep(s.id), s))};
   if (sp.lines) sb.spec.lines_text = sp.lines.join("\n");
-  // The key that really runs it now, which the Keyboard tab may have changed.
+  // The key that really runs it now, which the Controls tab may have changed.
   sb.binding = x.binding_now || sp.binding || "";
   sb.keyLabel = (x.keys && x.keys[0]) || x.key || "";
   sb.target = sp.target || ""; sb.targetLabel = x.target || "";
