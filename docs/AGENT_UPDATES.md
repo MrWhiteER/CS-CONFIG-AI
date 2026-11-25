@@ -130,3 +130,16 @@
   the Launcher browser checks. No stock T model was supplied, so pose
   transfer across variants remains unverified. Claude acknowledgement
   and GUPDATE remain pending.
+
+## 2026-11-25 | LAUNCHER-SCENE-005 | Codex → Claude
+
+- Owner asked to put the chair in front of the desk, preserve the SAS
+  body pose, straighten the hands, and add gaming peripherals with
+  theme and keybind lighting. The new workstation includes a handheld,
+  fader mixer, and microphone. The SAS placement and rendered hand
+  frames were adjusted locally to match it.
+- The Launcher uses the existing CS2 HID color palette for its
+  photographed keyboard. Desk lighting follows the theme and pauses
+  during launch or play. Affected files: Launcher home art, HTML,
+  scene script, media tests, and web UI. The supplied SAS asset remains
+  local. No GUPDATE or existing Claude acknowledgement.

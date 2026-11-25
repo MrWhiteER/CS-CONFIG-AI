@@ -1072,6 +1072,15 @@ def _rgb(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
     return {"ok": True, **state.rgb.status()}
 
 
+def _launcher_lighting(state: State, _body: Dict[str, Any]) -> Dict[str, Any]:
+    from dataclasses import asdict
+
+    if getattr(state, "cfg_scan", None) is not None:
+        _cfg_keys(state, {})
+    frame = state.rgb.frame()
+    return {"ok": True, "frame": asdict(frame) if frame is not None else None}
+
+
 def _rgb_settings(state: State, body: Dict[str, Any]) -> Dict[str, Any]:
     """Change the lighting setting, remember it, and apply it now."""
     from .cli import load_prefs, save_prefs
@@ -7066,6 +7075,7 @@ def make_handler(state: State):
         "/api/companions": _companions,
         "/api/inventory": _inventory,
         "/api/launcher/media": _launcher_media,
+        "/api/launcher/lighting": _launcher_lighting,
         "/api/inventory/inspect": _inventory_inspect,
         "/api/skins/catalog": _skins_catalog,
         "/api/skins/music": _skins_music,

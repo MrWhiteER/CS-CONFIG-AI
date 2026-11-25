@@ -10,9 +10,20 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from cs2cfg import launcher_media, webui
+from cs2cfg.rgb import palette
 
 
 class LauncherMedia(unittest.TestCase):
+    def test_launcher_reuses_the_configured_keyboard_palette(self):
+        frame = palette.frame({"scancode26": {"is_default": True},
+                               "scancode4": {"is_default": False}}, brightness=80)
+        lighting = mock.Mock()
+        lighting.frame.return_value = frame
+        state = SimpleNamespace(rgb=lighting)
+        result = webui._launcher_lighting(state, {})
+        self.assertEqual(result["frame"]["keys"], frame.keys)
+        self.assertEqual(result["frame"]["base"], frame.base)
+
     def test_screenshot_selection_and_serving_over_local_server(self):
         with TemporaryDirectory() as folder:
             root = Path(folder)

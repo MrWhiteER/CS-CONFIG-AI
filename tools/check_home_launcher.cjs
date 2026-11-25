@@ -40,12 +40,18 @@ const hasAgent = ${JSON.stringify(Boolean(process.env.HOME_AGENT_FILE || !proces
 const sheet = ${JSON.stringify(process.env.HOME_AGENT_FILE ? url.pathToFileURL(path.resolve(process.env.HOME_AGENT_FILE)).href : 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAYAAAABCAYAAAD9yd/wAAAAFklEQVR4nGO8tFTuPwMUdNzdAmMyAABRGwSvVb32FgAAAABJRU5ErkJggg==')};
 const agent = $('launcher-agent');
 const agentReady = new Promise(resolve => agent.addEventListener('load',resolve,{once:true}));
-launcherScene.connect(async()=>({ok:true,screenshot:'gameplay.jpg',url:still,agents:hasAgent?{ct:sheet}:{}}),()=>{});
+launcherScene.connect(async route=>route==='/api/launcher/lighting'?
+  {ok:true,frame:{keys:{26:[61,139,253],4:[255,183,43],22:[61,139,253],7:[61,139,253],9:[255,45,149],21:[61,139,253],44:[61,139,253]},base:[14,14,20]}}:
+  {ok:true,screenshot:'gameplay.jpg',url:still,agents:hasAgent?{ct:sheet}:{}},()=>{});
 await Promise.resolve();
 await screen.decode();
 check('Launcher shows a static screenshot without video playback',screen.naturalWidth>0&&!hero.querySelector('video'));
 const screenStyle=getComputedStyle(screen);
 check('gameplay fills the monitor and keeps the top-right kill feed in frame',screenStyle.objectFit==='cover'&&screenStyle.objectPosition==='100% 0%');
+const keyLights=$('launcher-key-lights');
+check('desk keyboard uses the CS2 RGB palette for individual keys',
+  keyLights.querySelector('[data-usage="26"]').style.getPropertyValue('--key-light')==='rgb(61,139,253)'&&
+  keyLights.querySelector('[data-usage="4"]').style.getPropertyValue('--key-light')==='rgb(255,183,43)');
 if (hasAgent) await agentReady;
 check('Launcher uses a supplied agent sheet or an empty chair',agent.parentElement.hidden===!hasAgent);
 check('hero waits for CS2 process status before animating hands',hero.classList.contains('scene-paused'));
@@ -56,6 +62,7 @@ if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
   check('hands animate while Launcher is idle',!hero.classList.contains('scene-paused'));
   launcherScene.launching(true);
   check('Play immediately freezes hands and keeps the same screenshot',screen.getAttribute('src')===still&&hero.classList.contains('scene-paused'));
+  check('Play freezes the desk RGB animation',getComputedStyle(hero.querySelector('.launcher-desk-light')).animationPlayState==='paused');
   launcherScene.activity(true);launcherScene.launching(false);
   check('running CS2 keeps the hands still',hero.classList.contains('scene-paused'));
   launcherScene.activity(false);

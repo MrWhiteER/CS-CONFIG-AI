@@ -5747,20 +5747,29 @@
 .hero-art { position:absolute; inset:0; z-index:-2; overflow:hidden; pointer-events:none; background:#101820; }
 .hero-scene { position:absolute; inset:0 0 0 auto; width:max(100%,1050px); overflow:hidden; }
 .hero-background,.hero-agent-layer { position:absolute; inset:0; width:100%; height:100%; }
+.launcher-desk-rgb { position:absolute; inset:0; --desk-light:color-mix(in srgb,var(--accent) 78%,white); }
+.launcher-desk-light { position:absolute; color:var(--desk-light); animation:launcher-rgb-pulse 5s ease-in-out infinite alternate; }
+.launcher-desk-mic { left:31.6%; top:47.7%; width:3%; height:13.3%; border-radius:14% 14% 16% 16%; background:linear-gradient(90deg,transparent,currentColor 52%,transparent); opacity:.62; mix-blend-mode:screen; }
+.launcher-desk-monitor { left:38.5%; top:71.3%; width:40.1%; height:3%; clip-path:polygon(0 84%,100% 0,100% 13%,0 100%); background:currentColor; opacity:.68; }
+.launcher-desk-mixer { left:34.4%; top:91.5%; width:9%; height:1.4%; background:repeating-linear-gradient(90deg,currentColor 0 5%,transparent 6% 12.5%); filter:blur(.5px); transform:rotate(-2deg); }
+.launcher-desk-handheld { left:19%; top:93.4%; width:10.2%; height:4.6%; background:radial-gradient(ellipse,currentColor,transparent 69%); opacity:.38; mix-blend-mode:screen; }
+.launcher-desk-keys { position:absolute; inset:0; }
+.launcher-desk-keys i { position:absolute; width:.65%; height:.45%; border-radius:30%; color:var(--key-light,var(--desk-light)); background:currentColor; box-shadow:0 0 .32em currentColor; transform:translate(-50%,-50%) rotate(-5deg); opacity:.84; }
+@keyframes launcher-rgb-pulse { from { filter:brightness(.65); } to { filter:brightness(1.25); } }
 .hero-agent-layer { overflow:hidden; }
 .hero-agent-layer[hidden] { display:none; }
 #launcher-agent { display:block; width:200%; height:100%; animation:hero-keypress 2.6s steps(1,end) infinite; }
 #launcher-screenshot { position:absolute; top:8%; bottom:26.1%; left:38.4%; right:21.2%; width:40.4%; height:65.9%; object-fit:cover; object-position:right top; background:#030304; clip-path:polygon(0 0,100% 2.3%,99.7% 95.4%,.35% 100%); }
 #launcher-screenshot:not([src]) { display:none; }
-.scene-paused #launcher-agent { animation-play-state:paused; }
+.scene-paused :is(#launcher-agent,.launcher-desk-light) { animation-play-state:paused; }
 .hero-gameplay-actions { display:flex; align-items:center; gap:6px; margin-left:8px; letter-spacing:normal; }
 .hero-gameplay-actions [hidden] { display:none; }
 @keyframes hero-keypress {
   0%,28%,48%,68%,100% { transform:none; }
   21%,41%,61% { transform:translateX(-50%); }
 }
-@media(prefers-reduced-motion:reduce) { #launcher-agent { animation:none; } }
-.home-hero::after { content:''; position:absolute; inset:0; z-index:-1; background:linear-gradient(90deg,var(--panel) 0%,color-mix(in srgb,var(--panel) 96%,transparent) 28%,color-mix(in srgb,var(--panel) 76%,transparent) 40%,transparent 55%); pointer-events:none; }
+@media(prefers-reduced-motion:reduce) { #launcher-agent,.launcher-desk-light { animation:none; } }
+.home-hero::after { content:''; position:absolute; inset:0; z-index:-1; background:linear-gradient(90deg,var(--panel) 0%,color-mix(in srgb,var(--panel) 96%,transparent) 28%,color-mix(in srgb,var(--panel) 76%,transparent) 40%,transparent 55%); mask-image:linear-gradient(#000 0 70%,#000a 85%,#0004 100%); pointer-events:none; }
 .home-hero .hero-copy { width:48%; max-width:580px; position:relative; }
 .hero-brand { display:flex; align-items:center; flex-wrap:wrap; gap:10px; font:600 11px var(--mono); letter-spacing:.18em; color:var(--muted); margin-bottom:24px; }
 .hero-brand .config-mark { width:32px; height:32px; }
@@ -5770,6 +5779,7 @@
 .home-hero .hero-play { width:100%; max-width:460px; }
 .home-hero .btn-play { min-height:62px; width:100%; border-radius:2px; font-size:19px; clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,0 100%); }
 .home-hero .fix-row { flex-wrap:wrap; gap:8px; margin-top:12px; }
+.home-hero .fix-row :is(#play-fix,#launch-modes) { background:var(--panel); }
 .home-hero #play-fix { font-size:10px; padding:8px 10px; }
 .home-hero #launch-modes { min-width:0; }
 .home-hero #launch-modes .seg-item { font-size:10px; padding:7px 9px; }
@@ -5888,7 +5898,7 @@
 @keyframes home-sweep { 0%,65% { transform:translateX(-55%); } 100% { transform:translateX(55%); } }
 .home-paused .mode-card::before,.home-paused .mode-card img { animation-play-state:paused; }
 @media(max-width:1150px) { [data-panel="launcher"] .home-hero { padding:26px; min-height:365px; }.home-hero .hero-copy { width:58%; }.home-hero .fix-row { display:flex; flex-direction:column; align-items:flex-start; }.mode-card { height:180px; padding:15px; }.mode-copy strong { font-size:18px; }[data-panel="launcher"] .grid2 { grid-template-columns:1fr; } }
-@media(max-width:700px) { .home-hero .hero-copy { width:100%; }.home-hero::after { background:color-mix(in srgb,var(--panel) 84%,transparent); }.mode-cards { gap:8px; }.mode-card { height:190px; }.mode-copy { left:12px; bottom:15px; }.mode-copy strong { font-size:15px; }.mode-copy > span { font-size:10px; }.mode-index { left:12px; font-size:8px; }[data-panel="launcher"] :is(#live-card,#hw-card,#net-card) { padding:16px; } }
+@media(max-width:700px) { .home-hero .hero-copy { width:100%; }.home-hero::after { background:color-mix(in srgb,var(--panel) 84%,transparent); mask-image:none; }.mode-cards { gap:8px; }.mode-card { height:190px; }.mode-copy { left:12px; bottom:15px; }.mode-copy strong { font-size:15px; }.mode-copy > span { font-size:10px; }.mode-index { left:12px; font-size:8px; }[data-panel="launcher"] :is(#live-card,#hw-card,#net-card) { padding:16px; } }
 @media(prefers-reduced-motion:reduce) { .mode-card::before,.mode-card img { animation:none; }.mode-card { transition:none; }.mode-card:hover,.mode-card[aria-pressed="true"] { transform:none; } }
 
 </style>
@@ -6543,9 +6553,14 @@ const startup = (() => {
       <div class="hero home-hero scene-paused" id="home-hero">
         <button type="button" class="sp-chip" id="sp-toggle" aria-expanded="false" aria-controls="sp-panel" aria-haspopup="dialog" title="Ping to Valve's relay in this city. In-game ping is usually within a few ms."><span id="sp-chip-icon" class="sp-tone"></span><span id="sp-summary">Server regions</span><span class="sp-led sp-tone" aria-hidden="true"></span><span aria-hidden="true">⌃</span></button>
         <div class="hero-art" aria-hidden="true"><div class="hero-scene">
-          <img class="hero-background" src="assets/home/hero-workstation.webp" alt="" fetchpriority="high">
+          <img class="hero-background" src="assets/home/hero-gaming-desk.webp" alt="" fetchpriority="high">
           <img id="launcher-screenshot" alt="" decoding="async">
-          <div class="hero-agent-layer" hidden><img id="launcher-agent" alt="" decoding="async"></div>
+          <div class="launcher-desk-rgb">
+            <span class="launcher-desk-light launcher-desk-monitor"></span><span class="launcher-desk-light launcher-desk-mic"></span>
+            <span class="launcher-desk-light launcher-desk-mixer"></span><span class="launcher-desk-light launcher-desk-handheld"></span>
+            <div class="launcher-desk-keys" id="launcher-key-lights"></div>
+          </div>
+          <div class="hero-agent-layer" hidden><img id="launcher-agent" alt="" decoding="sync"></div>
         </div></div>
         <div class="hero-copy">
           <div class="hero-brand">
@@ -18155,7 +18170,8 @@ function setTab(name) {
     b.setAttribute("aria-selected", String(b.dataset.tab === name)));
   document.querySelectorAll(".tab-panel").forEach(panel =>
     panel.classList.toggle("hidden", panel.dataset.panel !== name));
-  if (name === 'launcher') serverPingWidget.shown(); else serverPingWidget.hidden();
+  if (name === 'launcher') { serverPingWidget.shown(); launcherScene.refreshLighting(); }
+  else serverPingWidget.hidden();
   // Now that the panel is on screen there is something to measure.
   if (name === "settings") moveSegThumb("settings-subtabs");
   if (name === "cs2") requestAnimationFrame(() => moveSegThumb("cs2-sections"));
@@ -19013,6 +19029,7 @@ $("rescan").addEventListener("click", () => scan(true));
         // makeStarter already awaits loadSource after creating a collection.
         if (!created) await loadSource();
       });
+      launcherScene.refreshLighting();
       await startup.run("settings-pane", async () => {
         if (settingsSub === "overlay") await loadOverlay();
         if (settingsSub === "config" || settingsSub === "editing") await ensureScan(false);
